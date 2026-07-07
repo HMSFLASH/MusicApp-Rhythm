@@ -18,7 +18,7 @@ export function DynamicsRack() {
             <p className="text-secondary/60 text-xs font-mono mt-1">{t('studio.dynamics.desc', 'Control the dynamic range of your audio using Web Audio API\'s native compression engine.')}</p>
           </div>
           <div className="flex flex-wrap items-center gap-2">
-            <button
+            <button aria-label="Action"
               onClick={playerState.applyDefaultCompressor}
               title={t('studio.dynamics.defaultTitle', 'Apply recommended compressor settings')}
               className="flex h-10 items-center gap-2 rounded-md border border-[#ff0055]/30 bg-[#ff0055]/10 px-3 text-sm font-medium text-[#ff4f88] transition-colors hover:bg-[#ff0055]/20"
@@ -26,7 +26,7 @@ export function DynamicsRack() {
               <Wand2 size={16} />
               {t('studio.dynamics.defaultButton', 'Default')}
             </button>
-            <button
+            <button aria-label="Action"
               onClick={playerState.resetCompressor}
               title={t('studio.dynamics.resetTitle', 'Reset compressor to neutral settings')}
               className="flex h-10 items-center gap-2 rounded-md border border-white/10 bg-white/5 px-3 text-sm font-medium text-white/60 transition-colors hover:bg-white/10 hover:text-white"
@@ -34,9 +34,9 @@ export function DynamicsRack() {
               <RotateCcw size={16} />
               {t('studio.dynamics.resetButton', 'Reset')}
             </button>
-            <button
+            <button aria-label="Action"
               onClick={() => playerState.toggleFx('comp')}
-              className={`w-10 h-10 flex-shrink-0 rounded-full flex items-center justify-center transition-all ${playerState.fxEnabled.comp ? 'bg-[#ff0055]/20 text-[#ff0055] shadow-[0_0_15px_rgba(255,0,85,0.4)]' : 'bg-white/5 text-white/30 hover:bg-white/10'}`}
+              className={`w-10 h-10 flex-shrink-0 rounded-full flex items-center justify-center transition-all ${playerState.fxEnabled.comp ? 'bg-[#ff0055]/20 text-[#ff0055] shadow-[0_0_15px_rgba(255,0,85,0.4)]' : 'bg-white/5 text-white/80 hover:bg-white/10'}`}
             >
               <Power size={18} />
             </button>
@@ -128,9 +128,9 @@ export function DynamicsRack() {
           <h2 className="text-xl font-bold font-sans text-white/80 tracking-tight">{t('studio.dynamics.limiterTitle', 'Master Limiter (Anti-Crackling)')}</h2>
           <p className="text-secondary/60 text-xs font-mono mt-2">{t('studio.dynamics.limiterDesc', 'A brickwall limiter at the end of the audio graph. Prevents audio from exceeding 0dB and crackling on mobile speakers. Recommended to leave on.')}</p>
         </div>
-        <button
+        <button aria-label="Action"
           onClick={() => playerState.toggleFx('limiter')}
-          className={`w-10 h-10 flex-shrink-0 rounded-full flex items-center justify-center transition-all ${playerState.fxEnabled.limiter ? 'bg-[#00e5ff]/20 text-[#00e5ff] shadow-[0_0_15px_rgba(0,229,255,0.4)]' : 'bg-white/5 text-white/30 hover:bg-white/10'}`}
+          className={`w-10 h-10 flex-shrink-0 rounded-full flex items-center justify-center transition-all ${playerState.fxEnabled.limiter ? 'bg-[#00e5ff]/20 text-[#00e5ff] shadow-[0_0_15px_rgba(0,229,255,0.4)]' : 'bg-white/5 text-white/80 hover:bg-white/10'}`}
         >
           <Power size={18} />
         </button>

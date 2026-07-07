@@ -10,9 +10,9 @@ export function MasterOutput() {
   return (
     <div className="bg-[#0a0a0a] rounded-2xl border border-white/5 shadow-2xl p-8 flex flex-col gap-8 w-full">
       <div className="flex items-center gap-3 border-b border-white/10 pb-4">
-        <button
+        <button aria-label="Action"
           onClick={() => playerState.toggleFx('master')}
-          className={`w-8 h-8 rounded-full flex items-center justify-center transition-all ${playerState.fxEnabled.master ? 'bg-[#ffffff]/20 text-[#ffffff] shadow-[0_0_15px_rgba(255,255,255,0.4)]' : 'bg-white/5 text-white/30 hover:bg-white/10'}`}
+          className={`w-8 h-8 rounded-full flex items-center justify-center transition-all ${playerState.fxEnabled.master ? 'bg-[#ffffff]/20 text-[#ffffff] shadow-[0_0_15px_rgba(255,255,255,0.4)]' : 'bg-white/5 text-white/80 hover:bg-white/10'}`}
         >
           <Power size={14} />
         </button>
@@ -37,9 +37,9 @@ export function MasterOutput() {
       <div className="flex items-center justify-between mt-2 p-4 bg-white/5 rounded-xl border border-white/10">
         <div>
           <span className="text-sm text-white/80 font-bold block">{t('studio.masterOutput.loudnessNorm', 'Loudness Normalization')}</span>
-          <span className="text-xs text-white/50 font-mono mt-1 block">{t('studio.masterOutput.loudnessDesc', 'Smooths volume differences with a gentle end-of-chain compressor and makeup gain.')}</span>
+          <span className="text-xs text-white/80 font-mono mt-1 block">{t('studio.masterOutput.loudnessDesc', 'Smooths volume differences with a gentle end-of-chain compressor and makeup gain.')}</span>
         </div>
-        <button
+        <button aria-label="Action"
           onClick={playerState.toggleLoudnessNormalization}
           className={`shrink-0 w-12 h-6 rounded-full relative transition-colors ${playerState.loudnessNormalization ? 'bg-[#00E5FF]' : 'bg-white/20'}`}
         >
@@ -50,9 +50,9 @@ export function MasterOutput() {
       <div className="flex items-center justify-between mt-2 p-4 bg-white/5 rounded-xl border border-white/10">
         <div>
           <span className="text-sm text-white/80 font-bold block">{t('studio.masterOutput.hqOversample', 'High Quality Oversampling')}</span>
-          <span className="text-xs text-white/50 font-mono mt-1 block">{t('studio.masterOutput.hqOversampleDesc', 'Reduces aliasing in the limiter soft clip stage. Warning: May cause lag on mobile devices.')}</span>
+          <span className="text-xs text-white/80 font-mono mt-1 block">{t('studio.masterOutput.hqOversampleDesc', 'Reduces aliasing in the limiter soft clip stage. Warning: May cause lag on mobile devices.')}</span>
         </div>
-        <button
+        <button aria-label="Action"
           onClick={() => playerState.setUseOversample(!playerState.useOversample)}
           className={`shrink-0 w-12 h-6 rounded-full relative transition-colors ${playerState.useOversample ? 'bg-[#00E5FF]' : 'bg-white/20'}`}
         >
@@ -69,7 +69,7 @@ export function MasterOutput() {
             {t('studio.masterOutput.precalcIdleDesc', 'Saves to RAM for weak CPUs. Warning: Consumes high amount of RAM. May cause out-of-memory crashes on low RAM devices. EQ/Effects changes will only apply to the next track.')}
           </span>
         </div>
-        <button
+        <button aria-label="Action"
           onClick={() => playerState.setPrecalculateOnIdle(!playerState.precalculateOnIdle)}
           className={`shrink-0 w-12 h-6 rounded-full relative transition-colors ${playerState.precalculateOnIdle ? 'bg-amber-500' : 'bg-white/20'}`}
         >

@@ -18,9 +18,9 @@ export function ToneControls() {
 
       <div className="flex flex-col gap-6">
         <div className="flex items-center gap-3">
-          <button
+          <button aria-label="Action"
             onClick={() => playerState.toggleFx('preamp')}
-            className={`w-6 h-6 rounded-full flex items-center justify-center transition-all ${playerState.fxEnabled.preamp ? 'bg-[#00E5FF]/20 text-[#00E5FF] shadow-[0_0_10px_rgba(0,229,255,0.4)]' : 'bg-white/5 text-white/30 hover:bg-white/10'}`}
+            className={`w-6 h-6 rounded-full flex items-center justify-center transition-all ${playerState.fxEnabled.preamp ? 'bg-[#00E5FF]/20 text-[#00E5FF] shadow-[0_0_10px_rgba(0,229,255,0.4)]' : 'bg-white/5 text-white/80 hover:bg-white/10'}`}
           >
             <Power size={10} />
           </button>
@@ -42,9 +42,9 @@ export function ToneControls() {
 
       <div className="flex flex-col gap-6">
         <div className="flex items-center gap-3">
-          <button
+          <button aria-label="Action"
             onClick={() => playerState.toggleFx('tone')}
-            className={`w-6 h-6 rounded-full flex items-center justify-center transition-all ${playerState.fxEnabled.tone ? 'bg-[#00f5ff]/20 text-[#00f5ff] shadow-[0_0_10px_rgba(0,245,255,0.4)]' : 'bg-white/5 text-white/30 hover:bg-white/10'}`}
+            className={`w-6 h-6 rounded-full flex items-center justify-center transition-all ${playerState.fxEnabled.tone ? 'bg-[#00f5ff]/20 text-[#00f5ff] shadow-[0_0_10px_rgba(0,245,255,0.4)]' : 'bg-white/5 text-white/80 hover:bg-white/10'}`}
           >
             <Power size={10} />
           </button>

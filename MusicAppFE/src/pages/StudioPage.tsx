@@ -22,7 +22,7 @@ export function StudioPage() {
           <div className="bg-amber-500/10 border border-amber-500/20 rounded-xl p-3 flex gap-3 items-start max-w-2xl">
             <AlertCircle className="text-amber-500 shrink-0 mt-0.5" size={18} />
             <div>
-              <h3 className="text-amber-500 font-semibold mb-0.5 text-sm">{t('studio.warningTitle', 'Performance Warning')}</h3>
+              <h2 className="text-amber-500 font-semibold mb-0.5 text-sm">{t('studio.warningTitle', 'Performance Warning')}</h2>
               <p className="text-amber-500/80 text-xs">
                 {t('studio.warningDesc', 'Enabling multiple features on weak devices/CPUs may cause the audio processing to fall behind, resulting in stuttering and glitching.')}
               </p>
@@ -32,26 +32,26 @@ export function StudioPage() {
 
         {/* Tabs */}
         <div className="flex bg-[#111] p-1 rounded-xl border border-white/10 overflow-hidden">
-          <button
+          <button aria-label="Action"
             onClick={() => setActiveTab('eq')}
             className={`px-6 py-2 rounded-lg text-sm font-bold transition-all ${
-              activeTab === 'eq' ? 'bg-[#00E5FF]/20 text-[#00E5FF]' : 'text-white/50 hover:text-white hover:bg-white/5'
+              activeTab === 'eq' ? 'bg-[#00E5FF]/20 text-[#00E5FF]' : 'text-white/80 hover:text-white hover:bg-white/10'
             }`}
           >
             {t('studio.tabEq', 'EQ & Tone')}
           </button>
-          <button
+          <button aria-label="Action"
             onClick={() => setActiveTab('dynamics')}
             className={`px-6 py-2 rounded-lg text-sm font-bold transition-all ${
-              activeTab === 'dynamics' ? 'bg-[#ff0055]/20 text-[#ff0055]' : 'text-white/50 hover:text-white hover:bg-white/5'
+              activeTab === 'dynamics' ? 'bg-[#ff0055]/20 text-[#ff0055]' : 'text-white/80 hover:text-white hover:bg-white/10'
             }`}
           >
             {t('studio.tabDynamics', 'Dynamics')}
           </button>
-          <button
+          <button aria-label="Action"
             onClick={() => setActiveTab('spatial')}
             className={`px-6 py-2 rounded-lg text-sm font-bold transition-all ${
-              activeTab === 'spatial' ? 'bg-[#9d00ff]/20 text-[#9d00ff]' : 'text-white/50 hover:text-white hover:bg-white/5'
+              activeTab === 'spatial' ? 'bg-[#9d00ff]/20 text-[#9d00ff]' : 'text-white/80 hover:text-white hover:bg-white/10'
             }`}
           >
             {t('studio.tabSpatial', 'Spatial')}
