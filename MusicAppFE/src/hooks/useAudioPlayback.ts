@@ -7,6 +7,7 @@ import { configureLoudnessNormalization, configureMasterLimiter, createSoftClipC
 const BACKEND_URL = `http://${window.location.hostname}:8080`;
 const clamp = (value: number, min: number, max: number) => Math.min(max, Math.max(min, value));
 const msToAudioSeconds = (value: number) => clamp(value / 1000, 0, 1);
+const compressorAttackSeconds = (attackMs: number, rmsSizeMs: number) => msToAudioSeconds(Math.max(attackMs, rmsSizeMs * 0.5));
 const percentToPan = (value: number) => clamp(value / 100, -1, 1);
 const percentToStereoWidth = (value: number) => clamp(value / 100, 0, 2);
 const percentToStereoBaseWidth = (value: number) => {
@@ -121,6 +122,7 @@ export function useAudioPlayback(
     compKnee,
     compAttack,
     compRelease,
+    compRmsSize,
     compMakeupGain,
     reverbMix,
     reverbTime,
@@ -217,6 +219,7 @@ export function useAudioPlayback(
     compKnee,
     compAttack,
     compRelease,
+    compRmsSize,
     compMakeupGain,
     reverbMix,
     reverbTime,
@@ -243,6 +246,7 @@ export function useAudioPlayback(
       compKnee,
       compAttack,
       compRelease,
+      compRmsSize,
       compMakeupGain,
       reverbMix,
       reverbTime,
@@ -258,6 +262,7 @@ export function useAudioPlayback(
     compMakeupGain,
     compRatio,
     compRelease,
+    compRmsSize,
     compThreshold,
     eqBands,
     panValue,
@@ -279,6 +284,7 @@ export function useAudioPlayback(
     compMakeupGain,
     compRatio,
     compRelease,
+    compRmsSize,
     compThreshold,
     eqBands,
     fxEnabled,
@@ -474,7 +480,7 @@ console.log("[Audio] performOfflineRender called with EQ bands:", audioParamsRef
 
     let currentNode: AudioNode = offlineSource;
     const enabled = fxEnabledRef.current;
-    const { preampGain, eqBands, bassGain, trebleGain, compThreshold, compRatio, compKnee, compAttack, compRelease, compMakeupGain, reverbMix, stereoWidth, panValue, loudnessNormalization } = audioParamsRef.current;
+    const { preampGain, eqBands, bassGain, trebleGain, compThreshold, compRatio, compKnee, compAttack, compRelease, compRmsSize, compMakeupGain, reverbMix, stereoWidth, panValue, loudnessNormalization } = audioParamsRef.current;
 
     // 1. Gain Staging (-6dB)
     const headroomDrop = offlineCtx.createGain();
@@ -571,7 +577,7 @@ console.log("[Audio] performOfflineRender called with EQ bands:", audioParamsRef
       comp.threshold.value = compThreshold;
       comp.ratio.value = compRatio;
       comp.knee.value = compKnee;
-      comp.attack.value = msToAudioSeconds(compAttack);
+      comp.attack.value = compressorAttackSeconds(compAttack, compRmsSize);
       comp.release.value = msToAudioSeconds(compRelease);
 
       const makeup = offlineCtx.createGain();

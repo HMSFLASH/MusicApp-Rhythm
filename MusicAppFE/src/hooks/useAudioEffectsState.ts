@@ -17,6 +17,7 @@ type SavedAudioEffectsState = Partial<{
   compKnee: number;
   compAttack: number;
   compRelease: number;
+  compRmsSize: number;
   compMakeupGain: number;
   panValue: number;
   stereoWidth: number;
@@ -69,6 +70,7 @@ export function useAudioEffectsState(savedState: SavedAudioEffectsState = {}) {
   const [compKnee, setCompKnee] = useState<number>(savedState.compKnee ?? COMPRESSOR_DEFAULTS.knee);
   const [compAttack, setCompAttack] = useState<number>(savedState.compAttack ?? COMPRESSOR_DEFAULTS.attack);
   const [compRelease, setCompRelease] = useState<number>(savedState.compRelease ?? COMPRESSOR_DEFAULTS.release);
+  const [compRmsSize, setCompRmsSize] = useState<number>(savedState.compRmsSize ?? COMPRESSOR_DEFAULTS.rmsSize);
   const [compMakeupGain, setCompMakeupGain] = useState<number>(savedState.compMakeupGain ?? COMPRESSOR_DEFAULTS.makeupGain);
 
   const [panValue, setPanValue] = useState<number>(savedState.panValue ?? 0);
@@ -99,6 +101,7 @@ export function useAudioEffectsState(savedState: SavedAudioEffectsState = {}) {
     setCompKnee(settings.knee);
     setCompAttack(settings.attack);
     setCompRelease(settings.release);
+    setCompRmsSize(settings.rmsSize);
     setCompMakeupGain(settings.makeupGain);
 
     setFxEnabled((prev) => {
@@ -197,6 +200,7 @@ export function useAudioEffectsState(savedState: SavedAudioEffectsState = {}) {
     compKnee, setCompKnee, updateCompKnee: setCompKnee,
     compAttack, setCompAttack, updateCompAttack: setCompAttack,
     compRelease, setCompRelease, updateCompRelease: setCompRelease,
+    compRmsSize, setCompRmsSize, updateCompRmsSize: setCompRmsSize,
     compMakeupGain, setCompMakeupGain, updateCompMakeupGain: setCompMakeupGain,
     applyDefaultCompressor, resetCompressor,
     panValue, setPanValue, updatePanValue: setPanValue,

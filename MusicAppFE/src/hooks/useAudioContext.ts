@@ -104,6 +104,7 @@ export const configureLoudnessNormalization = (
 
 const clamp = (value: number, min: number, max: number) => Math.min(max, Math.max(min, value));
 const msToAudioSeconds = (value: number) => clamp(value / 1000, 0, 1);
+const compressorAttackSeconds = (attackMs: number, rmsSizeMs: number) => msToAudioSeconds(Math.max(attackMs, rmsSizeMs * 0.5));
 const percentToPan = (value: number) => clamp(value / 100, -1, 1);
 const percentToStereoWidth = (value: number) => clamp(value / 100, 0, 2);
 const percentToStereoBaseWidth = (value: number) => {
@@ -131,7 +132,7 @@ const generateImpulseResponse = (ctx: BaseAudioContext, duration: number, decay:
 
 // eslint-disable-next-line @typescript-eslint/no-explicit-any
 export function useAudioContext(effectsState: any) {
-  const { eqBands, preampGain, bassGain, trebleGain, compThreshold, compRatio, compKnee, compAttack, compRelease, compMakeupGain, panValue, stereoWidth, reverbMix, reverbTime, useOversample, loudnessNormalization, fxEnabled, } = effectsState;
+  const { eqBands, preampGain, bassGain, trebleGain, compThreshold, compRatio, compKnee, compAttack, compRelease, compRmsSize, compMakeupGain, panValue, stereoWidth, reverbMix, reverbTime, useOversample, loudnessNormalization, fxEnabled, } = effectsState;
 
   // Audio Context and Core Nodes
 
@@ -185,7 +186,7 @@ export function useAudioContext(effectsState: any) {
       compressor.threshold.value = compThreshold;
       compressor.ratio.value = compRatio;
       compressor.knee.value = compKnee;
-      compressor.attack.value = msToAudioSeconds(compAttack);
+      compressor.attack.value = compressorAttackSeconds(compAttack, compRmsSize);
       compressor.release.value = msToAudioSeconds(compRelease);
       makeup.gain.value = Math.pow(10, compMakeupGain / 20);
     } else {
@@ -196,7 +197,7 @@ export function useAudioContext(effectsState: any) {
       compressor.release.value = 0.25;
       makeup.gain.value = 1;
     }
-  }, [compAttack, compKnee, compMakeupGain, compRatio, compRelease, compThreshold, fxEnabled.comp]);
+  }, [compAttack, compKnee, compMakeupGain, compRatio, compRelease, compRmsSize, compThreshold, fxEnabled.comp]);
 
   const applyLoudnessParams = useCallback(() => {
     if (!agcPreGainRef.current || !agcCompressorRef.current || !agcMakeupRef.current) return;

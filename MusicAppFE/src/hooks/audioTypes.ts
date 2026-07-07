@@ -49,6 +49,7 @@ export type CompressorSettings = {
   knee: number;
   attack: number;
   release: number;
+  rmsSize: number;
   makeupGain: number;
 };
 
@@ -58,6 +59,7 @@ export const COMPRESSOR_DEFAULTS: CompressorSettings = {
   knee: 12,
   attack: 5,
   release: 180,
+  rmsSize: 5,
   makeupGain: 2
 };
 
@@ -67,6 +69,7 @@ export const COMPRESSOR_RESET_SETTINGS: CompressorSettings = {
   knee: 0,
   attack: 0,
   release: 250,
+  rmsSize: 5,
   makeupGain: 0
 };
 

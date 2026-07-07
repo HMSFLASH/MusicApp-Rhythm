@@ -100,6 +100,15 @@ export function DynamicsRack() {
 
           <div className="grid grid-cols-1 md:grid-cols-2 gap-12 pt-6 border-t border-white/10">
             <HorizontalSlider
+              value={playerState.compRmsSize}
+              min={1}
+              max={250}
+              onChange={playerState.updateCompRmsSize}
+              label={t('studio.dynamics.rmsSize', 'RMS Size')}
+              color="#a855f7"
+              unit="ms"
+            />
+            <HorizontalSlider
               value={playerState.compMakeupGain}
               min={-20}
               max={20}
