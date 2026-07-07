@@ -351,7 +351,8 @@ export function Playlist({ jwtToken, onPlay, currentTrackId }: PlaylistProps) {
                   onClick={() => {
                     const tracks = selectedPlaylistDetails.tracks;
                     if (playerState.isShuffle) {
-                      playerState.playTrack(null, tracks, true, true);
+                      const shuffled = [...tracks].sort(() => Math.random() - 0.5);
+                      playerState.playTrack(shuffled[0], shuffled);
                     } else {
                       playerState.playTrack(tracks[0], tracks);
                     }
@@ -365,7 +366,8 @@ export function Playlist({ jwtToken, onPlay, currentTrackId }: PlaylistProps) {
                   onClick={() => {
                     playerState.setIsShuffle(true);
                     const tracks = selectedPlaylistDetails.tracks;
-                    playerState.playTrack(null, tracks, true, true);
+                    const shuffled = [...tracks].sort(() => Math.random() - 0.5);
+                    playerState.playTrack(shuffled[0], shuffled);
                   }}
                   className="px-3 h-8 rounded-full bg-white/10 text-white hover:bg-white hover:text-black flex items-center gap-1.5 transition-all text-sm font-bold"
                   title={t('playlist.shuffleTitle')}

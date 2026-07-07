@@ -188,7 +188,8 @@ export function TracksPage() {
             <button
               onClick={() => {
                 if (playerState.isShuffle) {
-                  playerState.playTrack(null, displayTracks, true, true);
+                  const shuffled = [...displayTracks].sort(() => Math.random() - 0.5);
+                  playerState.playTrack(shuffled[0], shuffled);
                 } else {
                   playerState.playTrack(displayTracks[0], displayTracks);
                 }
@@ -201,7 +202,8 @@ export function TracksPage() {
             <button
               onClick={() => {
                 playerState.setIsShuffle(true);
-                playerState.playTrack(null, displayTracks, true, true);
+                const shuffled = [...displayTracks].sort(() => Math.random() - 0.5);
+                playerState.playTrack(shuffled[0], shuffled);
               }}
               className="px-4 h-9 rounded-full bg-white/10 text-white hover:bg-white hover:text-black flex items-center gap-1.5 transition-all text-sm font-bold"
               title="Shuffle & Play"
