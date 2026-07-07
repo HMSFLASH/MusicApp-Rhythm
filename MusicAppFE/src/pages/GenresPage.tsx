@@ -64,28 +64,30 @@ export function GenresPage() {
         <div className="grid grid-cols-2 md:grid-cols-3 lg:grid-cols-4 gap-6">
           {genres.map((genre, i) => {
             const count = tracks.filter(t => t.genre === genre).length;
-            const color = `hsl(${(i * 85) % 360}, 70%, 60%)`;
+            const hue = (i * 137.5) % 360;
+            const color1 = `hsl(${hue}, 85%, 60%)`;
+            const color2 = `hsl(${(hue + 45) % 360}, 85%, 50%)`;
             return (
               <div
                 key={i}
-                className="relative overflow-hidden rounded-2xl p-6 cursor-pointer group hover:scale-105 transition-transform"
-                style={{ background: `linear-gradient(135deg, ${color}22 0%, ${color}11 100%)`, border: `1px solid ${color}44` }}
+                className="relative overflow-hidden rounded-3xl p-6 cursor-pointer group hover:scale-[1.02] transition-all duration-300 shadow-lg"
+                style={{ background: `linear-gradient(135deg, ${color1}, ${color2})`, boxShadow: `0 12px 30px -10px ${color1}88` }}
                 onClick={(e) => handlePlayGenre(genre, e)}
               >
-                <div className="absolute -right-4 -bottom-4 opacity-10 group-hover:opacity-20 transition-opacity" style={{ color: color }}>
+                <div className="absolute -right-4 -bottom-4 opacity-[0.15] group-hover:opacity-[0.25] group-hover:rotate-6 group-hover:scale-110 transition-all duration-500 text-white">
                   <Music size={120} />
                 </div>
 
                 <div className="relative z-10 flex flex-col h-full justify-between gap-8">
-                  <h3 className="text-2xl font-bold text-white break-words" style={{ textShadow: '0 2px 10px rgba(0,0,0,0.5)' }}>
+                  <h3 className="text-2xl font-bold text-white break-words drop-shadow-md">
                     {genre}
                   </h3>
 
                   <div className="flex items-center justify-between">
-                    <span className="text-sm font-medium text-white/60">{count} songs</span>
-                    <button className="w-10 h-10 rounded-full flex items-center justify-center opacity-0 group-hover:opacity-100 transition-all transform translate-y-4 group-hover:translate-y-0 shadow-lg"
-                      style={{ backgroundColor: color }}>
-                      <Play size={18} fill="white" className="ml-1 text-white" />
+                    <span className="text-sm font-medium text-white/90 bg-black/20 px-3 py-1 rounded-full backdrop-blur-sm shadow-sm">{count} songs</span>
+                    <button className="w-12 h-12 rounded-full flex items-center justify-center opacity-0 group-hover:opacity-100 transition-all transform translate-y-4 group-hover:translate-y-0 shadow-xl bg-white text-black hover:scale-105"
+                      >
+                      <Play size={20} className="ml-1" fill="currentColor" />
                     </button>
                   </div>
                 </div>

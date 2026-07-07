@@ -692,12 +692,12 @@ console.log("[Audio] performOfflineRender called with EQ bands:", audioParamsRef
       
       if (track.sourceType === 'LOCAL') return;
 
-      console.log(`[preloadTrack] Fetching blob for ${track.fileName}...`);
+      console.log(`[preloadTrack] Fetching blob for ${track.title || track.fileName || 'Unknown Track'}...`);
       const streamUrl = `${BACKEND_URL}/api/music/stream/${track.id}`;
       const fetchUrl = `${streamUrl}?_t=${Date.now()}`;
       const res = await axiosClient.get(fetchUrl, { responseType: 'blob' });
       const rawBlob = res as unknown as Blob;
-      console.log(`[preloadTrack] Blob downloaded for ${track.fileName}`);
+      console.log(`[preloadTrack] Blob downloaded for ${track.title || track.fileName || 'Unknown Track'}`);
 
       const ext = track.fileName?.split('.').pop()?.toLowerCase();
       let mimeType = rawBlob.type;

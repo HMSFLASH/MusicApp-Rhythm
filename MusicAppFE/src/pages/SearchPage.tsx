@@ -330,7 +330,7 @@ export function SearchPage() {
                       </button>
                       <div className="flex flex-col truncate flex-1">
                         <span className={`text-sm font-medium truncate ${playerState.currentTrack?.id === track.id ? 'text-primary' : 'text-white'}`}>
-                          {track.title || playerState.getTrackMetadata(track.id)?.title || (track.fileName?.includes(' - ') ? track.fileName.split(' - ')[1].replace(/\.[^/.]+$/, "") : track.fileName.replace(/\.[^/.]+$/, ""))}
+                          {track.title || playerState.getTrackMetadata(track.id)?.title || (track.fileName ? (track.fileName.includes(' - ') ? track.fileName.split(' - ')[1].replace(/\.[^/.]+$/, "") : track.fileName.replace(/\.[^/.]+$/, "")) : 'Unknown Title')}
                         </span>
                         <span className="text-xs text-white/30 font-mono mt-0.5 flex items-center gap-1 truncate">
                           {track.sourceType === 'DRIVE' && <Cloud size={9} className="text-primary shrink-0" />}

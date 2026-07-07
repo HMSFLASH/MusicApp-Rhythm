@@ -196,13 +196,13 @@ export function NowPlaying() {
             className="flex-shrink-0 flex items-center justify-center transition-opacity duration-0"
             style={{ width: cdSize, height: cdSize, opacity: cdOpacity }}
           >
-            {currentTrack.imageUrl ? (
+            {currentTrack.imageUrl || playerState.getTrackImage(currentTrack.id) ? (
               <div
                 className={`relative flex items-center justify-center w-full h-full rounded-full shadow-[0_0_40px_rgba(0,0,0,0.5)] border-[8px] border-[#111] overflow-hidden mb-4 ${isPlaying ? 'scale-100 opacity-100' : 'scale-90 opacity-60'}`}
                 style={{ transition: 'transform 0.7s cubic-bezier(0.34, 1.56, 0.64, 1), opacity 0.7s ease' }}
               >
                 <div ref={discRef1} className="w-full h-full">
-                  <img src={currentTrack.imageUrl} alt="Album Art" className="w-full h-full object-cover" />
+                  <img src={currentTrack.imageUrl || playerState.getTrackImage(currentTrack.id)} alt="Album Art" className="w-full h-full object-cover" />
                   <div className="absolute inset-0 bg-black/10"></div>
                   {/* Center hole */}
                   <div className="absolute z-20 w-[8%] h-[8%] bg-background rounded-full border-2 border-black/40 top-1/2 left-1/2 -translate-x-1/2 -translate-y-1/2"></div>
@@ -234,10 +234,10 @@ export function NowPlaying() {
           </div>
 
           <div className="text-center">
-            <h2 className="text-3xl font-bold text-white mb-2">{currentTrack.title || (currentTrack.fileName?.includes(' - ') ? currentTrack.fileName.split(' - ')[1].replace(/\.[^/.]+$/, "") : currentTrack.fileName.replace(/\.[^/.]+$/, ""))}</h2>
+            <h2 className="text-3xl font-bold text-white mb-2">{currentTrack.title || playerState.getTrackMetadata(currentTrack.id)?.title || (currentTrack.fileName ? (currentTrack.fileName.includes(' - ') ? currentTrack.fileName.split(' - ')[1].replace(/\.[^/.]+$/, "") : currentTrack.fileName.replace(/\.[^/.]+$/, "")) : 'Unknown Title')}</h2>
             <div className="flex items-center justify-center gap-2 text-lg text-white/50">
               <User size={18} />
-              <span>{currentTrack.artist || (currentTrack.fileName?.includes(' - ') ? currentTrack.fileName.split(' - ')[0] : t('bottomPlayer.unknown'))}</span>
+              <span>{currentTrack.artist || playerState.getTrackMetadata(currentTrack.id)?.artist || (currentTrack.fileName?.includes(' - ') ? currentTrack.fileName.split(' - ')[0] : t('bottomPlayer.unknown'))}</span>
             </div>
           </div>
 
@@ -590,15 +590,17 @@ export function NowPlaying() {
                       }`}
                   >
                     <div
-                      className="w-12 h-12 rounded-full bg-primary/20 bg-cover bg-center flex-shrink-0 shadow-md"
-                      style={{ backgroundImage: `url(${track.imageUrl})` }}
-                    ></div>
+                      className="w-12 h-12 rounded-full bg-primary/20 bg-cover bg-center flex-shrink-0 shadow-md flex items-center justify-center overflow-hidden"
+                      style={(track.imageUrl || playerState.getTrackImage(track.id)) ? { backgroundImage: `url(${track.imageUrl || playerState.getTrackImage(track.id)})` } : {}}
+                    >
+                      {!(track.imageUrl || playerState.getTrackImage(track.id)) && <Music size={20} className="text-white/40" />}
+                    </div>
                     <div className="flex-1 min-w-0">
                       <p className={`text-sm font-bold truncate ${isActive ? 'text-primary' : 'text-white'}`}>
-                        {track.title || (track.fileName?.includes(' - ') ? track.fileName.split(' - ')[1].replace(/\.[^/.]+$/, "") : track.fileName.replace(/\.[^/.]+$/, ""))}
+                        {track.title || playerState.getTrackMetadata(track.id)?.title || (track.fileName ? (track.fileName.includes(' - ') ? track.fileName.split(' - ')[1].replace(/\.[^/.]+$/, "") : track.fileName.replace(/\.[^/.]+$/, "")) : 'Unknown Title')}
                       </p>
                       <p className="text-xs text-white/50 truncate mt-0.5">
-                        {track.artist || (track.fileName?.includes(' - ') ? track.fileName.split(' - ')[0] : 'Unknown Artist')}
+                        {track.artist || playerState.getTrackMetadata(track.id)?.artist || (track.fileName?.includes(' - ') ? track.fileName.split(' - ')[0] : 'Unknown Artist')}
                       </p>
                     </div>
                   </div>
@@ -636,10 +638,10 @@ export function NowPlaying() {
             <div className="p-5 flex flex-col gap-4 overflow-y-auto max-h-[70vh]">
               <div className="bg-white/5 rounded-xl p-4 flex flex-col gap-3">
                 {[
-                  { label: t('bottomPlayer.title'), value: currentTrack.title },
-                  { label: t('bottomPlayer.artist'), value: currentTrack.artist },
-                  { label: t('bottomPlayer.album'), value: currentTrack.album },
-                  { label: t('bottomPlayer.genre'), value: currentTrack.genre },
+                  { label: t('bottomPlayer.title'), value: currentTrack.title || playerState.getTrackMetadata(currentTrack.id)?.title },
+                  { label: t('bottomPlayer.artist'), value: currentTrack.artist || playerState.getTrackMetadata(currentTrack.id)?.artist },
+                  { label: t('bottomPlayer.album'), value: currentTrack.album || playerState.getTrackMetadata(currentTrack.id)?.album },
+                  { label: t('bottomPlayer.genre'), value: currentTrack.genre || playerState.getTrackMetadata(currentTrack.id)?.genre },
                   { label: t('bottomPlayer.duration'), value: currentTrack.durationSeconds ? formatTime(currentTrack.durationSeconds) : (duration ? formatTime(duration) : null) },
                   { label: t('bottomPlayer.fileName'), value: currentTrack.fileName },
                   { label: t('bottomPlayer.source'), value: currentTrack.sourceType },

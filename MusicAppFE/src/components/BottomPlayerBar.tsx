@@ -118,8 +118,8 @@ export function BottomPlayerBar() {
       {/* Left: Track Info */}
       <div className="flex items-center flex-1 w-auto md:w-full max-w-[60%] sm:max-w-[70%] md:max-w-xs gap-2 md:gap-3 cursor-pointer md:cursor-auto" onClick={() => { if (window.innerWidth < 768) navigate('/'); }}>
         <div className={`w-10 h-10 md:w-12 md:h-12 rounded-md bg-background border border-white/10 flex items-center justify-center overflow-hidden shrink-0`}>
-          {currentTrack.imageUrl ? (
-            <img src={currentTrack.imageUrl} alt="Album Art" className="w-full h-full object-cover" />
+          {currentTrack.imageUrl || playerState.getTrackImage(currentTrack.id) ? (
+            <img src={currentTrack.imageUrl || playerState.getTrackImage(currentTrack.id)} alt="Album Art" className="w-full h-full object-cover" />
           ) : (
             <div ref={discRef} className="w-8 h-8 rounded-full bg-white/10 flex items-center justify-center">
               <Disc size={20} className="text-white/50" />
@@ -127,10 +127,10 @@ export function BottomPlayerBar() {
           )}
         </div>
         <div className="flex flex-col overflow-hidden pr-2">
-          <span className="text-sm font-medium text-white truncate">{currentTrack.title || (currentTrack.fileName?.includes(' - ') ? currentTrack.fileName.split(' - ')[1].replace(/\.[^/.]+$/, "") : currentTrack.fileName.replace(/\.[^/.]+$/, ""))}</span>
+          <span className="text-sm font-medium text-white truncate">{currentTrack.title || playerState.getTrackMetadata(currentTrack.id)?.title || (currentTrack.fileName ? (currentTrack.fileName.includes(' - ') ? currentTrack.fileName.split(' - ')[1].replace(/\.[^/.]+$/, "") : currentTrack.fileName.replace(/\.[^/.]+$/, "")) : 'Unknown Title')}</span>
           <span className="text-xs text-secondary/60 font-mono flex items-center gap-1 mt-0.5 truncate">
             {currentTrack.sourceType === 'DRIVE' && <Cloud size={10} className="text-primary shrink-0" />}
-            <span className="truncate">{currentTrack.artist || (currentTrack.fileName?.includes(' - ') ? currentTrack.fileName.split(' - ')[0] : 'Unknown Artist')}</span>
+            <span className="truncate">{currentTrack.artist || playerState.getTrackMetadata(currentTrack.id)?.artist || (currentTrack.fileName?.includes(' - ') ? currentTrack.fileName.split(' - ')[0] : 'Unknown Artist')}</span>
           </span>
         </div>
         <button 
@@ -359,10 +359,10 @@ export function BottomPlayerBar() {
             <div className="p-5 flex flex-col gap-4 overflow-y-auto max-h-[70vh] no-scrollbar">
               <div className="bg-white/5 rounded-xl p-4 flex flex-col gap-3">
                 {[
-                  { label: t('bottomPlayer.title', 'Title'), value: currentTrack.title },
-                  { label: t('bottomPlayer.artist', 'Artist'), value: currentTrack.artist },
-                  { label: t('bottomPlayer.album', 'Album'), value: currentTrack.album },
-                  { label: t('bottomPlayer.genre', 'Genre'), value: currentTrack.genre },
+                  { label: t('bottomPlayer.title', 'Title'), value: currentTrack.title || playerState.getTrackMetadata(currentTrack.id)?.title },
+                  { label: t('bottomPlayer.artist', 'Artist'), value: currentTrack.artist || playerState.getTrackMetadata(currentTrack.id)?.artist },
+                  { label: t('bottomPlayer.album', 'Album'), value: currentTrack.album || playerState.getTrackMetadata(currentTrack.id)?.album },
+                  { label: t('bottomPlayer.genre', 'Genre'), value: currentTrack.genre || playerState.getTrackMetadata(currentTrack.id)?.genre },
                   { label: t('bottomPlayer.duration', 'Duration'), value: currentTrack.durationSeconds ? `${currentTrack.durationSeconds}s` : null },
                   { label: t('bottomPlayer.fileName', 'File Name'), value: currentTrack.fileName },
                   { label: t('bottomPlayer.source', 'Source'), value: currentTrack.sourceType },

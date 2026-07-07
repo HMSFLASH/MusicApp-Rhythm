@@ -126,8 +126,8 @@ export function QueuePage() {
                   </div>
 
                   <div className="w-12 h-12 flex-shrink-0 bg-white/5 rounded-lg overflow-hidden relative flex items-center justify-center">
-                    {track.imageUrl ? (
-                      <img src={track.imageUrl} alt="" className="w-full h-full object-cover" />
+                    {track.imageUrl || playerState.getTrackImage(track.id) ? (
+                      <img src={track.imageUrl || playerState.getTrackImage(track.id)} alt="" className="w-full h-full object-cover" />
                     ) : (
                       <div className="w-full h-full bg-white/5 flex items-center justify-center text-white/20">
                         🎵
@@ -146,10 +146,10 @@ export function QueuePage() {
 
                   <div className="flex-1 min-w-0">
                     <h4 className={`text-base font-medium truncate ${isCurrent ? 'text-primary' : 'text-white'}`}>
-                      {track.title || track.fileName}
+                      {track.title || playerState.getTrackMetadata(track.id)?.title || track.fileName}
                     </h4>
                     <p className="text-sm text-white/50 truncate">
-                      {track.artist || 'Unknown Artist'} {track.album ? `• ${track.album}` : ''}
+                      {track.artist || playerState.getTrackMetadata(track.id)?.artist || 'Unknown Artist'} {track.album ? `• ${track.album}` : ''}
                     </p>
                   </div>
 
@@ -229,15 +229,15 @@ export function QueuePage() {
                     {upQueue.map((track, tIndex) => (
                       <div key={`${qIndex}-${track.id}-${tIndex}`} className="flex items-center gap-4 p-2 rounded-lg bg-black/20">
                         <div className="w-10 h-10 flex-shrink-0 bg-white/5 rounded-md overflow-hidden">
-                          {track.imageUrl ? (
-                            <img src={track.imageUrl} alt="" className="w-full h-full object-cover" />
+                          {track.imageUrl || playerState.getTrackImage(track.id) ? (
+                            <img src={track.imageUrl || playerState.getTrackImage(track.id)} alt="" className="w-full h-full object-cover" />
                           ) : (
                             <div className="w-full h-full flex items-center justify-center text-white/20 text-xs">🎵</div>
                           )}
                         </div>
                         <div className="flex-1 min-w-0">
-                          <h4 className="text-sm font-medium text-white truncate">{track.title || track.fileName}</h4>
-                          <p className="text-xs text-white/50 truncate">{track.artist || 'Unknown Artist'}</p>
+                          <h4 className="text-sm font-medium text-white truncate">{track.title || playerState.getTrackMetadata(track.id)?.title || track.fileName}</h4>
+                          <p className="text-xs text-white/50 truncate">{track.artist || playerState.getTrackMetadata(track.id)?.artist || 'Unknown Artist'}</p>
                         </div>
                       </div>
                     ))}

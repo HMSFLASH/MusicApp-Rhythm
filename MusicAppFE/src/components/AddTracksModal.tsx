@@ -117,7 +117,7 @@ export function AddTracksModal({ isOpen, onClose, playlistId, playlistTracks, on
               return (
                 <div key={t.id} className="flex items-center justify-between p-3 rounded-lg hover:bg-white/5 border border-transparent hover:border-white/5 transition-all group">
                   <div className="flex flex-col truncate pr-4 w-full">
-                    <span className="text-sm font-medium text-white truncate">{t.title || playerState.getTrackMetadata(t.id)?.title || (t.fileName?.includes(' - ') ? t.fileName.split(' - ')[1].replace(/\.[^/.]+$/, "") : t.fileName.replace(/\.[^/.]+$/, ""))}</span>
+                    <span className="text-sm font-medium text-white truncate">{t.title || playerState.getTrackMetadata(t.id)?.title || (t.fileName ? (t.fileName.includes(' - ') ? t.fileName.split(' - ')[1].replace(/\.[^/.]+$/, "") : t.fileName.replace(/\.[^/.]+$/, "")) : 'Unknown Title')}</span>
                     <span className="text-xs text-white/40 truncate mt-0.5">{t.artist || playerState.getTrackMetadata(t.id)?.artist || (t.fileName?.includes(' - ') ? t.fileName.split(' - ')[0] : 'Unknown Artist')}</span>
                   </div>
                   <button

@@ -1,4 +1,4 @@
-import { useRef, useEffect } from 'react';
+import { useRef, useEffect, useState } from 'react';
 import type { Track } from './audioTypes';
 
 const BACKEND_URL = `http://${window.location.hostname}:8080`;
@@ -9,6 +9,8 @@ export function useAudioMetadata(jwtToken: string, queueState: any) {
     const setQueue = queueState?.setQueue;
     const currentTrack = queueState?.currentTrack;
     const queue = queueState?.queue;
+
+    const [metadataVersion, setMetadataVersion] = useState(0);
 
     const metadataCacheRef = useRef<Map<string, Partial<Track>>>(new Map());
     const imageCacheRef = useRef<Map<string, string>>(new Map());
@@ -67,7 +69,7 @@ export function useAudioMetadata(jwtToken: string, queueState: any) {
             }
         };
         preload();
-    // eslint-disable-next-line react-hooks/exhaustive-deps
+        // eslint-disable-next-line react-hooks/exhaustive-deps
     }, [currentTrack, queue]);
 
     const extractMetadata = async (track: Track) => {
@@ -123,7 +125,7 @@ export function useAudioMetadata(jwtToken: string, queueState: any) {
 
                     const contentLengthHeader = response.headers.get('Content-Length');
                     const fileSize = contentLengthHeader ? parseInt(contentLengthHeader, 10) : (track.fileSize || 0);
-                    const maxMetadataSize = fileSize > 15 * 1024 * 1024 ? 1 * 1024 * 1024 : 512 * 1024; // 1MB for >15MB files, 512KB for others
+                    const maxMetadataSize = fileSize > 15 * 1024 * 1024 ? 2 * 1024 * 1024 : 512 * 1024;
 
                     const reader = response.body!.getReader();
                     const chunks: Uint8Array[] = [];
@@ -165,6 +167,7 @@ export function useAudioMetadata(jwtToken: string, queueState: any) {
 
             // Always mark as cached so we don't infinitely retry
             metadataCacheRef.current.set(trackId, cachePayload);
+            setMetadataVersion(v => v + 1);
 
             if (Object.keys(up).length > 0) {
                 // eslint-disable-next-line @typescript-eslint/no-explicit-any
@@ -177,8 +180,15 @@ export function useAudioMetadata(jwtToken: string, queueState: any) {
             console.warn('[Metadata] Failed to extract for', track.fileName, e);
             // Mark as failed in cache to prevent infinite retries
             metadataCacheRef.current.set(trackId, {});
+            setMetadataVersion(v => v + 1);
         }
     };
 
-    return { extractMetadata, metadataCacheRef, imageCacheRef, blobCacheRef };
+    return {
+        extractMetadata,
+        metadataCacheRef,
+        imageCacheRef,
+        blobCacheRef,
+        metadataVersion
+    };
 }

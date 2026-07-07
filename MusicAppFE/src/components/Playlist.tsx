@@ -471,7 +471,7 @@ export function Playlist({ jwtToken, onPlay, currentTrackId }: PlaylistProps) {
                     </div>
                     <div className="flex flex-col truncate w-full pr-2">
                       <span className={`text-sm font-medium truncate ${currentTrackId === track.id ? 'text-primary' : 'text-white'}`}>
-                        {track.title || playerState.getTrackMetadata(track.id)?.title || (track.fileName?.includes(' - ') ? track.fileName.split(' - ')[1].replace(/\.[^/.]+$/, "") : track.fileName.replace(/\.[^/.]+$/, ""))}
+                        {track.title || playerState.getTrackMetadata(track.id)?.title || (track.fileName ? (track.fileName.includes(' - ') ? track.fileName.split(' - ')[1].replace(/\.[^/.]+$/, "") : track.fileName.replace(/\.[^/.]+$/, "")) : 'Unknown Title')}
                       </span>
                       <span className="text-xs text-secondary/60 font-mono mt-0.5 flex items-center gap-1 truncate">
                         {track.sourceType === 'DRIVE' && <Cloud size={10} className="text-primary shrink-0" />}

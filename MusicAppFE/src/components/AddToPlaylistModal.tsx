@@ -67,7 +67,7 @@ export function AddToPlaylistModal({ isOpen, onClose, track }: AddToPlaylistModa
         <div className="flex items-center justify-between p-6 border-b border-white/5 shrink-0">
           <div>
             <h2 className="text-xl font-bold text-white">Add to Playlist</h2>
-            <p className="text-sm text-white/50 truncate max-w-[200px] mt-1">{track.title || playerState.getTrackMetadata(track.id)?.title || (track.fileName?.includes(' - ') ? track.fileName.split(' - ')[1].replace(/\.[^/.]+$/, "") : track.fileName.replace(/\.[^/.]+$/, ""))}</p>
+            <p className="text-sm text-white/50 truncate max-w-[200px] mt-1">{track.title || playerState.getTrackMetadata(track.id)?.title || (track.fileName ? (track.fileName.includes(' - ') ? track.fileName.split(' - ')[1].replace(/\.[^/.]+$/, "") : track.fileName.replace(/\.[^/.]+$/, "")) : 'Unknown Title')}</p>
           </div>
           <button 
             onClick={onClose}
