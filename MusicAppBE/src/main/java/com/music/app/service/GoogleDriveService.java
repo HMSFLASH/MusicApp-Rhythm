@@ -1,0 +1,270 @@
+package com.music.app.service;
+
+import com.google.api.client.googleapis.javanet.GoogleNetHttpTransport;
+import com.google.api.client.http.InputStreamContent;
+import com.google.api.client.json.gson.GsonFactory;
+import com.google.api.services.drive.Drive;
+import com.google.api.services.drive.model.File;
+import com.google.auth.http.HttpCredentialsAdapter;
+import com.google.auth.oauth2.UserCredentials;
+import lombok.RequiredArgsConstructor;
+import lombok.extern.slf4j.Slf4j;
+import org.springframework.beans.factory.annotation.Value;
+import org.springframework.stereotype.Service;
+
+import java.io.InputStream;
+import java.util.List;
+
+import com.google.api.client.http.javanet.NetHttpTransport;
+import jakarta.annotation.PostConstruct;
+
+@Service
+@RequiredArgsConstructor
+@Slf4j
+public class GoogleDriveService {
+
+    private NetHttpTransport httpTransport;
+    private final GsonFactory jsonFactory = GsonFactory.getDefaultInstance();
+
+    @PostConstruct
+    public void init() throws Exception {
+        this.httpTransport = GoogleNetHttpTransport.newTrustedTransport();
+    }
+
+    @Value("${google.client-id}")
+    private String clientId;
+
+    @Value("${google.client-secret}")
+    private String clientSecret;
+
+    @Value("${google.drive.folder-name:MusicApp}")
+    private String folderName;
+
+    private String determineMimeType(String fileName) {
+        if (fileName == null) return "audio/mpeg";
+        String lower = fileName.toLowerCase();
+        if (lower.endsWith(".flac")) return "audio/flac";
+        if (lower.endsWith(".wav")) return "audio/wav";
+        if (lower.endsWith(".ogg")) return "audio/ogg";
+        if (lower.endsWith(".m4a")) return "audio/mp4";
+        return "audio/mpeg"; // default MP3
+    }
+
+    private String getOrCreateFolder(Drive drive) throws Exception {
+        com.google.api.services.drive.model.FileList result = drive.files().list()
+                .setQ("mimeType='application/vnd.google-apps.folder' and name='" + folderName + "' and trashed=false")
+                .setSpaces("drive")
+                .setFields("files(id, name)")
+                .execute();
+        
+        List<File> files = result.getFiles();
+        if (files != null && !files.isEmpty()) {
+            return files.get(0).getId();
+        }
+        
+        File folderMetadata = new File();
+        folderMetadata.setName(folderName);
+        folderMetadata.setMimeType("application/vnd.google-apps.folder");
+        
+        File folder = drive.files().create(folderMetadata)
+                .setFields("id")
+                .execute();
+        
+        return folder.getId();
+    }
+
+    public String uploadAudioStream(InputStream stream, long contentLength, String refreshToken, String fileName) throws Exception {
+        UserCredentials credentials = UserCredentials.newBuilder()
+                .setClientId(clientId)
+                .setClientSecret(clientSecret)
+                .setRefreshToken(refreshToken)
+                .build();
+
+        HttpCredentialsAdapter requestInitializer = new HttpCredentialsAdapter(credentials);
+
+        Drive drive = new Drive.Builder(
+                httpTransport,
+                jsonFactory,
+                requestInitializer)
+                .setApplicationName("MusicApp")
+                .build();
+
+        File fileMetadata = new File();
+        String folderId = getOrCreateFolder(drive);
+        fileMetadata.setParents(java.util.Collections.singletonList(folderId));
+
+        // Lấy tên file gốc (nếu đường dẫn Telegram có chứa thư mục thì chỉ lấy tên file)
+        if (fileName != null && fileName.contains("/")) {
+            fileMetadata.setName(fileName.substring(fileName.lastIndexOf("/") + 1));
+        } else {
+            fileMetadata.setName(fileName);
+        }
+
+        String mimeType = determineMimeType(fileName);
+
+        // Read stream into byte array to avoid InputStream issues with resumable upload
+        log.info("Reading file into memory: fileName={}, contentLength={}", fileName, contentLength);
+        byte[] fileBytes = stream.readAllBytes();
+        log.info("File read complete: {} bytes", fileBytes.length);
+
+        com.google.api.client.http.ByteArrayContent mediaContent =
+                new com.google.api.client.http.ByteArrayContent(mimeType, fileBytes);
+
+        log.info("Creating Drive upload request: fileName={}, mimeType={}, size={}", fileName, mimeType, fileBytes.length);
+
+        Drive.Files.Create createRequest = drive.files().create(fileMetadata, mediaContent)
+                .setFields("id");
+
+        // Add progress listener for debugging
+        createRequest.getMediaHttpUploader()
+                .setDirectUploadEnabled(fileBytes.length < 5 * 1024 * 1024)
+                .setProgressListener(uploader -> {
+                    switch (uploader.getUploadState()) {
+                        case INITIATION_STARTED -> log.info("Drive upload initiation started");
+                        case INITIATION_COMPLETE -> log.info("Drive upload initiation complete");
+                        case MEDIA_IN_PROGRESS -> log.info("Drive upload progress: {}", 
+                                String.format("%.1f%%", uploader.getProgress() * 100));
+                        case MEDIA_COMPLETE -> log.info("Drive upload complete");
+                        case NOT_STARTED -> log.info("Drive upload not started");
+                    }
+                });
+
+        log.info("Executing Drive upload...");
+        File file = createRequest.execute();
+        log.info("Drive upload finished, fileId={}", file.getId());
+
+        return file.getId();
+    }
+
+    public List<File> listFiles(String refreshToken) throws Exception {
+        UserCredentials credentials = UserCredentials.newBuilder()
+                .setClientId(clientId)
+                .setClientSecret(clientSecret)
+                .setRefreshToken(refreshToken)
+                .build();
+
+        HttpCredentialsAdapter requestInitializer = new HttpCredentialsAdapter(credentials);
+
+        Drive drive = new Drive.Builder(
+                httpTransport,
+                jsonFactory,
+                requestInitializer)
+                .setApplicationName("MusicApp")
+                .build();
+
+        String folderId = getOrCreateFolder(drive);
+
+        com.google.api.services.drive.model.FileList result = drive.files().list()
+                .setQ("'" + folderId + "' in parents and mimeType contains 'audio/' and trashed=false")
+                .setSpaces("drive")
+                .setFields("nextPageToken, files(id, name, size, mimeType)")
+                .execute();
+
+        return result.getFiles();
+    }
+
+    public com.music.app.dto.DriveStreamResponse streamFile(String fileId, String rangeHeader, String refreshToken) throws Exception {
+        UserCredentials credentials = UserCredentials.newBuilder()
+                .setClientId(clientId)
+                .setClientSecret(clientSecret)
+                .setRefreshToken(refreshToken)
+                .build();
+
+        HttpCredentialsAdapter requestInitializer = new HttpCredentialsAdapter(credentials);
+
+        Drive drive = new Drive.Builder(
+                httpTransport,
+                jsonFactory,
+                requestInitializer)
+                .setApplicationName("MusicApp")
+                .build();
+
+        Drive.Files.Get getRequest = drive.files().get(fileId);
+        
+        if (rangeHeader != null && !rangeHeader.isEmpty()) {
+            getRequest.getRequestHeaders().setRange(rangeHeader);
+        }
+
+        com.google.api.client.http.HttpResponse driveResponse = getRequest.executeMedia();
+
+        return com.music.app.dto.DriveStreamResponse.builder()
+                .inputStream(driveResponse.getContent())
+                .statusCode(driveResponse.getStatusCode())
+                .contentType(driveResponse.getContentType())
+                .contentLength(driveResponse.getHeaders().getContentLength())
+                .contentRange(driveResponse.getHeaders().getContentRange())
+                .build();
+    }
+
+    public void uploadJsonFile(String jsonData, String fileName, String refreshToken) throws Exception {
+        UserCredentials credentials = UserCredentials.newBuilder()
+                .setClientId(clientId)
+                .setClientSecret(clientSecret)
+                .setRefreshToken(refreshToken)
+                .build();
+
+        HttpCredentialsAdapter requestInitializer = new HttpCredentialsAdapter(credentials);
+        Drive drive = new Drive.Builder(httpTransport, jsonFactory, requestInitializer)
+                .setApplicationName("MusicApp")
+                .build();
+
+        String folderId = getOrCreateFolder(drive);
+
+        // Check if file exists
+        com.google.api.services.drive.model.FileList result = drive.files().list()
+                .setQ("'" + folderId + "' in parents and name='" + fileName + "' and trashed=false")
+                .setSpaces("drive")
+                .setFields("files(id)")
+                .execute();
+
+        java.util.List<File> files = result.getFiles();
+        
+        InputStreamContent mediaContent = new InputStreamContent("application/json", 
+            new java.io.ByteArrayInputStream(jsonData.getBytes(java.nio.charset.StandardCharsets.UTF_8)));
+
+        if (files != null && !files.isEmpty()) {
+            // Update existing
+            String existingFileId = files.get(0).getId();
+            drive.files().update(existingFileId, null, mediaContent).execute();
+        } else {
+            // Create new
+            File fileMetadata = new File();
+            fileMetadata.setName(fileName);
+            fileMetadata.setParents(java.util.Collections.singletonList(folderId));
+            drive.files().create(fileMetadata, mediaContent).setFields("id").execute();
+        }
+    }
+
+    public String downloadJsonFile(String fileName, String refreshToken) throws Exception {
+        UserCredentials credentials = UserCredentials.newBuilder()
+                .setClientId(clientId)
+                .setClientSecret(clientSecret)
+                .setRefreshToken(refreshToken)
+                .build();
+
+        HttpCredentialsAdapter requestInitializer = new HttpCredentialsAdapter(credentials);
+        Drive drive = new Drive.Builder(httpTransport, jsonFactory, requestInitializer)
+                .setApplicationName("MusicApp")
+                .build();
+
+        String folderId = getOrCreateFolder(drive);
+
+        com.google.api.services.drive.model.FileList result = drive.files().list()
+                .setQ("'" + folderId + "' in parents and name='" + fileName + "' and trashed=false")
+                .setSpaces("drive")
+                .setFields("files(id)")
+                .execute();
+
+        java.util.List<File> files = result.getFiles();
+        if (files == null || files.isEmpty()) {
+            return null; // No backup found
+        }
+
+        String fileId = files.get(0).getId();
+        
+        try (java.io.ByteArrayOutputStream outputStream = new java.io.ByteArrayOutputStream()) {
+            drive.files().get(fileId).executeMediaAndDownloadTo(outputStream);
+            return new String(outputStream.toByteArray(), java.nio.charset.StandardCharsets.UTF_8);
+        }
+    }
+}
