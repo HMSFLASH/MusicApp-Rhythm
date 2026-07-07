@@ -1,6 +1,6 @@
 import { Heart, ListMusic, Album, Mic2, Music, Disc, CloudUpload } from 'lucide-react';
 import { useNavigate } from 'react-router-dom';
-import { useState, useEffect, useRef } from 'react';
+import { useState, useEffect, useRef, useMemo } from 'react';
 import { useGlobalAudio } from '../context/AudioContext';
 import { useUploadQueue } from '../context/UploadContext';
 import type { Track } from '../hooks/useAudioPlayer';
@@ -89,6 +89,13 @@ export function LibraryPage() {
     return () => window.removeEventListener('music-uploaded', handleUploadSuccess);
   }, []);
 
+  const albumsCount = useMemo(() => new Set(tracks.map(t => t.album).filter(Boolean)).size, [tracks]);
+  const genresCount = useMemo(() => new Set(tracks.map(t => t.genre).filter(Boolean)).size, [tracks]);
+  const artistsCount = useMemo(() => {
+    return new Set(tracks.map(t => t.artist || playerState.getTrackMetadata(t.id)?.artist || (t.fileName?.includes(' - ') ? t.fileName.split(' - ')[0] : null)).filter(Boolean)).size;
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [tracks]);
+
   return (
     <div className="w-full h-full flex flex-col p-4 md:p-8 max-w-6xl mx-auto pb-32 overflow-y-auto">
       <div className="mb-8 flex flex-col md:flex-row justify-between items-start md:items-end gap-4 md:gap-0">
@@ -171,7 +178,7 @@ export function LibraryPage() {
             <Album size={20} />
           </div>
           <h2 className="text-base font-bold text-white mb-1">Albums</h2>
-          <p className="text-white/60 text-xs font-medium">{new Set(tracks.map(t => t.album).filter(Boolean)).size} albums</p>
+          <p className="text-white/60 text-xs font-medium">{albumsCount} albums</p>
         </div>
 
         <div
@@ -185,7 +192,7 @@ export function LibraryPage() {
             <Mic2 size={20} />
           </div>
           <h2 className="text-base font-bold text-white mb-1">Artists</h2>
-          <p className="text-white/60 text-xs font-medium">{new Set(tracks.map(t => t.artist || playerState.getTrackMetadata(t.id)?.artist || (t.fileName?.includes(' - ') ? t.fileName.split(' - ')[0] : null)).filter(Boolean)).size} artists</p>
+          <p className="text-white/60 text-xs font-medium">{artistsCount} artists</p>
         </div>
 
         <div
@@ -199,7 +206,7 @@ export function LibraryPage() {
             <Music size={20} />
           </div>
           <h2 className="text-base font-bold text-white mb-1">Genres</h2>
-          <p className="text-white/60 text-xs font-medium">{new Set(tracks.map(t => t.genre).filter(Boolean)).size} genres</p>
+          <p className="text-white/60 text-xs font-medium">{genresCount} genres</p>
         </div>
       </div>
 
