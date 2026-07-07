@@ -1,5 +1,6 @@
 import { useRef, useEffect, useState } from 'react';
 import type { Track } from './audioTypes';
+import { getCover, saveCover } from '../utils/idb';
 
 const BACKEND_URL = `http://${window.location.hostname}:8080`;
 
@@ -27,6 +28,37 @@ export function useAudioMetadata(jwtToken: string, queueState: any) {
         const trackId = String(track.id);
         if (metadataCacheRef.current.has(trackId)) return;
         if (track.sourceType !== 'LOCAL' && !jwtToken) return;
+
+        // --- CACHE READ LAYER ---
+        const lsKey = `sonic_meta_${trackId}`;
+        const lsData = localStorage.getItem(lsKey);
+        if (lsData) {
+            try {
+                const parsed = JSON.parse(lsData);
+                const idbCover = await getCover(trackId);
+                
+                if (idbCover) {
+                    const imgUrl = URL.createObjectURL(new Blob([idbCover.data as any], { type: idbCover.mimeType }));
+                    parsed.imageUrl = imgUrl;
+                    imageCacheRef.current.set(trackId, imgUrl);
+                }
+
+                metadataCacheRef.current.set(trackId, parsed);
+                setMetadataVersion(v => v + 1);
+
+                if (Object.keys(parsed).length > 0) {
+                    // eslint-disable-next-line @typescript-eslint/no-explicit-any
+                    setCurrentTrack((prev: any) => prev && String(prev.id) === trackId ? { ...prev, ...parsed } : prev);
+                    // eslint-disable-next-line @typescript-eslint/no-explicit-any
+                    setQueue((prevQ: any) => prevQ?.map ? prevQ.map((t: any) => String(t.id) === trackId ? { ...t, ...parsed } : t) : prevQ);
+                    window.dispatchEvent(new CustomEvent('sonic_metadata_updated', { detail: trackId }));
+                }
+                return; // SKIP EXTRACTION!
+            } catch (e) {
+                console.warn('[Metadata] Failed to load cache from storage', e);
+            }
+        }
+        // --- END CACHE READ LAYER ---
 
         // Mark as pending to prevent concurrent extractions
         // eslint-disable-next-line @typescript-eslint/no-explicit-any
@@ -179,10 +211,14 @@ export function useAudioMetadata(jwtToken: string, queueState: any) {
                 const imgUrl = URL.createObjectURL(new Blob([new Uint8Array(pic.data)], { type: mime }));
                 up.imageUrl = imgUrl;
                 imageCacheRef.current.set(trackId, imgUrl);
+                
+                // Save to IndexedDB (do not await to avoid blocking)
+                saveCover(trackId, new Uint8Array(pic.data), mime);
             }
 
             // Always mark as cached so we don't infinitely retry
             metadataCacheRef.current.set(trackId, cachePayload);
+            localStorage.setItem(lsKey, JSON.stringify(cachePayload));
             setMetadataVersion(v => v + 1);
 
             if (Object.keys(up).length > 0) {
