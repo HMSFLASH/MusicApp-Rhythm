@@ -159,7 +159,7 @@ export function QueuePage() {
 
       <div id="queue-page-container" className="flex-1 overflow-y-auto relative">
         {queue.length === 0 ? (
-          <div className="flex flex-col items-center justify-center h-64 text-white/40">
+          <div className="flex flex-col items-center justify-center h-64 text-white/60">
             <p>Queue is empty</p>
           </div>
         ) : (
@@ -193,7 +193,7 @@ export function QueuePage() {
                     {track.imageUrl || playerState.getTrackImage(track.id) ? (
                       <img src={track.imageUrl || playerState.getTrackImage(track.id)} alt="" className="w-full h-full object-cover" />
                     ) : (
-                      <div className="w-full h-full bg-white/5 flex items-center justify-center text-white/20">
+                      <div className="w-full h-full bg-white/5 flex items-center justify-center text-white/40">
                         🎵
                       </div>
                     )}
@@ -209,21 +209,22 @@ export function QueuePage() {
                   </div>
 
                   <div className="flex-1 min-w-0">
-                    <h4 className={`text-base font-medium truncate ${isCurrent ? 'text-primary' : 'text-white'}`}>
+                    <span className={`block text-base font-medium truncate ${isCurrent ? 'text-primary' : 'text-white'}`}>
                       {track.title || playerState.getTrackMetadata(track.id)?.title || (track.fileName ? (track.fileName.includes(' - ') ? track.fileName.split(' - ')[1].replace(/\.[^/.]+$/, "") : track.fileName.replace(/\.[^/.]+$/, "")) : 'Unknown Title')}
-                    </h4>
-                    <p className="text-sm text-white/50 truncate">
+                    </span>
+                    <p className="text-sm text-white/60 truncate">
                       {track.artist || playerState.getTrackMetadata(track.id)?.artist || (track.fileName?.includes(' - ') ? track.fileName.split(' - ')[0] : 'Unknown Artist')} {track.album ? `• ${track.album}` : ''}
                     </p>
                   </div>
 
                   <div className="relative flex items-center gap-2">
                     <button
+                      aria-label="More options"
                       onClick={(e) => {
                         e.stopPropagation();
                         setOpenMenuIndex(openMenuIndex === index ? null : index);
                       }}
-                      className="p-2 text-white/30 hover:text-white hover:bg-white/10 rounded-full transition-colors opacity-100 md:opacity-0 md:group-hover:opacity-100"
+                      className="p-2 text-white/60 hover:text-white hover:bg-white/10 rounded-full transition-colors opacity-100 md:opacity-0 md:group-hover:opacity-100"
                     >
                       <MoreHorizontal size={18} />
                     </button>
@@ -285,8 +286,9 @@ export function QueuePage() {
                     )}
                     
                     <button
+                      aria-label="Remove from queue"
                       onClick={(e) => handleRemoveTrack(e, track.id)}
-                      className="p-2 text-white/30 hover:text-red-400 hover:bg-white/10 rounded-full transition-colors opacity-100 md:opacity-0 md:group-hover:opacity-100 hidden sm:block"
+                      className="p-2 text-white/60 hover:text-red-400 hover:bg-white/10 rounded-full transition-colors opacity-100 md:opacity-0 md:group-hover:opacity-100 hidden sm:block"
                       title="Remove from queue"
                     >
                       <Trash2 size={18} />
@@ -309,8 +311,9 @@ export function QueuePage() {
                   <div className="flex items-center justify-between mb-3">
                     <h3 className="font-semibold text-white/80">Queue #{qIndex + 1}</h3>
                     <button 
+                      aria-label="Remove this queue"
                       onClick={() => removeUpcomingQueue && removeUpcomingQueue(qIndex)}
-                      className="text-white/40 hover:text-red-400 transition-colors"
+                      className="text-white/60 hover:text-red-400 transition-colors"
                       title="Remove this queue"
                     >
                       <Trash2 size={16} />
@@ -327,8 +330,8 @@ export function QueuePage() {
                           )}
                         </div>
                         <div className="flex-1 min-w-0">
-                          <h4 className="text-sm font-medium text-white truncate">{track.title || playerState.getTrackMetadata(track.id)?.title || track.fileName}</h4>
-                          <p className="text-xs text-white/50 truncate">{track.artist || playerState.getTrackMetadata(track.id)?.artist || 'Unknown Artist'}</p>
+                          <span className="block text-sm font-medium text-white truncate">{track.title || playerState.getTrackMetadata(track.id)?.title || track.fileName}</span>
+                          <p className="text-xs text-white/60 truncate">{track.artist || playerState.getTrackMetadata(track.id)?.artist || 'Unknown Artist'}</p>
                         </div>
                       </div>
                     ))}
@@ -353,11 +356,12 @@ export function QueuePage() {
             <div className="flex items-center justify-between p-5 border-b border-white/5">
               <div className="flex items-center gap-3 text-white">
                 <Info size={24} className="text-primary" />
-                <h3 className="font-semibold text-lg">Track Metadata</h3>
+                <h2 className="font-semibold text-lg">Track Metadata</h2>
               </div>
               <button
+                aria-label="Close info"
                 onClick={() => setInfoTrack(null)}
-                className="text-white/40 hover:text-white transition-colors p-1"
+                className="text-white/60 hover:text-white transition-colors p-1"
               >
                 <X size={20} />
               </button>
@@ -387,7 +391,7 @@ export function QueuePage() {
                   { label: 'Bit Depth', value: (infoTrack.bitsPerSample || playerState.getTrackMetadata(infoTrack.id)?.bitsPerSample) ? `${infoTrack.bitsPerSample || playerState.getTrackMetadata(infoTrack.id)?.bitsPerSample} bit` : null }
                 ].map((item, idx) => (
                   <div key={idx} className="flex flex-col gap-1">
-                    <span className="text-[10px] uppercase tracking-wider text-white/40 font-semibold">{item.label}</span>
+                    <span className="text-[10px] uppercase tracking-wider text-white/60 font-semibold">{item.label}</span>
                     <span className="text-sm text-white/90 font-medium break-all">{item.value || 'unknown'}</span>
                   </div>
                 ))}
