@@ -121,9 +121,7 @@ export function useAudioMetadata(jwtToken: string, queueState: any) {
                 }
                 parsedBufferLength = buffer.byteLength;
             } else {
-                const ext = track.fileName?.split('.').pop()?.toLowerCase();
-                const mimeMap: Record<string, string> = { mp3: 'audio/mpeg', m4a: 'audio/mp4', flac: 'audio/flac', wav: 'audio/wav', ogg: 'audio/ogg', opus: 'audio/ogg', aac: 'audio/aac', wma: 'audio/x-ms-wma' };
-                const mappedMimeType = mimeMap[ext || ''];
+
                 // eslint-disable-next-line @typescript-eslint/no-explicit-any
                 const parseBufferFn = mm.parseBuffer || (mm as any).default?.parseBuffer;
                 if (!parseBufferFn) throw new Error('parseBuffer not found');
