@@ -453,7 +453,7 @@ export function useAudioPlayback(
 
       if (shouldResume) {
         // eslint-disable-next-line @typescript-eslint/no-explicit-any
-        audioRef.current.play().catch((e: any) => { if (e.name !== 'AbortError') console.error("Playback failed", e); });
+        audioRef.current.play().catch((e: any) => console.error("Playback failed", e));
       } else {
         setIsPlaying(false);
       }
@@ -886,8 +886,6 @@ console.log("[Audio] performOfflineRender called with EQ bands:", audioParamsRef
       return;
     }
 
-    preloadAdjacentTracks(startingTrack.id, currentQueue);
-
     if (precalculateOnIdle) {
       audioRef.current!.pause();
       audioRef.current!.src = "";
@@ -961,7 +959,7 @@ console.log("[Audio] performOfflineRender called with EQ bands:", audioParamsRef
           configureAudioElementSource(audioUrl);
           if (autoPlay) {
             // eslint-disable-next-line @typescript-eslint/no-explicit-any
-            audioRef.current!.play().catch((playError: any) => { if (playError.name !== 'AbortError') console.error("Playback failed", playError); });
+            audioRef.current!.play().catch((playError: any) => console.error("Playback failed", playError));
           }
         } finally {
           if (decodeSessionRef.current === playSessionId) {
@@ -977,7 +975,7 @@ console.log("[Audio] performOfflineRender called with EQ bands:", audioParamsRef
       configureAudioElementSource(audioUrl);
       if (autoPlay) {
         // eslint-disable-next-line @typescript-eslint/no-explicit-any
-        audioRef.current!.play().catch((e: any) => { if (e.name !== 'AbortError') console.error("Playback failed", e); });
+        audioRef.current!.play().catch((e: any) => console.error("Playback failed", e));
       } else {
         audioRef.current!.pause();
         setIsPlaying(false);
@@ -987,7 +985,7 @@ console.log("[Audio] performOfflineRender called with EQ bands:", audioParamsRef
     // Preload adjacent tracks and extract metadata for ALL tracks
     if (startingTrack.sourceType !== 'LOCAL') {
       preloadTrack(startingTrack).then(() => {
-        preloadAdjacentTracks(startingTrack.id, queue || []);
+        preloadAdjacentTracks(startingTrack.id, currentQueue!);
       });
     }
     
@@ -1007,7 +1005,7 @@ console.log("[Audio] performOfflineRender called with EQ bands:", audioParamsRef
       } else if (audioRef.current) {
         audioRef.current.currentTime = 0;
         // eslint-disable-next-line @typescript-eslint/no-explicit-any
-        audioRef.current.play().catch((e: any) => { if (e.name !== 'AbortError') console.error(e); });
+        audioRef.current.play().catch((e: any) => console.error(e));
       }
       return;
     }
@@ -1104,7 +1102,7 @@ console.log("[Audio] performOfflineRender called with EQ bands:", audioParamsRef
         }
       } else if (!precalculateOnIdle) {
         // eslint-disable-next-line @typescript-eslint/no-explicit-any
-        audioRef.current.play().catch((e: any) => { if (e.name !== 'AbortError') console.error(e); });
+        audioRef.current.play().catch((e: any) => console.error(e));
       } else if (currentTrack && isDecodingRef.current === false) {
         playTrack(currentTrack, queue, true);
       }
