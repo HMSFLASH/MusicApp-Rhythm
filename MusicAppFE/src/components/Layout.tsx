@@ -244,7 +244,7 @@ export function Layout() {
                         className="flex items-center gap-3 px-3 py-2.5 rounded-lg text-white/60 hover:text-white hover:bg-white/5 transition-colors text-left disabled:opacity-50"
                       >
                         {syncing ? <Loader2 size={20} className="animate-spin" /> : <CloudUpload size={20} />}
-                        <span>{t('layout.backupToDrive', 'Backup to Drive')}</span>
+                        <span>{t('layout.backupToDrive', 'Backup Configuration')}</span>
                       </button>
                       <button 
                         onClick={() => setShowRestoreConfirm(true)} 

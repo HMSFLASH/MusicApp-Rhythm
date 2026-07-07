@@ -4,7 +4,19 @@ export const PLAYBACK_STORAGE_KEY = 'SONIC_DEPTH_PLAYBACK_STATE';
 export const getInitialState = () => {
   try {
     const saved = localStorage.getItem(LOCAL_STORAGE_KEY);
-    if (saved) return JSON.parse(saved);
+    if (saved) {
+      const parsed = JSON.parse(saved);
+      if (parsed.upcomingQueues) {
+        parsed.upcomingQueues = parsed.upcomingQueues.map((upQueue: any[]) => {
+          const filtered = upQueue.filter((t: any) => t.sourceType !== 'LOCAL');
+          filtered.forEach((t: any) => {
+            if (t.imageUrl?.startsWith('blob:')) t.imageUrl = '';
+          });
+          return filtered;
+        });
+      }
+      return parsed;
+    }
   } catch (e) {
     console.error('Failed to load audio config', e);
   }
