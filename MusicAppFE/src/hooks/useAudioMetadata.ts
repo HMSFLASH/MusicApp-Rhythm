@@ -75,6 +75,7 @@ export function useAudioMetadata(jwtToken: string, queueState: any) {
     const extractMetadata = async (track: Track) => {
         const trackId = String(track.id);
         if (metadataCacheRef.current.has(trackId)) return;
+        if (track.sourceType !== 'LOCAL' && !jwtToken) return;
 
         // Mark as pending to prevent concurrent extractions
         // eslint-disable-next-line @typescript-eslint/no-explicit-any

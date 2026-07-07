@@ -705,6 +705,7 @@ console.log("[Audio] performOfflineRender called with EQ bands:", audioParamsRef
       }
       
       if (track.sourceType === 'LOCAL') return;
+      if (!jwtToken) return;
 
       console.log(`[preloadTrack] Fetching blob for ${track.title || track.fileName || 'Unknown Track'}...`);
       const streamUrl = `${BACKEND_URL}/api/music/stream/${track.id}`;
