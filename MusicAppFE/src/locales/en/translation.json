@@ -49,7 +49,7 @@
       "hqOversample": "High Quality Oversampling",
       "hqOversampleDesc": "Reduces aliasing in the limiter's soft clip stage. Warning: May cause lag on mobile devices.",
       "precalcIdle": "Pre-calculate on Idle Cores",
-      "precalcIdleDesc": "Saves to RAM for weak CPUs. Warning: Consumes high amount of RAM. May cause out-of-memory crashes on low RAM devices. EQ/Effects changes will only apply to the next track."
+      "precalcIdleDesc": "Pre-renders the full Audio Studio chain and saves it to RAM for weak CPUs. Warning: Consumes high amount of RAM. May cause out-of-memory crashes on low RAM devices. EQ/Effects changes will only apply to the next track."
     },
     "eq": {
       "init": "Initializing EQ...",

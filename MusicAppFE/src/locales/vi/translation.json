@@ -49,7 +49,7 @@
       "hqOversample": "Oversampling chất lượng cao",
       "hqOversampleDesc": "Giảm răng cưa cho soft clip của limiter. Cảnh báo: Có thể gây lag và nóng máy trên điện thoại yếu.",
       "precalcIdle": "Tính toán trước trên nhân CPU rảnh",
-      "precalcIdleDesc": "Lưu vào RAM cho CPU yếu. Cảnh báo: Ngốn rất nhiều RAM, có thể gây văng ứng dụng (tràn RAM) trên máy cấu hình thấp. Thay đổi EQ/Hiệu ứng chỉ có tác dụng ở bài hát tiếp theo."
+      "precalcIdleDesc": "Tính toán trước toàn bộ chuỗi Audio Studio và lưu vào RAM cho CPU yếu. Cảnh báo: Ngốn rất nhiều RAM, có thể gây văng ứng dụng (tràn RAM) trên máy cấu hình thấp. Thay đổi EQ/Hiệu ứng chỉ có tác dụng ở bài hát tiếp theo."
     },
     "eq": {
       "init": "Khởi tạo EQ...",

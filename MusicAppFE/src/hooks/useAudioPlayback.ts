@@ -111,7 +111,7 @@ export function useAudioPlayback(
     panValue,
     loudnessNormalization,
   } = effectsState || {};
-  const { audioContextRef, audioRef, bufferSourceRef, bufferVolumeNodeRef, initializeAudioContext, limiterNodeRef, softClipNodeRef } = contextState;
+  const { audioContextRef, audioRef, bufferSourceRef, bufferVolumeNodeRef, initializeAudioContext, irBufferRef } = contextState;
   const { blobCacheRef } = metadataState;
 
   const [isPlaying, setIsPlaying] = useState(false);
@@ -180,7 +180,6 @@ export function useAudioPlayback(
   }, []);
   const preloadingIdsRef = useRef<Set<string>>(new Set());
   const allowedIdsRef = useRef<Set<string>>(new Set());
-  const irBufferRef = useRef<AudioBuffer | null>(null);
   const audioParamsRef = useRef<any>({
     preampGain,
     eqBands,
@@ -243,6 +242,29 @@ export function useAudioPlayback(
     loudnessNormalization,
   ]);
 
+  useEffect(() => {
+    precalculatedNextBufferRef.current = null;
+  }, [
+    bassGain,
+    compAttack,
+    compKnee,
+    compMakeupGain,
+    compRatio,
+    compRelease,
+    compThreshold,
+    eqBands,
+    fxEnabled,
+    loudnessNormalization,
+    panValue,
+    playbackRate,
+    preampGain,
+    reverbMix,
+    reverbTime,
+    stereoWidth,
+    trebleGain,
+    useOversample,
+  ]);
+
   const setVolume = useCallback((newVolume: number) => {
     setVolumeState(newVolume);
     if (bufferVolumeNodeRef.current) {
@@ -257,33 +279,30 @@ export function useAudioPlayback(
     } catch (e) { }
   }, [audioRef, bufferVolumeNodeRef]);
 
+  const getTrackAudioUrl = useCallback((track: Track) => {
+    const trackId = String(track.id);
+    const cachedUrl = blobCacheRef.current.get(trackId);
+    if (cachedUrl) return cachedUrl;
+
+    if (track.sourceType === 'LOCAL' && track.localFile instanceof Blob) {
+      const objectUrl = URL.createObjectURL(track.localFile);
+      blobCacheRef.current.set(trackId, objectUrl);
+      return objectUrl;
+    }
+
+    if (track.sourceType !== 'LOCAL') {
+      return `${BACKEND_URL}/api/music/stream/${track.id}?access_token=${jwtToken}`;
+    }
+
+    return '';
+  }, [blobCacheRef, jwtToken]);
+
   const connectBufferOutputChain = useCallback(() => {
     if (!audioContextRef.current || !bufferVolumeNodeRef.current) return;
 
     bufferVolumeNodeRef.current.disconnect();
-    if (limiterNodeRef.current) limiterNodeRef.current.disconnect();
-    if (softClipNodeRef.current) softClipNodeRef.current.disconnect();
-
-    let finalNode: AudioNode = bufferVolumeNodeRef.current;
-    if (fxEnabledRef.current?.limiter) {
-      if (!limiterNodeRef.current) {
-        limiterNodeRef.current = audioContextRef.current.createDynamicsCompressor();
-      }
-      configureMasterLimiter(limiterNodeRef.current);
-
-      if (!softClipNodeRef.current) {
-        softClipNodeRef.current = audioContextRef.current.createWaveShaper();
-        softClipNodeRef.current.curve = createSoftClipCurve(44100);
-      }
-      softClipNodeRef.current.oversample = audioParamsRef.current.useOversample ? '4x' : 'none';
-
-      finalNode.connect(limiterNodeRef.current);
-      limiterNodeRef.current.connect(softClipNodeRef.current);
-      finalNode = softClipNodeRef.current;
-    }
-
-    finalNode.connect(audioContextRef.current.destination);
-  }, [audioContextRef, bufferVolumeNodeRef, limiterNodeRef, softClipNodeRef]);
+    bufferVolumeNodeRef.current.connect(audioContextRef.current.destination);
+  }, [audioContextRef, bufferVolumeNodeRef]);
 
   const updatePlaybackRate = useCallback((val: number) => setPlaybackRate(val), []);
   const togglePreservesPitch = useCallback(() => setPreservesPitch((prev: any) => !prev), []);
@@ -292,7 +311,7 @@ export function useAudioPlayback(
     if (precalculateOnIdle && bufferVolumeNodeRef.current) {
       connectBufferOutputChain();
     }
-  }, [connectBufferOutputChain, fxEnabled.limiter, precalculateOnIdle, useOversample]);
+  }, [bufferVolumeNodeRef, connectBufferOutputChain, precalculateOnIdle]);
 
   // Define functions in correct dependency order
 
@@ -481,7 +500,16 @@ console.log("[Audio] performOfflineRender called with EQ bands:", audioParamsRef
     connectToNext(headroomRecover);
 
     // 8. Limiter & Soft Clip
-      // Removed from offline render to allow Volume to be applied before Limiter in real-time playback.
+    if (enabled.limiter) {
+      const limiter = offlineCtx.createDynamicsCompressor();
+      configureMasterLimiter(limiter);
+      connectToNext(limiter);
+
+      const softClip = offlineCtx.createWaveShaper();
+      softClip.curve = createSoftClipCurve(44100);
+      softClip.oversample = audioParamsRef.current.useOversample ? '4x' : 'none';
+      connectToNext(softClip);
+    }
 
     connectToNext(offlineCtx.destination);
 
@@ -548,7 +576,7 @@ console.log("[Audio] performOfflineRender called with EQ bands:", audioParamsRef
     if (!precalculateOnIdle || isPrecalculatingNextRef.current) return;
 
     // Find next track
-    let nextTrack = null;
+    let nextTrack: Track | null = null;
     const idx = currentQueue.findIndex((t: any) => String(t.id) === String(currentTrack.id));
     if (idx !== -1 && idx < currentQueue.length - 1) {
       nextTrack = currentQueue[idx + 1];
@@ -567,205 +595,13 @@ console.log("[Audio] performOfflineRender called with EQ bands:", audioParamsRef
       isPrecalculatingNextRef.current = true;
       console.log("[Lookahead] Precalculating next track:", nextTrack.title || nextTrack.fileName);
 
-      const audioUrl = nextTrack.localFile ? URL.createObjectURL(nextTrack.localFile) : `${BACKEND_URL}/api/music/${nextTrack.id}/stream`;
+      const audioUrl = getTrackAudioUrl(nextTrack);
+      if (!audioUrl) return;
+
       const response = await fetch(audioUrl);
       const arrayBuffer = await response.arrayBuffer();
       const audioBuffer = await audioContextRef.current!.decodeAudioData(arrayBuffer);
-
-      // Perform offline rendering using the exact same graph settings
-      // --- OFFLINE RENDERING START ---
-      const offlineCtx = new (window.OfflineAudioContext || (window as any).webkitOfflineAudioContext)(
-        audioBuffer.numberOfChannels,
-        audioBuffer.length,
-        audioBuffer.sampleRate
-      );
-      const offlineSource = offlineCtx.createBufferSource();
-      offlineSource.buffer = audioBuffer;
-      offlineSource.playbackRate.value = playbackRate;
-
-      let currentNode: AudioNode = offlineSource;
-      const enabled = fxEnabledRef.current; // use fxEnabledRef since it's a ref to the latest state
-      const { preampGain, eqBands, bassGain, trebleGain, compThreshold, compRatio, compKnee, compAttack, compRelease, compMakeupGain, reverbMix, stereoWidth, panValue, loudnessNormalization } = audioParamsRef.current;
-      // Wait, fxEnabled is state, not ref. Let's use fxEnabled directly.
-      // BUT playTrack might have a stale closure of fxEnabled if it's not wrapped in useCallback.
-      // Since playTrack is defined inside useAudioPlayer, it uses the latest closure.
-
-      // 1. Gain Staging (-6dB)
-      const headroomDrop = offlineCtx.createGain();
-      headroomDrop.gain.value = 0.5;
-      currentNode.connect(headroomDrop);
-      currentNode = headroomDrop;
-
-      // 1.5 Preamp
-      if (enabled.preamp) {
-        const preamp = offlineCtx.createGain();
-        preamp.gain.value = Math.pow(10, preampGain / 20);
-        currentNode.connect(preamp);
-        currentNode = preamp;
-      }
-
-      // 2. EQ
-      if (enabled.eq && eqBands && eqBands.length > 0) {
-        const filters = eqBands.map((band: any) => {
-          const filter = offlineCtx.createBiquadFilter();
-          filter.type = band.type || 'peaking';
-          filter.frequency.value = band.frequency;
-          filter.Q.value = band.q;
-          filter.gain.value = band.gain;
-          return filter;
-        });
-
-        const splitter = offlineCtx.createChannelSplitter(2);
-        const merger = offlineCtx.createChannelMerger(2);
-
-        const stereoFilters = filters.filter((_: any, i: number) => eqBands[i].channel === 'L+R');
-        const leftFilters = filters.filter((_: any, i: number) => eqBands[i].channel === 'L');
-        const rightFilters = filters.filter((_: any, i: number) => eqBands[i].channel === 'R');
-
-        let prevNode = null;
-        for (const filter of stereoFilters) {
-          if (prevNode) prevNode.connect(filter);
-          else currentNode.connect(filter);
-          prevNode = filter;
-        }
-        if (prevNode) prevNode.connect(splitter);
-        else currentNode.connect(splitter);
-
-        let leftNode = splitter;
-        let prevLeft = null;
-        for (const filter of leftFilters) {
-          if (prevLeft) prevLeft.connect(filter);
-          else splitter.connect(filter, 0, 0);
-          prevLeft = filter;
-        }
-        if (prevLeft) leftNode = prevLeft;
-
-        let rightNode = splitter;
-        let prevRight = null;
-        for (const filter of rightFilters) {
-          if (prevRight) prevRight.connect(filter);
-          else splitter.connect(filter, 1, 0);
-          prevRight = filter;
-        }
-        if (prevRight) rightNode = prevRight;
-
-        leftNode.connect(merger, leftNode === splitter ? 0 : 0, 0);
-        rightNode.connect(merger, rightNode === splitter ? 1 : 0, 1);
-
-        currentNode = merger;
-      }
-
-      // 3. Tone
-      if (enabled.tone) {
-        const bass = offlineCtx.createBiquadFilter();
-        bass.type = 'lowshelf';
-        bass.frequency.value = 150;
-        bass.gain.value = bassGain;
-
-        const treble = offlineCtx.createBiquadFilter();
-        treble.type = 'highshelf';
-        treble.frequency.value = 4000;
-        treble.gain.value = trebleGain;
-
-        currentNode.connect(bass);
-        bass.connect(treble);
-        currentNode = treble;
-      }
-
-      // 4. Compressor
-      if (enabled.comp) {
-        const comp = offlineCtx.createDynamicsCompressor();
-        comp.threshold.value = compThreshold;
-        comp.ratio.value = compRatio;
-        comp.knee.value = compKnee;
-        comp.attack.value = msToAudioSeconds(compAttack);
-        comp.release.value = msToAudioSeconds(compRelease);
-
-        const makeup = offlineCtx.createGain();
-        makeup.gain.value = Math.pow(10, compMakeupGain / 20);
-
-        currentNode.connect(comp);
-        comp.connect(makeup);
-        currentNode = makeup;
-      }
-
-      // 5. Reverb
-      let dryGain: GainNode | undefined, wetGain: GainNode | undefined;
-      let isReverbParallel = false;
-      if (enabled.reverb) {
-        const preDelay = offlineCtx.createDelay(1.0);
-        preDelay.delayTime.value = 0.02;
-
-        const convolver = offlineCtx.createConvolver();
-        if (irBufferRef.current) {
-          convolver.buffer = irBufferRef.current;
-        }
-        
-        dryGain = offlineCtx.createGain();
-        const x = reverbMix / 100;
-        dryGain.gain.value = Math.cos(x * Math.PI / 2);
-
-        wetGain = offlineCtx.createGain();
-        wetGain.gain.value = Math.sin(x * Math.PI / 2) * REVERB_WET_GAIN;
-
-        currentNode.connect(dryGain);
-        currentNode.connect(preDelay);
-        preDelay.connect(convolver);
-        convolver.connect(wetGain);
-
-        isReverbParallel = true;
-      }
-
-      const connectToNext = (nextNode: AudioNode) => {
-        if (isReverbParallel && dryGain && wetGain) {
-          dryGain.connect(nextNode);
-          wetGain.connect(nextNode);
-          isReverbParallel = false;
-        } else {
-          currentNode.connect(nextNode);
-        }
-        currentNode = nextNode;
-      };
-
-      // 5.5 Stereo Width Matrix
-      if (enabled.stereo) {
-        const stereoInput = offlineCtx.createGain();
-        connectToNext(stereoInput);
-        currentNode = connectStereoWidthMatrix(offlineCtx, stereoInput, stereoWidth);
-      }
-
-      // 6. Pan
-      if (enabled.master) {
-        const panNode = offlineCtx.createStereoPanner();
-        panNode.pan.value = percentToPan(panValue);
-        connectToNext(panNode);
-      }
-
-      // 6.5 Loudness Normalization
-      const agcPreGain = offlineCtx.createGain();
-      const agcComp = offlineCtx.createDynamicsCompressor();
-      const agcMakeup = offlineCtx.createGain();
-      configureLoudnessNormalization(agcPreGain, agcComp, agcMakeup, Boolean(loudnessNormalization));
-      connectToNext(agcPreGain);
-      agcPreGain.connect(agcComp);
-      agcComp.connect(agcMakeup);
-      currentNode = agcMakeup;
-
-      // 7. Headroom Recover
-      const headroomRecover = offlineCtx.createGain();
-      headroomRecover.gain.value = 1.414;
-      connectToNext(headroomRecover);
-
-      // 8. Limiter & Soft Clip
-      // Removed from offline render to allow Volume to be applied before Limiter in real-time playback.
-
-      connectToNext(offlineCtx.destination);
-
-      offlineSource.start(0);
-      console.log("[Offline Render] Starting...");
-      const finalRenderedBuffer = await offlineCtx.startRendering();
-      console.log("[Offline Render] Completed.");
-      // --- OFFLINE RENDERING END ---
+      const finalRenderedBuffer = await performOfflineRender(audioBuffer, playbackRate);
 
       precalculatedNextBufferRef.current = { trackId: String(nextTrack.id), buffer: finalRenderedBuffer };
       console.log("[Lookahead] Finished precalculating next track:", nextTrack.title || nextTrack.fileName);
@@ -863,17 +699,8 @@ console.log("[Audio] performOfflineRender called with EQ bands:", audioParamsRef
     setCurrentTrack(startingTrack);
     setQueue(currentQueue);
 
-    let audioUrl = '';
-    if (blobCacheRef.current.has(String(startingTrack.id))) {
-      audioUrl = blobCacheRef.current.get(String(startingTrack.id))!;
-    } else if (startingTrack.sourceType === 'LOCAL' && startingTrack.localFile instanceof Blob) {
-      audioUrl = URL.createObjectURL(startingTrack.localFile);
-      blobCacheRef.current.set(String(startingTrack.id), audioUrl);
-    } else if (startingTrack.sourceType !== 'LOCAL') {
-      audioUrl = `${BACKEND_URL}/api/music/stream/${startingTrack.id}?access_token=${jwtToken}`;
-    } else {
-      return;
-    }
+    const audioUrl = getTrackAudioUrl(startingTrack);
+    if (!audioUrl) return;
 
     preloadAdjacentTracks(startingTrack.id, currentQueue);
 
@@ -935,7 +762,7 @@ console.log("[Audio] performOfflineRender called with EQ bands:", audioParamsRef
 
           // Trigger background preload for the next track
           if (precalculateOnIdle) {
-            setTimeout(() => preloadNextTrack(startingTrack, queue), 500);
+            setTimeout(() => preloadNextTrack(startingTrack, currentQueue), 500);
           }
 
           if (autoPlay) {
