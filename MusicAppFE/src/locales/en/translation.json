@@ -136,6 +136,27 @@
     "trackId": "Track ID",
     "unknown": "unknown"
   },
+  "playlist": {
+    "yourPlaylists": "Your Playlists",
+    "createFirst": "Create your first playlist",
+    "libraryEmpty": "Your library of playlists is empty.",
+    "playlistEmpty": "This playlist is empty",
+    "clickSearch": "Click the button to search your library and add tracks.",
+    "tracks": "tracks",
+    "play": "Play",
+    "playPlaylist": "Play Playlist",
+    "shuffleTitle": "Shuffle & Play",
+    "shuffle": "Shuffle",
+    "addToQueueTitle": "Add to current queue",
+    "addToQueue": "Add to Queue",
+    "addToNextQueueTitle": "Add to next queue",
+    "nextQueue": "Next Queue",
+    "addTracks": "Add tracks",
+    "createPlaylist": "Create Playlist",
+    "deletePlaylist": "Delete Playlist",
+    "removeFromPlaylist": "Remove from playlist",
+    "deleteConfirm": "Are you sure you want to delete this playlist?"
+  },
   "nowPlaying": {
     "noTrack": "No Track Selected",
     "noTrackDesc": "Go to Playlist or Library to play a track",

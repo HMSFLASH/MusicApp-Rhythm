@@ -1,5 +1,6 @@
 import { useState, useEffect } from 'react';
 import { useSearchParams } from 'react-router-dom';
+import { useTranslation } from 'react-i18next';
 import type { Track } from '../hooks/useAudioPlayer';
 import { Cloud, Play, Plus, ListMusic, ChevronLeft, Trash2, ListPlus, X, Shuffle, Pencil, Check } from 'lucide-react';
 import { CreatePlaylistModal } from './CreatePlaylistModal';
@@ -14,6 +15,7 @@ interface PlaylistProps {
 }
 
 export function Playlist({ jwtToken, onPlay, currentTrackId }: PlaylistProps) {
+  const { t } = useTranslation();
   // eslint-disable-next-line @typescript-eslint/no-explicit-any
   const [playlists, setPlaylists] = useState<any[]>([]);
   const [searchParams, setSearchParams] = useSearchParams();
@@ -140,7 +142,7 @@ export function Playlist({ jwtToken, onPlay, currentTrackId }: PlaylistProps) {
 
   const deletePlaylist = async (id: number, e: React.MouseEvent) => {
     e.stopPropagation();
-    if (!confirm('Are you sure you want to delete this playlist?')) return;
+    if (!confirm(t('playlist.deleteConfirm'))) return;
 
     try {
       await axiosClient.delete(`/api/playlists/${id}`);
@@ -263,7 +265,7 @@ export function Playlist({ jwtToken, onPlay, currentTrackId }: PlaylistProps) {
               </div>
             )
           ) : (
-            'Your Playlists'
+            t('playlist.yourPlaylists')
           )}
         </h2>
 
@@ -281,9 +283,9 @@ export function Playlist({ jwtToken, onPlay, currentTrackId }: PlaylistProps) {
                     }
                   }}
                   className="px-3 h-8 rounded-full bg-primary text-black hover:bg-primary/90 flex items-center gap-1.5 transition-all text-sm font-bold shadow-lg shadow-primary/20"
-                  title="Play Playlist"
+                  title={t('playlist.playPlaylist')}
                 >
-                  <Play size={14} fill="currentColor" /> Play
+                  <Play size={14} fill="currentColor" /> {t('playlist.play')}
                 </button>
                 <button
                   onClick={() => {
@@ -292,34 +294,34 @@ export function Playlist({ jwtToken, onPlay, currentTrackId }: PlaylistProps) {
                     playerState.playTrack(null, tracks, true, true);
                   }}
                   className="px-3 h-8 rounded-full bg-white/10 text-white hover:bg-white hover:text-black flex items-center gap-1.5 transition-all text-sm font-bold"
-                  title="Shuffle & Play"
+                  title={t('playlist.shuffleTitle')}
                 >
-                  <Shuffle size={14} /> Shuffle
+                  <Shuffle size={14} /> {t('playlist.shuffle')}
                 </button>
                 <button
                   onClick={() => {
                     playerState.addToCurrentQueue(selectedPlaylistDetails.tracks);
                   }}
                   className="px-3 h-8 rounded-full bg-white/10 text-white hover:bg-white hover:text-black flex items-center gap-1.5 transition-all text-sm font-bold"
-                  title="Thêm vào hàng chờ hiện tại (Add to Queue)"
+                  title={t('playlist.addToQueueTitle')}
                 >
-                  <ListPlus size={14} /> Thêm vào hàng chờ
+                  <ListPlus size={14} /> {t('playlist.addToQueue')}
                 </button>
                 <button
                   onClick={() => {
                     playerState.addToNextQueue(selectedPlaylistDetails.tracks);
                   }}
                   className="px-3 h-8 rounded-full bg-white/10 text-white hover:bg-white hover:text-black flex items-center gap-1.5 transition-all text-sm font-bold"
-                  title="Thêm vào hàng chờ tiếp theo (Next Queue)"
+                  title={t('playlist.addToNextQueueTitle')}
                 >
-                  <ListMusic size={14} /> Hàng chờ tiếp theo
+                  <ListMusic size={14} /> {t('playlist.nextQueue')}
                 </button>
               </>
             )}
             <button
               onClick={() => setIsAddTracksModalOpen(true)}
               className="w-8 h-8 rounded-full bg-white/10 text-white hover:bg-white hover:text-black flex items-center justify-center transition-all ml-2"
-              title="Add tracks"
+              title={t('playlist.addTracks')}
             >
               <ListPlus size={16} />
             </button>
@@ -328,7 +330,7 @@ export function Playlist({ jwtToken, onPlay, currentTrackId }: PlaylistProps) {
           <button
             onClick={() => setIsCreateModalOpen(true)}
             className="w-8 h-8 rounded-full bg-primary/20 text-primary hover:bg-primary hover:text-black flex items-center justify-center transition-all"
-            title="Create Playlist"
+            title={t('playlist.createPlaylist')}
           >
             <Plus size={18} />
           </button>
@@ -352,9 +354,9 @@ export function Playlist({ jwtToken, onPlay, currentTrackId }: PlaylistProps) {
                 <Plus size={40} className="group-hover:scale-110 transition-transform" />
               </button>
               <div className="flex flex-col items-center gap-1">
-                <span className="text-white font-medium text-lg">Create your first playlist</span>
+                <span className="text-white font-medium text-lg">{t('playlist.createFirst')}</span>
                 <span className="text-sm text-white/40 text-center">
-                  Your library of playlists is empty.
+                  {t('playlist.libraryEmpty')}
                 </span>
               </div>
             </div>
@@ -409,13 +411,13 @@ export function Playlist({ jwtToken, onPlay, currentTrackId }: PlaylistProps) {
                         </button>
                       </div>
                     )}
-                    <span className="text-xs text-white/40 truncate">{p.trackCount} tracks</span>
+                    <span className="text-xs text-white/40 truncate">{p.trackCount} {t('playlist.tracks')}</span>
                   </div>
                 </div>
                 <button
                   onClick={(e) => deletePlaylist(p.id, e)}
                   className="p-2 text-white/30 md:text-transparent md:group-hover:text-red-400/50 hover:!text-red-400 transition-colors rounded-full hover:bg-red-400/10 shrink-0"
-                  title="Delete Playlist"
+                  title={t('playlist.deletePlaylist')}
                 >
                   <Trash2 size={16} />
                 </button>
@@ -434,9 +436,9 @@ export function Playlist({ jwtToken, onPlay, currentTrackId }: PlaylistProps) {
                   <ListPlus size={32} className="group-hover:scale-110 transition-transform" />
                 </button>
                 <div className="flex flex-col items-center gap-1">
-                  <span className="text-white font-medium">This playlist is empty</span>
+                  <span className="text-white font-medium">{t('playlist.playlistEmpty')}</span>
                   <span className="text-sm text-white/40 text-center max-w-[200px]">
-                    Click the button to search your library and add tracks.
+                    {t('playlist.clickSearch')}
                   </span>
                 </div>
               </div>
@@ -481,7 +483,7 @@ export function Playlist({ jwtToken, onPlay, currentTrackId }: PlaylistProps) {
                   <button
                     onClick={(e) => removeTrackFromPlaylist(track.id, e)}
                     className="p-2 text-white/30 md:text-transparent md:group-hover:text-white/40 hover:!text-red-400 transition-colors rounded-full hover:bg-red-400/10 shrink-0"
-                    title="Remove from playlist"
+                    title={t('playlist.removeFromPlaylist')}
                   >
                     <X size={16} />
                   </button>

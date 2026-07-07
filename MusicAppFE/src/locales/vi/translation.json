@@ -136,6 +136,27 @@
     "trackId": "Mã bài hát",
     "unknown": "không rõ"
   },
+  "playlist": {
+    "yourPlaylists": "Danh Sách Phát",
+    "createFirst": "Tạo danh sách phát đầu tiên của bạn",
+    "libraryEmpty": "Thư viện danh sách phát của bạn trống.",
+    "playlistEmpty": "Danh sách phát này trống",
+    "clickSearch": "Nhấp vào nút để tìm kiếm thư viện của bạn và thêm bài hát.",
+    "tracks": "bài hát",
+    "play": "Phát",
+    "playPlaylist": "Phát Danh sách",
+    "shuffleTitle": "Phát ngẫu nhiên & Phát",
+    "shuffle": "Trộn bài",
+    "addToQueueTitle": "Thêm vào hàng chờ hiện tại",
+    "addToQueue": "Thêm vào hàng chờ",
+    "addToNextQueueTitle": "Thêm vào hàng chờ tiếp theo",
+    "nextQueue": "Hàng chờ tiếp theo",
+    "addTracks": "Thêm bài hát",
+    "createPlaylist": "Tạo Danh sách phát",
+    "deletePlaylist": "Xóa Danh sách phát",
+    "removeFromPlaylist": "Xóa khỏi danh sách phát",
+    "deleteConfirm": "Bạn có chắc chắn muốn xóa danh sách phát này không?"
+  },
   "nowPlaying": {
     "noTrack": "Không Có Bài Hát Nào",
     "noTrackDesc": "Vào Danh sách phát hoặc Thư viện để chọn bài hát",
