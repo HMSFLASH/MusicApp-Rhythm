@@ -77,7 +77,9 @@ public class MusicStreamController {
                 } catch (Exception e) {
                     String msg = e.getMessage() != null ? e.getMessage().toLowerCase() : "";
                     if (e.getClass().getName().contains("ClientAbortException") || 
+                        e.getClass().getName().contains("AsyncRequestNotUsableException") ||
                         msg.contains("broken pipe") || 
+                        msg.contains("connection reset by peer") ||
                         msg.contains("an established connection was aborted")) {
                         log.debug("Client aborted connection during Drive stream (expected)");
                     } else {
