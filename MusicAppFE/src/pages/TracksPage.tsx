@@ -360,11 +360,10 @@ export function TracksPage() {
                   { label: 'Bit Rate', value: (infoTrack.bitrate || playerState.getTrackMetadata(infoTrack.id)?.bitrate) ? `${Math.round((infoTrack.bitrate || playerState.getTrackMetadata(infoTrack.id)?.bitrate!) / 1000)} kbps` : null },
                   // eslint-disable-next-line @typescript-eslint/no-non-null-asserted-optional-chain
                   { label: 'Channels', value: (infoTrack.numberOfChannels || playerState.getTrackMetadata(infoTrack.id)?.numberOfChannels) ? `${infoTrack.numberOfChannels || playerState.getTrackMetadata(infoTrack.id)?.numberOfChannels} ${[2].includes(infoTrack.numberOfChannels || playerState.getTrackMetadata(infoTrack.id)?.numberOfChannels!) ? '(stereo)' : ''}` : null },
-                  // eslint-disable-next-line @typescript-eslint/no-non-null-asserted-optional-chain
                   { label: 'Audio Sample Rate', value: (infoTrack.sampleRate || playerState.getTrackMetadata(infoTrack.id)?.sampleRate) ? `${((infoTrack.sampleRate || playerState.getTrackMetadata(infoTrack.id)?.sampleRate!) / 1000).toFixed(3)} kHz` : null },
                   { label: 'Bit Depth', value: (infoTrack.bitsPerSample || playerState.getTrackMetadata(infoTrack.id)?.bitsPerSample) ? `${infoTrack.bitsPerSample || playerState.getTrackMetadata(infoTrack.id)?.bitsPerSample} bit` : null }
-                ].map((item, idx) => (
-                  <div key={idx} className="flex flex-col gap-1">
+                ].map((item, index) => (
+                  <div key={index} className="flex flex-col gap-1">
                     <span className="text-[10px] uppercase tracking-wider text-white/40 font-semibold">{item.label}</span>
                     <span className="text-sm text-white/90 font-medium break-all">{item.value || 'unknown'}</span>
                   </div>

@@ -80,6 +80,9 @@ export function useAudioMetadata(jwtToken: string, queueState: any) {
         // eslint-disable-next-line @typescript-eslint/no-explicit-any
         metadataCacheRef.current.set(trackId, { pending: true } as any);
 
+        const cachePayload: Partial<Track> = {};
+        const up: Partial<Track> = {};
+
         try {
             const mm = await import('music-metadata-browser');
             // eslint-disable-next-line @typescript-eslint/no-explicit-any
@@ -93,19 +96,29 @@ export function useAudioMetadata(jwtToken: string, queueState: any) {
 
                 const arrayBuffer = await track.localFile.arrayBuffer();
                 const buffer = new Uint8Array(arrayBuffer);
+                
+                // eslint-disable-next-line @typescript-eslint/no-explicit-any
+                const fileInfo: any = { size: track.localFile.size };
+                if (track.fileName) fileInfo.path = track.fileName;
                 const ext = track.fileName?.split('.').pop()?.toLowerCase();
-                const mimeMap: Record<string, string> = { mp3: 'audio/mpeg', m4a: 'audio/mp4', flac: 'audio/flac', wav: 'audio/wav', ogg: 'audio/ogg', opus: 'audio/ogg', aac: 'audio/aac', wma: 'audio/x-ms-wma' };
-                const mimeType = mimeMap[ext || ''] || track.localFile.type || 'audio/mpeg';
+                if (!ext || ext === track.fileName?.toLowerCase()) {
+                    fileInfo.mimeType = track.localFile.type || 'audio/mpeg';
+                }
 
-                const parsePromise = parseBufferFn(buffer, mimeType, { duration: false });
+                const parsePromise = parseBufferFn(buffer, fileInfo, { duration: true });
                 const timeoutPromise = new Promise<never>((_, reject) => {
                     timeoutId = setTimeout(() => reject(new Error('Local metadata parse timeout')), 10000);
                 });
                 metadata = await Promise.race([parsePromise, timeoutPromise]).finally(() => clearTimeout(timeoutId!));
+                
+                if (track.localFile.size > 0) {
+                    up.fileSize = track.localFile.size;
+                    cachePayload.fileSize = track.localFile.size;
+                }
             } else {
                 const ext = track.fileName?.split('.').pop()?.toLowerCase();
                 const mimeMap: Record<string, string> = { mp3: 'audio/mpeg', m4a: 'audio/mp4', flac: 'audio/flac', wav: 'audio/wav', ogg: 'audio/ogg', opus: 'audio/ogg', aac: 'audio/aac', wma: 'audio/x-ms-wma' };
-                const mimeType = mimeMap[ext || ''] || 'audio/mpeg';
+                const mappedMimeType = mimeMap[ext || ''];
                 // eslint-disable-next-line @typescript-eslint/no-explicit-any
                 const parseBufferFn = mm.parseBuffer || (mm as any).default?.parseBuffer;
                 if (!parseBufferFn) throw new Error('parseBuffer not found');
@@ -117,8 +130,22 @@ export function useAudioMetadata(jwtToken: string, queueState: any) {
                     const arrayBuffer = await fetched.arrayBuffer();
                     const buffer = new Uint8Array(arrayBuffer);
                     const fetchedMimeType = fetched.headers.get('Content-Type');
-                    const actualMimeType = (fetchedMimeType && fetchedMimeType !== 'application/octet-stream') ? fetchedMimeType : mimeType;
-                    metadata = await parseBufferFn(buffer, actualMimeType, { duration: false });
+                    
+                    const contentLengthHeader = fetched.headers.get('Content-Length');
+                    const fileSize = contentLengthHeader ? parseInt(contentLengthHeader, 10) : (track.fileSize || 0);
+                    if (fileSize > 0) {
+                        up.fileSize = fileSize;
+                        cachePayload.fileSize = fileSize;
+                    }
+                    
+                    // eslint-disable-next-line @typescript-eslint/no-explicit-any
+                    const fileInfo: any = { size: fileSize };
+                    if (track.fileName) fileInfo.path = track.fileName;
+                    if (!ext) {
+                        fileInfo.mimeType = (fetchedMimeType && fetchedMimeType !== 'application/octet-stream') ? fetchedMimeType : 'audio/mpeg';
+                    }
+                    
+                    metadata = await parseBufferFn(buffer, fileInfo, { duration: false });
                 } else {
                     const fetchUrl = `${BACKEND_URL}/api/music/stream/${track.id}?access_token=${jwtToken}`;
                     const controller = new AbortController();
@@ -126,10 +153,13 @@ export function useAudioMetadata(jwtToken: string, queueState: any) {
                     if (!response.ok) throw new Error(`HTTP ${response.status}`);
 
                     const fetchedMimeType = response.headers.get('Content-Type');
-                    const actualMimeType = (fetchedMimeType && fetchedMimeType !== 'application/octet-stream') ? fetchedMimeType : mimeType;
 
                     const contentLengthHeader = response.headers.get('Content-Length');
                     const fileSize = contentLengthHeader ? parseInt(contentLengthHeader, 10) : (track.fileSize || 0);
+                    if (fileSize > 0) {
+                        up.fileSize = fileSize;
+                        cachePayload.fileSize = fileSize;
+                    }
                     const maxMetadataSize = fileSize > 15 * 1024 * 1024 ? 1.2 * 1024 * 1024 : 512 * 1024;
 
                     const reader = response.body!.getReader();
@@ -151,16 +181,31 @@ export function useAudioMetadata(jwtToken: string, queueState: any) {
                         offset += c.length;
                     }
 
-                    metadata = await parseBufferFn(buffer, actualMimeType, { duration: false });
+                    // eslint-disable-next-line @typescript-eslint/no-explicit-any
+                    const fileInfo: any = { size: fileSize };
+                    if (track.fileName) fileInfo.path = track.fileName;
+                    if (!ext) {
+                        fileInfo.mimeType = (fetchedMimeType && fetchedMimeType !== 'application/octet-stream') ? fetchedMimeType : 'audio/mpeg';
+                    }
+
+                    metadata = await parseBufferFn(buffer, fileInfo, { duration: false });
                 }
             }
-
-            const up: Partial<Track> = {};
-            const cachePayload: Partial<Track> = {};
 
             if (metadata.common.title) { up.title = metadata.common.title; cachePayload.title = metadata.common.title; }
             if (metadata.common.artist) { up.artist = metadata.common.artist; cachePayload.artist = metadata.common.artist; }
             if (metadata.common.album) { up.album = metadata.common.album; cachePayload.album = metadata.common.album; }
+            
+            if (metadata.format) {
+                if (metadata.format.container) { up.fileFormat = metadata.format.container; cachePayload.fileFormat = metadata.format.container; }
+                if (metadata.format.codec) { up.codec = metadata.format.codec; cachePayload.codec = metadata.format.codec; }
+                if (metadata.format.bitrate) { up.bitrate = metadata.format.bitrate; cachePayload.bitrate = metadata.format.bitrate; }
+                if (metadata.format.sampleRate) { up.sampleRate = metadata.format.sampleRate; cachePayload.sampleRate = metadata.format.sampleRate; }
+                if (metadata.format.numberOfChannels) { up.numberOfChannels = metadata.format.numberOfChannels; cachePayload.numberOfChannels = metadata.format.numberOfChannels; }
+                if (metadata.format.bitsPerSample) { up.bitsPerSample = metadata.format.bitsPerSample; cachePayload.bitsPerSample = metadata.format.bitsPerSample; }
+                if (metadata.format.duration) { up.durationSeconds = metadata.format.duration; cachePayload.durationSeconds = metadata.format.duration; }
+            }
+
             if (metadata.common.picture?.length) {
                 const pic = metadata.common.picture[0];
                 const fmt = pic.format || 'jpeg';

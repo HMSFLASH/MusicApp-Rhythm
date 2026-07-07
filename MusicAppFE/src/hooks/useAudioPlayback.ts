@@ -181,7 +181,16 @@ export function useAudioPlayback(
       // Store the handler on the ref for cleanup
       // eslint-disable-next-line @typescript-eslint/no-explicit-any
       (audioRef as any).current._visibilityHandler = handleVisibilityChange;
-      audioRef.current.addEventListener('loadedmetadata', () => setDuration(audioRef.current?.duration || 0));
+      audioRef.current.addEventListener('loadedmetadata', () => {
+        const dur = audioRef.current?.duration || 0;
+        setDuration(dur);
+        if (dur > 0 && currentTrackSnapshotRef.current && !currentTrackSnapshotRef.current.durationSeconds && Number.isFinite(dur)) {
+          const updatedTrack = { ...currentTrackSnapshotRef.current, durationSeconds: dur };
+          if (setCurrentTrack) setCurrentTrack(updatedTrack);
+          // eslint-disable-next-line @typescript-eslint/no-explicit-any
+          if (setQueue) setQueue((prevQueue: any[]) => prevQueue.map((t: any) => t.id === updatedTrack.id ? { ...t, durationSeconds: dur } : t));
+        }
+      });
       audioRef.current.addEventListener('ended', () => {
         if (playNextRef.current) playNextRef.current();
       });
