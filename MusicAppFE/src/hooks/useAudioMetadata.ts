@@ -8,7 +8,7 @@ export function useAudioMetadata(jwtToken: string, queueState: any) {
     const setCurrentTrack = queueState?.setCurrentTrack;
     const setQueue = queueState?.setQueue;
     const currentTrack = queueState?.currentTrack;
-    const queue = queueState?.queue;
+
 
     const [metadataVersion, setMetadataVersion] = useState(0);
 
@@ -17,60 +17,11 @@ export function useAudioMetadata(jwtToken: string, queueState: any) {
     const blobCacheRef = useRef<Map<string, string>>(new Map());
 
     useEffect(() => {
-        let tracksToPreload: any[] = [];
-
-        if (queue && queue.length > 0) {
-            if (currentTrack) {
-                const currentIndex = queue.findIndex((t: any) => String(t.id) === String(currentTrack.id));
-                if (currentIndex !== -1) {
-                    const nextTracks = queue.slice(currentIndex);
-                    const prevTracks = queue.slice(0, currentIndex);
-                    tracksToPreload = [...nextTracks, ...prevTracks];
-                } else {
-                    if (!metadataCacheRef.current.has(String(currentTrack.id))) {
-                        extractMetadata(currentTrack);
-                    }
-                    tracksToPreload = [...queue];
-                }
-            } else {
-                tracksToPreload = [...queue];
-            }
-        } else if (currentTrack) {
-            if (!metadataCacheRef.current.has(String(currentTrack.id))) {
-                extractMetadata(currentTrack);
-            }
+        if (currentTrack && !metadataCacheRef.current.has(String(currentTrack.id))) {
+            extractMetadata(currentTrack);
         }
-
-        const preload = async () => {
-            for (let i = 0; i < tracksToPreload.length; i++) {
-                const t = tracksToPreload[i];
-                if (!metadataCacheRef.current.has(String(t.id))) {
-                    await extractMetadata(t);
-                    if (i < tracksToPreload.length - 1) {
-                        await new Promise(resolve => setTimeout(resolve, 440));
-                    }
-                }
-            }
-
-            try {
-                const cachedLib = localStorage.getItem('sonic_library_tracks');
-                if (cachedLib) {
-                    const allTracks = JSON.parse(cachedLib);
-                    for (let i = 0; i < allTracks.length; i++) {
-                        const t = allTracks[i];
-                        if (!metadataCacheRef.current.has(String(t.id))) {
-                            await new Promise(resolve => setTimeout(resolve, 440));
-                            await extractMetadata(t);
-                        }
-                    }
-                }
-            } catch (e) {
-                console.warn('[Metadata] Failed to preload all songs', e);
-            }
-        };
-        preload();
         // eslint-disable-next-line react-hooks/exhaustive-deps
-    }, [currentTrack, queue]);
+    }, [currentTrack]);
 
     const extractMetadata = async (track: Track) => {
         const trackId = String(track.id);
