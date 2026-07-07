@@ -886,8 +886,6 @@ console.log("[Audio] performOfflineRender called with EQ bands:", audioParamsRef
       return;
     }
 
-    preloadAdjacentTracks(startingTrack.id, currentQueue);
-
     if (precalculateOnIdle) {
       audioRef.current!.pause();
       audioRef.current!.src = "";
@@ -987,7 +985,7 @@ console.log("[Audio] performOfflineRender called with EQ bands:", audioParamsRef
     // Preload adjacent tracks and extract metadata for ALL tracks
     if (startingTrack.sourceType !== 'LOCAL') {
       preloadTrack(startingTrack).then(() => {
-        preloadAdjacentTracks(startingTrack.id, queue || []);
+        preloadAdjacentTracks(startingTrack.id, currentQueue!);
       });
     }
     
