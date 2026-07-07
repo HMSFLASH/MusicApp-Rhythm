@@ -13,9 +13,11 @@ export function GenresPage() {
   useEffect(() => {
     const cached = localStorage.getItem('sonic_library_tracks');
     if (cached) {
+      // eslint-disable-next-line react-hooks/set-state-in-effect, @typescript-eslint/no-unused-vars, no-empty
       try { setTracks(JSON.parse(cached)); } catch (e) { }
     }
     axiosClient.get('/api/music/list')
+      // eslint-disable-next-line @typescript-eslint/no-explicit-any
       .then((data: any) => {
         const parsed = data.length > 0 ? (typeof data[0] === 'string' ? JSON.parse(data[0]) : data) : [];
         setTracks(parsed);

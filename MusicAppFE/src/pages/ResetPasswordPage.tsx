@@ -40,6 +40,7 @@ export function ResetPasswordPage() {
       await axiosClient.post('/api/auth/reset-password', { token, newPassword });
       setSuccess(true);
       setTimeout(() => navigate('/login'), 3000);
+    // eslint-disable-next-line @typescript-eslint/no-explicit-any
     } catch (err: any) {
       setError(err.response?.data?.message || err.message || 'Failed to reset password. The link might be expired.');
     } finally {

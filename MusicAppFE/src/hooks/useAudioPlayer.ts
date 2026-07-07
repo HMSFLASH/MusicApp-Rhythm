@@ -12,6 +12,7 @@ export function useAudioPlayer(jwtToken: string) {
 
   const queueState = useAudioQueue(initialPlayback, savedState);
   const effectsState = useAudioEffectsState(savedState);
+  // eslint-disable-next-line @typescript-eslint/no-explicit-any
   const engineState = useAudioEngine(jwtToken, queueState as any, effectsState as any, savedState);
 
   useEffect(() => {

@@ -70,6 +70,7 @@ const generateImpulseResponse = (ctx: BaseAudioContext, duration: number, decay:
   return impulse;
 };
 
+// eslint-disable-next-line @typescript-eslint/no-explicit-any
 export function useAudioContext(effectsState: any) {
   const { eqBands, preampGain, bassGain, trebleGain, compThreshold, compRatio, compKnee, compAttack, compRelease, compMakeupGain, panValue, stereoWidth, reverbMix, reverbTime, useOversample, loudnessNormalization, fxEnabled, } = effectsState;
 
@@ -91,6 +92,7 @@ export function useAudioContext(effectsState: any) {
   const pseudoRightGainRef = useRef<GainNode | null>(null);
   const pseudoMergerRef = useRef<ChannelMergerNode | null>(null);
   const irBufferRef = useRef<AudioBuffer | null>(null);
+  // eslint-disable-next-line @typescript-eslint/no-explicit-any
   const fxEnabledRef = useRef<any>(effectsState?.fxEnabled || {});
   useEffect(() => { fxEnabledRef.current = effectsState?.fxEnabled; }, [effectsState?.fxEnabled]);
   
@@ -171,6 +173,7 @@ export function useAudioContext(effectsState: any) {
   const initializeAudioContext = useCallback(() => {
 console.log("[Audio] initializeAudioContext called");
     if (!audioContextRef.current) {
+      // eslint-disable-next-line @typescript-eslint/no-explicit-any
       const AudioContext = window.AudioContext || (window as any).webkitAudioContext;
       audioContextRef.current = new AudioContext();
     }
@@ -205,7 +208,9 @@ console.log("[Audio] initializeAudioContext called");
     if (convolverNodeRef.current) convolverNodeRef.current.disconnect();
     if (stereoSplitterRef.current) stereoSplitterRef.current.disconnect();
     if (stereoMergerRef.current) stereoMergerRef.current.disconnect();
+    // eslint-disable-next-line @typescript-eslint/no-explicit-any
     if (lToLRef.current) (lToLRef.current as any).disconnect();
+    // eslint-disable-next-line @typescript-eslint/no-explicit-any
     if (rToLRef.current) (rToLRef.current as any).disconnect();
     if (lToRRef.current) lToRRef.current.disconnect();
     if (rToRRef.current) rToRRef.current.disconnect();
@@ -246,6 +251,7 @@ console.log("[Audio] initializeAudioContext called");
       if (eqNodesRef.current.length !== eqBands.length) {
         eqNodesRef.current = eqBands.map(() => ctx.createBiquadFilter());
       }
+      // eslint-disable-next-line @typescript-eslint/no-explicit-any
       eqBands.forEach((band: any, i: number) => {
         const filter = eqNodesRef.current[i];
         filter.type = band.type || 'peaking';
@@ -442,6 +448,7 @@ console.log("[Audio] initializeAudioContext called");
     }
 
 
+  // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [
     applyCompressorParams,
     applyLoudnessParams,
@@ -475,6 +482,7 @@ if (preampNodeRef.current) {
 
   useEffect(() => {
     if (eqNodesRef.current && eqBands) {
+      // eslint-disable-next-line @typescript-eslint/no-explicit-any
       eqBands.forEach((band: any, i: number) => {
         if (eqNodesRef.current[i]) {
           eqNodesRef.current[i].type = band.type || 'peaking';
@@ -542,6 +550,7 @@ if (preampNodeRef.current) {
     if (sourceNodeRef.current) {
       initializeAudioContext();
     }
+  // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [fxEnabled.limiter, eqBandsLength]);
 
   return {

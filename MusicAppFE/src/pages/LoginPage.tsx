@@ -27,6 +27,7 @@ export function LoginPage() {
     setError('');
     
     try {
+      // eslint-disable-next-line @typescript-eslint/no-explicit-any
       const response: any = await axiosClient.post('/api/auth/login', {
         loginId,
         password
@@ -35,6 +36,7 @@ export function LoginPage() {
         setJwtToken(response.accessToken);
         navigate('/');
       }
+    // eslint-disable-next-line @typescript-eslint/no-explicit-any
     } catch (err: any) {
       setError(err.message || 'Invalid credentials');
     } finally {

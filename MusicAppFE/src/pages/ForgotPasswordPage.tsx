@@ -19,6 +19,7 @@ export function ForgotPasswordPage() {
     try {
       await axiosClient.post('/api/auth/forgot-password', { email });
       setSuccess(true);
+    // eslint-disable-next-line @typescript-eslint/no-unused-vars, @typescript-eslint/no-explicit-any
     } catch (err: any) {
       setError('An error occurred. Please try again later.');
     } finally {

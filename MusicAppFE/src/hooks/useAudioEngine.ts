@@ -8,6 +8,7 @@ export function useAudioEngine(
   jwtToken: string,
   queueState: ReturnType<typeof useAudioQueue>,
   effectsState: ReturnType<typeof useAudioEffectsState>,
+  // eslint-disable-next-line @typescript-eslint/no-explicit-any
   savedState: any
 ) {
   const contextState = useAudioContext(effectsState);

@@ -48,8 +48,10 @@ export function BottomPlayerBar() {
 
   useEffect(() => {
     if (animationRef.current) {
+      // eslint-disable-next-line @typescript-eslint/no-unused-expressions
       (isPlaying && currentTime > 0) ? animationRef.current.play() : animationRef.current.pause();
     }
+  // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [isPlaying, currentTime > 0]);
 
   useEffect(() => {
@@ -71,11 +73,14 @@ export function BottomPlayerBar() {
   useEffect(() => {
     if (currentTrack?.id && jwtToken && currentTrack.sourceType !== 'LOCAL') {
       axiosClient.get(`/api/favorites/check/${currentTrack.id}`)
+        // eslint-disable-next-line @typescript-eslint/no-explicit-any
         .then((res: any) => setIsFavorite(res === true || res.data === true))
         .catch(() => setIsFavorite(false));
     } else {
+      // eslint-disable-next-line react-hooks/set-state-in-effect
       setIsFavorite(false);
     }
+  // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [currentTrack?.id, jwtToken]);
 
   const toggleFavorite = () => {

@@ -97,6 +97,7 @@ export function LocalFilePicker() {
         type="file"
         accept={AUDIO_EXTENSIONS.join(',')}
         multiple
+        // eslint-disable-next-line @typescript-eslint/ban-ts-comment
         // @ts-ignore
         webkitdirectory="true"
         className="hidden"

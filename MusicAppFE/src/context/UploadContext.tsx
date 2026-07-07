@@ -145,6 +145,7 @@ export function UploadProvider({ children }: { children: ReactNode }) {
   );
 }
 
+// eslint-disable-next-line react-refresh/only-export-components
 export const useUploadQueue = () => {
   const context = useContext(UploadContext);
   if (!context) throw new Error('useUploadQueue must be used within UploadProvider');

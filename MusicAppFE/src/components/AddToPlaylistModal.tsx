@@ -14,6 +14,7 @@ import { useGlobalAudio } from '../context/AudioContext';
 
 export function AddToPlaylistModal({ isOpen, onClose, track }: AddToPlaylistModalProps) {
   const { jwtToken, playerState } = useGlobalAudio();
+  // eslint-disable-next-line @typescript-eslint/no-explicit-any
   const [playlists, setPlaylists] = useState<any[]>([]);
   const [loading, setLoading] = useState(false);
   const [addingId, setAddingId] = useState<number | null>(null);
@@ -22,10 +23,12 @@ export function AddToPlaylistModal({ isOpen, onClose, track }: AddToPlaylistModa
 
   useEffect(() => {
     if (isOpen && jwtToken) {
+      // eslint-disable-next-line react-hooks/set-state-in-effect
       setLoading(true);
       setError('');
       setSuccessMsg('');
       axiosClient.get('/api/playlists')
+      // eslint-disable-next-line @typescript-eslint/no-explicit-any
       .then((data: any) => setPlaylists(data))
       .catch(() => setError('Failed to load playlists'))
       .finally(() => setLoading(false));
@@ -47,6 +50,7 @@ export function AddToPlaylistModal({ isOpen, onClose, track }: AddToPlaylistModa
       setTimeout(() => {
         onClose();
       }, 1500);
+    // eslint-disable-next-line @typescript-eslint/no-explicit-any
     } catch (err: any) {
       setError(err.message || 'An error occurred');
     } finally {

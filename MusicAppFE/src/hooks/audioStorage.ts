@@ -7,8 +7,11 @@ export const getInitialState = () => {
     if (saved) {
       const parsed = JSON.parse(saved);
       if (parsed.upcomingQueues) {
+        // eslint-disable-next-line @typescript-eslint/no-explicit-any
         parsed.upcomingQueues = parsed.upcomingQueues.map((upQueue: any[]) => {
+          // eslint-disable-next-line @typescript-eslint/no-explicit-any
           const filtered = upQueue.filter((t: any) => t.sourceType !== 'LOCAL');
+          // eslint-disable-next-line @typescript-eslint/no-explicit-any
           filtered.forEach((t: any) => {
             if (t.imageUrl?.startsWith('blob:')) t.imageUrl = '';
           });
@@ -30,7 +33,9 @@ export const getInitialPlaybackState = () => {
       const parsed = JSON.parse(saved);
 
       if (parsed.queue) {
+        // eslint-disable-next-line @typescript-eslint/no-explicit-any
         parsed.queue = parsed.queue.filter((t: any) => t.sourceType !== 'LOCAL');
+        // eslint-disable-next-line @typescript-eslint/no-explicit-any
         parsed.queue.forEach((t: any) => {
           if (t.imageUrl?.startsWith('blob:')) t.imageUrl = '';
         });

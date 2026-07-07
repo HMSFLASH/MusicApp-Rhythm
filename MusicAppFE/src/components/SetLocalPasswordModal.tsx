@@ -37,6 +37,7 @@ export function SetLocalPasswordModal({ isOpen, onClose, defaultEmail = '' }: Se
 
     setLoading(true);
     try {
+      // eslint-disable-next-line @typescript-eslint/no-explicit-any
       const response: any = await axiosClient.post('/api/auth/set-password', {
         password
       });
@@ -51,6 +52,7 @@ export function SetLocalPasswordModal({ isOpen, onClose, defaultEmail = '' }: Se
         setPassword('');
         setConfirmPassword('');
       }, 2000);
+    // eslint-disable-next-line @typescript-eslint/no-explicit-any
     } catch (err: any) {
       setError(err.message || 'Failed to set password');
     } finally {

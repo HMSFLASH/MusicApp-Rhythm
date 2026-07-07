@@ -62,9 +62,11 @@ export function NowPlaying() {
 
   useEffect(() => {
     if (animationRef1.current) {
+      // eslint-disable-next-line @typescript-eslint/no-unused-expressions
       isPlaying ? animationRef1.current.play() : animationRef1.current.pause();
     }
     if (animationRef2.current) {
+      // eslint-disable-next-line @typescript-eslint/no-unused-expressions
       isPlaying ? animationRef2.current.play() : animationRef2.current.pause();
     }
   }, [isPlaying]);

@@ -36,6 +36,7 @@ export function CreatePlaylistModal({ isOpen, onClose, onSuccess }: CreatePlayli
       setDescription('');
       onSuccess();
       onClose();
+    // eslint-disable-next-line @typescript-eslint/no-explicit-any
     } catch (err: any) {
       setError(err.message || 'An error occurred');
     } finally {

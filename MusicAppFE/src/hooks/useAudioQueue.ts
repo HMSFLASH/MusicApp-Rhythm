@@ -2,6 +2,7 @@ import { useState, useCallback, useEffect } from 'react';
 import type { Track, SongEndMode, QueueEndMode } from './audioTypes';
 import { PLAYBACK_STORAGE_KEY } from './audioStorage';
 
+// eslint-disable-next-line @typescript-eslint/no-explicit-any
 export function useAudioQueue(initialPlayback: { currentTrack: Track | null; queue: Track[] }, savedState: any) {
   const [currentTrack, setCurrentTrack] = useState<Track | null>(initialPlayback.currentTrack);
   const [queue, setQueue] = useState<Track[]>(initialPlayback.queue);

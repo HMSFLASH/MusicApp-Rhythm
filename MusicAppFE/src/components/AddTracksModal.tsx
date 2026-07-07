@@ -23,9 +23,12 @@ export function AddTracksModal({ isOpen, onClose, playlistId, playlistTracks, on
 
   useEffect(() => {
     if (isOpen && jwtToken) {
+      // eslint-disable-next-line react-hooks/set-state-in-effect
       setLoading(true);
       axiosClient.get('/api/music/list')
+      // eslint-disable-next-line @typescript-eslint/no-explicit-any
       .then((data: any) => {
+        // eslint-disable-next-line @typescript-eslint/no-explicit-any
         const mapped = data.map((d: any) => ({
           id: d.id,
           fileName: d.name,

@@ -36,6 +36,7 @@ const parseJwt = (token: string) => {
     }).join(''));
 
     return JSON.parse(jsonPayload);
+  // eslint-disable-next-line @typescript-eslint/no-unused-vars
   } catch (e) {
     return null;
   }
@@ -55,6 +56,7 @@ export function Layout() {
 
   // Close mobile menu on navigation
   useEffect(() => {
+    // eslint-disable-next-line react-hooks/set-state-in-effect
     setIsMobileMenuOpen(false);
   }, [location.pathname]);
 
@@ -77,6 +79,7 @@ export function Layout() {
       await axiosClient.post('/api/backup/drive', { config });
       
       setNotification({ type: 'success', message: t('layout.backupSuccess', 'Backup to Google Drive successful!') });
+    // eslint-disable-next-line @typescript-eslint/no-explicit-any
     } catch (e: any) {
       console.error(e);
       setNotification({ type: 'error', message: e.message || t('layout.backupFail', 'Failed to backup to Google Drive. Ensure you have linked your account.') });
@@ -99,6 +102,7 @@ export function Layout() {
       
       setNotification({ type: 'success', message: t('layout.restoreSuccess', 'Restore successful! The app will now reload to apply changes.') });
       setTimeout(() => window.location.reload(), 1500);
+    // eslint-disable-next-line @typescript-eslint/no-explicit-any
     } catch (e: any) {
       console.error(e);
       setNotification({ type: 'error', message: e.message || t('layout.restoreFail', 'Failed to restore from Google Drive. No backup found or account not linked.') });

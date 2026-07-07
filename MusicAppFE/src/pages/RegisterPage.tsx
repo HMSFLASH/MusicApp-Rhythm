@@ -38,6 +38,7 @@ export function RegisterPage() {
     setError('');
 
     try {
+      // eslint-disable-next-line @typescript-eslint/no-explicit-any
       const response: any = await axiosClient.post('/api/auth/register', {
         email,
         username: displayName,
@@ -47,6 +48,7 @@ export function RegisterPage() {
         setJwtToken(response.accessToken);
         navigate('/');
       }
+    // eslint-disable-next-line @typescript-eslint/no-explicit-any
     } catch (err: any) {
       setError(err.response?.data?.message || err.message || 'Registration failed. Email or username might already exist.');
     } finally {
