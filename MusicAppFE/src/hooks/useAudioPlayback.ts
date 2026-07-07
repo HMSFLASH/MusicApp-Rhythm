@@ -153,6 +153,8 @@ export function useAudioPlayback(
   const decodeSessionRef = useRef<symbol | null>(null);
   const playNextRef = useRef<(() => void) | null>(null);
   const playPreviousRef = useRef<(() => void) | null>(null);
+  // eslint-disable-next-line @typescript-eslint/no-explicit-any
+  const playTrackRef = useRef<((...args: any[]) => void) | null>(null);
   const currentTimeSnapshotRef = useRef<number>(0);
   const isPlayingSnapshotRef = useRef<boolean>(false);
   const currentTrackSnapshotRef = useRef<Track | null>(currentTrack ?? null);
@@ -984,8 +986,11 @@ console.log("[Audio] performOfflineRender called with EQ bands:", audioParamsRef
   const playNext = useCallback(() => {
     if (!currentTrack || queue.length === 0) return;
 
+    // Read current precalculate state from ref to avoid stale closure
+    const isPrecalc = precalculateOnIdleRef.current;
+
     if (songEndMode === 'repeat_one') {
-      if (precalculateOnIdle && audioBufferRef.current) {
+      if (isPrecalc && audioBufferRef.current) {
         playCurrentBuffer(0);
       } else if (audioRef.current) {
         audioRef.current.currentTime = 0;
@@ -996,7 +1001,7 @@ console.log("[Audio] performOfflineRender called with EQ bands:", audioParamsRef
     }
 
     if (songEndMode === 'stop') {
-      if (precalculateOnIdle) {
+      if (isPrecalc) {
         stopBufferPlayback();
         setCurrentTime(0);
         bufferPausedTimeRef.current = 0;
@@ -1011,10 +1016,14 @@ console.log("[Audio] performOfflineRender called with EQ bands:", audioParamsRef
 
     const isPreload = songEndMode === 'preload';
 
+    // Use playTrackRef to always call the latest playTrack (avoids stale closure)
+    const latestPlayTrack = playTrackRef.current;
+    if (!latestPlayTrack) return;
+
     // eslint-disable-next-line @typescript-eslint/no-explicit-any
     const idx = queue.findIndex((t: any) => String(t.id) === String(currentTrack.id));
     if (idx !== -1 && idx < queue.length - 1) {
-      playTrack(queue[idx + 1], queue, !isPreload);
+      latestPlayTrack(queue[idx + 1], queue, !isPreload);
     } else if (queueEndMode === 'repeat' && idx === queue.length - 1) {
       if (isShuffleState) {
         // eslint-disable-next-line prefer-const
@@ -1023,9 +1032,9 @@ console.log("[Audio] performOfflineRender called with EQ bands:", audioParamsRef
           const j = Math.floor(Math.random() * (i + 1));
           [newQueue[i], newQueue[j]] = [newQueue[j], newQueue[i]];
         }
-        playTrack(newQueue[0], newQueue, !isPreload);
+        latestPlayTrack(newQueue[0], newQueue, !isPreload);
       } else {
-        playTrack(queue[0], queue, !isPreload);
+        latestPlayTrack(queue[0], queue, !isPreload);
       }
     } else if (queueEndMode === 'next' && idx === queue.length - 1) {
       if (upcomingQueues.length > 0) {
@@ -1036,9 +1045,9 @@ console.log("[Audio] performOfflineRender called with EQ bands:", audioParamsRef
           if (cycleQueues) return [...rest, queue];
           return rest;
         });
-        playTrack(nextQ[0], nextQ, !isPreload);
+        latestPlayTrack(nextQ[0], nextQ, !isPreload);
       } else if (cycleQueues) {
-        playTrack(queue[0], queue, !isPreload);
+        latestPlayTrack(queue[0], queue, !isPreload);
       } else {
         setIsPlaying(false);
       }
@@ -1051,10 +1060,13 @@ console.log("[Audio] performOfflineRender called with EQ bands:", audioParamsRef
 
   const playPrevious = useCallback(() => {
     if (!currentTrack || queue.length === 0) return;
+    // Use playTrackRef to always call the latest playTrack (avoids stale closure)
+    const latestPlayTrack = playTrackRef.current;
+    if (!latestPlayTrack) return;
     // eslint-disable-next-line @typescript-eslint/no-explicit-any
     const idx = queue.findIndex((t: any) => t.id === currentTrack.id);
     if (idx > 0) {
-      playTrack(queue[idx - 1], queue);
+      latestPlayTrack(queue[idx - 1], queue);
     }
   // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [currentTrack, queue]);
@@ -1103,6 +1115,7 @@ console.log("[Audio] performOfflineRender called with EQ bands:", audioParamsRef
   useEffect(() => {
     playNextRef.current = playNext;
     playPreviousRef.current = playPrevious;
+    playTrackRef.current = playTrack;
   }, [playNext, playPrevious]);
 
   useEffect(() => {
