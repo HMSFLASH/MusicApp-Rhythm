@@ -116,16 +116,21 @@ export function useAudioMetadata(jwtToken: string, queueState: any) {
                     const fetched = await fetch(blobUrl);
                     const arrayBuffer = await fetched.arrayBuffer();
                     const buffer = new Uint8Array(arrayBuffer);
-                    metadata = await parseBufferFn(buffer, mimeType, { duration: false });
+                    const fetchedMimeType = fetched.headers.get('Content-Type');
+                    const actualMimeType = (fetchedMimeType && fetchedMimeType !== 'application/octet-stream') ? fetchedMimeType : mimeType;
+                    metadata = await parseBufferFn(buffer, actualMimeType, { duration: false });
                 } else {
                     const fetchUrl = `${BACKEND_URL}/api/music/stream/${track.id}?access_token=${jwtToken}`;
                     const controller = new AbortController();
                     const response = await fetch(fetchUrl, { signal: controller.signal });
                     if (!response.ok) throw new Error(`HTTP ${response.status}`);
 
+                    const fetchedMimeType = response.headers.get('Content-Type');
+                    const actualMimeType = (fetchedMimeType && fetchedMimeType !== 'application/octet-stream') ? fetchedMimeType : mimeType;
+
                     const contentLengthHeader = response.headers.get('Content-Length');
                     const fileSize = contentLengthHeader ? parseInt(contentLengthHeader, 10) : (track.fileSize || 0);
-                    const maxMetadataSize = fileSize > 15 * 1024 * 1024 ? 2 * 1024 * 1024 : 512 * 1024;
+                    const maxMetadataSize = fileSize > 15 * 1024 * 1024 ? 1.2 * 1024 * 1024 : 512 * 1024;
 
                     const reader = response.body!.getReader();
                     const chunks: Uint8Array[] = [];
@@ -146,7 +151,7 @@ export function useAudioMetadata(jwtToken: string, queueState: any) {
                         offset += c.length;
                     }
 
-                    metadata = await parseBufferFn(buffer, mimeType, { duration: false });
+                    metadata = await parseBufferFn(buffer, actualMimeType, { duration: false });
                 }
             }
 

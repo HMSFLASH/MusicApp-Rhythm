@@ -210,10 +210,10 @@ export function QueuePage() {
 
                   <div className="flex-1 min-w-0">
                     <h4 className={`text-base font-medium truncate ${isCurrent ? 'text-primary' : 'text-white'}`}>
-                      {track.title || playerState.getTrackMetadata(track.id)?.title || track.fileName}
+                      {track.title || playerState.getTrackMetadata(track.id)?.title || (track.fileName ? (track.fileName.includes(' - ') ? track.fileName.split(' - ')[1].replace(/\.[^/.]+$/, "") : track.fileName.replace(/\.[^/.]+$/, "")) : 'Unknown Title')}
                     </h4>
                     <p className="text-sm text-white/50 truncate">
-                      {track.artist || playerState.getTrackMetadata(track.id)?.artist || 'Unknown Artist'} {track.album ? `• ${track.album}` : ''}
+                      {track.artist || playerState.getTrackMetadata(track.id)?.artist || (track.fileName?.includes(' - ') ? track.fileName.split(' - ')[0] : 'Unknown Artist')} {track.album ? `• ${track.album}` : ''}
                     </p>
                   </div>
 
