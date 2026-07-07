@@ -1,0 +1,41 @@
+export const LOCAL_STORAGE_KEY = 'SONIC_DEPTH_AUDIO_CONFIG';
+export const PLAYBACK_STORAGE_KEY = 'SONIC_DEPTH_PLAYBACK_STATE';
+
+export const getInitialState = () => {
+  try {
+    const saved = localStorage.getItem(LOCAL_STORAGE_KEY);
+    if (saved) return JSON.parse(saved);
+  } catch (e) {
+    console.error('Failed to load audio config', e);
+  }
+  return {};
+};
+
+export const getInitialPlaybackState = () => {
+  try {
+    const saved = localStorage.getItem(PLAYBACK_STORAGE_KEY);
+    if (saved) {
+      const parsed = JSON.parse(saved);
+
+      if (parsed.queue) {
+        parsed.queue = parsed.queue.filter((t: any) => t.sourceType !== 'LOCAL');
+        parsed.queue.forEach((t: any) => {
+          if (t.imageUrl?.startsWith('blob:')) t.imageUrl = '';
+        });
+      }
+
+      if (parsed.currentTrack) {
+        if (parsed.currentTrack.sourceType === 'LOCAL') {
+          parsed.currentTrack = parsed.queue.length > 0 ? parsed.queue[0] : null;
+        } else if (parsed.currentTrack.imageUrl?.startsWith('blob:')) {
+          parsed.currentTrack.imageUrl = '';
+        }
+      }
+
+      return parsed;
+    }
+  } catch (e) {
+    console.error('Failed to load playback state', e);
+  }
+  return { currentTrack: null, queue: [] };
+};

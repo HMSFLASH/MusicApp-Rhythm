@@ -1,0 +1,1639 @@
+import { useState, useRef, useEffect, useCallback } from 'react';
+import { axiosClient } from '../api/axiosClient';
+import type { Track } from './audioTypes';
+import { useAudioQueue } from './useAudioQueue';
+import { useAudioEffectsState } from './useAudioEffectsState';
+import { LOCAL_STORAGE_KEY, PLAYBACK_STORAGE_KEY } from './audioStorage';
+const BACKEND_URL = `http://${window.location.hostname}:8080`;
+const createSoftClipCurve = (amount = 44100) => {
+  const curve = new Float32Array(amount);
+  for (let i = 0; i < amount; ++i) {
+    const x = (i * 2) / amount - 1;
+    curve[i] = Math.max(-1, Math.min(1, 1.5 * x - 0.5 * Math.pow(x, 3)));
+  }
+  return curve;
+};
+export function useAudioEngine(jwtToken: string, queueState: ReturnType<typeof useAudioQueue>, effectsState: ReturnType<typeof useAudioEffectsState>, savedState: any) {
+  const { currentTrack, setCurrentTrack, queue, setQueue, isShuffleState, songEndMode, queueEndMode, upcomingQueues, cycleQueues, setUpcomingQueues, continueFromLast, repeatMode } = queueState;
+  const { eqBands, preampGain, bassGain, trebleGain, compThreshold, compRatio, compKnee, compAttack, compRelease, compMakeupGain, panValue, stereoWidth, reverbMix, reverbTime, useOversample, precalculateOnIdle, fxEnabledRef, eqPresetName, fxEnabled, customEqPresets, loudnessNormalization } = effectsState;
+  const [isPlaying, setIsPlaying] = useState(false);
+  const [currentTime, setCurrentTime] = useState(0);
+  const [duration, setDuration] = useState(0);
+
+  // Audio state
+  const audioRef = useRef<HTMLAudioElement | null>(null);
+  const audioContextRef = useRef<AudioContext | null>(null);
+  const sourceNodeRef = useRef<MediaElementAudioSourceNode | null>(null);
+  
+  const bufferSourceRef = useRef<AudioBufferSourceNode | null>(null);
+  const bufferVolumeNodeRef = useRef<GainNode | null>(null);
+  const audioBufferRef = useRef<AudioBuffer | null>(null);
+  const bufferStartTimeRef = useRef<number>(0);
+  const bufferPausedTimeRef = useRef<number>(0);
+  const rafRef = useRef<number | null>(null);
+  const isDecodingRef = useRef<boolean>(false);
+  const precalculatedNextBufferRef = useRef<{ trackId: string, buffer: AudioBuffer } | null>(null);
+  const isPrecalculatingNextRef = useRef<boolean>(false);
+  const decodeSessionRef = useRef<symbol | null>(null);
+
+  // Volume state
+  const [volume, setVolumeState] = useState<number>(savedState.volume ?? 1);
+  const setVolume = useCallback((newVolume: number) => {
+    setVolumeState(newVolume);
+    if (rafRef.current) window.clearInterval(rafRef.current);
+    if (bufferSourceRef.current) {
+      try { bufferSourceRef.current.onended = null; bufferSourceRef.current.stop(); } catch (e) { }
+      bufferSourceRef.current.disconnect();
+    }
+    if (audioRef.current) {
+      audioRef.current.volume = newVolume;
+    }
+    try {
+      const existing = JSON.parse(localStorage.getItem(LOCAL_STORAGE_KEY) || '{}');
+      localStorage.setItem(LOCAL_STORAGE_KEY, JSON.stringify({ ...existing, volume: newVolume }));
+    } catch (e) { }
+  }, []);
+
+  // New states for Shuffle and Repeat
+  
+  const playNextRef = useRef<(() => void) | null>(null);
+  const playPreviousRef = useRef<(() => void) | null>(null);
+  
+  
+  // Dynamic EQ State
+
+
+  const eqNodesRef = useRef<BiquadFilterNode[]>([]);
+  
+  
+      const limiterNodeRef = useRef<DynamicsCompressorNode | null>(null);
+  const softClipNodeRef = useRef<WaveShaperNode | null>(null);
+    const panNodeRef = useRef<StereoPannerNode | null>(null);
+  const headroomDropRef = useRef<GainNode | null>(null);
+  const headroomRecoverRef = useRef<GainNode | null>(null);
+
+  // Preamp Control
+  const preampNodeRef = useRef<GainNode | null>(null);
+
+  // Loudness Normalization (AGC)
+    const agcPreGainRef = useRef<GainNode | null>(null);
+    const agcCompressorRef = useRef<DynamicsCompressorNode | null>(null);
+    const agcMakeupRef = useRef<GainNode | null>(null);
+  
+  
+  
+
+  // FX Enabled State
+
+
+  // Tone Controls
+  const bassNodeRef = useRef<BiquadFilterNode | null>(null);
+  const trebleNodeRef = useRef<BiquadFilterNode | null>(null);
+
+
+  // Compressor Controls
+  const compressorNodeRef = useRef<DynamicsCompressorNode | null>(null);
+
+  const compMakeupNodeRef = useRef<GainNode | null>(null);
+
+  // Playback & Pitch
+  const [playbackRate, setPlaybackRate] = useState<number>(savedState.playbackRate ?? 1);
+  const [preservesPitch, setPreservesPitch] = useState<boolean>(savedState.preservesPitch ?? true);
+
+  // Pan (Balance)
+  
+
+  // Reverb Controls
+  const convolverNodeRef = useRef<ConvolverNode | null>(null);
+  const irBufferRef = useRef<AudioBuffer | null>(null);
+
+  const generateImpulseResponse = (ctx: AudioContext, duration: number, decay: number) => {
+    const sampleRate = ctx.sampleRate;
+    const length = sampleRate * duration;
+    const impulse = ctx.createBuffer(2, length, sampleRate);
+    const left = impulse.getChannelData(0);
+    const right = impulse.getChannelData(1);
+    for (let i = 0; i < length; i++) {
+      const factor = Math.pow(1 - i / length, decay);
+      left[i] = (Math.random() * 2 - 1) * factor;
+      right[i] = (Math.random() * 2 - 1) * factor;
+    }
+    return impulse;
+  };
+
+  useEffect(() => {
+    const loadIR = async () => {
+      try {
+        const tempCtx = new (window.AudioContext || (window as any).webkitAudioContext)();
+        irBufferRef.current = generateImpulseResponse(tempCtx, 2.0, 2.0);
+      } catch (e) { console.error('Failed to generate IR', e); }
+    };
+    loadIR();
+  }, []);
+  const reverbPreDelayRef = useRef<DelayNode | null>(null);
+  const dryGainRef = useRef<GainNode | null>(null);
+  const wetGainRef = useRef<GainNode | null>(null);
+
+  // Stereo Expand Controls
+  const stereoSplitterRef = useRef<ChannelSplitterNode | null>(null);
+  const stereoMergerRef = useRef<ChannelMergerNode | null>(null);
+  const lToLRef = useRef<GainNode | null>(null);
+  const rToLRef = useRef<GainNode | null>(null);
+        const haasWetGainRef = useRef<GainNode | null>(null);
+
+
+  useEffect(() => {
+    localStorage.setItem(PLAYBACK_STORAGE_KEY, JSON.stringify({ currentTrack, queue }));
+  }, [currentTrack, queue]);
+
+
+  // Preload Cache
+  const blobCacheRef = useRef<Map<string | number, string>>(new Map());
+  const preloadingIdsRef = useRef<Set<string>>(new Set());
+  const allowedIdsRef = useRef<Set<string>>(new Set());
+
+  
+  const imageCacheRef = useRef<Map<string | number, string>>(new Map());
+  const metadataCacheRef = useRef<Map<string | number, Partial<Track>>>(new Map());
+
+  // Initialize Web Audio API
+  useEffect(() => {
+    if (!audioRef.current) {
+      audioRef.current = new Audio();
+      audioRef.current.crossOrigin = "anonymous";
+      audioRef.current.volume = savedState.volume ?? 1;
+
+      audioRef.current.addEventListener('timeupdate', () => {
+        if (document.hidden) return;
+        if (rafRef.current) return; // Ignore native timeupdate if raf is active
+        setCurrentTime(audioRef.current!.currentTime);
+      });
+
+      const handleVisibilityChange = () => {
+        if (!document.hidden && audioRef.current) {
+          if (rafRef.current) return; // Ignore if using manual timer (precalculate mode)
+          setCurrentTime(audioRef.current.currentTime);
+        }
+      };
+      document.addEventListener('visibilitychange', handleVisibilityChange);
+      // Store the handler on the ref for cleanup
+      (audioRef as any).current._visibilityHandler = handleVisibilityChange;
+      audioRef.current.addEventListener('loadedmetadata', () => setDuration(audioRef.current?.duration || 0));
+      audioRef.current.addEventListener('ended', () => {
+        if (playNextRef.current) playNextRef.current();
+      });
+      audioRef.current.addEventListener('play', () => setIsPlaying(true));
+      audioRef.current.addEventListener('pause', () => setIsPlaying(false));
+    }
+
+    return () => {
+      // Cleanup on unmount (critical for React Hot Reload / Fast Refresh)
+      // Prevents multiple hidden audio elements from playing concurrently
+      if (audioRef.current) {
+        if ((audioRef as any).current._visibilityHandler) {
+          document.removeEventListener('visibilitychange', (audioRef as any).current._visibilityHandler);
+        }
+        audioRef.current.pause();
+        audioRef.current.src = "";
+        audioRef.current = null;
+      }
+      if (audioContextRef.current && audioContextRef.current.state !== 'closed') {
+        audioContextRef.current.close().catch(console.error);
+        audioContextRef.current = null;
+      }
+    };
+  }, []);
+
+
+
+  // Save Config to Local Storage
+  useEffect(() => {
+    const config = {
+      volume,
+      eqPresetName,
+      eqBands,
+      fxEnabled,
+      preampGain,
+      bassGain,
+      trebleGain,
+      compThreshold,
+      compRatio,
+      compKnee,
+      compAttack,
+      compRelease,
+      compMakeupGain,
+      panValue,
+      stereoWidth,
+      playbackRate,
+      preservesPitch,
+      reverbMix,
+      reverbTime,
+      customEqPresets,
+      upcomingQueues,
+      continueFromLast,
+      cycleQueues,
+      loudnessNormalization,
+      isShuffleState,
+      songEndMode,
+      queueEndMode,
+      repeatMode,
+      useOversample,
+      precalculateOnIdle
+    };
+    localStorage.setItem(LOCAL_STORAGE_KEY, JSON.stringify(config));
+  }, [
+    volume, eqPresetName, eqBands, fxEnabled, preampGain, bassGain, trebleGain,
+    compThreshold, compRatio, compKnee, compAttack, compRelease, compMakeupGain,
+    panValue, stereoWidth, playbackRate, preservesPitch, customEqPresets,
+    reverbMix, reverbTime, upcomingQueues, continueFromLast, cycleQueues,
+    loudnessNormalization, isShuffleState, songEndMode, queueEndMode, repeatMode, useOversample, precalculateOnIdle
+  ]);
+
+
+
+  
+  // --- OFFLINE RENDERING PARAMS REF ---
+  const audioParamsRef = useRef({
+    preampGain, eqBands, bassGain, trebleGain, compThreshold, compRatio, compKnee, compAttack, compRelease, compMakeupGain, reverbMix, reverbTime, stereoWidth, panValue, useOversample
+  });
+
+  useEffect(() => {
+    audioParamsRef.current = {
+      preampGain, eqBands, bassGain, trebleGain, compThreshold, compRatio, compKnee, compAttack, compRelease, compMakeupGain, reverbMix, reverbTime, stereoWidth, panValue, useOversample
+    };
+  }, [preampGain, eqBands, bassGain, trebleGain, compThreshold, compRatio, compKnee, compAttack, compRelease, compMakeupGain, reverbMix, reverbTime, stereoWidth, panValue, useOversample]);
+
+  const performOfflineRender = async (audioBuffer: AudioBuffer, rate: number = 1.0) => {
+console.log("[Audio] performOfflineRender called with EQ bands:", audioParamsRef.current.eqBands.length);
+    if (!audioBuffer) return audioBuffer;
+    const sampleRate = audioBuffer.sampleRate;
+    const length = audioBuffer.length;
+    const offlineCtx = new OfflineAudioContext(2, length, sampleRate);
+
+    const offlineSource = offlineCtx.createBufferSource();
+    offlineSource.buffer = audioBuffer;
+    offlineSource.playbackRate.value = rate;
+
+    let currentNode: AudioNode = offlineSource;
+    const enabled = fxEnabledRef.current;
+    const { preampGain, eqBands, bassGain, trebleGain, compThreshold, compRatio, compKnee, compAttack, compRelease, compMakeupGain, reverbMix, stereoWidth, panValue,  } = audioParamsRef.current;
+
+    // 1. Gain Staging (-6dB)
+    const headroomDrop = offlineCtx.createGain();
+    headroomDrop.gain.value = 0.5;
+    currentNode.connect(headroomDrop);
+    currentNode = headroomDrop;
+
+    // 1.5 Preamp
+    if (enabled.preamp) {
+      const preamp = offlineCtx.createGain();
+      preamp.gain.value = Math.pow(10, preampGain / 20);
+      currentNode.connect(preamp);
+      currentNode = preamp;
+    }
+
+    // 2. EQ
+    if (enabled.eq && eqBands && eqBands.length > 0) {
+      const filters = eqBands.map(band => {
+        const filter = offlineCtx.createBiquadFilter();
+        filter.type = band.type || 'peaking';
+        filter.frequency.value = band.frequency;
+        filter.Q.value = band.q;
+        filter.gain.value = band.gain;
+        return filter;
+      });
+
+      const splitter = offlineCtx.createChannelSplitter(2);
+      const merger = offlineCtx.createChannelMerger(2);
+
+      const stereoFilters = filters.filter((_, i) => eqBands[i].channel === 'L+R');
+      const leftFilters = filters.filter((_, i) => eqBands[i].channel === 'L');
+      const rightFilters = filters.filter((_, i) => eqBands[i].channel === 'R');
+
+      // Stereo Chain
+      let prevNode = null;
+      for (const filter of stereoFilters) {
+        if (prevNode) prevNode.connect(filter);
+        else currentNode.connect(filter);
+        prevNode = filter;
+      }
+      if (prevNode) prevNode.connect(splitter);
+      else currentNode.connect(splitter);
+
+      // Left Chain
+      let leftNode = splitter;
+      let prevLeft = null;
+      for (const filter of leftFilters) {
+        if (prevLeft) prevLeft.connect(filter);
+        else splitter.connect(filter, 0, 0);
+        prevLeft = filter;
+      }
+      if (prevLeft) leftNode = prevLeft;
+
+      // Right Chain
+      let rightNode = splitter;
+      let prevRight = null;
+      for (const filter of rightFilters) {
+        if (prevRight) prevRight.connect(filter);
+        else splitter.connect(filter, 1, 0);
+        prevRight = filter;
+      }
+      if (prevRight) rightNode = prevRight;
+
+      leftNode.connect(merger, leftNode === splitter ? 0 : 0, 0);
+      rightNode.connect(merger, rightNode === splitter ? 1 : 0, 1);
+
+      currentNode = merger;
+    }
+
+    // 3. Tone
+    if (enabled.tone) {
+      const bass = offlineCtx.createBiquadFilter();
+      bass.type = 'lowshelf';
+      bass.frequency.value = 150;
+      bass.gain.value = bassGain;
+
+      const treble = offlineCtx.createBiquadFilter();
+      treble.type = 'highshelf';
+      treble.frequency.value = 4000;
+      treble.gain.value = trebleGain;
+
+      currentNode.connect(bass);
+      bass.connect(treble);
+      currentNode = treble;
+    }
+
+    // 4. Compressor
+    if (enabled.comp) {
+      const comp = offlineCtx.createDynamicsCompressor();
+      comp.threshold.value = compThreshold;
+      comp.ratio.value = compRatio;
+      comp.knee.value = compKnee;
+      comp.attack.value = compAttack;
+      comp.release.value = compRelease;
+
+      const makeup = offlineCtx.createGain();
+      makeup.gain.value = Math.pow(10, compMakeupGain / 20);
+
+      currentNode.connect(comp);
+      comp.connect(makeup);
+      currentNode = makeup;
+    }
+
+    // 5. Reverb
+    let dryGain: any, wetGain: any;
+    let isReverbParallel = false;
+    if (enabled.reverb) {
+      const preDelay = offlineCtx.createDelay(1.0);
+      preDelay.delayTime.value = 0.02;
+
+      const convolver = offlineCtx.createConvolver();
+      if (irBufferRef.current) {
+        convolver.buffer = irBufferRef.current;
+      }
+      
+      dryGain = offlineCtx.createGain();
+      const x = reverbMix / 100;
+      dryGain.gain.value = Math.cos(x * Math.PI / 2);
+
+      wetGain = offlineCtx.createGain();
+      wetGain.gain.value = Math.sin(x * Math.PI / 2) * 0.35;
+
+      currentNode.connect(dryGain);
+      currentNode.connect(preDelay);
+      preDelay.connect(convolver);
+      convolver.connect(wetGain);
+
+      isReverbParallel = true;
+    }
+
+    const connectToNext = (nextNode: AudioNode) => {
+      if (isReverbParallel && dryGain && wetGain) {
+        dryGain.connect(nextNode);
+        wetGain.connect(nextNode);
+        isReverbParallel = false;
+      } else {
+        currentNode.connect(nextNode);
+      }
+      currentNode = nextNode;
+    };
+
+    // 5.5 Stereo Haas Effect
+      if (enabled.stereo) {
+        const haasOut = offlineCtx.createGain();
+        connectToNext(haasOut); // dry path
+
+        const monoDownmix = offlineCtx.createGain();
+        monoDownmix.channelCount = 1;
+        monoDownmix.channelCountMode = 'explicit';
+        connectToNext(monoDownmix);
+
+        const merge = offlineCtx.createChannelMerger(2);
+        
+        const delay = offlineCtx.createDelay(0.05);
+        delay.delayTime.value = 0.015;
+        
+        const filter = offlineCtx.createBiquadFilter();
+        filter.type = 'highpass';
+        filter.frequency.value = 200;
+
+        const m_S = Math.min(stereoWidth / 100, 1.5);
+        const wetGain = offlineCtx.createGain();
+        wetGain.gain.value = 0.2 * m_S;
+
+        monoDownmix.connect(merge, 0, 0);
+        monoDownmix.connect(delay);
+        delay.connect(filter);
+        filter.connect(merge, 0, 1);
+
+        merge.connect(wetGain);
+        wetGain.connect(haasOut);
+
+        currentNode = haasOut;
+      }
+
+    // 6. Pan
+    if (enabled.master) {
+      const panNode = offlineCtx.createStereoPanner();
+      panNode.pan.value = panValue;
+      connectToNext(panNode);
+    }
+
+    // 7. Headroom Recover
+    const headroomRecover = offlineCtx.createGain();
+    headroomRecover.gain.value = 1.414;
+    connectToNext(headroomRecover);
+
+    // 8. Limiter & Soft Clip
+      // Removed from offline render to allow Volume to be applied before Limiter in real-time playback.
+
+    connectToNext(offlineCtx.destination);
+
+    offlineSource.start(0);
+    const renderedBuffer = await offlineCtx.startRendering();
+    return renderedBuffer;
+  };
+
+  const preloadAdjacentTracks = async (currentId: string | number, currentQueue: Track[]) => {
+    const allowedIds = new Set<string>();
+    allowedIds.add(String(currentId));
+
+    let prev1: Track | undefined;
+    let next1: Track | undefined;
+
+    const idx = currentQueue.findIndex(t => String(t.id) === String(currentId));
+    if (idx !== -1) {
+      prev1 = currentQueue[idx - 1];
+      next1 = currentQueue[idx + 1];
+
+      // Assuming queueEndMode logic exists or defaulting to not looping if missing
+      // If we don't have queueEndMode accessible here, we just ignore it for now.
+      // But let's just do a simple next1/prev1 fallback if undefined and queue length > 1
+      if (!prev1 && currentQueue.length > 0) prev1 = currentQueue[currentQueue.length - 1];
+      if (!next1 && currentQueue.length > 0) next1 = currentQueue[0];
+
+      if (prev1) allowedIds.add(String(prev1.id));
+      if (next1) allowedIds.add(String(next1.id));
+    }
+    allowedIdsRef.current = allowedIds;
+
+    // 1. Memory Cleanup: Only keep current, prev1, and next1 in RAM
+    for (const [key, objectUrl] of blobCacheRef.current.entries()) {
+      if (!allowedIds.has(String(key))) {
+        URL.revokeObjectURL(objectUrl);
+        blobCacheRef.current.delete(key);
+        console.log(`[Cache Cleanup] Removed ${key} from RAM`);
+      }
+    }
+
+    // 2. Preload the next and prev tracks
+    if (next1) {
+      await preloadTrack(next1);
+    }
+    if (prev1 && (!next1 || String(prev1.id) !== String(next1.id))) {
+      await preloadTrack(prev1);
+    }
+  };
+
+  const playTrack = async (startingTrack: Track | null, currentQueue?: Track[], autoPlay = true, ..._args: any[]) => {
+    initializeAudioContext();
+    if (!startingTrack) return;
+    if (!currentQueue) currentQueue = [startingTrack];
+    setCurrentTrack(startingTrack);
+    setQueue(currentQueue);
+
+    let audioUrl = '';
+    if (blobCacheRef.current.has(String(startingTrack.id))) {
+      audioUrl = blobCacheRef.current.get(String(startingTrack.id))!;
+    } else if (startingTrack.sourceType === 'LOCAL' && startingTrack.localFile instanceof Blob) {
+      audioUrl = URL.createObjectURL(startingTrack.localFile);
+      blobCacheRef.current.set(String(startingTrack.id), audioUrl);
+    } else if (startingTrack.sourceType !== 'LOCAL') {
+      audioUrl = `${BACKEND_URL}/api/music/stream/${startingTrack.id}?access_token=${jwtToken}`;
+    } else {
+      return;
+    }
+
+    preloadAdjacentTracks(startingTrack.id, currentQueue);
+
+    if (rafRef.current) {
+      window.clearInterval(rafRef.current);
+      rafRef.current = null;
+    }
+    if (bufferSourceRef.current) {
+      try { bufferSourceRef.current.onended = null; bufferSourceRef.current.stop(); } catch (e) { }
+      bufferSourceRef.current.disconnect();
+      bufferSourceRef.current = null;
+    }
+
+    if (precalculateOnIdle) {
+      audioRef.current!.pause();
+      audioRef.current!.src = "";
+      setIsPlaying(true);
+
+      const playSessionId = Symbol();
+      decodeSessionRef.current = playSessionId;
+
+      (async () => {
+        try {
+          isDecodingRef.current = true;
+
+          let finalRenderedBuffer = null;
+          if (precalculatedNextBufferRef.current?.trackId === String(startingTrack.id)) {
+            finalRenderedBuffer = precalculatedNextBufferRef.current.buffer;
+          } else {
+            const response = await fetch(audioUrl);
+            const arrayBuffer = await response.arrayBuffer();
+            const audioBuffer = await audioContextRef.current!.decodeAudioData(arrayBuffer);
+
+            const renderedBuffer = await performOfflineRender(audioBuffer, playbackRate);
+            finalRenderedBuffer = renderedBuffer;
+          }
+
+          // Check if session changed while decoding
+          if (decodeSessionRef.current !== playSessionId) return;
+
+          audioBufferRef.current = finalRenderedBuffer;
+          setDuration(finalRenderedBuffer.duration);
+
+          bufferSourceRef.current = audioContextRef.current!.createBufferSource();
+          bufferSourceRef.current.buffer = finalRenderedBuffer;
+          // (AudioBufferSourceNode doesn't support preservesPitch, only HTMLMediaElement does)
+          bufferSourceRef.current.playbackRate.value = playbackRate;
+
+          if (!bufferVolumeNodeRef.current) {
+            bufferVolumeNodeRef.current = audioContextRef.current!.createGain();
+            let finalNode: AudioNode = bufferVolumeNodeRef.current;
+            if (fxEnabledRef.current.limiter) {
+            if (!limiterNodeRef.current) {
+              limiterNodeRef.current = audioContextRef.current!.createDynamicsCompressor();
+              limiterNodeRef.current.threshold.value = -0.1;
+              limiterNodeRef.current.knee.value = 0.0;
+              limiterNodeRef.current.ratio.value = 20.0;
+              limiterNodeRef.current.attack.value = 0.005;
+              limiterNodeRef.current.release.value = 0.050;
+            }
+            if (!softClipNodeRef.current) {
+              softClipNodeRef.current = audioContextRef.current!.createWaveShaper();
+              softClipNodeRef.current.curve = createSoftClipCurve(44100);
+              if (useOversample) softClipNodeRef.current.oversample = '4x';
+            }
+            finalNode.connect(limiterNodeRef.current);
+            limiterNodeRef.current.connect(softClipNodeRef.current);
+            finalNode = softClipNodeRef.current;
+          }
+            finalNode.connect(audioContextRef.current!.destination);
+          }
+          bufferVolumeNodeRef.current.gain.value = volume;
+          bufferSourceRef.current.connect(bufferVolumeNodeRef.current);
+          bufferSourceRef.current.onended = () => {
+            if (playNextRef.current) playNextRef.current();
+          };
+
+
+          // Trigger background preload for the next track
+          if (precalculateOnIdle) {
+            setTimeout(() => preloadNextTrack(startingTrack, queue), 500);
+          }
+
+          if (autoPlay) {
+            bufferStartTimeRef.current = audioContextRef.current!.currentTime;
+            bufferPausedTimeRef.current = 0;
+            bufferSourceRef.current.start(0);
+            setIsPlaying(true);
+
+            const updateTime = () => {
+              if (document.hidden) return;
+              if (audioContextRef.current) {
+                const elapsed = (audioContextRef.current.currentTime - bufferStartTimeRef.current) * playbackRate;
+                setCurrentTime(elapsed);
+              }
+            };
+            rafRef.current = window.setInterval(updateTime, 25);
+          } else {
+            bufferPausedTimeRef.current = 0;
+            setIsPlaying(false);
+          }
+        } catch (e) {
+          console.error("Decode failed, falling back to stream", e);
+          audioRef.current!.src = audioUrl;
+          if (autoPlay) audioRef.current!.play();
+        } finally {
+          isDecodingRef.current = false;
+        }
+      })();
+    } else {
+      if ((window as any).dummyAudio) (window as any).dummyAudio.pause();
+      audioRef.current!.loop = false;
+      if (audioUrl.startsWith('blob:')) {
+        audioRef.current!.removeAttribute('crossorigin');
+      } else {
+        audioRef.current!.crossOrigin = "anonymous";
+      }
+      audioRef.current!.src = audioUrl;
+      if (autoPlay) {
+        audioRef.current!.play().catch((e: any) => console.error("Playback failed", e));
+      } else {
+        audioRef.current!.pause();
+        setIsPlaying(false);
+      }
+    }
+
+    // Preload adjacent tracks and extract metadata for ALL tracks
+    if (startingTrack.sourceType !== 'LOCAL') {
+      preloadTrack(startingTrack).then(() => {
+        preloadAdjacentTracks(startingTrack.id, queue || []);
+      });
+    }
+    
+    
+  };
+
+  
+  const extractMetadata = async (track: Track) => {
+    const trackId = String(track.id);
+    if (metadataCacheRef.current.has(trackId)) return;
+    
+    try {
+        const mm = await import('music-metadata-browser');
+        let metadata: any;
+        let timeoutId: ReturnType<typeof setTimeout>;
+
+        if (track.sourceType === 'LOCAL' && track.localFile) {
+            const parseBufferFn = mm.parseBuffer || mm.default?.parseBuffer;
+            if (!parseBufferFn) throw new Error('parseBuffer not found');
+
+            const arrayBuffer = await track.localFile.arrayBuffer();
+            const buffer = new Uint8Array(arrayBuffer);
+            const ext = track.fileName?.split('.').pop()?.toLowerCase();
+            const mimeMap: Record<string, string> = { mp3: 'audio/mpeg', m4a: 'audio/mp4', flac: 'audio/flac', wav: 'audio/wav', ogg: 'audio/ogg', opus: 'audio/ogg', aac: 'audio/aac', wma: 'audio/x-ms-wma' };
+            const mimeType = mimeMap[ext || ''] || track.localFile.type || 'audio/mpeg';
+
+            const parsePromise = parseBufferFn(buffer, mimeType, { duration: false });
+            const timeoutPromise = new Promise<never>((_, reject) => {
+                timeoutId = setTimeout(() => reject(new Error('Local metadata parse timeout')), 10000);
+            });
+            metadata = await Promise.race([parsePromise, timeoutPromise]).finally(() => clearTimeout(timeoutId!));
+        } else {
+            const ext = track.fileName?.split('.').pop()?.toLowerCase();
+            const mimeMap: Record<string, string> = { mp3: 'audio/mpeg', m4a: 'audio/mp4', flac: 'audio/flac', wav: 'audio/wav', ogg: 'audio/ogg', opus: 'audio/ogg', aac: 'audio/aac', wma: 'audio/x-ms-wma' };
+            const mimeType = mimeMap[ext || ''] || 'audio/mpeg';
+            const parseBufferFn = mm.parseBuffer || mm.default?.parseBuffer;
+            if (!parseBufferFn) throw new Error('parseBuffer not found');
+
+            let blobUrl = blobCacheRef.current.get(trackId);
+            if (blobUrl) {
+                const fetched = await fetch(blobUrl);
+                const arrayBuffer = await fetched.arrayBuffer();
+                const buffer = new Uint8Array(arrayBuffer);
+                metadata = await parseBufferFn(buffer, mimeType, { duration: false });
+            } else {
+                const fetchUrl = `${BACKEND_URL}/api/music/stream/${track.id}?access_token=${jwtToken}`;
+                const controller = new AbortController();
+                const response = await fetch(fetchUrl, { signal: controller.signal });
+                if (!response.ok) throw new Error(`HTTP ${response.status}`);
+                
+                const reader = response.body!.getReader();
+                const chunks: Uint8Array[] = [];
+                const isLossless = track.fileName?.toLowerCase().endsWith('.flac') || track.fileName?.toLowerCase().endsWith('.wav') || track.fileName?.toLowerCase().endsWith('.opus');
+                const maxMetadataSize = isLossless ? 3 * 1024 * 1024 : 512 * 1024; // 3MB for lossless, 512KB for others
+                let totalLength = 0;
+                
+                while (totalLength < maxMetadataSize) { 
+                    const { done, value } = await reader.read();
+                    if (done || !value) break;
+                    chunks.push(value);
+                    totalLength += value.length;
+                }
+                controller.abort(); 
+                
+                const buffer = new Uint8Array(totalLength);
+                let offset = 0;
+                for (const c of chunks) {
+                    buffer.set(c, offset);
+                    offset += c.length;
+                }
+                
+                metadata = await parseBufferFn(buffer, mimeType, { duration: false });
+            }
+        }
+
+        const up: Partial<Track> = {};
+        const cachePayload: Partial<Track> = {};
+        
+        if (metadata.common.title) { up.title = metadata.common.title; cachePayload.title = metadata.common.title; }
+        if (metadata.common.artist) { up.artist = metadata.common.artist; cachePayload.artist = metadata.common.artist; }
+        if (metadata.common.album) { up.album = metadata.common.album; cachePayload.album = metadata.common.album; }
+        if (metadata.common.picture?.length) {
+            const pic = metadata.common.picture[0];
+            const fmt = pic.format || 'jpeg';
+            const mime = fmt.startsWith('image/') ? fmt : `image/${fmt}`;
+            const imgUrl = URL.createObjectURL(new Blob([new Uint8Array(pic.data)], { type: mime }));
+            up.imageUrl = imgUrl;
+            imageCacheRef.current.set(trackId, imgUrl);
+        }
+
+        // Always mark as cached so we don't infinitely retry
+        metadataCacheRef.current.set(trackId, cachePayload);
+
+        if (Object.keys(up).length > 0) {
+            setCurrentTrack(prev => prev && String(prev.id) === trackId ? { ...prev, ...up } : prev);
+            setQueue(prevQ => prevQ.map(t => String(t.id) === trackId ? { ...t, ...up } : t));
+        }
+    } catch (e) {
+        console.warn('[Metadata] Failed to extract for', track.fileName, e);
+        // Mark as failed in cache to prevent infinite retries
+        metadataCacheRef.current.set(trackId, {});
+    }
+  };
+
+  useEffect(() => {
+    if (!queue || queue.length === 0) return;
+    let cancelled = false;
+    
+    const processQueue = async () => {
+        const currentIdx = currentTrack ? queue.findIndex(t => String(t.id) === String(currentTrack.id)) : 0;
+        const baseIdx = currentIdx !== -1 ? currentIdx : 0;
+        
+        const sortedQueue = [...queue].sort((a, b) => {
+            const idxA = queue.findIndex(t => String(t.id) === String(a.id));
+            const idxB = queue.findIndex(t => String(t.id) === String(b.id));
+            const distA = Math.abs(idxA - baseIdx);
+            const distB = Math.abs(idxB - baseIdx);
+            return distA - distB;
+        });
+
+        for (const track of sortedQueue) {
+            if (cancelled) break;
+            if (!metadataCacheRef.current.has(String(track.id))) {
+                await extractMetadata(track);
+                await new Promise(r => setTimeout(r, 240)); // Rate limit
+            }
+        }
+    };
+    
+    processQueue();
+    return () => { cancelled = true; };
+  }, [queue, currentTrack]);
+
+  const preloadNextTrack = async (currentTrack: Track, currentQueue: Track[]) => {
+    if (!precalculateOnIdle || isPrecalculatingNextRef.current) return;
+
+    // Find next track
+    let nextTrack = null;
+    const idx = currentQueue.findIndex(t => String(t.id) === String(currentTrack.id));
+    if (idx !== -1 && idx < currentQueue.length - 1) {
+      nextTrack = currentQueue[idx + 1];
+    } else if (queueEndMode === 'repeat' && idx === currentQueue.length - 1) {
+      if (!isShuffleState) nextTrack = currentQueue[0];
+    } else if (queueEndMode === 'next' && idx === currentQueue.length - 1 && upcomingQueues.length > 0) {
+      nextTrack = upcomingQueues[0][0];
+    }
+
+    if (!nextTrack) return;
+
+    // Check if we already have it
+    if (precalculatedNextBufferRef.current?.trackId === String(nextTrack.id)) return;
+
+    try {
+      isPrecalculatingNextRef.current = true;
+      console.log("[Lookahead] Precalculating next track:", nextTrack.title || nextTrack.fileName);
+
+      const audioUrl = nextTrack.localFile ? URL.createObjectURL(nextTrack.localFile) : `${BACKEND_URL}/api/music/${nextTrack.id}/stream`;
+      const response = await fetch(audioUrl);
+      const arrayBuffer = await response.arrayBuffer();
+      const audioBuffer = await audioContextRef.current!.decodeAudioData(arrayBuffer);
+
+      // Perform offline rendering using the exact same graph settings
+      // --- OFFLINE RENDERING START ---
+      const offlineCtx = new (window.OfflineAudioContext || (window as any).webkitOfflineAudioContext)(
+        audioBuffer.numberOfChannels,
+        audioBuffer.length,
+        audioBuffer.sampleRate
+      );
+      const offlineSource = offlineCtx.createBufferSource();
+      offlineSource.buffer = audioBuffer;
+      offlineSource.playbackRate.value = playbackRate;
+
+      let currentNode: AudioNode = offlineSource;
+      const enabled = fxEnabledRef.current; // use fxEnabledRef since it's a ref to the latest state
+      const { preampGain, eqBands, bassGain, trebleGain, compThreshold, compRatio, compKnee, compAttack, compRelease, compMakeupGain, reverbMix, stereoWidth, panValue,  } = audioParamsRef.current;
+      // Wait, fxEnabled is state, not ref. Let's use fxEnabled directly.
+      // BUT playTrack might have a stale closure of fxEnabled if it's not wrapped in useCallback.
+      // Since playTrack is defined inside useAudioPlayer, it uses the latest closure.
+
+      // 1. Gain Staging (-6dB)
+      const headroomDrop = offlineCtx.createGain();
+      headroomDrop.gain.value = 0.5;
+      currentNode.connect(headroomDrop);
+      currentNode = headroomDrop;
+
+      // 1.5 Preamp
+      if (enabled.preamp) {
+        const preamp = offlineCtx.createGain();
+        preamp.gain.value = Math.pow(10, preampGain / 20);
+        currentNode.connect(preamp);
+        currentNode = preamp;
+      }
+
+      // 2. EQ
+      if (enabled.eq && eqBands && eqBands.length > 0) {
+        const filters = eqBands.map((band) => {
+          const filter = offlineCtx.createBiquadFilter();
+          filter.type = band.type || 'peaking';
+          filter.frequency.value = band.frequency;
+          filter.Q.value = band.q;
+          filter.gain.value = band.gain;
+          return filter;
+        });
+
+        const splitter = offlineCtx.createChannelSplitter(2);
+        const merger = offlineCtx.createChannelMerger(2);
+
+        const stereoFilters = filters.filter((_, i) => eqBands[i].channel === 'L+R');
+        const leftFilters = filters.filter((_, i) => eqBands[i].channel === 'L');
+        const rightFilters = filters.filter((_, i) => eqBands[i].channel === 'R');
+
+        let prevNode = null;
+        for (const filter of stereoFilters) {
+          if (prevNode) prevNode.connect(filter);
+          else currentNode.connect(filter);
+          prevNode = filter;
+        }
+        if (prevNode) prevNode.connect(splitter);
+        else currentNode.connect(splitter);
+
+        let leftNode = splitter;
+        let prevLeft = null;
+        for (const filter of leftFilters) {
+          if (prevLeft) prevLeft.connect(filter);
+          else splitter.connect(filter, 0, 0);
+          prevLeft = filter;
+        }
+        if (prevLeft) leftNode = prevLeft;
+
+        let rightNode = splitter;
+        let prevRight = null;
+        for (const filter of rightFilters) {
+          if (prevRight) prevRight.connect(filter);
+          else splitter.connect(filter, 1, 0);
+          prevRight = filter;
+        }
+        if (prevRight) rightNode = prevRight;
+
+        leftNode.connect(merger, leftNode === splitter ? 0 : 0, 0);
+        rightNode.connect(merger, rightNode === splitter ? 1 : 0, 1);
+
+        currentNode = merger;
+      }
+
+      // 3. Tone
+      if (enabled.tone) {
+        const bass = offlineCtx.createBiquadFilter();
+        bass.type = 'lowshelf';
+        bass.frequency.value = 150;
+        bass.gain.value = bassGain;
+
+        const treble = offlineCtx.createBiquadFilter();
+        treble.type = 'highshelf';
+        treble.frequency.value = 4000;
+        treble.gain.value = trebleGain;
+
+        currentNode.connect(bass);
+        bass.connect(treble);
+        currentNode = treble;
+      }
+
+      // 4. Compressor
+      if (enabled.comp) {
+        const comp = offlineCtx.createDynamicsCompressor();
+        comp.threshold.value = compThreshold;
+        comp.ratio.value = compRatio;
+        comp.knee.value = compKnee;
+        comp.attack.value = compAttack;
+        comp.release.value = compRelease;
+
+        const makeup = offlineCtx.createGain();
+        makeup.gain.value = Math.pow(10, compMakeupGain / 20);
+
+        currentNode.connect(comp);
+        comp.connect(makeup);
+        currentNode = makeup;
+      }
+
+      // 5. Reverb
+      let dryGain: GainNode | undefined, wetGain: GainNode | undefined;
+      let isReverbParallel = false;
+      if (enabled.reverb) {
+        const preDelay = offlineCtx.createDelay(1.0);
+        preDelay.delayTime.value = 0.02;
+
+        const convolver = offlineCtx.createConvolver();
+        if (irBufferRef.current) {
+          convolver.buffer = irBufferRef.current;
+        }
+        
+        dryGain = offlineCtx.createGain();
+        const x = reverbMix / 100;
+        dryGain.gain.value = Math.cos(x * Math.PI / 2);
+
+        wetGain = offlineCtx.createGain();
+        wetGain.gain.value = Math.sin(x * Math.PI / 2) * 0.35;
+
+        currentNode.connect(dryGain);
+        currentNode.connect(preDelay);
+        preDelay.connect(convolver);
+        convolver.connect(wetGain);
+
+        isReverbParallel = true;
+      }
+
+      const connectToNext = (nextNode: AudioNode) => {
+        if (isReverbParallel && dryGain && wetGain) {
+          dryGain.connect(nextNode);
+          wetGain.connect(nextNode);
+          isReverbParallel = false;
+        } else {
+          currentNode.connect(nextNode);
+        }
+        currentNode = nextNode;
+      };
+
+      // 5.5 Stereo Haas Effect
+      if (enabled.stereo) {
+        const haasOut = offlineCtx.createGain();
+        connectToNext(haasOut); // dry path
+
+        const monoDownmix = offlineCtx.createGain();
+        monoDownmix.channelCount = 1;
+        monoDownmix.channelCountMode = 'explicit';
+        connectToNext(monoDownmix);
+
+        const merge = offlineCtx.createChannelMerger(2);
+        
+        const delay = offlineCtx.createDelay(0.05);
+        delay.delayTime.value = 0.015;
+        
+        const filter = offlineCtx.createBiquadFilter();
+        filter.type = 'highpass';
+        filter.frequency.value = 200;
+
+        const m_S = Math.min(stereoWidth / 100, 1.5);
+        const wetGain = offlineCtx.createGain();
+        wetGain.gain.value = 0.2 * m_S;
+
+        monoDownmix.connect(merge, 0, 0);
+        monoDownmix.connect(delay);
+        delay.connect(filter);
+        filter.connect(merge, 0, 1);
+
+        merge.connect(wetGain);
+        wetGain.connect(haasOut);
+
+        currentNode = haasOut;
+      }
+
+      // 6. Pan
+      if (enabled.master) {
+        const panNode = offlineCtx.createStereoPanner();
+        panNode.pan.value = panValue;
+        connectToNext(panNode);
+      }
+
+      // 7. Headroom Recover
+      const headroomRecover = offlineCtx.createGain();
+      headroomRecover.gain.value = 1.414;
+      connectToNext(headroomRecover);
+
+      // 8. Limiter & Soft Clip
+      // Removed from offline render to allow Volume to be applied before Limiter in real-time playback.
+
+      connectToNext(offlineCtx.destination);
+
+      offlineSource.start(0);
+      console.log("[Offline Render] Starting...");
+      const finalRenderedBuffer = await offlineCtx.startRendering();
+      console.log("[Offline Render] Completed.");
+      // --- OFFLINE RENDERING END ---
+
+      precalculatedNextBufferRef.current = { trackId: String(nextTrack.id), buffer: finalRenderedBuffer };
+      console.log("[Lookahead] Finished precalculating next track:", nextTrack.title || nextTrack.fileName);
+    } catch (e) {
+      console.error("[Lookahead] Failed to precalculate:", e);
+    } finally {
+      isPrecalculatingNextRef.current = false;
+    }
+  };
+
+  const playNext = useCallback(() => {
+    if (!currentTrack || queue.length === 0) return;
+
+    if (songEndMode === 'repeat_one') {
+      if (precalculateOnIdle && audioBufferRef.current) {
+        playCurrentBuffer(0);
+      } else if (audioRef.current) {
+        audioRef.current.currentTime = 0;
+        audioRef.current.play().catch((e: any) => console.error(e));
+      }
+      return;
+    }
+
+    if (songEndMode === 'stop') {
+      if (precalculateOnIdle) {
+        if (bufferSourceRef.current) {
+          try { bufferSourceRef.current.onended = null; bufferSourceRef.current.stop(); } catch (e) { }
+        }
+        if (rafRef.current) window.clearInterval(rafRef.current);
+        setCurrentTime(0);
+        bufferPausedTimeRef.current = 0;
+        setIsPlaying(false);
+      } else if (audioRef.current) {
+        audioRef.current.pause();
+        audioRef.current.currentTime = 0;
+        setIsPlaying(false);
+      }
+      return;
+    }
+
+    const isPreload = songEndMode === 'preload';
+
+    const idx = queue.findIndex(t => String(t.id) === String(currentTrack.id));
+    if (idx !== -1 && idx < queue.length - 1) {
+      playTrack(queue[idx + 1], queue, !isPreload);
+    } else if (queueEndMode === 'repeat' && idx === queue.length - 1) {
+      if (isShuffleState) {
+        let newQueue = [...queue];
+        for (let i = newQueue.length - 1; i > 0; i--) {
+          const j = Math.floor(Math.random() * (i + 1));
+          [newQueue[i], newQueue[j]] = [newQueue[j], newQueue[i]];
+        }
+        playTrack(newQueue[0], newQueue, !isPreload);
+      } else {
+        playTrack(queue[0], queue, !isPreload);
+      }
+    } else if (queueEndMode === 'next' && idx === queue.length - 1) {
+      if (upcomingQueues.length > 0) {
+        const nextQ = upcomingQueues[0];
+        setUpcomingQueues(prev => {
+          const rest = prev.slice(1);
+          if (cycleQueues) return [...rest, queue];
+          return rest;
+        });
+        playTrack(nextQ[0], nextQ, !isPreload);
+      } else if (cycleQueues) {
+        playTrack(queue[0], queue, !isPreload);
+      } else {
+        setIsPlaying(false);
+      }
+    } else {
+      setIsPlaying(false);
+    }
+  }, [currentTrack, queue, songEndMode, queueEndMode, isShuffleState, upcomingQueues, cycleQueues, continueFromLast]);
+
+  useEffect(() => {
+    playNextRef.current = playNext;
+  }, [playNext]);
+
+  const playPrevious = useCallback(() => {
+    if (!currentTrack || queue.length === 0) return;
+    const idx = queue.findIndex(t => t.id === currentTrack.id);
+    if (idx > 0) {
+      playTrack(queue[idx - 1], queue);
+    }
+  }, [currentTrack, queue]);
+
+  useEffect(() => {
+    playPreviousRef.current = playPrevious;
+  }, [playPrevious]);
+
+  useEffect(() => {
+    if ('mediaSession' in navigator) {
+      if (currentTrack) {
+        navigator.mediaSession.metadata = new MediaMetadata({
+          title: currentTrack.title || (currentTrack.fileName?.includes(' - ') ? currentTrack.fileName.split(' - ')[1].replace(/\.[^/.]+$/, "") : currentTrack.fileName.replace(/\.[^/.]+$/, "")),
+          artist: currentTrack.artist || (currentTrack.fileName?.includes(' - ') ? currentTrack.fileName.split(' - ')[0] : 'Unknown Artist'),
+          album: currentTrack.album || '',
+          artwork: currentTrack.imageUrl ? [
+            { src: currentTrack.imageUrl, sizes: '512x512', type: 'image/jpeg' },
+            { src: currentTrack.imageUrl, sizes: '512x512', type: 'image/png' }
+          ] : []
+        });
+      }
+
+      navigator.mediaSession.setActionHandler('play', () => {
+        if (audioRef.current) audioRef.current.play();
+      });
+      navigator.mediaSession.setActionHandler('pause', () => {
+        if (audioRef.current) audioRef.current.pause();
+      });
+      navigator.mediaSession.setActionHandler('previoustrack', () => {
+        if (playPreviousRef.current) playPreviousRef.current();
+      });
+      navigator.mediaSession.setActionHandler('nexttrack', () => {
+        if (playNextRef.current) playNextRef.current();
+      });
+    }
+  }, [currentTrack]);
+
+  const playCurrentBuffer = (offset = 0) => {
+    if (!audioBufferRef.current || !audioContextRef.current) return;
+    if (bufferSourceRef.current) {
+      try { bufferSourceRef.current.onended = null; bufferSourceRef.current.stop(); } catch (e) { }
+      bufferSourceRef.current.disconnect();
+    }
+    const source = audioContextRef.current.createBufferSource();
+    source.buffer = audioBufferRef.current;
+    source.playbackRate.value = playbackRate;
+    if (!bufferVolumeNodeRef.current) {
+      bufferVolumeNodeRef.current = audioContextRef.current.createGain();
+      bufferVolumeNodeRef.current.connect(audioContextRef.current.destination);
+    }
+    bufferVolumeNodeRef.current.gain.value = volume;
+    source.connect(bufferVolumeNodeRef.current);
+
+    source.onended = () => {
+      if (playNextRef.current) playNextRef.current();
+    };
+
+    bufferSourceRef.current = source;
+    bufferStartTimeRef.current = audioContextRef.current.currentTime - (offset / playbackRate);
+    source.start(0, offset);
+
+    if (rafRef.current) window.clearInterval(rafRef.current);
+    const updateTime = () => {
+      if (document.hidden) return;
+      if (audioContextRef.current) {
+        const elapsed = (audioContextRef.current.currentTime - bufferStartTimeRef.current) * playbackRate;
+        setCurrentTime(elapsed);
+      }
+    };
+    rafRef.current = window.setInterval(updateTime, 25);
+    setIsPlaying(true);
+  };
+
+  const togglePlay = () => {
+    if (!audioRef.current) return;
+    initializeAudioContext();
+    if (isPlaying) {
+      if (precalculateOnIdle && bufferSourceRef.current) {
+        try { bufferSourceRef.current.onended = null; bufferSourceRef.current.stop(); } catch (e) { }
+        if (rafRef.current) window.clearInterval(rafRef.current);
+        bufferPausedTimeRef.current = currentTime;
+        setIsPlaying(false);
+      } else {
+        audioRef.current.pause();
+      }
+    } else {
+      if (precalculateOnIdle && audioBufferRef.current) {
+        playCurrentBuffer(bufferPausedTimeRef.current);
+      } else if (!precalculateOnIdle && (!audioRef.current.src || audioRef.current.src === window.location.href || audioRef.current.src.endsWith('/'))) {
+        if (currentTrack) {
+          playTrack(currentTrack, queue, true);
+        }
+      } else if (!precalculateOnIdle) {
+        audioRef.current.play().catch((e: any) => console.error(e));
+      } else if (currentTrack && isDecodingRef.current === false) {
+        playTrack(currentTrack, queue, true);
+      }
+    }
+  };
+
+  const seek = (time: number) => {
+    if (precalculateOnIdle && audioBufferRef.current) {
+      bufferPausedTimeRef.current = time;
+      setCurrentTime(time);
+      if (isPlaying) {
+        playCurrentBuffer(time);
+      }
+    } else if (audioRef.current) {
+      audioRef.current.currentTime = time;
+    }
+  };
+
+
+
+
+
+
+
+
+
+
+  // Preload tracks into RAM
+  const preloadTrack = async (track: Track) => {
+    if (!track) return;
+    if (blobCacheRef.current.has(String(track.id)) || preloadingIdsRef.current.has(String(track.id))) {
+      return;
+    }
+
+    preloadingIdsRef.current.add(String(track.id));
+
+    try {
+      if (track.sourceType === 'LOCAL' && track.localFile instanceof Blob) {
+        blobCacheRef.current.set(String(track.id), URL.createObjectURL(track.localFile));
+        return;
+      }
+      
+      if (track.sourceType === 'LOCAL') return;
+
+      console.log(`[preloadTrack] Fetching blob for ${track.fileName}...`);
+      const streamUrl = `${BACKEND_URL}/api/music/stream/${track.id}`;
+      const fetchUrl = `${streamUrl}?_t=${Date.now()}`;
+      const res = await axiosClient.get(fetchUrl, { responseType: 'blob' });
+      const rawBlob = res as unknown as Blob;
+      console.log(`[preloadTrack] Blob downloaded for ${track.fileName}`);
+
+      const ext = track.fileName?.split('.').pop()?.toLowerCase();
+      let mimeType = rawBlob.type;
+      if (ext === 'm4a') mimeType = 'audio/mp4';
+      else if (ext === 'opus') mimeType = 'audio/ogg';
+      else if (ext === 'flac') mimeType = 'audio/flac';
+      else if (ext === 'wav') mimeType = 'audio/wav';
+      else if (ext === 'ogg') mimeType = 'audio/ogg';
+      else if (!mimeType || mimeType === 'application/octet-stream') mimeType = 'audio/mpeg';
+
+      const blob = new Blob([rawBlob], { type: mimeType });
+      const objectUrl = URL.createObjectURL(blob);
+
+      // Prevent memory leak if user skipped tracks before download finished
+      if (allowedIdsRef.current.size > 0 && !allowedIdsRef.current.has(String(track.id))) {
+        URL.revokeObjectURL(objectUrl);
+        console.log(`[Cache Cleanup] Skipped adding ${track.id} to RAM due to race condition`);
+        return;
+      }
+
+      blobCacheRef.current.set(String(track.id), objectUrl);
+
+    } catch (e) {
+      console.error("Preload failed for track", track.id, e);
+    } finally {
+      preloadingIdsRef.current.delete(String(track.id));
+    }
+  };
+
+  
+  
+  
+
+
+  const initializeAudioContext = useCallback(() => {
+console.log("[Audio] initializeAudioContext called");
+    if (!audioContextRef.current) {
+      const AudioContext = window.AudioContext || (window as any).webkitAudioContext;
+      audioContextRef.current = new AudioContext();
+    }
+    const ctx = audioContextRef.current;
+
+    // Only create media element source if it doesn't exist and we have an audio ref
+    if (audioRef.current && !sourceNodeRef.current) {
+      sourceNodeRef.current = ctx.createMediaElementSource(audioRef.current);
+    }
+
+    if (!sourceNodeRef.current) return;
+    
+        // Disconnect everything first to rebuild graph
+    if (sourceNodeRef.current) sourceNodeRef.current.disconnect();
+    if (headroomDropRef.current) headroomDropRef.current.disconnect();
+    if (preampNodeRef.current) preampNodeRef.current.disconnect();
+    if (eqNodesRef.current) {
+      eqNodesRef.current.forEach(filter => {
+        if (filter) filter.disconnect();
+      });
+    }
+    if (bassNodeRef.current) bassNodeRef.current.disconnect();
+    if (trebleNodeRef.current) trebleNodeRef.current.disconnect();
+    if (compressorNodeRef.current) compressorNodeRef.current.disconnect();
+    if (compMakeupNodeRef.current) compMakeupNodeRef.current.disconnect();
+    if (dryGainRef.current) dryGainRef.current.disconnect();
+    if (wetGainRef.current) wetGainRef.current.disconnect();
+    if (reverbPreDelayRef.current) reverbPreDelayRef.current.disconnect();
+    if (convolverNodeRef.current) convolverNodeRef.current.disconnect();
+    if (stereoSplitterRef.current) stereoSplitterRef.current.disconnect();
+    if (stereoMergerRef.current) stereoMergerRef.current.disconnect();
+    if (lToLRef.current) (lToLRef.current as any).disconnect();
+    if (rToLRef.current) (rToLRef.current as any).disconnect();
+    if (headroomRecoverRef.current) headroomRecoverRef.current.disconnect();
+    if (agcPreGainRef.current) agcPreGainRef.current.disconnect();
+    if (agcCompressorRef.current) agcCompressorRef.current.disconnect();
+    if (agcMakeupRef.current) agcMakeupRef.current.disconnect();
+    if (bufferVolumeNodeRef.current) bufferVolumeNodeRef.current.disconnect();
+    if (limiterNodeRef.current) limiterNodeRef.current.disconnect();
+    if (softClipNodeRef.current) softClipNodeRef.current.disconnect();
+    if (panNodeRef.current) panNodeRef.current.disconnect();
+
+    let currentNode: AudioNode = sourceNodeRef.current;
+    const enabled = fxEnabledRef.current;
+
+    // 1. Gain Staging (-6dB)
+    if (!headroomDropRef.current) headroomDropRef.current = ctx.createGain();
+    headroomDropRef.current.gain.value = 0.5;
+    currentNode.connect(headroomDropRef.current);
+    currentNode = headroomDropRef.current;
+
+    // 1.5 Preamp
+    if (!preampNodeRef.current) preampNodeRef.current = ctx.createGain();
+    preampNodeRef.current.gain.value = enabled.preamp ? Math.pow(10, preampGain / 20) : 1;
+    currentNode.connect(preampNodeRef.current);
+    currentNode = preampNodeRef.current;
+
+    // 2. EQ
+    if (eqBands && eqBands.length > 0) {
+      if (eqNodesRef.current.length !== eqBands.length) {
+        eqNodesRef.current = eqBands.map(() => ctx.createBiquadFilter());
+      }
+      eqBands.forEach((band, i) => {
+        const filter = eqNodesRef.current[i];
+        filter.type = band.type || 'peaking';
+        filter.frequency.value = band.frequency;
+        filter.Q.value = band.q;
+        filter.gain.value = enabled.eq ? band.gain : 0;
+      });
+
+      let prevEq = currentNode;
+      eqNodesRef.current.forEach(filter => {
+        prevEq.connect(filter);
+        prevEq = filter;
+      });
+      currentNode = prevEq;
+    }
+
+    // 3. Tone
+    if (!bassNodeRef.current) {
+      bassNodeRef.current = ctx.createBiquadFilter();
+      bassNodeRef.current.type = 'lowshelf';
+      bassNodeRef.current.frequency.value = 150;
+    }
+    if (!trebleNodeRef.current) {
+      trebleNodeRef.current = ctx.createBiquadFilter();
+      trebleNodeRef.current.type = 'highshelf';
+      trebleNodeRef.current.frequency.value = 4000;
+    }
+    bassNodeRef.current.gain.value = enabled.tone ? bassGain : 0;
+    trebleNodeRef.current.gain.value = enabled.tone ? trebleGain : 0;
+    
+    currentNode.connect(bassNodeRef.current);
+    bassNodeRef.current.connect(trebleNodeRef.current);
+    currentNode = trebleNodeRef.current;
+
+    // 4. Compressor
+    if (!compressorNodeRef.current) compressorNodeRef.current = ctx.createDynamicsCompressor();
+    if (!compMakeupNodeRef.current) compMakeupNodeRef.current = ctx.createGain();
+    
+    if (enabled.comp) {
+        compressorNodeRef.current.threshold.value = compThreshold;
+        compressorNodeRef.current.ratio.value = compRatio;
+        compressorNodeRef.current.knee.value = compKnee;
+        compressorNodeRef.current.attack.value = compAttack;
+        compressorNodeRef.current.release.value = compRelease;
+        compMakeupNodeRef.current.gain.value = Math.pow(10, compMakeupGain / 20);
+    } else {
+        compressorNodeRef.current.threshold.value = 0;
+        compressorNodeRef.current.ratio.value = 1;
+        compMakeupNodeRef.current.gain.value = 1;
+    }
+    currentNode.connect(compressorNodeRef.current);
+    compressorNodeRef.current.connect(compMakeupNodeRef.current);
+    currentNode = compMakeupNodeRef.current;
+
+    
+    // 5. Reverb
+    if (!convolverNodeRef.current) convolverNodeRef.current = ctx.createConvolver();
+    if (!reverbPreDelayRef.current) reverbPreDelayRef.current = ctx.createDelay(1.0);
+    if (!dryGainRef.current) dryGainRef.current = ctx.createGain();
+    if (!wetGainRef.current) wetGainRef.current = ctx.createGain();
+
+    if (enabled.reverb) {
+      reverbPreDelayRef.current.delayTime.value = 0.02;
+
+      if (irBufferRef.current && !convolverNodeRef.current.buffer) {
+        convolverNodeRef.current.buffer = irBufferRef.current;
+      }
+
+      const x = reverbMix / 100;
+      dryGainRef.current.gain.value = Math.cos(x * Math.PI / 2);
+      wetGainRef.current.gain.value = Math.sin(x * Math.PI / 2) * 0.35;
+
+      currentNode.connect(dryGainRef.current);
+      currentNode.connect(reverbPreDelayRef.current);
+      reverbPreDelayRef.current.connect(convolverNodeRef.current);
+      convolverNodeRef.current.connect(wetGainRef.current);
+
+      const reverbOut = ctx.createGain();
+      dryGainRef.current.connect(reverbOut);
+      wetGainRef.current.connect(reverbOut);
+      currentNode = reverbOut;
+    } else {
+      dryGainRef.current.gain.value = 1;
+      wetGainRef.current.gain.value = 0;
+      currentNode.connect(dryGainRef.current);
+      const reverbOut = ctx.createGain();
+      dryGainRef.current.connect(reverbOut);
+      currentNode = reverbOut;
+    }
+
+    // 5.5 Stereo Haas Effect
+    if (!haasWetGainRef.current) haasWetGainRef.current = ctx.createGain();
+    if (!stereoSplitterRef.current) stereoSplitterRef.current = ctx.createChannelSplitter(2);
+    if (!stereoMergerRef.current) stereoMergerRef.current = ctx.createChannelMerger(2);
+    
+    if (!lToLRef.current) {
+        lToLRef.current = ctx.createGain();
+        lToLRef.current.channelCount = 1;
+        lToLRef.current.channelCountMode = "explicit";
+    }
+    if (!rToLRef.current) {
+        rToLRef.current = ctx.createDelay(0.05) as unknown as GainNode; // delay
+    }
+
+    const haasOut = ctx.createGain();
+    currentNode.connect(haasOut); // dry path
+    
+    // Wet path (Haas layer)
+    currentNode.connect(lToLRef.current); // Mono downmix
+    lToLRef.current.connect(stereoSplitterRef.current);
+    
+    const m_S = enabled.stereo ? Math.min(stereoWidth / 100, 1.5) : 0;
+    (rToLRef.current as any).delayTime.value = 0.02 * m_S; // 0 to 30ms
+    
+    stereoSplitterRef.current.connect(stereoMergerRef.current, 0, 0); // L: 0ms delay
+    stereoSplitterRef.current.connect(rToLRef.current as any, 1);
+    (rToLRef.current as any).connect(stereoMergerRef.current, 0, 1); // R: delayed
+    
+    haasWetGainRef.current.gain.value = 0.2 * m_S;
+    stereoMergerRef.current.connect(haasWetGainRef.current);
+    haasWetGainRef.current.connect(haasOut);
+
+    currentNode = haasOut;
+
+
+    // 6. Pan
+    if (enabled.master) {
+      if (!panNodeRef.current) panNodeRef.current = ctx.createStereoPanner();
+      panNodeRef.current.pan.value = panValue;
+      currentNode.connect(panNodeRef.current);
+      currentNode = panNodeRef.current;
+    }
+
+    // 6.5 Loudness Normalization (AGC at the end)
+    if (!agcPreGainRef.current) agcPreGainRef.current = ctx.createGain();
+    if (!agcCompressorRef.current) agcCompressorRef.current = ctx.createDynamicsCompressor();
+    if (!agcMakeupRef.current) agcMakeupRef.current = ctx.createGain();
+
+    currentNode.connect(agcPreGainRef.current);
+    agcPreGainRef.current.connect(agcCompressorRef.current);
+    agcCompressorRef.current.connect(agcMakeupRef.current);
+    currentNode = agcMakeupRef.current;
+
+    // Output
+    // 7. Headroom Recover
+    if (!headroomRecoverRef.current) {
+        headroomRecoverRef.current = ctx.createGain();
+        headroomRecoverRef.current.gain.value = 1.414;
+    }
+    currentNode.connect(headroomRecoverRef.current);
+    currentNode = headroomRecoverRef.current;
+
+    if (bufferVolumeNodeRef.current) {
+      currentNode.connect(bufferVolumeNodeRef.current);
+      currentNode = bufferVolumeNodeRef.current;
+    }
+    
+    if (enabled.limiter) {
+      if (!limiterNodeRef.current) {
+        limiterNodeRef.current = ctx.createDynamicsCompressor();
+        limiterNodeRef.current.threshold.value = -0.1;
+        limiterNodeRef.current.knee.value = 0.0;
+        limiterNodeRef.current.ratio.value = 20.0;
+        limiterNodeRef.current.attack.value = 0.005;
+        limiterNodeRef.current.release.value = 0.050;
+      }
+      if (!softClipNodeRef.current) {
+        softClipNodeRef.current = ctx.createWaveShaper();
+        softClipNodeRef.current.curve = createSoftClipCurve(44100);
+        if (useOversample) {
+          softClipNodeRef.current.oversample = '4x';
+        }
+      }
+      currentNode.connect(limiterNodeRef.current);
+      limiterNodeRef.current.connect(softClipNodeRef.current);
+      currentNode = softClipNodeRef.current;
+    }
+    
+    currentNode.connect(ctx.destination);
+    if (audioContextRef.current && audioContextRef.current.state === 'suspended') {
+      audioContextRef.current.resume();
+    }
+
+
+  }, [eqBands?.length, fxEnabledRef]); // Only rebuild when graph topology needs changing
+
+  // === DYNAMIC EFFECT UPDATES ===
+  useEffect(() => {
+    console.log("[Audio] Preamp useEffect triggered: ", preampGain);
+if (preampNodeRef.current) {
+        preampNodeRef.current.gain.value = fxEnabled.preamp ? Math.pow(10, preampGain / 20) : 1;
+    }
+  }, [preampGain, fxEnabled.preamp]);
+
+  useEffect(() => {
+    if (eqNodesRef.current && eqBands) {
+      eqBands.forEach((band, i) => {
+        if (eqNodesRef.current[i]) {
+          eqNodesRef.current[i].frequency.value = band.frequency;
+          eqNodesRef.current[i].Q.value = band.q;
+          eqNodesRef.current[i].gain.value = fxEnabled.eq ? band.gain : 0;
+        }
+      });
+    }
+  }, [eqBands, fxEnabled.eq]);
+
+  useEffect(() => {
+    if (bassNodeRef.current) bassNodeRef.current.gain.value = fxEnabled.tone ? bassGain : 0;
+    if (trebleNodeRef.current) trebleNodeRef.current.gain.value = fxEnabled.tone ? trebleGain : 0;
+  }, [bassGain, trebleGain, fxEnabled.tone]);
+  
+  useEffect(() => {
+    if (compressorNodeRef.current && compMakeupNodeRef.current) {
+      if (fxEnabled.comp) {
+        compressorNodeRef.current.threshold.value = compThreshold;
+        compressorNodeRef.current.ratio.value = compRatio;
+        compressorNodeRef.current.knee.value = compKnee;
+        compressorNodeRef.current.attack.value = compAttack;
+        compressorNodeRef.current.release.value = compRelease;
+        compMakeupNodeRef.current.gain.value = Math.pow(10, compMakeupGain / 20);
+      } else {
+        compressorNodeRef.current.threshold.value = 0;
+        compressorNodeRef.current.ratio.value = 1;
+        compMakeupNodeRef.current.gain.value = 1;
+      }
+    }
+  }, [compThreshold, compRatio, compKnee, compAttack, compRelease, compMakeupGain, fxEnabled.comp]);
+
+  
+  useEffect(() => {
+    if (dryGainRef.current && wetGainRef.current) {
+      if (fxEnabled.reverb) {
+        const x = reverbMix / 100;
+        dryGainRef.current.gain.value = Math.cos(x * Math.PI / 2);
+        wetGainRef.current.gain.value = Math.sin(x * Math.PI / 2) * 0.35;
+      } else {
+        dryGainRef.current.gain.value = 1;
+        wetGainRef.current.gain.value = 0;
+      }
+    }
+  }, [reverbMix, fxEnabled.reverb]);
+
+  useEffect(() => {
+    if (haasWetGainRef.current) {
+      const m_S = fxEnabled.stereo ? Math.min(stereoWidth / 100, 1.5) : 0;
+      haasWetGainRef.current.gain.value = 0.2 * m_S;
+    }
+  }, [stereoWidth, fxEnabled.stereo]);
+
+      
+  
+  
+  const updatePlaybackRate = useCallback((val: number) => setPlaybackRate(val), []);
+  const togglePreservesPitch = useCallback(() => setPreservesPitch(prev => !prev), []);
+  
+
+  return {
+    isPlaying,
+    currentTime,
+    duration,
+    volume,
+    setVolume,
+    playbackRate,
+    updatePlaybackRate,
+    preservesPitch,
+    togglePreservesPitch,
+    playTrack,
+    playNext,
+    playPrevious,
+    togglePlay,
+    seek,
+    preloadTrack,
+    getTrackMetadata: (id: number | string) => metadataCacheRef.current.get(id),
+    getTrackImage: (id: number | string) => imageCacheRef.current.get(id)
+  };
+}
