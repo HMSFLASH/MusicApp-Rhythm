@@ -218,8 +218,8 @@ export function Playlist({ jwtToken, onPlay, currentTrackId }: PlaylistProps) {
       />
 
       {/* Header */}
-      <div className="flex items-center justify-between mb-6">
-        <h2 className="text-xl font-bold font-sans text-white flex items-center gap-2">
+      <div className="flex flex-col md:flex-row md:items-center justify-between mb-6 gap-4">
+        <h2 className="text-xl font-bold font-sans text-white flex items-center gap-2 flex-wrap min-w-0">
           {selectedPlaylistId ? (
             <button
               onClick={() => setSelectedPlaylistId(null)}
@@ -253,11 +253,11 @@ export function Playlist({ jwtToken, onPlay, currentTrackId }: PlaylistProps) {
               </div>
             ) : (
               <div 
-                className="flex items-center gap-2 group/title cursor-pointer hover:bg-white/5 px-2 py-0.5 -ml-2 rounded-md transition-colors" 
+                className="flex items-center gap-2 group/title cursor-pointer hover:bg-white/5 px-2 py-0.5 -ml-2 rounded-md transition-colors min-w-0" 
                 onClick={() => { setEditName(selectedPlaylistDetails.name); setIsEditingName(true); }}
               >
                 <span className="truncate">{selectedPlaylistDetails.name}</span>
-                <button className="opacity-0 group-hover/title:opacity-100 text-white/40 hover:text-white transition-opacity p-1">
+                <button className="opacity-100 md:opacity-0 group-hover/title:opacity-100 text-white/40 hover:text-white transition-opacity p-1 shrink-0">
                   <Pencil size={16} />
                 </button>
               </div>
@@ -268,7 +268,7 @@ export function Playlist({ jwtToken, onPlay, currentTrackId }: PlaylistProps) {
         </h2>
 
         {selectedPlaylistId ? (
-          <div className="flex gap-2 items-center">
+          <div className="flex flex-wrap gap-2 items-center">
             {selectedPlaylistDetails && selectedPlaylistDetails.tracks && selectedPlaylistDetails.tracks.length > 0 && (
               <>
                 <button
@@ -395,7 +395,7 @@ export function Playlist({ jwtToken, onPlay, currentTrackId }: PlaylistProps) {
                         </button>
                       </div>
                     ) : (
-                      <div className="flex items-center gap-2 group/title">
+                      <div className="flex items-center gap-2 group/title min-w-0">
                         <span className="text-sm font-bold text-white truncate">{p.name}</span>
                         <button 
                           onClick={(e) => {
@@ -403,7 +403,7 @@ export function Playlist({ jwtToken, onPlay, currentTrackId }: PlaylistProps) {
                             setEditListName(p.name);
                             setEditingListPlaylistId(p.id);
                           }}
-                          className="opacity-0 group-hover/title:opacity-100 text-white/40 hover:text-white transition-opacity p-1"
+                          className="opacity-100 md:opacity-0 group-hover/title:opacity-100 text-white/40 hover:text-white transition-opacity p-1 shrink-0"
                         >
                           <Pencil size={14} />
                         </button>
@@ -414,7 +414,7 @@ export function Playlist({ jwtToken, onPlay, currentTrackId }: PlaylistProps) {
                 </div>
                 <button
                   onClick={(e) => deletePlaylist(p.id, e)}
-                  className="p-2 text-white/0 group-hover:text-red-400/50 hover:!text-red-400 transition-colors rounded-full hover:bg-red-400/10"
+                  className="p-2 text-white/30 md:text-transparent md:group-hover:text-red-400/50 hover:!text-red-400 transition-colors rounded-full hover:bg-red-400/10 shrink-0"
                   title="Delete Playlist"
                 >
                   <Trash2 size={16} />
@@ -480,7 +480,7 @@ export function Playlist({ jwtToken, onPlay, currentTrackId }: PlaylistProps) {
 
                   <button
                     onClick={(e) => removeTrackFromPlaylist(track.id, e)}
-                    className="p-2 text-white/0 group-hover:text-white/40 hover:!text-red-400 transition-colors rounded-full hover:bg-red-400/10 shrink-0"
+                    className="p-2 text-white/30 md:text-transparent md:group-hover:text-white/40 hover:!text-red-400 transition-colors rounded-full hover:bg-red-400/10 shrink-0"
                     title="Remove from playlist"
                   >
                     <X size={16} />
