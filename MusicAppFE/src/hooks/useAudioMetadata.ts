@@ -121,7 +121,7 @@ export function useAudioMetadata(jwtToken: string, queueState: any) {
                 }
                 parsedBufferLength = buffer.byteLength;
             } else {
-
+                const ext = track.fileName?.split('.').pop()?.toLowerCase();
                 // eslint-disable-next-line @typescript-eslint/no-explicit-any
                 const parseBufferFn = mm.parseBuffer || (mm as any).default?.parseBuffer;
                 if (!parseBufferFn) throw new Error('parseBuffer not found');
