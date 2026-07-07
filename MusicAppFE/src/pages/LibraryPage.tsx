@@ -101,7 +101,7 @@ export function LibraryPage() {
       <div className="mb-8 flex flex-col md:flex-row justify-between items-start md:items-end gap-4 md:gap-0">
         <div>
           <h1 className="text-3xl font-bold font-sans text-white tracking-tight">Your Library</h1>
-          <p className="text-white/60 text-sm mt-1">{tracks.length} songs across all your collections.</p>
+          <p className="text-white/80 text-sm mt-1">{tracks.length} songs across all your collections.</p>
         </div>
         <div className="flex gap-2">
           <input
@@ -136,7 +136,7 @@ export function LibraryPage() {
             <Disc size={20} />
           </div>
           <h2 className="text-base font-bold text-white mb-1">All Songs</h2>
-          <p className="text-white/60 text-xs font-medium">{tracks.length} songs</p>
+          <p className="text-white/80 text-xs font-medium">{tracks.length} songs</p>
         </div>
 
         <div
@@ -150,7 +150,7 @@ export function LibraryPage() {
             <Heart size={20} fill="currentColor" />
           </div>
           <h2 className="text-base font-bold text-white mb-1">Favorites</h2>
-          <p className="text-white/60 text-xs font-medium">{favorites.length} songs</p>
+          <p className="text-white/80 text-xs font-medium">{favorites.length} songs</p>
         </div>
 
         <div
@@ -164,7 +164,7 @@ export function LibraryPage() {
             <ListMusic size={20} />
           </div>
           <h2 className="text-base font-bold text-white mb-1">Playlists</h2>
-          <p className="text-white/60 text-xs font-medium">Manage queues</p>
+          <p className="text-white/80 text-xs font-medium">Manage queues</p>
         </div>
 
         <div
@@ -178,7 +178,7 @@ export function LibraryPage() {
             <Album size={20} />
           </div>
           <h2 className="text-base font-bold text-white mb-1">Albums</h2>
-          <p className="text-white/60 text-xs font-medium">{albumsCount} albums</p>
+          <p className="text-white/80 text-xs font-medium">{albumsCount} albums</p>
         </div>
 
         <div
@@ -192,7 +192,7 @@ export function LibraryPage() {
             <Mic2 size={20} />
           </div>
           <h2 className="text-base font-bold text-white mb-1">Artists</h2>
-          <p className="text-white/60 text-xs font-medium">{artistsCount} artists</p>
+          <p className="text-white/80 text-xs font-medium">{artistsCount} artists</p>
         </div>
 
         <div
@@ -206,7 +206,7 @@ export function LibraryPage() {
             <Music size={20} />
           </div>
           <h2 className="text-base font-bold text-white mb-1">Genres</h2>
-          <p className="text-white/60 text-xs font-medium">{genresCount} genres</p>
+          <p className="text-white/80 text-xs font-medium">{genresCount} genres</p>
         </div>
       </div>
 
