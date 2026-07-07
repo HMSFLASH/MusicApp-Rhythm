@@ -23,13 +23,22 @@ export function GenresPage() {
         setTracks(parsed);
       })
       .catch(console.error);
+
+    const handleMetadataUpdated = () => {
+      setTracks(prev => [...prev]);
+    };
+    window.addEventListener('sonic_metadata_updated', handleMetadataUpdated);
+    
+    return () => {
+      window.removeEventListener('sonic_metadata_updated', handleMetadataUpdated);
+    };
   }, []);
 
-  const genres = Array.from(new Set(tracks.map(t => t.genre).filter(Boolean))) as string[];
+  const genres = Array.from(new Set(tracks.map(t => t.genre || playerState.getTrackMetadata(t.id)?.genre).filter(Boolean))) as string[];
 
   const handlePlayGenre = (genre: string, e: React.MouseEvent) => {
     e.stopPropagation();
-    const genreTracks = tracks.filter(t => t.genre === genre);
+    const genreTracks = tracks.filter(t => t.genre === genre || playerState.getTrackMetadata(t.id)?.genre === genre);
     if (genreTracks.length > 0) {
       playerState.playTrack(genreTracks[0], genreTracks);
     }

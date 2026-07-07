@@ -23,13 +23,22 @@ export function AlbumsPage() {
         setTracks(parsed);
       })
       .catch(console.error);
+
+    const handleMetadataUpdated = () => {
+      setTracks(prev => [...prev]);
+    };
+    window.addEventListener('sonic_metadata_updated', handleMetadataUpdated);
+    
+    return () => {
+      window.removeEventListener('sonic_metadata_updated', handleMetadataUpdated);
+    };
   }, []);
 
-  const albums = Array.from(new Set(tracks.map(t => t.album).filter(Boolean))) as string[];
+  const albums = Array.from(new Set(tracks.map(t => t.album || playerState.getTrackMetadata(t.id)?.album).filter(Boolean))) as string[];
 
   const handlePlayAlbum = (album: string, e: React.MouseEvent) => {
     e.stopPropagation();
-    const albumTracks = tracks.filter(t => t.album === album);
+    const albumTracks = tracks.filter(t => t.album === album || playerState.getTrackMetadata(t.id)?.album === album);
     if (albumTracks.length > 0) {
       playerState.playTrack(albumTracks[0], albumTracks);
     }

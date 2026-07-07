@@ -23,6 +23,15 @@ export function ArtistsPage() {
         setTracks(parsed);
       })
       .catch(console.error);
+
+    const handleMetadataUpdated = () => {
+      setTracks(prev => [...prev]);
+    };
+    window.addEventListener('sonic_metadata_updated', handleMetadataUpdated);
+    
+    return () => {
+      window.removeEventListener('sonic_metadata_updated', handleMetadataUpdated);
+    };
   }, []);
 
   const artists = Array.from(new Set(

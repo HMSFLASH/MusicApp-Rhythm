@@ -83,8 +83,20 @@ export function TracksPage() {
         }).catch(() => setFavorites([]));
       }
     };
+    
+    // Force re-render when background metadata loads
+    const handleMetadataUpdated = () => {
+      setTracks(prev => [...prev]);
+      setFavorites(prev => [...prev]);
+    };
+
     window.addEventListener('DriveConfigRestored', handleRestore);
-    return () => window.removeEventListener('DriveConfigRestored', handleRestore);
+    window.addEventListener('sonic_metadata_updated', handleMetadataUpdated);
+    
+    return () => {
+      window.removeEventListener('DriveConfigRestored', handleRestore);
+      window.removeEventListener('sonic_metadata_updated', handleMetadataUpdated);
+    };
   }, [jwtToken]);
   const toggleFavorite = async (track: Track, e: React.MouseEvent) => {
     e.stopPropagation();

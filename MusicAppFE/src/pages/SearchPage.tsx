@@ -38,6 +38,16 @@ export function SearchPage() {
         }
       })
       .catch(() => setAllTracks([]));
+
+    const handleMetadataUpdated = () => {
+      setAllTracks(prev => [...prev]);
+      setSearchResults(prev => [...prev]);
+    };
+    window.addEventListener('sonic_metadata_updated', handleMetadataUpdated);
+    
+    return () => {
+      window.removeEventListener('sonic_metadata_updated', handleMetadataUpdated);
+    };
   }, [jwtToken]);
 
   // Debounced local search
