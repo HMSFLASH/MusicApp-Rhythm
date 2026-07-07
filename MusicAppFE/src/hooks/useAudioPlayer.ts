@@ -20,7 +20,6 @@ export function useAudioPlayer(jwtToken: string) {
       songEndMode: queueState.songEndMode,
       queueEndMode: queueState.queueEndMode,
       repeatMode: queueState.repeatMode,
-      continueFromLast: queueState.continueFromLast,
       cycleQueues: queueState.cycleQueues,
       upcomingQueues: queueState.upcomingQueues,
       
@@ -54,7 +53,7 @@ export function useAudioPlayer(jwtToken: string) {
     return () => clearTimeout(timeoutId);
   }, [
     queueState.isShuffleState, queueState.songEndMode, queueState.queueEndMode, queueState.repeatMode,
-    queueState.continueFromLast, queueState.cycleQueues, queueState.upcomingQueues,
+    queueState.cycleQueues, queueState.upcomingQueues,
     effectsState.eqPresetName, effectsState.eqBands, effectsState.customEqPresets,
     effectsState.preampGain, effectsState.bassGain, effectsState.trebleGain,
     effectsState.compThreshold, effectsState.compRatio, effectsState.compKnee,

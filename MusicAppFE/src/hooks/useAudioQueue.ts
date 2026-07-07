@@ -17,7 +17,6 @@ export function useAudioQueue(initialPlayback: { currentTrack: Track | null; que
   const [queueEndMode, setQueueEndMode] = useState<QueueEndMode>(savedState.queueEndMode ?? 'stop');
   const [repeatMode, setRepeatMode] = useState<'simple' | 'advanced'>(savedState.repeatMode ?? 'simple');
   const [upcomingQueues, setUpcomingQueues] = useState<Track[][]>(savedState.upcomingQueues || []);
-  const [continueFromLast, setContinueFromLast] = useState<boolean>(savedState.continueFromLast || false);
   const [cycleQueues, setCycleQueues] = useState<boolean>(savedState.cycleQueues || false);
 
   const setIsShuffle = useCallback((newShuffle: boolean | ((prev: boolean) => boolean)) => {
@@ -90,7 +89,6 @@ export function useAudioQueue(initialPlayback: { currentTrack: Track | null; que
     queueEndMode, setQueueEndMode,
     repeatMode, setRepeatMode,
     upcomingQueues, setUpcomingQueues,
-    continueFromLast, setContinueFromLast,
     cycleQueues, setCycleQueues,
     addToCurrentQueue,
     addToNextQueue,

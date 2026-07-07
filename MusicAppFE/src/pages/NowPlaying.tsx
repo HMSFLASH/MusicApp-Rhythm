@@ -20,7 +20,6 @@ export function NowPlaying() {
     isShuffle, setIsShuffle, songEndMode, setSongEndMode, queueEndMode, setQueueEndMode,
     repeatMode, setRepeatMode,
     volume, setVolume,
-    continueFromLast, setContinueFromLast,
     cycleQueues, setCycleQueues
   } = playerState;
 
@@ -414,17 +413,7 @@ export function NowPlaying() {
                               {/* Sub-options when 'next' is selected */}
                               {val === 'next' && queueEndModeTemp === 'next' && (
                                 <div className="ml-7 mt-1 mb-2 flex flex-col gap-2">
-                                  <label className="flex items-start gap-2.5 cursor-pointer group">
-                                    <input
-                                      type="checkbox"
-                                      checked={continueFromLast}
-                                      onChange={e => setContinueFromLast(e.target.checked)}
-                                      className="mt-0.5 accent-primary w-3.5 h-3.5 cursor-pointer flex-shrink-0"
-                                    />
-                                    <span className="text-xs text-white/60 group-hover:text-white/80 transition-colors">
-                                      Tiếp tục hàng đợi tiếp theo từ vị trí cuối cùng của nó
-                                    </span>
-                                  </label>
+
                                   <label className="flex items-start gap-2.5 cursor-pointer group">
                                     <input
                                       type="checkbox"

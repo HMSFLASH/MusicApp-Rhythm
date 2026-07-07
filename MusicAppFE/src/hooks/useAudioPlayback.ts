@@ -90,7 +90,7 @@ export function useAudioPlayback(
   metadataState: any,
   savedState: any
 ) {
-  const { currentTrack, setCurrentTrack, queue, setQueue, isShuffleState, songEndMode, queueEndMode, upcomingQueues, cycleQueues, setUpcomingQueues, continueFromLast, } = queueState || {};
+  const { currentTrack, setCurrentTrack, queue, setQueue, isShuffleState, songEndMode, queueEndMode, upcomingQueues, cycleQueues, setUpcomingQueues } = queueState || {};
   const {
     useOversample,
     precalculateOnIdle,
@@ -1055,7 +1055,7 @@ console.log("[Audio] performOfflineRender called with EQ bands:", audioParamsRef
     } else {
       setIsPlaying(false);
     }
-  }, [currentTrack, queue, songEndMode, queueEndMode, isShuffleState, upcomingQueues, cycleQueues, continueFromLast]);
+  }, [currentTrack, queue, songEndMode, queueEndMode, isShuffleState, upcomingQueues, cycleQueues]);
 
 
   const playPrevious = useCallback(() => {
