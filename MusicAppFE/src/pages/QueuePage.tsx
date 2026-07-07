@@ -86,8 +86,8 @@ export function QueuePage() {
 
   return (
     <div className="flex flex-col h-full max-w-7xl mx-auto p-4 md:p-8">
-      <div className="mb-8 border-b border-white/10 pb-6">
-        <h1 className="text-3xl font-bold font-sans text-white tracking-tight">Play Queue</h1>
+      <div className="mb-6 md:mb-8 border-b border-white/10 pb-4 md:pb-6">
+        <h1 className="text-2xl md:text-3xl font-bold font-sans text-white tracking-tight">Play Queue</h1>
         <p className="text-secondary/60 text-sm font-mono mt-1">
           {queue.length} track{queue.length !== 1 ? 's' : ''} in queue
         </p>

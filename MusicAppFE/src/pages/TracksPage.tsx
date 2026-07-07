@@ -157,10 +157,10 @@ export function TracksPage() {
   const currentTracks = displayTracks.slice((currentPage - 1) * ITEMS_PER_PAGE, currentPage * ITEMS_PER_PAGE);
 
   return (
-    <div className="w-full h-full flex flex-col p-8 max-w-6xl mx-auto pb-32 overflow-y-auto">
-      <div className="mb-8 border-b border-white/10 pb-6 flex items-center justify-between">
+    <div className="w-full h-full flex flex-col p-4 md:p-8 max-w-6xl mx-auto pb-32 overflow-y-auto">
+      <div className="mb-6 md:mb-8 border-b border-white/10 pb-4 md:pb-6 flex flex-col md:flex-row items-start md:items-center justify-between gap-4">
         <div>
-          <h1 className="text-3xl font-bold font-sans text-white tracking-tight flex items-center gap-3">
+          <h1 className="text-2xl md:text-3xl font-bold font-sans text-white tracking-tight flex items-center gap-3">
             <button onClick={() => navigate('/library')} className="p-2 hover:bg-white/10 rounded-full transition-colors text-white/50 hover:text-white">
               <ArrowLeft size={24} />
             </button>
@@ -179,12 +179,12 @@ export function TracksPage() {
         track={trackToPlaylist}
       />
 
-      <div className="flex items-center justify-between mb-4 mt-2">
-        <h2 className="text-xl font-bold text-white flex items-center gap-2">
+      <div className="flex items-center justify-between mb-4 mt-2 flex-wrap gap-4">
+        <h2 className="text-lg md:text-xl font-bold text-white flex items-center gap-2">
           {activeTab === 'all' ? <><Clock size={18} className="text-[#00E5FF]" /> Songs List</> : <><Star size={18} className="text-yellow-400" /> Favorites List</>}
         </h2>
         {displayTracks.length > 0 && (
-          <div className="flex items-center gap-2">
+          <div className="flex items-center gap-2 flex-wrap">
             <button
               onClick={() => {
                 if (playerState.isShuffle) {
@@ -223,10 +223,10 @@ export function TracksPage() {
               : 'bg-white/[0.02] border-white/5 hover:bg-white/5 hover:border-white/10'
               }`}
           >
-            <span className="text-xs text-white/20 w-5 text-right group-hover:hidden">{(currentPage - 1) * ITEMS_PER_PAGE + idx + 1}</span>
+            <span className="text-xs text-white/20 w-5 text-right md:group-hover:hidden">{(currentPage - 1) * ITEMS_PER_PAGE + idx + 1}</span>
             <button
               onClick={(e) => { e.stopPropagation(); playerState.playTrack(track, displayTracks); }}
-              className={`hidden group-hover:flex w-5 items-center justify-center rounded-full transition-colors text-white`}
+              className={`hidden md:group-hover:flex w-5 items-center justify-center rounded-full transition-colors text-white`}
             >
               <Play size={13} fill="currentColor" />
             </button>

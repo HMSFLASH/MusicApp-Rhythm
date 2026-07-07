@@ -233,11 +233,11 @@ export function NowPlaying() {
             )}
           </div>
 
-          <div className="text-center">
-            <h2 className="text-3xl font-bold text-white mb-2">{currentTrack.title || playerState.getTrackMetadata(currentTrack.id)?.title || (currentTrack.fileName ? (currentTrack.fileName.includes(' - ') ? currentTrack.fileName.split(' - ')[1].replace(/\.[^/.]+$/, "") : currentTrack.fileName.replace(/\.[^/.]+$/, "")) : 'Unknown Title')}</h2>
-            <div className="flex items-center justify-center gap-2 text-lg text-white/50">
-              <User size={18} />
-              <span>{currentTrack.artist || playerState.getTrackMetadata(currentTrack.id)?.artist || (currentTrack.fileName?.includes(' - ') ? currentTrack.fileName.split(' - ')[0] : t('bottomPlayer.unknown'))}</span>
+          <div className="text-center px-4 w-full">
+            <h2 className="text-2xl md:text-3xl font-bold text-white mb-2 truncate">{currentTrack.title || playerState.getTrackMetadata(currentTrack.id)?.title || (currentTrack.fileName ? (currentTrack.fileName.includes(' - ') ? currentTrack.fileName.split(' - ')[1].replace(/\.[^/.]+$/, "") : currentTrack.fileName.replace(/\.[^/.]+$/, "")) : 'Unknown Title')}</h2>
+            <div className="flex items-center justify-center gap-2 text-base md:text-lg text-white/50 truncate w-full">
+              <User size={16} className="flex-shrink-0" />
+              <span className="truncate">{currentTrack.artist || playerState.getTrackMetadata(currentTrack.id)?.artist || (currentTrack.fileName?.includes(' - ') ? currentTrack.fileName.split(' - ')[0] : t('bottomPlayer.unknown'))}</span>
             </div>
           </div>
 
@@ -539,22 +539,22 @@ export function NowPlaying() {
                 )}
               </div>
 
-              <div className="flex items-center gap-10">
+              <div className="flex items-center gap-6 md:gap-10">
                 <button onClick={playPrevious} className="text-white hover:text-white/80 transition-colors">
-                  <SkipBack size={32} fill="currentColor" />
+                  <SkipBack size={28} className="md:w-8 md:h-8" fill="currentColor" />
                 </button>
                 <button
                   onClick={togglePlay}
-                  className="w-16 h-16 flex items-center justify-center text-white hover:scale-105 transition-transform"
+                  className="w-14 h-14 md:w-16 md:h-16 flex items-center justify-center text-white hover:scale-105 transition-transform"
                 >
                   {isPlaying ? (
-                    <Pause size={48} fill="currentColor" />
+                    <Pause size={40} className="md:w-12 md:h-12" fill="currentColor" />
                   ) : (
-                    <Play size={48} fill="currentColor" />
+                    <Play size={40} className="md:w-12 md:h-12" fill="currentColor" />
                   )}
                 </button>
                 <button onClick={playNext} className="text-white hover:text-white/80 transition-colors">
-                  <SkipForward size={32} fill="currentColor" />
+                  <SkipForward size={28} className="md:w-8 md:h-8" fill="currentColor" />
                 </button>
               </div>
 

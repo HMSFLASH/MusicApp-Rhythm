@@ -45,10 +45,10 @@ export function GenresPage() {
   };
 
   return (
-    <div className="w-full h-full flex flex-col p-8 max-w-6xl mx-auto pb-32 overflow-y-auto">
-      <div className="mb-8 border-b border-white/10 pb-6 flex items-center justify-between">
+    <div className="w-full h-full flex flex-col p-4 md:p-8 max-w-6xl mx-auto pb-32 overflow-y-auto">
+      <div className="mb-6 md:mb-8 border-b border-white/10 pb-4 md:pb-6 flex flex-col md:flex-row items-start md:items-center justify-between gap-4">
         <div>
-          <h1 className="text-3xl font-bold font-sans text-white tracking-tight flex items-center gap-3">
+          <h1 className="text-2xl md:text-3xl font-bold font-sans text-white tracking-tight flex items-center gap-3">
             <button onClick={() => navigate('/library')} className="p-2 hover:bg-white/10 rounded-full transition-colors text-white/50 hover:text-white">
               <ArrowLeft size={24} />
             </button>
@@ -78,16 +78,16 @@ export function GenresPage() {
                   <Music size={120} />
                 </div>
 
-                <div className="relative z-10 flex flex-col h-full justify-between gap-8">
-                  <h3 className="text-2xl font-bold text-white break-words drop-shadow-md">
+                <div className="relative z-10 flex flex-col h-full justify-between gap-6 md:gap-8">
+                  <h3 className="text-xl md:text-2xl font-bold text-white break-words drop-shadow-md">
                     {genre}
                   </h3>
 
                   <div className="flex items-center justify-between">
-                    <span className="text-sm font-medium text-white/90 bg-black/20 px-3 py-1 rounded-full backdrop-blur-sm shadow-sm">{count} songs</span>
-                    <button className="w-12 h-12 rounded-full flex items-center justify-center opacity-0 group-hover:opacity-100 transition-all transform translate-y-4 group-hover:translate-y-0 shadow-xl bg-white text-black hover:scale-105"
+                    <span className="text-xs md:text-sm font-medium text-white/90 bg-black/20 px-3 py-1 rounded-full backdrop-blur-sm shadow-sm">{count} songs</span>
+                    <button className="w-10 h-10 md:w-12 md:h-12 rounded-full flex items-center justify-center opacity-100 md:opacity-0 md:group-hover:opacity-100 transition-all transform translate-y-0 md:translate-y-4 md:group-hover:translate-y-0 shadow-xl bg-white text-black hover:scale-105"
                       >
-                      <Play size={20} className="ml-1" fill="currentColor" />
+                      <Play size={18} className="ml-1" fill="currentColor" />
                     </button>
                   </div>
                 </div>
