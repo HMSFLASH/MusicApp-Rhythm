@@ -89,6 +89,9 @@ export function useAudioMetadata(jwtToken: string, queueState: any) {
             let metadata: any;
             let timeoutId: ReturnType<typeof setTimeout>;
 
+            let parsedBufferLength = 0;
+            let trueFileSize = 0;
+
             if (track.sourceType === 'LOCAL' && track.localFile) {
                 // eslint-disable-next-line @typescript-eslint/no-explicit-any
                 const parseBufferFn = mm.parseBuffer || (mm as any).default?.parseBuffer;
@@ -114,7 +117,9 @@ export function useAudioMetadata(jwtToken: string, queueState: any) {
                 if (track.localFile.size > 0) {
                     up.fileSize = track.localFile.size;
                     cachePayload.fileSize = track.localFile.size;
+                    trueFileSize = track.localFile.size;
                 }
+                parsedBufferLength = buffer.byteLength;
             } else {
                 const ext = track.fileName?.split('.').pop()?.toLowerCase();
                 const mimeMap: Record<string, string> = { mp3: 'audio/mpeg', m4a: 'audio/mp4', flac: 'audio/flac', wav: 'audio/wav', ogg: 'audio/ogg', opus: 'audio/ogg', aac: 'audio/aac', wma: 'audio/x-ms-wma' };
@@ -122,9 +127,6 @@ export function useAudioMetadata(jwtToken: string, queueState: any) {
                 // eslint-disable-next-line @typescript-eslint/no-explicit-any
                 const parseBufferFn = mm.parseBuffer || (mm as any).default?.parseBuffer;
                 if (!parseBufferFn) throw new Error('parseBuffer not found');
-
-                let parsedBufferLength = 0;
-                let trueFileSize = 0;
 
                 // eslint-disable-next-line prefer-const
                 let blobUrl = blobCacheRef.current.get(trackId);
