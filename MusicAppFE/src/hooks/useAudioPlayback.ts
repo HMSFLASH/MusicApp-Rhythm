@@ -146,9 +146,14 @@ export function useAudioPlayback(
   const isDecodingRef = useRef<boolean>(false);
   const precalculatedNextBufferRef = useRef<{ trackId: string, buffer: AudioBuffer } | null>(null);
   const isPrecalculatingNextRef = useRef<boolean>(false);
+  const precalculateOnIdleRef = useRef<boolean>(precalculateOnIdle);
+  const previousPrecalculateOnIdleRef = useRef<boolean>(precalculateOnIdle);
   const decodeSessionRef = useRef<symbol | null>(null);
   const playNextRef = useRef<(() => void) | null>(null);
   const playPreviousRef = useRef<(() => void) | null>(null);
+  const currentTimeSnapshotRef = useRef<number>(0);
+  const isPlayingSnapshotRef = useRef<boolean>(false);
+  const currentTrackSnapshotRef = useRef<Track | null>(currentTrack ?? null);
 
   useEffect(() => {
     if (!audioRef.current) {
@@ -328,9 +333,125 @@ export function useAudioPlayback(
     bufferVolumeNodeRef.current.connect(audioContextRef.current.destination);
   }, [audioContextRef, bufferVolumeNodeRef]);
 
+  const stopBufferPlayback = useCallback(() => {
+    if (bufferSourceRef.current) {
+      try {
+        bufferSourceRef.current.onended = null;
+        bufferSourceRef.current.stop();
+      } catch {
+        // Source may have already ended.
+      }
+      try {
+        bufferSourceRef.current.disconnect();
+      } catch {
+        // Source may have already been disconnected.
+      }
+      bufferSourceRef.current = null;
+    }
+
+    if (rafRef.current) {
+      window.clearInterval(rafRef.current);
+      rafRef.current = null;
+    }
+  }, [bufferSourceRef]);
+
+  const configureAudioElementSource = useCallback((audioUrl: string) => {
+    if (!audioRef.current) return;
+
+    audioRef.current.loop = false;
+    if (audioUrl.startsWith('blob:')) {
+      audioRef.current.removeAttribute('crossorigin');
+    } else {
+      audioRef.current.crossOrigin = "anonymous";
+    }
+    audioRef.current.src = audioUrl;
+  }, [audioRef]);
+
   const updatePlaybackRate = useCallback((val: number) => setPlaybackRate(val), []);
   // eslint-disable-next-line @typescript-eslint/no-explicit-any
   const togglePreservesPitch = useCallback(() => setPreservesPitch((prev: any) => !prev), []);
+
+  useEffect(() => {
+    currentTimeSnapshotRef.current = currentTime;
+  }, [currentTime]);
+
+  useEffect(() => {
+    isPlayingSnapshotRef.current = isPlaying;
+  }, [isPlaying]);
+
+  useEffect(() => {
+    currentTrackSnapshotRef.current = currentTrack ?? null;
+  }, [currentTrack]);
+
+  useEffect(() => {
+    precalculateOnIdleRef.current = precalculateOnIdle;
+    const wasPrecalculating = previousPrecalculateOnIdleRef.current;
+    previousPrecalculateOnIdleRef.current = precalculateOnIdle;
+
+    if (!wasPrecalculating || precalculateOnIdle) return;
+
+    const transitionSessionId = Symbol();
+    decodeSessionRef.current = transitionSessionId;
+    isDecodingRef.current = false;
+    precalculatedNextBufferRef.current = null;
+
+    const trackToResume = currentTrackSnapshotRef.current;
+    const resumeAt = currentTimeSnapshotRef.current;
+    const shouldResume = isPlayingSnapshotRef.current;
+
+    stopBufferPlayback();
+    audioBufferRef.current = null;
+    bufferPausedTimeRef.current = 0;
+    initializeAudioContext();
+
+    if (!audioRef.current || !trackToResume) {
+      setIsPlaying(false);
+      return;
+    }
+
+    const audioUrl = getTrackAudioUrl(trackToResume);
+    if (!audioUrl) {
+      setIsPlaying(false);
+      return;
+    }
+
+    configureAudioElementSource(audioUrl);
+
+    const resumeHtmlAudio = () => {
+      if (!audioRef.current) return;
+      if (decodeSessionRef.current !== transitionSessionId || precalculateOnIdleRef.current) return;
+
+      const safeResumeAt = Number.isFinite(audioRef.current.duration)
+        ? clamp(resumeAt, 0, Math.max(0, audioRef.current.duration - 0.05))
+        : Math.max(0, resumeAt);
+
+      try {
+        audioRef.current.currentTime = safeResumeAt;
+      } catch {
+        // Some streams reject seeking until enough data is loaded.
+      }
+
+      if (shouldResume) {
+        // eslint-disable-next-line @typescript-eslint/no-explicit-any
+        audioRef.current.play().catch((e: any) => console.error("Playback failed", e));
+      } else {
+        setIsPlaying(false);
+      }
+    };
+
+    if (audioRef.current.readyState >= 1) {
+      resumeHtmlAudio();
+    } else {
+      audioRef.current.addEventListener('loadedmetadata', resumeHtmlAudio, { once: true });
+    }
+  }, [
+    audioRef,
+    configureAudioElementSource,
+    getTrackAudioUrl,
+    initializeAudioContext,
+    precalculateOnIdle,
+    stopBufferPlayback,
+  ]);
 
   useEffect(() => {
     if (precalculateOnIdle && bufferVolumeNodeRef.current) {
@@ -603,7 +724,7 @@ console.log("[Audio] performOfflineRender called with EQ bands:", audioParamsRef
 
 
   const preloadNextTrack = async (currentTrack: Track, currentQueue: Track[]) => {
-    if (!precalculateOnIdle || isPrecalculatingNextRef.current) return;
+    if (!precalculateOnIdleRef.current || isPrecalculatingNextRef.current) return;
     if (isLikelyConstrainedDevice()) {
       console.log("[Lookahead] Skipping next-track precalculate on constrained device");
       return;
@@ -638,6 +759,7 @@ console.log("[Audio] performOfflineRender called with EQ bands:", audioParamsRef
       const audioBuffer = await audioContextRef.current!.decodeAudioData(arrayBuffer);
       const finalRenderedBuffer = await performOfflineRender(audioBuffer, playbackRate);
 
+      if (!precalculateOnIdleRef.current) return;
       precalculatedNextBufferRef.current = { trackId: String(nextTrack.id), buffer: finalRenderedBuffer };
       console.log("[Lookahead] Finished precalculating next track:", nextTrack.title || nextTrack.fileName);
     } catch (e) {
@@ -693,11 +815,7 @@ console.log("[Audio] performOfflineRender called with EQ bands:", audioParamsRef
 
   const playCurrentBuffer = (offset = 0) => {
     if (!audioBufferRef.current || !audioContextRef.current) return;
-    if (bufferSourceRef.current) {
-      // eslint-disable-next-line @typescript-eslint/no-unused-vars, no-empty
-      try { bufferSourceRef.current.onended = null; bufferSourceRef.current.stop(); } catch (e) { }
-      bufferSourceRef.current.disconnect();
-    }
+    stopBufferPlayback();
     const source = audioContextRef.current.createBufferSource();
     source.buffer = audioBufferRef.current;
     source.playbackRate.value = playbackRate;
@@ -737,29 +855,23 @@ console.log("[Audio] performOfflineRender called with EQ bands:", audioParamsRef
     setCurrentTrack(startingTrack);
     setQueue(currentQueue);
 
+    const playSessionId = Symbol();
+    decodeSessionRef.current = playSessionId;
+    isDecodingRef.current = false;
+    stopBufferPlayback();
+
     const audioUrl = getTrackAudioUrl(startingTrack);
-    if (!audioUrl) return;
+    if (!audioUrl) {
+      setIsPlaying(false);
+      return;
+    }
 
     preloadAdjacentTracks(startingTrack.id, currentQueue);
-
-    if (rafRef.current) {
-      window.clearInterval(rafRef.current);
-      rafRef.current = null;
-    }
-    if (bufferSourceRef.current) {
-      // eslint-disable-next-line @typescript-eslint/no-unused-vars, no-empty
-      try { bufferSourceRef.current.onended = null; bufferSourceRef.current.stop(); } catch (e) { }
-      bufferSourceRef.current.disconnect();
-      bufferSourceRef.current = null;
-    }
 
     if (precalculateOnIdle) {
       audioRef.current!.pause();
       audioRef.current!.src = "";
       setIsPlaying(true);
-
-      const playSessionId = Symbol();
-      decodeSessionRef.current = playSessionId;
 
       (async () => {
         try {
@@ -778,7 +890,7 @@ console.log("[Audio] performOfflineRender called with EQ bands:", audioParamsRef
           }
 
           // Check if session changed while decoding
-          if (decodeSessionRef.current !== playSessionId) return;
+          if (decodeSessionRef.current !== playSessionId || !precalculateOnIdleRef.current) return;
 
           audioBufferRef.current = finalRenderedBuffer;
           setDuration(finalRenderedBuffer.duration);
@@ -800,7 +912,7 @@ console.log("[Audio] performOfflineRender called with EQ bands:", audioParamsRef
 
 
           // Trigger background preload for the next track
-          if (precalculateOnIdle) {
+          if (precalculateOnIdleRef.current) {
             setTimeout(() => preloadNextTrack(startingTrack, currentQueue), 500);
           }
 
@@ -823,23 +935,26 @@ console.log("[Audio] performOfflineRender called with EQ bands:", audioParamsRef
             setIsPlaying(false);
           }
         } catch (e) {
+          if (decodeSessionRef.current !== playSessionId) return;
           console.error("Decode failed, falling back to stream", e);
-          audioRef.current!.src = audioUrl;
-          if (autoPlay) audioRef.current!.play();
+          audioBufferRef.current = null;
+          configureAudioElementSource(audioUrl);
+          if (autoPlay) {
+            // eslint-disable-next-line @typescript-eslint/no-explicit-any
+            audioRef.current!.play().catch((playError: any) => console.error("Playback failed", playError));
+          }
         } finally {
-          isDecodingRef.current = false;
+          if (decodeSessionRef.current === playSessionId) {
+            isDecodingRef.current = false;
+          }
         }
       })();
     } else {
       // eslint-disable-next-line @typescript-eslint/no-explicit-any
       if ((window as any).dummyAudio) (window as any).dummyAudio.pause();
-      audioRef.current!.loop = false;
-      if (audioUrl.startsWith('blob:')) {
-        audioRef.current!.removeAttribute('crossorigin');
-      } else {
-        audioRef.current!.crossOrigin = "anonymous";
-      }
-      audioRef.current!.src = audioUrl;
+      audioBufferRef.current = null;
+      bufferPausedTimeRef.current = 0;
+      configureAudioElementSource(audioUrl);
       if (autoPlay) {
         // eslint-disable-next-line @typescript-eslint/no-explicit-any
         audioRef.current!.play().catch((e: any) => console.error("Playback failed", e));
@@ -876,11 +991,7 @@ console.log("[Audio] performOfflineRender called with EQ bands:", audioParamsRef
 
     if (songEndMode === 'stop') {
       if (precalculateOnIdle) {
-        if (bufferSourceRef.current) {
-          // eslint-disable-next-line @typescript-eslint/no-unused-vars, no-empty
-          try { bufferSourceRef.current.onended = null; bufferSourceRef.current.stop(); } catch (e) { }
-        }
-        if (rafRef.current) window.clearInterval(rafRef.current);
+        stopBufferPlayback();
         setCurrentTime(0);
         bufferPausedTimeRef.current = 0;
         setIsPlaying(false);
@@ -948,9 +1059,7 @@ console.log("[Audio] performOfflineRender called with EQ bands:", audioParamsRef
     initializeAudioContext();
     if (isPlaying) {
       if (precalculateOnIdle && bufferSourceRef.current) {
-        // eslint-disable-next-line @typescript-eslint/no-unused-vars, no-empty
-        try { bufferSourceRef.current.onended = null; bufferSourceRef.current.stop(); } catch (e) { }
-        if (rafRef.current) window.clearInterval(rafRef.current);
+        stopBufferPlayback();
         bufferPausedTimeRef.current = currentTime;
         setIsPlaying(false);
       } else {
