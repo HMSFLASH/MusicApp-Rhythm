@@ -63,7 +63,7 @@ export function GenresPage() {
       {genres.length > 0 ? (
         <div className="grid grid-cols-2 md:grid-cols-3 lg:grid-cols-4 gap-6">
           {genres.map((genre, i) => {
-            const count = tracks.filter(t => t.genre === genre).length;
+            const count = tracks.filter(t => t.genre === genre || playerState.getTrackMetadata(t.id)?.genre === genre).length;
             const hue = (i * 137.5) % 360;
             const color1 = `hsl(${hue}, 85%, 60%)`;
             const color2 = `hsl(${(hue + 45) % 360}, 85%, 50%)`;

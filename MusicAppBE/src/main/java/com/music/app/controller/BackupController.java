@@ -99,10 +99,17 @@ public class BackupController {
                 .map(f -> libToDto(f.getMusicLibrary()))
                 .collect(Collectors.toList());
 
+            // Fetch all library tracks
+            List<MusicLibrary> libraries = musicLibraryRepository.findByUserId(userId);
+            List<MusicItemDto> libraryDtos = libraries.stream()
+                .map(this::libToDto)
+                .collect(Collectors.toList());
+
             BackupDataDto backupData = new BackupDataDto();
             backupData.setConfig(request.getConfig());
             backupData.setPlaylists(playlistDtos);
             backupData.setFavorites(favoriteDtos);
+            backupData.setLibrary(libraryDtos);
 
             String jsonData = objectMapper.writeValueAsString(backupData);
             
@@ -134,6 +141,36 @@ public class BackupController {
             }
 
             BackupDataDto backupData = objectMapper.readValue(jsonData, BackupDataDto.class);
+
+            // Restore library
+            if (backupData.getLibrary() != null) {
+                for (MusicItemDto trackDto : backupData.getLibrary()) {
+                    String trackIdStr = trackDto.getId();
+                    if (trackIdStr == null || trackIdStr.matches("\\d+")) continue; // Skip if no ID or is just numeric local ID
+
+                    MusicLibrary lib = musicLibraryRepository.findByDriveFileId(trackIdStr).orElse(null);
+                    if (lib == null) {
+                        lib = MusicLibrary.builder()
+                                .name(trackDto.getTitle() != null ? trackDto.getTitle() : "Drive File")
+                                .driveFileId(trackIdStr)
+                                .sourceType("DRIVE")
+                                .user(user)
+                                .title(trackDto.getTitle())
+                                .artist(trackDto.getArtist())
+                                .album(trackDto.getAlbum())
+                                .genre(trackDto.getGenre())
+                                .imageUrl(trackDto.getImageUrl())
+                                .build();
+                    } else {
+                        lib.setTitle(trackDto.getTitle());
+                        lib.setArtist(trackDto.getArtist());
+                        lib.setAlbum(trackDto.getAlbum());
+                        lib.setGenre(trackDto.getGenre());
+                        lib.setImageUrl(trackDto.getImageUrl());
+                    }
+                    musicLibraryRepository.save(lib);
+                }
+            }
 
             // Restore playlists
             if (backupData.getPlaylists() != null) {
@@ -169,6 +206,11 @@ public class BackupController {
                                             .driveFileId(trackIdStr)
                                             .sourceType("DRIVE")
                                             .user(user)
+                                            .title(trackDto.getTitle())
+                                            .artist(trackDto.getArtist())
+                                            .album(trackDto.getAlbum())
+                                            .genre(trackDto.getGenre())
+                                            .imageUrl(trackDto.getImageUrl())
                                             .build());
                                 }
                             }
@@ -208,6 +250,11 @@ public class BackupController {
                                     .driveFileId(trackIdStr)
                                     .sourceType("DRIVE")
                                     .user(user)
+                                    .title(trackDto.getTitle())
+                                    .artist(trackDto.getArtist())
+                                    .album(trackDto.getAlbum())
+                                    .genre(trackDto.getGenre())
+                                    .imageUrl(trackDto.getImageUrl())
                                     .build());
                         }
                     }

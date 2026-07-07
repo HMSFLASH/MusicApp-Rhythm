@@ -9,4 +9,5 @@ public class BackupDataDto {
     private Map<String, Object> config;
     private List<PlaylistDto> playlists;
     private List<MusicItemDto> favorites;
+    private List<MusicItemDto> library;
 }

@@ -88,7 +88,7 @@ export function AlbumsPage() {
                   </div>
                 </div>
                 <p className="text-base font-semibold text-white truncate group-hover:text-[#f59e0b] transition-colors">{album}</p>
-                <p className="text-sm text-white/40 truncate">{track?.artist || 'Unknown'}</p>
+                <p className="text-sm text-white/40 truncate">{track?.artist || (track && playerState.getTrackMetadata(track.id)?.artist) || (track?.fileName?.includes(' - ') ? track.fileName.split(' - ')[0] : 'Unknown')}</p>
               </div>
             );
           })}

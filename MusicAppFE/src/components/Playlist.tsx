@@ -2,7 +2,7 @@ import { useState, useEffect } from 'react';
 import { useSearchParams } from 'react-router-dom';
 import { useTranslation } from 'react-i18next';
 import type { Track } from '../hooks/useAudioPlayer';
-import { Cloud, Play, Plus, ListMusic, ChevronLeft, Trash2, ListPlus, X, Shuffle, Pencil, Check } from 'lucide-react';
+import { Cloud, Play, Plus, ListMusic, ChevronLeft, Trash2, ListPlus, X, Shuffle, Pencil, Check, MoreHorizontal, Heart, Info, ListStart, ListEnd } from 'lucide-react';
 import { CreatePlaylistModal } from './CreatePlaylistModal';
 import { AddTracksModal } from './AddTracksModal';
 import { axiosClient } from '../api/axiosClient';
@@ -38,6 +38,80 @@ export function Playlist({ jwtToken, onPlay, currentTrackId }: PlaylistProps) {
   const [editName, setEditName] = useState('');
   const [editingListPlaylistId, setEditingListPlaylistId] = useState<number | null>(null);
   const [editListName, setEditListName] = useState('');
+  const [openMenuId, setOpenMenuId] = useState<string | number | null>(null);
+  const [favorites, setFavorites] = useState<Track[]>([]);
+  const [infoTrack, setInfoTrack] = useState<Track | null>(null);
+
+  useEffect(() => {
+    if (!jwtToken) return;
+    const cachedFavs = localStorage.getItem('sonic_favorites');
+    if (cachedFavs) {
+      // eslint-disable-next-line react-hooks/set-state-in-effect, @typescript-eslint/no-unused-vars, no-empty
+      try { setFavorites(JSON.parse(cachedFavs)); } catch (e) { }
+    }
+    axiosClient.get('/api/favorites')
+      // eslint-disable-next-line @typescript-eslint/no-explicit-any
+      .then((data: any) => {
+        // eslint-disable-next-line @typescript-eslint/no-explicit-any
+        const parsed = data.length > 0 ? data.map((d: any) => ({ id: d.id, fileName: d.name, sourceType: d.sourceType, imageUrl: d.imageUrl, artist: d.artist, title: d.title, album: d.album, genre: d.genre, durationSeconds: d.durationSeconds })) : [];
+        setFavorites(parsed);
+        localStorage.setItem('sonic_favorites', JSON.stringify(parsed));
+      })
+      .catch(() => setFavorites([]));
+  }, [jwtToken]);
+
+  const toggleFavorite = async (track: Track, e: React.MouseEvent) => {
+    e.stopPropagation();
+    const isFav = favorites.some(f => f.id === track.id);
+    try {
+      if (isFav) {
+        await axiosClient.delete(`/api/favorites/${track.id}`);
+        setFavorites(prev => {
+          const newFavs = prev.filter(f => f.id !== track.id);
+          localStorage.setItem('sonic_favorites', JSON.stringify(newFavs));
+          return newFavs;
+        });
+      } else {
+        await axiosClient.post(`/api/favorites/${track.id}`);
+        setFavorites(prev => {
+          const newFavs = [...prev, track];
+          localStorage.setItem('sonic_favorites', JSON.stringify(newFavs));
+          return newFavs;
+        });
+      }
+      setOpenMenuId(null);
+    } catch (err) {
+      console.error(err);
+    }
+  };
+
+  const handlePlayNext = (track: Track, e: React.MouseEvent) => {
+    e.stopPropagation();
+    const currentQueue = playerState.queue;
+    if (currentQueue.length === 0 && !playerState.currentTrack) {
+      playerState.playTrack(track, selectedPlaylistDetails?.tracks || []);
+    } else {
+      const currentIndex = currentQueue.findIndex(t => t.id === playerState.currentTrack?.id);
+      if (currentIndex !== -1) {
+        const newQueue = [...currentQueue];
+        newQueue.splice(currentIndex + 1, 0, track);
+        playerState.setQueue(newQueue);
+      } else {
+        playerState.setQueue([...currentQueue, track]);
+      }
+    }
+    setOpenMenuId(null);
+  };
+
+  const handleAddToQueue = (track: Track, e: React.MouseEvent) => {
+    e.stopPropagation();
+    if (playerState.queue.length === 0 && !playerState.currentTrack) {
+      playerState.playTrack(track, selectedPlaylistDetails?.tracks || []);
+    } else {
+      playerState.setQueue([...playerState.queue, track]);
+    }
+    setOpenMenuId(null);
+  };
 
   const fetchPlaylists = async () => {
     try {
@@ -446,6 +520,7 @@ export function Playlist({ jwtToken, onPlay, currentTrackId }: PlaylistProps) {
               selectedPlaylistDetails.tracks.map((track: Track) => (
                 <div
                   key={track.id}
+                  onMouseLeave={() => setOpenMenuId(null)}
                   onClick={() => onPlay(track, selectedPlaylistDetails.tracks)}
                   className={`flex items-center justify-between p-3 rounded-lg border transition-colors group cursor-pointer ${currentTrackId === track.id
                       ? 'bg-primary/10 border-primary/30'
@@ -480,19 +555,115 @@ export function Playlist({ jwtToken, onPlay, currentTrackId }: PlaylistProps) {
                     </div>
                   </div>
 
-                  <button
-                    onClick={(e) => removeTrackFromPlaylist(track.id, e)}
-                    className="p-2 text-white/30 md:text-transparent md:group-hover:text-white/40 hover:!text-red-400 transition-colors rounded-full hover:bg-red-400/10 shrink-0"
-                    title={t('playlist.removeFromPlaylist')}
-                  >
-                    <X size={16} />
-                  </button>
+                  <div className={`relative flex items-center gap-2 transition-opacity ${openMenuId === track.id ? 'opacity-100' : 'opacity-100 md:opacity-0 md:group-hover:opacity-100'}`}>
+                    <button
+                      onClick={(e) => { e.stopPropagation(); setOpenMenuId(openMenuId === track.id ? null : track.id); }}
+                      className="p-1.5 text-white/40 hover:text-white hover:bg-white/10 rounded-full transition-colors"
+                      title="More options"
+                    >
+                      <MoreHorizontal size={18} />
+                    </button>
+
+                    {openMenuId === track.id && (
+                      <div className="absolute right-0 top-full mt-1 w-48 bg-[#1A1A1A] border border-white/10 rounded-lg shadow-xl overflow-hidden z-50 py-1">
+                        <button
+                          onClick={(e) => handlePlayNext(track, e)}
+                          className="w-full flex items-center gap-3 px-4 py-2 text-sm text-left text-white/80 hover:bg-white/10"
+                        >
+                          <ListStart size={14} /> Play Next
+                        </button>
+                        <button
+                          onClick={(e) => handleAddToQueue(track, e)}
+                          className="w-full flex items-center gap-3 px-4 py-2 text-sm text-left text-white/80 hover:bg-white/10"
+                        >
+                          <ListEnd size={14} /> Add to Queue
+                        </button>
+                        <button
+                          onClick={(e) => toggleFavorite(track, e)}
+                          className="w-full flex items-center gap-3 px-4 py-2 text-sm text-left text-white/80 hover:bg-white/10"
+                        >
+                          <Heart size={14} fill={favorites.some(f => f.id === track.id) ? "currentColor" : "none"} className={favorites.some(f => f.id === track.id) ? "text-primary" : ""} /> 
+                          {favorites.some(f => f.id === track.id) ? "Remove from Favorites" : "Add to Favorites"}
+                        </button>
+                        <button
+                          onClick={(e) => { e.stopPropagation(); setInfoTrack(track); setOpenMenuId(null); }}
+                          className="w-full flex items-center gap-3 px-4 py-2 text-sm text-left text-white/80 hover:bg-white/10 border-t border-white/10"
+                        >
+                          <Info size={14} /> Info
+                        </button>
+                        <div className="h-px bg-white/10 my-1"></div>
+                        <button
+                          onClick={(e) => { setOpenMenuId(null); removeTrackFromPlaylist(track.id, e); }}
+                          className="w-full flex items-center gap-3 px-4 py-2 text-sm text-left text-red-400 hover:bg-white/10"
+                        >
+                          <Trash2 size={14} /> Remove
+                        </button>
+                      </div>
+                    )}
+                  </div>
                 </div>
               ))
             )
           )
         )}
       </div>
+
+      {/* Info Modal */}
+      {infoTrack && (
+        <div
+          className="fixed inset-0 z-[100] flex items-center justify-center bg-black/60 backdrop-blur-sm p-4"
+          onClick={() => setInfoTrack(null)}
+        >
+          <div
+            className="bg-[#1a1a1a] border border-white/10 rounded-2xl w-full max-w-md shadow-2xl overflow-hidden flex flex-col"
+            onClick={(e) => e.stopPropagation()}
+          >
+            <div className="flex items-center justify-between p-5 border-b border-white/5">
+              <div className="flex items-center gap-3 text-white">
+                <Info size={24} className="text-primary" />
+                <h3 className="font-semibold text-lg">Track Metadata</h3>
+              </div>
+              <button
+                onClick={() => setInfoTrack(null)}
+                className="text-white/40 hover:text-white transition-colors p-1"
+              >
+                <X size={20} />
+              </button>
+            </div>
+
+            <div className="p-5 flex flex-col gap-4 overflow-y-auto max-h-[70vh]">
+              <div className="bg-white/5 rounded-xl p-4 flex flex-col gap-3">
+                {[
+                  { label: 'Title', value: infoTrack.title || playerState.getTrackMetadata(infoTrack.id)?.title },
+                  { label: 'Artist', value: infoTrack.artist || playerState.getTrackMetadata(infoTrack.id)?.artist },
+                  { label: 'Album', value: infoTrack.album || playerState.getTrackMetadata(infoTrack.id)?.album },
+                  { label: 'Genre', value: infoTrack.genre || playerState.getTrackMetadata(infoTrack.id)?.genre },
+                  { label: 'Duration', value: infoTrack.durationSeconds ? `${Math.floor(infoTrack.durationSeconds / 60)}:${Math.floor(infoTrack.durationSeconds % 60).toString().padStart(2, '0')}` : null },
+                  { label: 'File Name', value: infoTrack.fileName },
+                  { label: 'Source', value: infoTrack.sourceType },
+                  { label: 'Track ID', value: String(infoTrack.id) },
+                  { label: 'File Type', value: infoTrack.fileFormat || playerState.getTrackMetadata(infoTrack.id)?.fileFormat },
+                  { label: 'Codec', value: infoTrack.codec || playerState.getTrackMetadata(infoTrack.id)?.codec },
+                  // eslint-disable-next-line @typescript-eslint/no-non-null-asserted-optional-chain
+                  { label: 'Size', value: (infoTrack.fileSize || playerState.getTrackMetadata(infoTrack.id)?.fileSize) ? `${((infoTrack.fileSize || playerState.getTrackMetadata(infoTrack.id)?.fileSize!) / 1024 / 1024).toFixed(2)} MB` : null },
+                  // eslint-disable-next-line @typescript-eslint/no-non-null-asserted-optional-chain
+                  { label: 'Bit Rate', value: (infoTrack.bitrate || playerState.getTrackMetadata(infoTrack.id)?.bitrate) ? `${Math.round((infoTrack.bitrate || playerState.getTrackMetadata(infoTrack.id)?.bitrate!) / 1000)} kbps` : null },
+                  // eslint-disable-next-line @typescript-eslint/no-non-null-asserted-optional-chain
+                  { label: 'Channels', value: (infoTrack.numberOfChannels || playerState.getTrackMetadata(infoTrack.id)?.numberOfChannels) ? `${infoTrack.numberOfChannels || playerState.getTrackMetadata(infoTrack.id)?.numberOfChannels} ${[2].includes(infoTrack.numberOfChannels || playerState.getTrackMetadata(infoTrack.id)?.numberOfChannels!) ? '(stereo)' : ''}` : null },
+                  // eslint-disable-next-line @typescript-eslint/no-non-null-asserted-optional-chain
+                  { label: 'Audio Sample Rate', value: (infoTrack.sampleRate || playerState.getTrackMetadata(infoTrack.id)?.sampleRate) ? `${((infoTrack.sampleRate || playerState.getTrackMetadata(infoTrack.id)?.sampleRate!) / 1000).toFixed(3)} kHz` : null },
+                  { label: 'Bit Depth', value: (infoTrack.bitsPerSample || playerState.getTrackMetadata(infoTrack.id)?.bitsPerSample) ? `${infoTrack.bitsPerSample || playerState.getTrackMetadata(infoTrack.id)?.bitsPerSample} bit` : null }
+                ].map((item, idx) => (
+                  <div key={idx} className="flex flex-col gap-1">
+                    <span className="text-[10px] uppercase tracking-wider text-white/40 font-semibold">{item.label}</span>
+                    <span className="text-sm text-white/90 font-medium break-all">{item.value || 'unknown'}</span>
+                  </div>
+                ))}
+              </div>
+            </div>
+          </div>
+        </div>
+      )}
     </div>
   );
 }
