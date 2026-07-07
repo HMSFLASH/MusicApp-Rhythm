@@ -16,6 +16,18 @@ const percentToStereoBaseWidth = (value: number) => {
 const percentToPseudoStereoAmount = (value: number) => clamp((value - 100) / 100, 0, 1);
 const REVERB_WET_GAIN = 0.75;
 
+type NavigatorWithDeviceMemory = Navigator & { deviceMemory?: number };
+
+const isLikelyConstrainedDevice = () => {
+  const nav = navigator as NavigatorWithDeviceMemory;
+  const cores = nav.hardwareConcurrency ?? 8;
+  const memory = nav.deviceMemory ?? 8;
+  const isCoarseSmallScreen = window.matchMedia?.('(pointer: coarse)').matches && window.innerWidth <= 1024;
+  const isMobileUserAgent = /Android|iPhone|iPad|iPod|Mobile/i.test(nav.userAgent);
+
+  return isMobileUserAgent || isCoarseSmallScreen || cores <= 4 || memory <= 4;
+};
+
 const connectStereoWidthMatrix = (ctx: BaseAudioContext, input: AudioNode, widthPercent: number) => {
   const width = percentToStereoBaseWidth(widthPercent);
   const pseudoAmount = percentToPseudoStereoAmount(widthPercent);
@@ -592,6 +604,10 @@ console.log("[Audio] performOfflineRender called with EQ bands:", audioParamsRef
 
   const preloadNextTrack = async (currentTrack: Track, currentQueue: Track[]) => {
     if (!precalculateOnIdle || isPrecalculatingNextRef.current) return;
+    if (isLikelyConstrainedDevice()) {
+      console.log("[Lookahead] Skipping next-track precalculate on constrained device");
+      return;
+    }
 
     // Find next track
     let nextTrack: Track | null = null;

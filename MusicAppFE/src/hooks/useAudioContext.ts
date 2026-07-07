@@ -2,10 +2,32 @@ import { useRef, useEffect, useCallback } from 'react';
 
 export const createSoftClipCurve = (amount = 44100) => {
   const curve = new Float32Array(amount);
+  const threshold = 0.92;
+  const knee = 1 - threshold;
+
   for (let i = 0; i < amount; ++i) {
     const x = amount > 1 ? (i * 2) / (amount - 1) - 1 : 0;
-    curve[i] = Math.max(-1, Math.min(1, 1.5 * x - 0.5 * Math.pow(x, 3)));
+    const absX = Math.abs(x);
+
+    if (absX <= threshold) {
+      curve[i] = x;
+    } else {
+      const sign = Math.sign(x);
+      const normalized = (absX - threshold) / knee;
+      const softened = threshold + knee * Math.tanh(normalized);
+      curve[i] = Math.max(-1, Math.min(1, sign * softened));
+    }
   }
+  return curve;
+};
+
+const createIdentityCurve = (amount = 44100) => {
+  const curve = new Float32Array(amount);
+
+  for (let i = 0; i < amount; ++i) {
+    curve[i] = amount > 1 ? (i * 2) / (amount - 1) - 1 : 0;
+  }
+
   return curve;
 };
 
@@ -15,6 +37,43 @@ export const configureMasterLimiter = (limiter: DynamicsCompressorNode) => {
   limiter.ratio.value = 20;
   limiter.attack.value = 0.002;
   limiter.release.value = 0.08;
+};
+
+const MASTER_LIMITER_RAMP_SECONDS = 0.08;
+
+const setAudioParam = (
+  ctx: BaseAudioContext,
+  param: AudioParam,
+  value: number,
+  smooth: boolean
+) => {
+  const now = ctx.currentTime;
+  param.cancelScheduledValues(now);
+
+  if (smooth) {
+    param.setValueAtTime(param.value, now);
+    param.linearRampToValueAtTime(value, now + MASTER_LIMITER_RAMP_SECONDS);
+    return;
+  }
+
+  param.value = value;
+};
+
+const applyMasterLimiterState = (
+  ctx: BaseAudioContext,
+  limiter: DynamicsCompressorNode,
+  softClip: WaveShaperNode,
+  enabled: boolean,
+  useOversample: boolean,
+  smooth = false
+) => {
+  setAudioParam(ctx, limiter.threshold, enabled ? -0.8 : 0, smooth);
+  setAudioParam(ctx, limiter.knee, 0, smooth);
+  setAudioParam(ctx, limiter.ratio, enabled ? 20 : 1, smooth);
+  setAudioParam(ctx, limiter.attack, enabled ? 0.002 : 0, smooth);
+  setAudioParam(ctx, limiter.release, enabled ? 0.08 : 0.25, smooth);
+  softClip.curve = enabled ? createSoftClipCurve(44100) : createIdentityCurve(44100);
+  softClip.oversample = useOversample ? '4x' : 'none';
 };
 
 export const configureLoudnessNormalization = (
@@ -425,22 +484,23 @@ console.log("[Audio] initializeAudioContext called");
       currentNode = bufferVolumeNodeRef.current;
     }
     
-    if (enabled.limiter) {
-      if (!limiterNodeRef.current) {
-        limiterNodeRef.current = ctx.createDynamicsCompressor();
-      }
-      configureMasterLimiter(limiterNodeRef.current);
-      if (!softClipNodeRef.current) {
-        softClipNodeRef.current = ctx.createWaveShaper();
-        softClipNodeRef.current.curve = createSoftClipCurve(44100);
-        if (useOversample) {
-          softClipNodeRef.current.oversample = '4x';
-        }
-      }
-      currentNode.connect(limiterNodeRef.current);
-      limiterNodeRef.current.connect(softClipNodeRef.current);
-      currentNode = softClipNodeRef.current;
+    if (!limiterNodeRef.current) {
+      limiterNodeRef.current = ctx.createDynamicsCompressor();
     }
+    if (!softClipNodeRef.current) {
+      softClipNodeRef.current = ctx.createWaveShaper();
+    }
+    applyMasterLimiterState(
+      ctx,
+      limiterNodeRef.current,
+      softClipNodeRef.current,
+      Boolean(enabled.limiter),
+      useOversample
+    );
+
+    currentNode.connect(limiterNodeRef.current);
+    limiterNodeRef.current.connect(softClipNodeRef.current);
+    currentNode = softClipNodeRef.current;
     
     currentNode.connect(ctx.destination);
     if (audioContextRef.current && audioContextRef.current.state === 'suspended') {
@@ -456,7 +516,6 @@ console.log("[Audio] initializeAudioContext called");
     compMakeupGain,
     eqBands,
     fxEnabled.master,
-    fxEnabled.limiter,
     fxEnabled.reverb,
     fxEnabled.stereo,
     panValue,
@@ -535,10 +594,17 @@ if (preampNodeRef.current) {
   }, [panValue, fxEnabled.master]);
 
   useEffect(() => {
-    if (softClipNodeRef.current) {
-      softClipNodeRef.current.oversample = useOversample ? '4x' : 'none';
-    }
-  }, [useOversample]);
+    if (!audioContextRef.current || !limiterNodeRef.current || !softClipNodeRef.current) return;
+
+    applyMasterLimiterState(
+      audioContextRef.current,
+      limiterNodeRef.current,
+      softClipNodeRef.current,
+      Boolean(fxEnabled.limiter),
+      useOversample,
+      true
+    );
+  }, [fxEnabled.limiter, useOversample]);
 
   useEffect(() => {
     applyLoudnessParams();
@@ -551,7 +617,7 @@ if (preampNodeRef.current) {
       initializeAudioContext();
     }
   // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [fxEnabled.limiter, eqBandsLength]);
+  }, [eqBandsLength]);
 
   return {
     audioRef,
