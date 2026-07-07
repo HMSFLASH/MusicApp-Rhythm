@@ -123,6 +123,9 @@ export function useAudioMetadata(jwtToken: string, queueState: any) {
                 const parseBufferFn = mm.parseBuffer || (mm as any).default?.parseBuffer;
                 if (!parseBufferFn) throw new Error('parseBuffer not found');
 
+                let parsedBufferLength = 0;
+                let trueFileSize = 0;
+
                 // eslint-disable-next-line prefer-const
                 let blobUrl = blobCacheRef.current.get(trackId);
                 if (blobUrl) {
@@ -136,7 +139,10 @@ export function useAudioMetadata(jwtToken: string, queueState: any) {
                     if (fileSize > 0) {
                         up.fileSize = fileSize;
                         cachePayload.fileSize = fileSize;
+                        trueFileSize = fileSize;
                     }
+                    
+                    parsedBufferLength = buffer.byteLength;
                     
                     // eslint-disable-next-line @typescript-eslint/no-explicit-any
                     const fileInfo: any = { size: fileSize };
@@ -159,6 +165,7 @@ export function useAudioMetadata(jwtToken: string, queueState: any) {
                     if (fileSize > 0) {
                         up.fileSize = fileSize;
                         cachePayload.fileSize = fileSize;
+                        trueFileSize = fileSize;
                     }
                     const maxMetadataSize = fileSize > 15 * 1024 * 1024 ? 1.2 * 1024 * 1024 : 512 * 1024;
 
@@ -175,6 +182,7 @@ export function useAudioMetadata(jwtToken: string, queueState: any) {
                     controller.abort();
 
                     const buffer = new Uint8Array(totalLength);
+                    parsedBufferLength = buffer.byteLength;
                     let offset = 0;
                     for (const c of chunks) {
                         buffer.set(c, offset);
@@ -197,6 +205,12 @@ export function useAudioMetadata(jwtToken: string, queueState: any) {
             if (metadata.common.album) { up.album = metadata.common.album; cachePayload.album = metadata.common.album; }
             
             if (metadata.format) {
+                const isPartialBuffer = trueFileSize > 0 && parsedBufferLength < trueFileSize;
+                const isOggOrWebM = ['Ogg', 'EBML/WebM', 'WebM', 'Matroska'].includes(metadata.format.container || '');
+                if (isPartialBuffer && isOggOrWebM) {
+                    delete metadata.format.duration;
+                }
+                
                 if (metadata.format.container) { up.fileFormat = metadata.format.container; cachePayload.fileFormat = metadata.format.container; }
                 if (metadata.format.codec) { up.codec = metadata.format.codec; cachePayload.codec = metadata.format.codec; }
                 if (metadata.format.bitrate) { up.bitrate = metadata.format.bitrate; cachePayload.bitrate = metadata.format.bitrate; }
