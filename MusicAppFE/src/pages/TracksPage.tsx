@@ -161,7 +161,7 @@ export function TracksPage() {
       <div className="mb-6 md:mb-8 border-b border-white/10 pb-4 md:pb-6 flex flex-col md:flex-row items-start md:items-center justify-between gap-4">
         <div>
           <h1 className="text-2xl md:text-3xl font-bold font-sans text-white tracking-tight flex items-center gap-3">
-            <button onClick={() => navigate('/library')} className="p-2 hover:bg-white/10 rounded-full transition-colors text-white/50 hover:text-white">
+            <button onClick={() => navigate('/library')} aria-label="Back to library" className="p-2 hover:bg-white/10 rounded-full transition-colors text-white/50 hover:text-white">
               <ArrowLeft size={24} />
             </button>
             {activeTab === 'all' ? 'All Songs' : 'Favorites'}
@@ -227,6 +227,7 @@ export function TracksPage() {
           >
             <span className="text-xs text-white/20 w-5 text-right md:group-hover:hidden">{(currentPage - 1) * ITEMS_PER_PAGE + idx + 1}</span>
             <button
+              aria-label="Play track"
               onClick={(e) => { e.stopPropagation(); playerState.playTrack(track, displayTracks); }}
               className={`hidden md:group-hover:flex w-5 items-center justify-center rounded-full transition-colors text-white`}
             >
@@ -250,6 +251,7 @@ export function TracksPage() {
             </div>
             <div className={`relative flex items-center gap-2 transition-opacity ${openMenuId === track.id ? 'opacity-100' : 'opacity-100 md:opacity-0 md:group-hover:opacity-100'}`}>
               <button
+                aria-label="More options"
                 onClick={(e) => { e.stopPropagation(); setOpenMenuId(openMenuId === track.id ? null : track.id); }}
                 className="p-1.5 text-white/40 hover:text-white hover:bg-white/10 rounded-full transition-colors"
                 title="More options"
@@ -301,6 +303,7 @@ export function TracksPage() {
       {totalPages > 1 && (
         <div className="flex justify-center items-center gap-4 mt-6">
           <button
+            aria-label="Previous page"
             onClick={() => setCurrentPage(p => Math.max(1, p - 1))}
             disabled={currentPage === 1}
             className="px-4 py-2 rounded-xl bg-white/5 hover:bg-white/10 disabled:opacity-30 disabled:cursor-not-allowed text-sm font-medium transition-colors border border-white/5"
@@ -311,6 +314,7 @@ export function TracksPage() {
             Page <span className="text-white font-bold">{currentPage}</span> of <span className="text-white font-bold">{totalPages}</span>
           </div>
           <button
+            aria-label="Next page"
             onClick={() => setCurrentPage(p => Math.min(totalPages, p + 1))}
             disabled={currentPage === totalPages}
             className="px-4 py-2 rounded-xl bg-white/5 hover:bg-white/10 disabled:opacity-30 disabled:cursor-not-allowed text-sm font-medium transition-colors border border-white/5"
@@ -336,6 +340,7 @@ export function TracksPage() {
                 <h3 className="font-semibold text-lg">Track Metadata</h3>
               </div>
               <button
+                aria-label="Close info"
                 onClick={() => setInfoTrack(null)}
                 className="text-white/40 hover:text-white transition-colors p-1"
               >

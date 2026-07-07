@@ -313,6 +313,7 @@ export function Layout() {
                       onClick={() => setIsPasswordModalOpen(true)}
                       className="p-2 text-white/40 hover:text-[#00E5FF] hover:bg-[#00E5FF]/10 rounded-md transition-colors"
                       title={t('layout.setLocalPassword', 'Set Local Password')}
+                      aria-label="Set local password"
                     >
                       <Key size={16} />
                     </button>
@@ -322,6 +323,7 @@ export function Layout() {
                     disabled={isLoggingOut}
                     className="p-2 text-white/40 hover:text-white hover:bg-white/10 rounded-md transition-colors disabled:opacity-50"
                     title={t('layout.signOut', 'Sign Out')}
+                    aria-label="Sign out"
                   >
                     {isLoggingOut ? <Loader2 size={16} className="animate-spin" /> : <LogOut size={16} />}
                   </button>

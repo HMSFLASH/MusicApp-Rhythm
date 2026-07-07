@@ -517,6 +517,7 @@ export function NowPlaying() {
             <div className="flex items-center justify-between px-2 mb-4">
               <div className="relative" ref={volumeRef}>
                 <button
+                  aria-label="Volume"
                   onClick={() => setShowVolume(v => !v)}
                   className={`transition-colors ${showVolume ? 'text-white' : 'text-white/60 hover:text-white'}`}
                 >
@@ -540,10 +541,11 @@ export function NowPlaying() {
               </div>
 
               <div className="flex items-center gap-6 md:gap-10">
-                <button onClick={playPrevious} className="text-white hover:text-white/80 transition-colors">
+                <button aria-label="Previous track" onClick={playPrevious} className="text-white hover:text-white/80 transition-colors">
                   <SkipBack size={28} className="md:w-8 md:h-8" fill="currentColor" />
                 </button>
                 <button
+                  aria-label="Play or pause"
                   onClick={togglePlay}
                   className="w-14 h-14 md:w-16 md:h-16 flex items-center justify-center text-white hover:scale-105 transition-transform"
                 >
@@ -553,12 +555,13 @@ export function NowPlaying() {
                     <Play size={40} className="md:w-12 md:h-12" fill="currentColor" />
                   )}
                 </button>
-                <button onClick={playNext} className="text-white hover:text-white/80 transition-colors">
+                <button aria-label="Next track" onClick={playNext} className="text-white hover:text-white/80 transition-colors">
                   <SkipForward size={28} className="md:w-8 md:h-8" fill="currentColor" />
                 </button>
               </div>
 
               <button
+                aria-label="EQ and tone settings"
                 onClick={() => navigate('/studio')}
                 className="text-white/60 hover:text-white transition-colors"
                 title="EQ & Tone"
