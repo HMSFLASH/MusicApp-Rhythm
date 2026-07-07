@@ -3,6 +3,7 @@ import { useGlobalAudio } from '../context/AudioContext';
 import { Disc, Play, Pause, SkipBack, SkipForward, Shuffle, Repeat, Heart, Info, ListPlus, MoreHorizontal, Repeat1, User, Volume2, VolumeX, BarChart2, Gauge, Music, Check, X, ArrowRight, Square, PauseCircle, ListX } from 'lucide-react';
 import { HorizontalSlider } from '../components/HorizontalSlider';
 import { useNavigate } from 'react-router-dom';
+import { useTranslation } from 'react-i18next';
 
 const formatTime = (time: number) => {
   const m = Math.floor(time / 60);
@@ -11,6 +12,7 @@ const formatTime = (time: number) => {
 };
 
 export function NowPlaying() {
+  const { t } = useTranslation();
   const { playerState } = useGlobalAudio();
   const navigate = useNavigate();
   const {
@@ -146,8 +148,8 @@ export function NowPlaying() {
           <div className="absolute z-20 w-3 h-3 bg-background rounded-full"></div>
         </div>
         <div className="text-center">
-          <p className="text-white font-semibold text-lg">No Track Selected</p>
-          <p className="text-white/30 text-xs mt-3">Go to Playlist or Library to play a track</p>
+          <p className="text-white font-semibold text-lg">{t('nowPlaying.noTrack')}</p>
+          <p className="text-white/30 text-xs mt-3">{t('nowPlaying.noTrackDesc')}</p>
         </div>
       </div>
     );
@@ -205,7 +207,7 @@ export function NowPlaying() {
             <h2 className="text-3xl font-bold text-white mb-2">{currentTrack.title || (currentTrack.fileName?.includes(' - ') ? currentTrack.fileName.split(' - ')[1].replace(/\.[^/.]+$/, "") : currentTrack.fileName.replace(/\.[^/.]+$/, ""))}</h2>
             <div className="flex items-center justify-center gap-2 text-lg text-white/50">
               <User size={18} />
-              <span>{currentTrack.artist || (currentTrack.fileName?.includes(' - ') ? currentTrack.fileName.split(' - ')[0] : 'Unknown Artist')}</span>
+              <span>{currentTrack.artist || (currentTrack.fileName?.includes(' - ') ? currentTrack.fileName.split(' - ')[0] : t('bottomPlayer.unknown'))}</span>
             </div>
           </div>
 
@@ -227,14 +229,14 @@ export function NowPlaying() {
                 {showMenu && (
                   <div className="absolute bottom-full left-1/2 -translate-x-1/2 mb-3 w-72 bg-[#1e1e1e] border border-white/10 rounded-2xl shadow-2xl overflow-hidden z-50">
                     <div className="px-4 py-3 border-b border-white/10">
-                      <p className="text-xs text-white/40 font-medium uppercase tracking-wider">Tùy chọn</p>
+                      <p className="text-xs text-white/40 font-medium uppercase tracking-wider">{t('nowPlaying.options')}</p>
                     </div>
                     {/* Tempo Control */}
                     <div className="px-4 py-4 border-b border-white/5">
                       <div className="flex items-center justify-between mb-3">
                         <div className="flex items-center gap-2 text-white">
                           <Gauge size={16} className="text-primary" />
-                          <span className="text-sm font-semibold">Tốc độ phát</span>
+                          <span className="text-sm font-semibold">{t('nowPlaying.playbackSpeed')}</span>
                         </div>
                         <button
                           onClick={togglePreservesPitch}
@@ -243,7 +245,7 @@ export function NowPlaying() {
                             : 'bg-white/10 text-white/50 border-white/20'
                             }`}
                         >
-                          {preservesPitch ? 'Giữ tông' : 'Vinyl'}
+                          {preservesPitch ? t('nowPlaying.preservePitch') : t('nowPlaying.vinyl')}
                         </button>
                       </div>
                       <HorizontalSlider
@@ -252,7 +254,7 @@ export function NowPlaying() {
                         max={2.0}
                         step={0.05}
                         onChange={updatePlaybackRate}
-                        label="Tempo"
+                        label={t('nowPlaying.tempo')}
                         color="#00f5ff"
                         unit="x"
                       />
@@ -260,7 +262,7 @@ export function NowPlaying() {
                     {/* Other menu items */}
                     <button className="w-full flex items-center gap-3 px-4 py-3 text-sm text-white/70 hover:bg-white/5 hover:text-white transition-colors">
                       <Music size={16} />
-                      <span>Xem lời bài hát</span>
+                      <span>{t('nowPlaying.viewLyrics')}</span>
                     </button>
 
                   </div>
@@ -283,7 +285,7 @@ export function NowPlaying() {
                       }}
                       onContextMenu={(e) => { e.preventDefault(); openRepeatMenu(); }}
                       className={`hover:scale-105 transition-transform ${(queueEndMode === 'repeat' || songEndMode === 'repeat_one') ? 'text-primary' : 'text-white/40 hover:text-white'}`}
-                      title={songEndMode === 'repeat_one' ? "Lặp lại bài hát" : queueEndMode === 'repeat' ? "Lặp lại hàng chờ" : "Lặp lại: Tắt"}
+                      title={songEndMode === 'repeat_one' ? t('bottomPlayer.repeatSong') : queueEndMode === 'repeat' ? t('bottomPlayer.repeatQueue') : t('bottomPlayer.repeatOff')}
                     >
                       {songEndMode === 'repeat_one' ? <Repeat1 size={22} /> : <Repeat size={22} />}
                     </button>
@@ -301,7 +303,7 @@ export function NowPlaying() {
                         onContextMenu={(e) => { e.preventDefault(); openRepeatMenu(); }}
                         className={`hover:scale-105 transition-transform ${songEndMode !== 'next' ? 'text-primary' : 'text-white/40 hover:text-white'
                           }`}
-                        title={songEndMode === 'next' ? "Bài hát: Tiếp tục" : songEndMode === 'repeat_one' ? "Bài hát: Lặp lại" : songEndMode === 'preload' ? "Bài hát: Tải & Dừng" : "Bài hát: Dừng"}
+                        title={songEndMode === 'next' ? t('bottomPlayer.songNext') : songEndMode === 'repeat_one' ? t('bottomPlayer.songRepeat') : songEndMode === 'preload' ? t('bottomPlayer.songPreload') : t('bottomPlayer.songStop')}
                       >
                         {songEndMode === 'repeat_one' ? <Repeat1 size={22} /> : songEndMode === 'stop' ? <Square size={18} /> : songEndMode === 'preload' ? <PauseCircle size={22} /> : <ArrowRight size={22} />}
                       </button>
@@ -316,7 +318,7 @@ export function NowPlaying() {
                         onContextMenu={(e) => { e.preventDefault(); openRepeatMenu(); }}
                         className={`hover:scale-105 transition-transform ${queueEndMode !== 'stop' ? 'text-primary' : 'text-white/40 hover:text-white'
                           }`}
-                        title={queueEndMode === 'repeat' ? "Hàng chờ: Lặp lại" : queueEndMode === 'next' ? "Hàng chờ: Tiếp tục" : "Hàng chờ: Dừng"}
+                        title={queueEndMode === 'repeat' ? t('bottomPlayer.queueRepeat') : queueEndMode === 'next' ? t('bottomPlayer.queueNext') : t('bottomPlayer.queueStop')}
                       >
                         {queueEndMode === 'repeat' ? <Repeat size={22} /> : queueEndMode === 'next' ? <ListPlus size={22} /> : <ListX size={22} />}
                       </button>
@@ -332,21 +334,21 @@ export function NowPlaying() {
                         onClick={() => setRepeatMode('simple')}
                         className={`flex-1 py-3 text-sm font-semibold transition-colors rounded-tl-2xl ${repeatMode === 'simple' ? 'text-white border-b-2 border-primary' : 'text-white/40 hover:text-white/70'
                           }`}
-                      >Đơn giản</button>
+                      >{t('nowPlaying.simple')}</button>
                       <button
                         onClick={() => setRepeatMode('advanced')}
                         className={`flex-1 py-3 text-sm font-semibold transition-colors rounded-tr-2xl ${repeatMode === 'advanced' ? 'text-white border-b-2 border-primary' : 'text-white/40 hover:text-white/70'
                           }`}
-                      >Nâng cao</button>
+                      >{t('nowPlaying.advanced')}</button>
                     </div>
 
                     {/* Simple Tab */}
                     {repeatMode === 'simple' && (
                       <div>
                         {([
-                          { sMode: 'next' as SongEndMode, qMode: 'stop' as QueueEndMode, label: 'Phát bài hát tiếp theo' },
-                          { sMode: 'next' as SongEndMode, qMode: 'repeat' as QueueEndMode, label: 'Lặp lại hàng chờ' },
-                          { sMode: 'repeat_one' as SongEndMode, qMode: 'repeat' as QueueEndMode, label: 'Lặp lại bài hát' },
+                          { sMode: 'next' as SongEndMode, qMode: 'stop' as QueueEndMode, label: t('nowPlaying.playNext') },
+                          { sMode: 'next' as SongEndMode, qMode: 'repeat' as QueueEndMode, label: t('nowPlaying.repeatQueue') },
+                          { sMode: 'repeat_one' as SongEndMode, qMode: 'repeat' as QueueEndMode, label: t('nowPlaying.repeatSong') },
                         ] as { sMode: SongEndMode; qMode: QueueEndMode; label: string }[]).map(({ sMode, qMode, label }) => {
                           const isActive = songEndModeTemp === sMode && queueEndModeTemp === qMode;
                           return (
@@ -374,12 +376,12 @@ export function NowPlaying() {
                     {repeatMode === 'advanced' && (
                       <div className="divide-y divide-white/5">
                         <div className="px-4 py-3">
-                          <p className="text-xs font-bold text-primary uppercase tracking-wider mb-3">Khi một bài hát kết thúc...</p>
+                          <p className="text-xs font-bold text-primary uppercase tracking-wider mb-3">{t('nowPlaying.whenSongEnds')}</p>
                           {([
-                            { val: 'stop' as SongEndMode, label: 'Dừng phát nhạc' },
-                            { val: 'preload' as SongEndMode, label: 'Tải bài hát tiếp theo và Tạm dừng' },
-                            { val: 'next' as SongEndMode, label: 'Phát bài hát tiếp theo' },
-                            { val: 'repeat_one' as SongEndMode, label: 'Lặp lại bài hát' },
+                            { val: 'stop' as SongEndMode, label: t('nowPlaying.stopPlayback') },
+                            { val: 'preload' as SongEndMode, label: t('nowPlaying.preloadNext') },
+                            { val: 'next' as SongEndMode, label: t('nowPlaying.playNext') },
+                            { val: 'repeat_one' as SongEndMode, label: t('nowPlaying.repeatSong') },
                           ]).map(({ val, label }) => (
                             <button key={val} onClick={() => setSongEndModeTemp(val)}
                               className={`w-full flex items-center gap-3 py-2.5 text-sm transition-colors ${songEndModeTemp === val ? 'text-white font-semibold' : 'text-white/40 hover:text-white/70'
@@ -393,11 +395,11 @@ export function NowPlaying() {
                           ))}
                         </div>
                         <div className="px-4 py-3">
-                          <p className="text-xs font-bold text-primary uppercase tracking-wider mb-3">Khi hàng chờ hiện tại kết thúc...</p>
+                          <p className="text-xs font-bold text-primary uppercase tracking-wider mb-3">{t('nowPlaying.whenQueueEnds')}</p>
                           {([
-                            { val: 'stop' as QueueEndMode, label: 'Dừng phát nhạc' },
-                            { val: 'next' as QueueEndMode, label: 'Chuyển sang hàng chờ tiếp theo' },
-                            { val: 'repeat' as QueueEndMode, label: 'Lặp lại hàng chờ' },
+                            { val: 'stop' as QueueEndMode, label: t('nowPlaying.stopPlayback') },
+                            { val: 'next' as QueueEndMode, label: t('nowPlaying.switchToNextQueue') },
+                            { val: 'repeat' as QueueEndMode, label: t('nowPlaying.repeatQueue') },
                           ]).map(({ val, label }) => (
                             <div key={val}>
                               <button onClick={() => setQueueEndModeTemp(val)}
@@ -422,7 +424,7 @@ export function NowPlaying() {
                                       className="mt-0.5 accent-primary w-3.5 h-3.5 cursor-pointer flex-shrink-0"
                                     />
                                     <span className="text-xs text-white/60 group-hover:text-white/80 transition-colors">
-                                      Khi hàng chờ cuối cùng kết thúc, chuyển tới hàng chờ đầu tiên và ngược lại
+                                      {t('nowPlaying.cycleQueues')}
                                     </span>
                                   </label>
                                 </div>
@@ -534,7 +536,7 @@ export function NowPlaying() {
           <div className="w-full bg-white/5 rounded-2xl p-6 border border-white/10">
             <h3 className="font-bold text-white mb-6 flex items-center gap-2">
               <ListPlus size={20} className="text-primary" />
-              Tiếp theo (Up Next)
+              {t('player.upNext')}
             </h3>
             <div id="nowplaying-queue-container" className="flex flex-col gap-3 max-h-[60vh] overflow-y-auto pr-2 relative">
               {playerState.queue.map((track) => {
@@ -581,7 +583,7 @@ export function NowPlaying() {
             <div className="flex items-center justify-between p-5 border-b border-white/5">
               <div className="flex items-center gap-3 text-white">
                 <Info size={24} className="text-primary" />
-                <h3 className="font-semibold text-lg">Track Metadata</h3>
+                <h3 className="font-semibold text-lg">{t('bottomPlayer.trackMetadata')}</h3>
               </div>
               <button
                 onClick={() => setShowMetadata(false)}
@@ -594,14 +596,14 @@ export function NowPlaying() {
             <div className="p-5 flex flex-col gap-4 overflow-y-auto max-h-[70vh]">
               <div className="bg-white/5 rounded-xl p-4 flex flex-col gap-3">
                 {[
-                  { label: 'Title', value: currentTrack.title },
-                  { label: 'Artist', value: currentTrack.artist },
-                  { label: 'Album', value: currentTrack.album },
-                  { label: 'Genre', value: currentTrack.genre },
-                  { label: 'Duration', value: currentTrack.durationSeconds ? formatTime(currentTrack.durationSeconds) : (duration ? formatTime(duration) : null) },
-                  { label: 'File Name', value: currentTrack.fileName },
-                  { label: 'Source', value: currentTrack.sourceType },
-                  { label: 'Track ID', value: String(currentTrack.id) },
+                  { label: t('bottomPlayer.title'), value: currentTrack.title },
+                  { label: t('bottomPlayer.artist'), value: currentTrack.artist },
+                  { label: t('bottomPlayer.album'), value: currentTrack.album },
+                  { label: t('bottomPlayer.genre'), value: currentTrack.genre },
+                  { label: t('bottomPlayer.duration'), value: currentTrack.durationSeconds ? formatTime(currentTrack.durationSeconds) : (duration ? formatTime(duration) : null) },
+                  { label: t('bottomPlayer.fileName'), value: currentTrack.fileName },
+                  { label: t('bottomPlayer.source'), value: currentTrack.sourceType },
+                  { label: t('bottomPlayer.trackId'), value: String(currentTrack.id) },
                   { label: 'File Type', value: currentTrack.fileFormat },
                   { label: 'Codec', value: currentTrack.codec },
                   { label: 'Size', value: currentTrack.fileSize ? `${(currentTrack.fileSize / 1024 / 1024).toFixed(2)} MB` : null },

@@ -134,5 +134,26 @@
     "source": "Nguồn",
     "trackId": "Mã bài hát",
     "unknown": "không rõ"
+  },
+  "nowPlaying": {
+    "noTrack": "Không Có Bài Hát Nào",
+    "noTrackDesc": "Vào Danh sách phát hoặc Thư viện để chọn bài hát",
+    "options": "Tùy chọn",
+    "playbackSpeed": "Tốc độ phát",
+    "preservePitch": "Giữ tông",
+    "vinyl": "Vinyl",
+    "tempo": "Tempo",
+    "viewLyrics": "Xem lời bài hát",
+    "simple": "Đơn giản",
+    "advanced": "Nâng cao",
+    "whenSongEnds": "Khi một bài hát kết thúc...",
+    "whenQueueEnds": "Khi hàng chờ hiện tại kết thúc...",
+    "stopPlayback": "Dừng phát nhạc",
+    "preloadNext": "Tải bài hát tiếp theo và Tạm dừng",
+    "playNext": "Phát bài hát tiếp theo",
+    "repeatSong": "Lặp lại bài hát",
+    "repeatQueue": "Lặp lại hàng chờ",
+    "switchToNextQueue": "Chuyển sang hàng chờ tiếp theo",
+    "cycleQueues": "Khi hàng chờ cuối cùng kết thúc, chuyển tới hàng chờ đầu tiên và ngược lại"
   }
 }

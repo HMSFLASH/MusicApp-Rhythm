@@ -134,5 +134,26 @@
     "source": "Source",
     "trackId": "Track ID",
     "unknown": "unknown"
+  },
+  "nowPlaying": {
+    "noTrack": "No Track Selected",
+    "noTrackDesc": "Go to Playlist or Library to play a track",
+    "options": "Options",
+    "playbackSpeed": "Playback Speed",
+    "preservePitch": "Preserve Pitch",
+    "vinyl": "Vinyl",
+    "tempo": "Tempo",
+    "viewLyrics": "View Lyrics",
+    "simple": "Simple",
+    "advanced": "Advanced",
+    "whenSongEnds": "When a song ends...",
+    "whenQueueEnds": "When the current queue ends...",
+    "stopPlayback": "Stop playback",
+    "preloadNext": "Preload next song & Pause",
+    "playNext": "Play next song",
+    "repeatSong": "Repeat song",
+    "repeatQueue": "Repeat queue",
+    "switchToNextQueue": "Switch to next queue",
+    "cycleQueues": "When the last queue ends, switch to the first queue and vice versa"
   }
 }
