@@ -4,6 +4,7 @@ import { Disc, Play, Pause, SkipBack, SkipForward, Shuffle, Repeat, Heart, Info,
 import { HorizontalSlider } from '../components/HorizontalSlider';
 import { useNavigate } from 'react-router-dom';
 import { useTranslation } from 'react-i18next';
+import { axiosClient } from '../api/axiosClient';
 
 const formatTime = (time: number) => {
   const m = Math.floor(time / 60);
@@ -13,7 +14,7 @@ const formatTime = (time: number) => {
 
 export function NowPlaying() {
   const { t } = useTranslation();
-  const { playerState } = useGlobalAudio();
+  const { playerState, jwtToken } = useGlobalAudio();
   const navigate = useNavigate();
   const {
     isPlaying, currentTrack, currentTime, duration,
@@ -37,6 +38,33 @@ export function NowPlaying() {
       }
     }
   }, [currentTrack]);
+
+  const [isFavorite, setIsFavorite] = useState(false);
+
+  useEffect(() => {
+    if (currentTrack?.id && jwtToken && currentTrack.sourceType !== 'LOCAL') {
+      axiosClient.get(`/api/favorites/check/${currentTrack.id}`)
+        // eslint-disable-next-line @typescript-eslint/no-explicit-any
+        .then((res: any) => setIsFavorite(res === true || res.data === true))
+        .catch(() => setIsFavorite(false));
+    } else {
+      setIsFavorite(false);
+    }
+  }, [currentTrack?.id, jwtToken]);
+
+  const toggleFavorite = () => {
+    if (!currentTrack?.id || !jwtToken || currentTrack.sourceType === 'LOCAL') return;
+    
+    if (isFavorite) {
+      axiosClient.delete(`/api/favorites/${currentTrack.id}`)
+        .then(() => setIsFavorite(false))
+        .catch(console.error);
+    } else {
+      axiosClient.post(`/api/favorites/${currentTrack.id}`)
+        .then(() => setIsFavorite(true))
+        .catch(console.error);
+    }
+  };
 
 
   // F8 scroll effect state
@@ -218,7 +246,17 @@ export function NowPlaying() {
 
             {/* Top Action Bar */}
             <div className="flex items-center justify-between px-2 mb-8 text-white/60">
-              <button className="hover:text-white transition-colors"><Heart size={22} /></button>
+              <button 
+                onClick={toggleFavorite}
+                className={`
+                  ${isFavorite ? 'text-primary drop-shadow-[0_0_12px_var(--tw-colors-primary)] scale-110' : 'text-white/40 hover:text-white'} 
+                  transition-all duration-300 p-2 -ml-2 rounded-full
+                  active:scale-95
+                `}
+                aria-label={isFavorite ? "Remove from Favorites" : "Add to Favorites"}
+              >
+                <Heart size={24} fill={isFavorite ? "currentColor" : "none"} className={`transition-all duration-300`} />
+              </button>
               <button onClick={() => setShowMetadata(true)} className="hover:text-white transition-colors"><Info size={22} /></button>
               {/* More Options (...) Button */}
               <div className="relative" ref={menuRef}>

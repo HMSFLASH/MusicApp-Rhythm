@@ -134,7 +134,7 @@ export function QueuePage() {
                       </div>
                     )}
 
-                    <div className={`absolute inset-0 flex items-center justify-center bg-black/60 transition-opacity ${isCurrent && isPlaying ? 'opacity-100' : 'opacity-0 group-hover:opacity-100'
+                    <div className={`absolute inset-0 flex items-center justify-center bg-black/60 transition-opacity ${isCurrent && isPlaying ? 'opacity-100' : 'opacity-100 md:opacity-0 md:group-hover:opacity-100'
                       }`}>
                       {isCurrent && isPlaying ? (
                         <Pause size={20} className="text-primary fill-primary" />
@@ -159,7 +159,7 @@ export function QueuePage() {
                         e.stopPropagation();
                         setOpenMenuIndex(openMenuIndex === index ? null : index);
                       }}
-                      className="p-2 text-white/30 hover:text-white hover:bg-white/10 rounded-full transition-colors opacity-0 group-hover:opacity-100"
+                      className="p-2 text-white/30 hover:text-white hover:bg-white/10 rounded-full transition-colors opacity-100 md:opacity-0 md:group-hover:opacity-100"
                     >
                       <MoreHorizontal size={18} />
                     </button>
@@ -195,7 +195,7 @@ export function QueuePage() {
                     
                     <button
                       onClick={(e) => handleRemoveTrack(e, track.id)}
-                      className="p-2 text-white/30 hover:text-red-400 hover:bg-white/10 rounded-full transition-colors opacity-0 group-hover:opacity-100 hidden sm:block"
+                      className="p-2 text-white/30 hover:text-red-400 hover:bg-white/10 rounded-full transition-colors opacity-100 md:opacity-0 md:group-hover:opacity-100 hidden sm:block"
                       title="Remove from queue"
                     >
                       <Trash2 size={18} />

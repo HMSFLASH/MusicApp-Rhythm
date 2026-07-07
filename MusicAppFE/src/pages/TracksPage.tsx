@@ -246,7 +246,7 @@ export function TracksPage() {
                 <span className="text-xs text-white/30 truncate">{track.artist || playerState.getTrackMetadata(track.id)?.artist || (track.fileName?.includes(' - ') ? track.fileName.split(' - ')[0] : 'Unknown Artist')}</span>
               </div>
             </div>
-            <div className={`relative flex items-center gap-2 transition-opacity ${openMenuId === track.id ? 'opacity-100' : 'opacity-0 group-hover:opacity-100'}`}>
+            <div className={`relative flex items-center gap-2 transition-opacity ${openMenuId === track.id ? 'opacity-100' : 'opacity-100 md:opacity-0 md:group-hover:opacity-100'}`}>
               <button
                 onClick={(e) => { e.stopPropagation(); setOpenMenuId(openMenuId === track.id ? null : track.id); }}
                 className="p-1.5 text-white/40 hover:text-white hover:bg-white/10 rounded-full transition-colors"
