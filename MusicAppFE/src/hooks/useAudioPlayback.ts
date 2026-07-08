@@ -16,6 +16,40 @@ const percentToStereoBaseWidth = (value: number) => {
 const percentToPseudoStereoAmount = (value: number) => clamp((value - 100) / 100, 0, 1);
 const REVERB_WET_GAIN = 0.75;
 const DRIVE_MEDIA_URL = 'https://www.googleapis.com/drive/v3/files';
+type LoadingTrackPhase = 'downloading' | 'processing';
+
+const createSilentWavUrl = () => {
+  const sampleRate = 8000;
+  const durationSeconds = 1;
+  const bytesPerSample = 2;
+  const channelCount = 1;
+  const sampleCount = sampleRate * durationSeconds;
+  const dataSize = sampleCount * channelCount * bytesPerSample;
+  const buffer = new ArrayBuffer(44 + dataSize);
+  const view = new DataView(buffer);
+
+  const writeAscii = (offset: number, value: string) => {
+    for (let i = 0; i < value.length; i += 1) {
+      view.setUint8(offset + i, value.charCodeAt(i));
+    }
+  };
+
+  writeAscii(0, 'RIFF');
+  view.setUint32(4, 36 + dataSize, true);
+  writeAscii(8, 'WAVE');
+  writeAscii(12, 'fmt ');
+  view.setUint32(16, 16, true);
+  view.setUint16(20, 1, true);
+  view.setUint16(22, channelCount, true);
+  view.setUint32(24, sampleRate, true);
+  view.setUint32(28, sampleRate * channelCount * bytesPerSample, true);
+  view.setUint16(32, channelCount * bytesPerSample, true);
+  view.setUint16(34, bytesPerSample * 8, true);
+  writeAscii(36, 'data');
+  view.setUint32(40, dataSize, true);
+
+  return URL.createObjectURL(new Blob([buffer], { type: 'audio/wav' }));
+};
 
 const getTrackMimeType = (track: Track, fallback?: string | null) => {
   const ext = track.fileName?.split('.').pop()?.toLowerCase();
@@ -150,6 +184,9 @@ export function useAudioPlayback(
   const { blobCacheRef } = metadataState;
 
   const [isPlaying, setIsPlaying] = useState(false);
+  const [isLoadingTrack, setIsLoadingTrack] = useState(false);
+  const [loadingTrackId, setLoadingTrackId] = useState<string | null>(null);
+  const [loadingTrackPhase, setLoadingTrackPhase] = useState<LoadingTrackPhase | null>(null);
   const [currentTime, setCurrentTime] = useState(0);
   const [duration, setDuration] = useState(0);
 
@@ -174,6 +211,46 @@ export function useAudioPlayback(
   const currentTimeSnapshotRef = useRef<number>(0);
   const isPlayingSnapshotRef = useRef<boolean>(false);
   const currentTrackSnapshotRef = useRef<Track | null>(currentTrack ?? null);
+  const usingBufferPlaybackRef = useRef<boolean>(false);
+  const mediaSessionAnchorRef = useRef<HTMLAudioElement | null>(null);
+  const mediaSessionAnchorUrlRef = useRef<string | null>(null);
+
+  const clearTrackLoading = useCallback(() => {
+    setIsLoadingTrack(false);
+    setLoadingTrackId(null);
+    setLoadingTrackPhase(null);
+  }, []);
+
+  const getMediaSessionAnchor = useCallback(() => {
+    if (!mediaSessionAnchorRef.current) {
+      const anchor = new Audio();
+      anchor.loop = true;
+      anchor.preload = 'auto';
+      anchor.src = mediaSessionAnchorUrlRef.current || createSilentWavUrl();
+      mediaSessionAnchorUrlRef.current = anchor.src;
+      mediaSessionAnchorRef.current = anchor;
+    }
+
+    return mediaSessionAnchorRef.current;
+  }, []);
+
+  const startMediaSessionAnchor = useCallback(() => {
+    const anchor = getMediaSessionAnchor();
+    if (!anchor.paused) return;
+    anchor.play().catch((e) => console.warn('[MediaSession] Silent anchor playback failed', e));
+  }, [getMediaSessionAnchor]);
+
+  const pauseMediaSessionAnchor = useCallback(() => {
+    const anchor = mediaSessionAnchorRef.current;
+    if (!anchor) return;
+
+    anchor.pause();
+    try {
+      anchor.currentTime = 0;
+    } catch {
+      // Some browsers reject seeks while the silent anchor is still loading.
+    }
+  }, []);
 
   useEffect(() => {
     if (!audioRef.current) {
@@ -211,10 +288,26 @@ export function useAudioPlayback(
         }
       });
       audioRef.current.addEventListener('ended', () => {
+        clearTrackLoading();
         if (playNextRef.current) playNextRef.current();
       });
-      audioRef.current.addEventListener('play', () => setIsPlaying(true));
-      audioRef.current.addEventListener('pause', () => setIsPlaying(false));
+      audioRef.current.addEventListener('play', () => {
+        clearTrackLoading();
+        if (!usingBufferPlaybackRef.current) setIsPlaying(true);
+      });
+      audioRef.current.addEventListener('playing', () => {
+        clearTrackLoading();
+      });
+      audioRef.current.addEventListener('canplay', () => {
+        clearTrackLoading();
+      });
+      audioRef.current.addEventListener('pause', () => {
+        clearTrackLoading();
+        if (!usingBufferPlaybackRef.current) setIsPlaying(false);
+      });
+      audioRef.current.addEventListener('error', () => {
+        clearTrackLoading();
+      });
     }
 
     return () => {
@@ -232,6 +325,15 @@ export function useAudioPlayback(
       if (audioContextRef.current && audioContextRef.current.state !== 'closed') {
         audioContextRef.current.close().catch(console.error);
         audioContextRef.current = null;
+      }
+      pauseMediaSessionAnchor();
+      if (mediaSessionAnchorRef.current) {
+        mediaSessionAnchorRef.current.src = "";
+        mediaSessionAnchorRef.current = null;
+      }
+      if (mediaSessionAnchorUrlRef.current) {
+        URL.revokeObjectURL(mediaSessionAnchorUrlRef.current);
+        mediaSessionAnchorUrlRef.current = null;
       }
     };
   // eslint-disable-next-line react-hooks/exhaustive-deps
@@ -448,7 +550,9 @@ export function useAudioPlayback(
       window.clearInterval(rafRef.current);
       rafRef.current = null;
     }
-  }, [bufferSourceRef]);
+
+    pauseMediaSessionAnchor();
+  }, [bufferSourceRef, pauseMediaSessionAnchor]);
 
   const configureAudioElementSource = useCallback((audioUrl: string) => {
     if (!audioRef.current) return;
@@ -513,6 +617,7 @@ export function useAudioPlayback(
     stopBufferPlayback();
     audioBufferRef.current = null;
     bufferPausedTimeRef.current = 0;
+    usingBufferPlaybackRef.current = false;
     initializeAudioContext();
 
     if (!audioRef.current || !trackToResume) {
@@ -895,6 +1000,7 @@ console.log("[Audio] performOfflineRender called with EQ bands:", audioParamsRef
 
   const playCurrentBuffer = (offset = 0) => {
     if (!audioBufferRef.current || !audioContextRef.current) return;
+    usingBufferPlaybackRef.current = true;
     stopBufferPlayback();
     const source = audioContextRef.current.createBufferSource();
     source.buffer = audioBufferRef.current;
@@ -913,6 +1019,7 @@ console.log("[Audio] performOfflineRender called with EQ bands:", audioParamsRef
     bufferSourceRef.current = source;
     bufferStartTimeRef.current = audioContextRef.current.currentTime - (offset / playbackRate);
     source.start(0, offset);
+    startMediaSessionAnchor();
 
     if (rafRef.current) window.clearInterval(rafRef.current);
     const updateTime = () => {
@@ -934,6 +1041,9 @@ console.log("[Audio] performOfflineRender called with EQ bands:", audioParamsRef
     if (!currentQueue) currentQueue = [startingTrack];
     setCurrentTrack(startingTrack);
     setQueue(currentQueue);
+    setLoadingTrackId(String(startingTrack.id));
+    setIsLoadingTrack(autoPlay);
+    setLoadingTrackPhase(autoPlay ? 'downloading' : null);
 
     const playSessionId = Symbol();
     decodeSessionRef.current = playSessionId;
@@ -945,18 +1055,24 @@ console.log("[Audio] performOfflineRender called with EQ bands:", audioParamsRef
       audioUrl = await getTrackAudioUrl(startingTrack);
       if (!audioUrl) {
         setIsPlaying(false);
+        clearTrackLoading();
         return;
       }
     } catch (e) {
       console.error("[Audio] Failed to prepare track for playback", e);
       setIsPlaying(false);
+      clearTrackLoading();
       return;
     }
 
     if (precalculateOnIdle) {
+      usingBufferPlaybackRef.current = true;
       audioRef.current!.pause();
       audioRef.current!.src = "";
-      setIsPlaying(true);
+      setIsPlaying(autoPlay);
+      if (autoPlay) startMediaSessionAnchor();
+      else pauseMediaSessionAnchor();
+      setLoadingTrackPhase(autoPlay ? 'processing' : null);
 
       (async () => {
         try {
@@ -1005,6 +1121,8 @@ console.log("[Audio] performOfflineRender called with EQ bands:", audioParamsRef
             bufferStartTimeRef.current = audioContextRef.current!.currentTime;
             bufferPausedTimeRef.current = 0;
             bufferSourceRef.current.start(0);
+            startMediaSessionAnchor();
+            clearTrackLoading();
             setIsPlaying(true);
 
             const updateTime = () => {
@@ -1017,34 +1135,49 @@ console.log("[Audio] performOfflineRender called with EQ bands:", audioParamsRef
             rafRef.current = window.setInterval(updateTime, 25);
           } else {
             bufferPausedTimeRef.current = 0;
+            clearTrackLoading();
             setIsPlaying(false);
           }
         } catch (e) {
           if (decodeSessionRef.current !== playSessionId) return;
           console.error("Decode failed, falling back to stream", e);
           audioBufferRef.current = null;
+          usingBufferPlaybackRef.current = false;
+          pauseMediaSessionAnchor();
           configureAudioElementSource(audioUrl);
           if (autoPlay) {
             // eslint-disable-next-line @typescript-eslint/no-explicit-any
-            audioRef.current!.play().catch((playError: any) => console.error("Playback failed", playError));
+            audioRef.current!.play().catch((playError: any) => {
+              clearTrackLoading();
+              console.error("Playback failed", playError);
+            });
           }
         } finally {
           if (decodeSessionRef.current === playSessionId) {
             isDecodingRef.current = false;
+            if (!autoPlay) {
+              clearTrackLoading();
+            }
           }
         }
       })();
     } else {
       // eslint-disable-next-line @typescript-eslint/no-explicit-any
       if ((window as any).dummyAudio) (window as any).dummyAudio.pause();
+      pauseMediaSessionAnchor();
       audioBufferRef.current = null;
+      usingBufferPlaybackRef.current = false;
       bufferPausedTimeRef.current = 0;
       configureAudioElementSource(audioUrl);
       if (autoPlay) {
         // eslint-disable-next-line @typescript-eslint/no-explicit-any
-        audioRef.current!.play().catch((e: any) => console.error("Playback failed", e));
+        audioRef.current!.play().catch((e: any) => {
+          clearTrackLoading();
+          console.error("Playback failed", e);
+        });
       } else {
         audioRef.current!.pause();
+        clearTrackLoading();
         setIsPlaying(false);
       }
     }
@@ -1266,6 +1399,9 @@ console.log("[Audio] performOfflineRender called with EQ bands:", audioParamsRef
 
   return {
     isPlaying,
+    isLoadingTrack,
+    loadingTrackId,
+    loadingTrackPhase,
     currentTime,
     duration,
     volume,

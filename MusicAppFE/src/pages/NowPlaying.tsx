@@ -1,7 +1,7 @@
 import { useState, useRef, useEffect } from 'react';
 import { useGlobalAudio } from '../context/AudioContext'
 import { useAuth } from '../context/AuthContext';;
-import { Disc, Play, Pause, SkipBack, SkipForward, Shuffle, Repeat, Heart, Info, ListPlus, MoreHorizontal, Repeat1, User, Volume2, VolumeX, BarChart2, Gauge, Music, Check, X, ArrowRight, Square, PauseCircle, ListX } from 'lucide-react';
+import { Disc, Play, Pause, SkipBack, SkipForward, Shuffle, Repeat, Heart, Info, ListPlus, MoreHorizontal, Repeat1, User, Volume2, VolumeX, BarChart2, Gauge, Music, Check, X, ArrowRight, Square, PauseCircle, ListX, Loader2 } from 'lucide-react';
 import { HorizontalSlider } from '../components/HorizontalSlider';
 import { useNavigate } from 'react-router-dom';
 import { useTranslation } from 'react-i18next';
@@ -19,7 +19,7 @@ export function NowPlaying() {
   const { playerState } = useGlobalAudio();
   const navigate = useNavigate();
   const {
-    isPlaying, currentTrack, currentTime, duration,
+    isPlaying, isLoadingTrack, currentTrack, currentTime, duration,
     togglePlay, seek, playNext, playPrevious,
     playbackRate, updatePlaybackRate, preservesPitch, togglePreservesPitch,
     isShuffle, setIsShuffle, songEndMode, setSongEndMode, queueEndMode, setQueueEndMode,
@@ -585,7 +585,9 @@ export function NowPlaying() {
                   onClick={togglePlay}
                   className="w-14 h-14 md:w-16 md:h-16 flex items-center justify-center text-white hover:scale-105 transition-transform"
                 >
-                  {isPlaying ? (
+                  {isLoadingTrack ? (
+                    <Loader2 size={40} className="md:w-12 md:h-12 animate-spin" />
+                  ) : isPlaying ? (
                     <Pause size={40} className="md:w-12 md:h-12" fill="currentColor" />
                   ) : (
                     <Play size={40} className="md:w-12 md:h-12" fill="currentColor" />

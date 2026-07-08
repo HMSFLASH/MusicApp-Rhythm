@@ -30,7 +30,9 @@
     "backupSuccess": "Sao lưu lên Google Drive thành công!",
     "backupFail": "Sao lưu lên Google Drive thất bại. Hãy đảm bảo bạn đã liên kết tài khoản.",
     "restoreSuccess": "Khôi phục thành công! Ứng dụng sẽ tải lại.",
-    "restoreFail": "Khôi phục từ Google Drive thất bại."
+    "restoreFail": "Khôi phục từ Google Drive thất bại.",
+    "downloadingTrack": "Đang tải nhạc về...",
+    "processingTrack": "Đang tính toán âm thanh..."
   },
   "studio": {
     "pageTitle": "Studio Âm Thanh",

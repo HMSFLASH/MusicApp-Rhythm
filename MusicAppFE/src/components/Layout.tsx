@@ -27,6 +27,7 @@ import { LocalFilePicker } from './LocalFilePicker';
 import { UploadQueuePanel } from './UploadQueuePanel';
 import { SetLocalPasswordModal } from './SetLocalPasswordModal';
 import { db } from '../lib/db';
+import { useGlobalAudio } from '../context/AudioContext';
 
 const parseJwt = (token: string) => {
   try {
@@ -47,6 +48,7 @@ export function Layout() {
   const { t, i18n } = useTranslation();
   const location = useLocation();
   const { jwtToken, setJwtToken } = useAuth();
+  const { playerState } = useGlobalAudio();
   const [syncing, setSyncing] = useState(false);
   const [isLoggingOut, setIsLoggingOut] = useState(false);
   const [isPasswordModalOpen, setIsPasswordModalOpen] = useState(false);
@@ -381,6 +383,16 @@ export function Layout() {
               }`}>
                 {notification.type === 'error' ? <AlertCircle size={20} /> : <CheckCircle2 size={20} />}
                 <span className="font-medium text-sm">{notification.message}</span>
+              </div>
+            )}
+            {playerState.isLoadingTrack && (
+              <div className={`fixed ${notification ? 'top-32 md:top-20' : 'top-16 md:top-4'} left-1/2 -translate-x-1/2 z-[100] flex max-w-[calc(100vw-2rem)] items-center gap-2 rounded-lg border border-primary/25 bg-primary/10 px-4 py-3 text-primary shadow-lg backdrop-blur-md`}>
+                <Loader2 size={20} className="animate-spin shrink-0" />
+                <span className="truncate text-sm font-medium">
+                  {playerState.loadingTrackPhase === 'processing'
+                    ? t('layout.processingTrack', 'Đang tính toán âm thanh...')
+                    : t('layout.downloadingTrack', 'Đang tải nhạc về...')}
+                </span>
               </div>
             )}
             <div className="p-4 md:p-8 max-w-7xl mx-auto min-h-full w-full pb-32">

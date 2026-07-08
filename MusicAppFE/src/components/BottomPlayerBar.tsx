@@ -2,7 +2,7 @@ import { useRef, useEffect, useState } from 'react';
 import { useNavigate, useLocation } from 'react-router-dom';
 import { useGlobalAudio } from '../context/AudioContext'
 import { useAuth } from '../context/AuthContext';;
-import { Play, Pause, SkipForward, SkipBack, Cloud, Disc, Heart, Shuffle, Repeat, Repeat1, Square, PauseCircle, ListX, ListPlus, Maximize2, Info, ListMusic, Volume2, VolumeX, X, ArrowRight } from 'lucide-react';
+import { Play, Pause, SkipForward, SkipBack, Cloud, Disc, Heart, Shuffle, Repeat, Repeat1, Square, PauseCircle, ListX, ListPlus, Maximize2, Info, ListMusic, Volume2, VolumeX, X, ArrowRight, Loader2 } from 'lucide-react';
 import { HorizontalSlider } from './HorizontalSlider';
 import { axiosClient } from '../api/axiosClient';
 import { useTranslation } from 'react-i18next';
@@ -20,7 +20,7 @@ export function BottomPlayerBar() {
   const { jwtToken } = useAuth();
   const { playerState } = useGlobalAudio();
   const { 
-    currentTrack, isPlaying, currentTime, duration, 
+    currentTrack, isPlaying, isLoadingTrack, currentTime, duration, 
     togglePlay, seek, playNext, playPrevious,
     isShuffle,
     setIsShuffle,
@@ -188,7 +188,9 @@ export function BottomPlayerBar() {
             aria-label="Play or pause"
             className="w-8 h-8 md:w-8 md:h-8 shrink-0 rounded-full bg-white flex items-center justify-center text-black hover:scale-105 transition-transform"
           >
-            {isPlaying ? (
+            {isLoadingTrack ? (
+              <Loader2 size={16} className="animate-spin" />
+            ) : isPlaying ? (
               <Pause size={16} fill="currentColor" />
             ) : (
               <Play size={16} fill="currentColor" className="ml-0.5" />
