@@ -71,6 +71,8 @@ export function useAudioContext(effectsState: any) {
   const dryGainRef = useRef<GainNode | null>(null);
   const wetGainRef = useRef<GainNode | null>(null);
   const reverbPreDelayRef = useRef<DelayNode | null>(null);
+  const reverbHighpassRef = useRef<BiquadFilterNode | null>(null);
+  const reverbLowpassRef = useRef<BiquadFilterNode | null>(null);
   const applyCompressorParams = useCallback((compressor: DynamicsCompressorNode, makeup: GainNode) => {
     if (fxEnabled.comp) {
       compressor.threshold.value = compThreshold;
@@ -104,13 +106,60 @@ export function useAudioContext(effectsState: any) {
     if (!audioContextRef.current) return;
 
     try {
-      irBufferRef.current = generateImpulseResponse(
+      const newIrBuffer = generateImpulseResponse(
         audioContextRef.current,
         clamp(reverbTime || 2, 0.1, 10),
         2
       );
-      if (convolverNodeRef.current) {
-        convolverNodeRef.current.buffer = irBufferRef.current;
+      irBufferRef.current = newIrBuffer;
+      
+      if (convolverNodeRef.current && reverbHighpassRef.current && reverbPreDelayRef.current && wetGainRef.current) {
+        const ctx = audioContextRef.current;
+        const now = ctx.currentTime;
+        
+        // Save old nodes
+        const oldConvolver = convolverNodeRef.current;
+        const oldWetGain = ctx.createGain(); 
+        
+        // Re-route old convolver through temporary fade-out gain
+        oldConvolver.disconnect();
+        oldConvolver.connect(oldWetGain);
+        oldWetGain.connect(reverbHighpassRef.current);
+        oldWetGain.gain.setValueAtTime(1, now);
+        oldWetGain.gain.setTargetAtTime(0, now, 0.015);
+        
+        // Setup new convolver
+        const newConvolver = ctx.createConvolver();
+        newConvolver.buffer = newIrBuffer;
+        
+        const newConvolverGain = ctx.createGain();
+        newConvolverGain.gain.setValueAtTime(0, now);
+        newConvolverGain.gain.setTargetAtTime(1, now, 0.015);
+        
+        reverbPreDelayRef.current.connect(newConvolver);
+        newConvolver.connect(newConvolverGain);
+        newConvolverGain.connect(reverbHighpassRef.current);
+        
+        // Update ref
+        convolverNodeRef.current = newConvolver;
+        
+        // Cleanup old nodes
+        setTimeout(() => {
+          try {
+            oldConvolver.disconnect();
+            oldWetGain.disconnect();
+            newConvolverGain.disconnect();
+            // Connect new convolver directly to highpass once fade is done
+            if (convolverNodeRef.current === newConvolver && reverbHighpassRef.current) {
+                newConvolver.disconnect();
+                newConvolver.connect(reverbHighpassRef.current);
+            }
+          } catch (err) {
+            console.error('Failed to cleanup reverb crossfade', err);
+          }
+        }, 100);
+      } else if (convolverNodeRef.current) {
+        convolverNodeRef.current.buffer = newIrBuffer;
       }
     } catch (e) {
       console.error('Failed to generate IR', e);
@@ -159,6 +208,8 @@ console.log("[Audio] initializeAudioContext called");
     if (dryGainRef.current) dryGainRef.current.disconnect();
     if (wetGainRef.current) wetGainRef.current.disconnect();
     if (reverbPreDelayRef.current) reverbPreDelayRef.current.disconnect();
+    if (reverbHighpassRef.current) reverbHighpassRef.current.disconnect();
+    if (reverbLowpassRef.current) reverbLowpassRef.current.disconnect();
     if (convolverNodeRef.current) convolverNodeRef.current.disconnect();
     if (stereoSplitterRef.current) stereoSplitterRef.current.disconnect();
     if (stereoMergerRef.current) stereoMergerRef.current.disconnect();
@@ -256,23 +307,39 @@ console.log("[Audio] initializeAudioContext called");
     // 5. Reverb
     if (!convolverNodeRef.current) convolverNodeRef.current = ctx.createConvolver();
     if (!reverbPreDelayRef.current) reverbPreDelayRef.current = ctx.createDelay(1.0);
+    if (!reverbHighpassRef.current) reverbHighpassRef.current = ctx.createBiquadFilter();
+    if (!reverbLowpassRef.current) reverbLowpassRef.current = ctx.createBiquadFilter();
     if (!dryGainRef.current) dryGainRef.current = ctx.createGain();
     if (!wetGainRef.current) wetGainRef.current = ctx.createGain();
 
-    reverbPreDelayRef.current.delayTime.value = 0.02;
+    const preDelayAmount = Math.min(0.04, Math.max(0.008, 0.008 + 0.032 * (reverbMix / 100)));
+    reverbPreDelayRef.current.delayTime.value = preDelayAmount;
+    
+    reverbHighpassRef.current.type = 'highpass';
+    reverbHighpassRef.current.frequency.value = 150;
+    reverbHighpassRef.current.Q.value = 0.7;
+    
+    reverbLowpassRef.current.type = 'lowpass';
+    reverbLowpassRef.current.frequency.value = 7500;
+    reverbLowpassRef.current.Q.value = 0.7;
 
     if (irBufferRef.current && !convolverNodeRef.current.buffer) {
       convolverNodeRef.current.buffer = irBufferRef.current;
     }
 
-    const x = enabled.reverb ? reverbMix / 100 : 0;
-    dryGainRef.current.gain.value = Math.cos(x * Math.PI / 2);
-    wetGainRef.current.gain.value = Math.sin(x * Math.PI / 2) * REVERB_WET_GAIN;
+    const validReverbMix = Number(reverbMix) || 0;
+    const x = enabled.reverb ? clamp(validReverbMix / 100, 0, 1) : 0;
+    const wetAmount = (1 - Math.exp(-x * 3)) / (1 - Math.exp(-3));
+    
+    dryGainRef.current.gain.value = 1.0;
+    wetGainRef.current.gain.value = wetAmount * REVERB_WET_GAIN;
 
     currentNode.connect(dryGainRef.current);
     currentNode.connect(reverbPreDelayRef.current);
     reverbPreDelayRef.current.connect(convolverNodeRef.current);
-    convolverNodeRef.current.connect(wetGainRef.current);
+    convolverNodeRef.current.connect(reverbHighpassRef.current);
+    reverbHighpassRef.current.connect(reverbLowpassRef.current);
+    reverbLowpassRef.current.connect(wetGainRef.current);
 
     const reverbOut = ctx.createGain();
     dryGainRef.current.connect(reverbOut);
@@ -449,17 +516,20 @@ if (preampNodeRef.current) {
   }, [applyCompressorParams]);
 
   useEffect(() => {
-    if (dryGainRef.current && wetGainRef.current) {
-      if (fxEnabled.reverb) {
-        const x = reverbMix / 100;
-        dryGainRef.current.gain.value = Math.cos(x * Math.PI / 2);
-        wetGainRef.current.gain.value = Math.sin(x * Math.PI / 2) * REVERB_WET_GAIN;
+    if (dryGainRef.current && wetGainRef.current && reverbPreDelayRef.current) {
+      if (fxEnabled?.reverb) {
+        const validReverbMix = Number(reverbMix) || 0;
+        const x = clamp(validReverbMix / 100, 0, 1);
+        const wetAmount = (1 - Math.exp(-x * 3)) / (1 - Math.exp(-3));
+        dryGainRef.current.gain.value = 1.0;
+        wetGainRef.current.gain.value = wetAmount * REVERB_WET_GAIN;
+        reverbPreDelayRef.current.delayTime.value = 0.008 + 0.032 * x;
       } else {
         dryGainRef.current.gain.value = 1;
         wetGainRef.current.gain.value = 0;
       }
     }
-  }, [reverbMix, fxEnabled.reverb]);
+  }, [reverbMix, fxEnabled?.reverb]);
 
   useEffect(() => {
     if (lToLRef.current && rToLRef.current && lToRRef.current && rToRRef.current) {

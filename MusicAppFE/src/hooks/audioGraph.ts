@@ -3,7 +3,7 @@ import {
   percentToStereoBaseWidth,
 } from './audioMath';
 
-export const REVERB_WET_GAIN = 0.75;
+export const REVERB_WET_GAIN = 0.35;
 
 export const createSoftClipCurve = (amount = 44100) => {
   const curve = new Float32Array(amount);
@@ -111,13 +111,44 @@ export const generateImpulseResponse = (ctx: BaseAudioContext, duration: number,
   const sampleRate = ctx.sampleRate;
   const length = Math.max(1, Math.floor(sampleRate * duration));
   const impulse = ctx.createBuffer(2, length, sampleRate);
-  const left = impulse.getChannelData(0);
-  const right = impulse.getChannelData(1);
 
-  for (let i = 0; i < length; i += 1) {
-    const factor = Math.pow(1 - i / length, decay);
-    left[i] = (Math.random() * 2 - 1) * factor;
-    right[i] = (Math.random() * 2 - 1) * factor;
+  const earlyReflections = [
+    { time: 0.007, gain: 0.35 },
+    { time: 0.013, gain: -0.28 },
+    { time: 0.021, gain: 0.22 },
+    { time: 0.034, gain: -0.18 },
+    { time: 0.055, gain: 0.12 },
+  ];
+
+  for (let channel = 0; channel < 2; channel++) {
+    const data = impulse.getChannelData(channel);
+    let last = 0;
+
+    for (let i = 0; i < length; i++) {
+      const t = i / sampleRate;
+      const progress = i / length;
+
+      // T60 exponential decay
+      const envelope = Math.exp((-6.9078 * t) / duration);
+
+      // High frequency damping: cutoff smoothly decreases from 12kHz to 4kHz
+      const cutoff = 12000 - progress * 8000;
+      const alpha = 1 - Math.exp((-2 * Math.PI * cutoff) / sampleRate);
+
+      const noise = Math.random() * 2 - 1;
+      last = last + alpha * (noise - last);
+
+      // Apply T60 envelope and base decay modifier
+      data[i] = last * envelope * decay;
+    }
+
+    // Add early reflections
+    for (const reflection of earlyReflections) {
+      const index = Math.floor(reflection.time * sampleRate);
+      if (index < length) {
+        data[index] += reflection.gain;
+      }
+    }
   }
 
   return impulse;
@@ -170,10 +201,10 @@ export const connectStereoWidthMatrix = (ctx: BaseAudioContext, input: AudioNode
     pseudoMono.channelCount = 1;
     pseudoMono.channelCountMode = 'explicit';
     pseudoMono.channelInterpretation = 'speakers';
-    pseudoDelay.delayTime.value = 0.012 + 0.008 * pseudoAmount;
+    pseudoDelay.delayTime.value = 0.006 + 0.007 * pseudoAmount;
     pseudoHighpass.type = 'highpass';
     pseudoHighpass.frequency.value = 180;
-    pseudoWet.gain.value = 0.16 * pseudoAmount;
+    pseudoWet.gain.value = 0.14 * pseudoAmount;
 
     input.connect(pseudoMono);
     pseudoMono.connect(pseudoLeft);
