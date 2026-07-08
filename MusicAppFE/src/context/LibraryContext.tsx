@@ -79,6 +79,12 @@ const mergeCachedMetadata = async (track: Track): Promise<Track> => {
 
 const enrichTracksWithCachedMetadata = (items: Track[]) => Promise.all(items.map(mergeCachedMetadata));
 
+const dispatchLibraryRefreshed = (items: Track[]) => {
+  window.dispatchEvent(new CustomEvent('music-library-refreshed', {
+    detail: { trackIds: items.map((track) => track.id) }
+  }));
+};
+
 export function LibraryProvider({ children }: { children: ReactNode }) {
   const { isAuthenticated } = useAuth();
   const [tracks, setTracks] = useState<Track[]>([]);
@@ -107,6 +113,7 @@ export function LibraryProvider({ children }: { children: ReactNode }) {
 
       await db.set('sonic_library_tracks', parsedTracks);
       await db.set('sonic_favorites', parsedFavs);
+      dispatchLibraryRefreshed(parsedTracks);
     } catch (err) {
       console.error('Failed to load library', err);
     } finally {
@@ -131,6 +138,7 @@ export function LibraryProvider({ children }: { children: ReactNode }) {
 
       await db.set('sonic_library_tracks', parsedTracks);
       await db.set('sonic_favorites', parsedFavs);
+      dispatchLibraryRefreshed(parsedTracks);
     } catch (err) {
       console.error('Failed to sync library', err);
     } finally {

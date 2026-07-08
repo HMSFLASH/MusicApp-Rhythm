@@ -109,6 +109,8 @@ export function useAudioPlayback(
   const currentTimeSnapshotRef = useRef<number>(0);
   const isPlayingSnapshotRef = useRef<boolean>(false);
   const currentTrackSnapshotRef = useRef<Track | null>(currentTrack ?? null);
+  const queueSnapshotRef = useRef<Track[]>(queue ?? []);
+  const upcomingQueuesSnapshotRef = useRef<Track[][]>(upcomingQueues ?? []);
   const usingBufferPlaybackRef = useRef<boolean>(false);
 
   const clearTrackLoading = useCallback(() => {
@@ -463,6 +465,14 @@ export function useAudioPlayback(
   useEffect(() => {
     currentTrackSnapshotRef.current = currentTrack ?? null;
   }, [currentTrack]);
+
+  useEffect(() => {
+    queueSnapshotRef.current = queue ?? [];
+  }, [queue]);
+
+  useEffect(() => {
+    upcomingQueuesSnapshotRef.current = upcomingQueues ?? [];
+  }, [upcomingQueues]);
 
   useEffect(() => {
     precalculateOnIdleRef.current = precalculateOnIdle;
@@ -1126,34 +1136,123 @@ export function useAudioPlayback(
   });
 
   useEffect(() => {
+    const stopDeletedCurrentTrack = () => {
+      decodeSessionRef.current = Symbol();
+      isDecodingRef.current = false;
+      stopBufferPlayback();
+      audioBufferRef.current = null;
+      bufferPausedTimeRef.current = 0;
+      usingBufferPlaybackRef.current = false;
+      setCurrentTime(0);
+      setDuration(0);
+      setIsPlaying(false);
+      clearTrackLoading();
+      releaseAudioElementSource();
+      if (setCurrentTrack) setCurrentTrack(null);
+    };
+
+    const isTrackAllowed = (track: Track, validIds?: Set<string>) => (
+      track.sourceType === 'LOCAL' || !validIds || validIds.has(String(track.id))
+    );
+
+    const continueAfterDeletedCurrentTrack = (deletedId: string | number, validIds?: Set<string>) => {
+      const activeTrack = currentTrackSnapshotRef.current;
+      if (!activeTrack || String(activeTrack.id) !== String(deletedId)) return;
+
+      const deletedTrackId = String(deletedId);
+      const deletedBlobUrl = blobCacheRef.current.get(deletedTrackId);
+      if (deletedBlobUrl) {
+        URL.revokeObjectURL(deletedBlobUrl);
+        blobCacheRef.current.delete(deletedTrackId);
+      }
+      blobLoadingPromisesRef.current.delete(deletedTrackId);
+      precalculatedQueueBuffersRef.current.delete(deletedTrackId);
+      if (precalculatedNextBufferRef.current?.trackId === deletedTrackId) {
+        precalculatedNextBufferRef.current = null;
+      }
+      for (const key of renderSignatureBuffersRef.current.keys()) {
+        if (key.startsWith(`${deletedTrackId}::`)) {
+          renderSignatureBuffersRef.current.delete(key);
+        }
+      }
+
+      const currentQueue = queueSnapshotRef.current ?? [];
+      const sanitizedQueue = currentQueue.filter((track) => (
+        String(track.id) !== deletedTrackId && isTrackAllowed(track, validIds)
+      ));
+      const currentIndex = currentQueue.findIndex((track) => String(track.id) === deletedTrackId);
+      const replacementTrack = currentIndex === -1
+        ? sanitizedQueue[0]
+        : currentQueue
+          .slice(currentIndex + 1)
+          .find((track) => String(track.id) !== deletedTrackId && isTrackAllowed(track, validIds))
+          ?? (queueEndMode === 'repeat' ? sanitizedQueue[0] : undefined);
+
+      if (replacementTrack && playTrackRef.current) {
+        playTrackRef.current(replacementTrack, sanitizedQueue, isPlayingSnapshotRef.current);
+        return;
+      }
+
+      if (queueEndMode === 'next') {
+        const upcomingQueuesToKeep = (upcomingQueuesSnapshotRef.current ?? [])
+          .map((nextQueue) => nextQueue.filter((track) => (
+            String(track.id) !== deletedTrackId && isTrackAllowed(track, validIds)
+          )))
+          .filter((nextQueue) => nextQueue.length > 0);
+        const nextQueue = upcomingQueuesToKeep[0];
+
+        if (nextQueue?.[0] && playTrackRef.current) {
+          setUpcomingQueues?.((previous: Track[][]) => {
+            const rest = previous
+              .map((candidateQueue) => candidateQueue.filter((track) => (
+                String(track.id) !== deletedTrackId && isTrackAllowed(track, validIds)
+              )))
+              .filter((candidateQueue) => candidateQueue.length > 0)
+              .slice(1);
+            if (cycleQueues && sanitizedQueue.length > 0) return [...rest, sanitizedQueue];
+            return rest;
+          });
+          playTrackRef.current(nextQueue[0], nextQueue, isPlayingSnapshotRef.current);
+          return;
+        }
+      }
+
+      stopDeletedCurrentTrack();
+    };
+
     const handleMusicDeleted = (e: Event) => {
       const deletedId = (e as CustomEvent).detail;
       if (!deletedId) return;
-      
-      let wasCurrent = false;
-      if (currentTrackSnapshotRef.current && String(currentTrackSnapshotRef.current.id) === String(deletedId)) {
-        wasCurrent = true;
-      }
-      
-      if (wasCurrent) {
-        setTimeout(() => {
-          if (playNextRef.current) {
-            playNextRef.current();
-          } else if (setCurrentTrack) {
-            setCurrentTrack(null);
-            // Also stop the player
-            if (audioRef.current) {
-              audioRef.current.pause();
-              audioRef.current.src = "";
-            }
-          }
-        }, 50);
+      continueAfterDeletedCurrentTrack(deletedId);
+    };
+
+    const handleLibraryRefreshed = (e: Event) => {
+      const trackIds = (e as CustomEvent<{ trackIds?: Array<string | number> }>).detail?.trackIds;
+      if (!Array.isArray(trackIds)) return;
+
+      const validIds = new Set(trackIds.map(String));
+      const activeTrack = currentTrackSnapshotRef.current;
+      if (activeTrack?.sourceType !== 'LOCAL' && activeTrack && !validIds.has(String(activeTrack.id))) {
+        continueAfterDeletedCurrentTrack(activeTrack.id, validIds);
       }
     };
 
     window.addEventListener('music-deleted', handleMusicDeleted);
-    return () => window.removeEventListener('music-deleted', handleMusicDeleted);
-  }, [audioRef, setCurrentTrack]);
+    window.addEventListener('music-library-refreshed', handleLibraryRefreshed);
+    return () => {
+      window.removeEventListener('music-deleted', handleMusicDeleted);
+      window.removeEventListener('music-library-refreshed', handleLibraryRefreshed);
+    };
+  }, [
+    blobCacheRef,
+    clearTrackLoading,
+    cycleQueues,
+    queueEndMode,
+    releaseAudioElementSource,
+    setCurrentTrack,
+    setUpcomingQueues,
+    stopBufferPlayback,
+  ]);
 
   const { hasPrevious, hasNext } = getPlaybackAvailability({
     currentTrack: currentTrack ?? null,

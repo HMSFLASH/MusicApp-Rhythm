@@ -12,6 +12,17 @@ type SavedAudioQueueState = Partial<{
   cycleQueues: boolean;
 }>;
 
+const isTrackAllowedByLibrary = (track: Track, validIds: Set<string>) => (
+  track.sourceType === 'LOCAL' || validIds.has(String(track.id))
+);
+
+const filterUpcomingQueues = (
+  queues: Track[][],
+  predicate: (track: Track) => boolean
+) => queues
+  .map((candidateQueue) => candidateQueue.filter(predicate))
+  .filter((candidateQueue) => candidateQueue.length > 0);
+
 export function useAudioQueue(savedState: SavedAudioQueueState) {
   const [currentTrack, setCurrentTrack] = useState<Track | null>(null);
   const [queue, setQueue] = useState<Track[]>([]);
@@ -63,11 +74,30 @@ export function useAudioQueue(savedState: SavedAudioQueueState) {
 
       setQueue(prev => prev.filter(t => String(t.id) !== String(deletedId)));
       setOriginalQueue(prev => prev.filter(t => String(t.id) !== String(deletedId)));
-      setUpcomingQueues(prev => prev.map(q => q.filter(t => String(t.id) !== String(deletedId))));
+      setUpcomingQueues(prev => filterUpcomingQueues(
+        prev,
+        (track) => String(track.id) !== String(deletedId)
+      ));
+    };
+
+    const handleLibraryRefreshed = (e: Event) => {
+      const trackIds = (e as CustomEvent<{ trackIds?: Array<string | number> }>).detail?.trackIds;
+      if (!Array.isArray(trackIds)) return;
+
+      const validIds = new Set(trackIds.map(String));
+      const isAllowed = (track: Track) => isTrackAllowedByLibrary(track, validIds);
+
+      setQueue(prev => prev.filter(isAllowed));
+      setOriginalQueue(prev => prev.filter(isAllowed));
+      setUpcomingQueues(prev => filterUpcomingQueues(prev, isAllowed));
     };
 
     window.addEventListener('music-deleted', handleMusicDeleted);
-    return () => window.removeEventListener('music-deleted', handleMusicDeleted);
+    window.addEventListener('music-library-refreshed', handleLibraryRefreshed);
+    return () => {
+      window.removeEventListener('music-deleted', handleMusicDeleted);
+      window.removeEventListener('music-library-refreshed', handleLibraryRefreshed);
+    };
   }, [setOriginalQueue, setUpcomingQueues]);
 
   const setIsShuffle = useCallback((newShuffle: boolean | ((prev: boolean) => boolean)) => {
