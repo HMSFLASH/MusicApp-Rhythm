@@ -16,7 +16,15 @@ import java.io.InputStream;
 import java.util.List;
 
 import com.google.api.client.http.javanet.NetHttpTransport;
+import com.google.api.services.drive.model.FileList;
+import com.google.api.client.http.HttpResponse;
 import jakarta.annotation.PostConstruct;
+import java.util.Collections;
+import java.util.Map;
+import java.util.concurrent.ConcurrentHashMap;
+import java.io.ByteArrayOutputStream;
+import java.io.ByteArrayInputStream;
+import java.nio.charset.StandardCharsets;
 
 @Service
 @RequiredArgsConstructor
@@ -25,7 +33,7 @@ public class GoogleDriveService {
 
     private NetHttpTransport httpTransport;
     private final GsonFactory jsonFactory = GsonFactory.getDefaultInstance();
-    private final java.util.Map<String, Drive> driveCache = new java.util.concurrent.ConcurrentHashMap<>();
+    private final Map<String, Drive> driveCache = new ConcurrentHashMap<>();
 
     private Drive getDrive(String refreshToken) {
         return driveCache.computeIfAbsent(refreshToken, token -> {
@@ -71,7 +79,7 @@ public class GoogleDriveService {
     }
 
     private String getOrCreateFolder(Drive drive) throws Exception {
-        com.google.api.services.drive.model.FileList result = drive.files().list()
+        FileList result = drive.files().list()
                 .setQ("mimeType='application/vnd.google-apps.folder' and name='" + folderName + "' and trashed=false")
                 .setSpaces("drive")
                 .setFields("files(id, name)")
@@ -98,7 +106,7 @@ public class GoogleDriveService {
 
         File fileMetadata = new File();
         String folderId = getOrCreateFolder(drive);
-        fileMetadata.setParents(java.util.Collections.singletonList(folderId));
+        fileMetadata.setParents(Collections.singletonList(folderId));
 
         // Lấy tên file gốc (nếu đường dẫn Telegram có chứa thư mục thì chỉ lấy tên file)
         if (fileName != null && fileName.contains("/")) {
@@ -111,8 +119,8 @@ public class GoogleDriveService {
 
         log.info("Creating Drive upload request: fileName={}, mimeType={}, size={}", fileName, mimeType, contentLength);
         
-        com.google.api.client.http.InputStreamContent mediaContent =
-                new com.google.api.client.http.InputStreamContent(mimeType, stream);
+        InputStreamContent mediaContent =
+                new InputStreamContent(mimeType, stream);
         mediaContent.setLength(contentLength);
 
         Drive.Files.Create createRequest = drive.files().create(fileMetadata, mediaContent)
@@ -144,7 +152,7 @@ public class GoogleDriveService {
 
         String folderId = getOrCreateFolder(drive);
 
-        com.google.api.services.drive.model.FileList result = drive.files().list()
+        FileList result = drive.files().list()
                 .setQ("'" + folderId + "' in parents and mimeType contains 'audio/' and trashed=false")
                 .setSpaces("drive")
                 .setFields("nextPageToken, files(id, name, size, mimeType)")
@@ -162,7 +170,7 @@ public class GoogleDriveService {
             getRequest.getRequestHeaders().setRange(rangeHeader);
         }
 
-        com.google.api.client.http.HttpResponse driveResponse = getRequest.executeMedia();
+        HttpResponse driveResponse = getRequest.executeMedia();
 
         return com.music.app.dto.DriveStreamResponse.builder()
                 .inputStream(driveResponse.getContent())
@@ -179,16 +187,16 @@ public class GoogleDriveService {
         String folderId = getOrCreateFolder(drive);
 
         // Check if file exists
-        com.google.api.services.drive.model.FileList result = drive.files().list()
+        FileList result = drive.files().list()
                 .setQ("'" + folderId + "' in parents and name='" + fileName + "' and trashed=false")
                 .setSpaces("drive")
                 .setFields("files(id)")
                 .execute();
 
-        java.util.List<File> files = result.getFiles();
+        List<File> files = result.getFiles();
         
         InputStreamContent mediaContent = new InputStreamContent("application/json", 
-            new java.io.ByteArrayInputStream(jsonData.getBytes(java.nio.charset.StandardCharsets.UTF_8)));
+            new ByteArrayInputStream(jsonData.getBytes(StandardCharsets.UTF_8)));
 
         if (files != null && !files.isEmpty()) {
             // Update existing
@@ -198,7 +206,7 @@ public class GoogleDriveService {
             // Create new
             File fileMetadata = new File();
             fileMetadata.setName(fileName);
-            fileMetadata.setParents(java.util.Collections.singletonList(folderId));
+            fileMetadata.setParents(Collections.singletonList(folderId));
             drive.files().create(fileMetadata, mediaContent).setFields("id").execute();
         }
     }
@@ -208,22 +216,22 @@ public class GoogleDriveService {
 
         String folderId = getOrCreateFolder(drive);
 
-        com.google.api.services.drive.model.FileList result = drive.files().list()
+        FileList result = drive.files().list()
                 .setQ("'" + folderId + "' in parents and name='" + fileName + "' and trashed=false")
                 .setSpaces("drive")
                 .setFields("files(id)")
                 .execute();
 
-        java.util.List<File> files = result.getFiles();
+        List<File> files = result.getFiles();
         if (files == null || files.isEmpty()) {
             return null; // No backup found
         }
 
         String fileId = files.get(0).getId();
         
-        try (java.io.ByteArrayOutputStream outputStream = new java.io.ByteArrayOutputStream()) {
+        try (ByteArrayOutputStream outputStream = new ByteArrayOutputStream()) {
             drive.files().get(fileId).executeMediaAndDownloadTo(outputStream);
-            return new String(outputStream.toByteArray(), java.nio.charset.StandardCharsets.UTF_8);
+            return new String(outputStream.toByteArray(), StandardCharsets.UTF_8);
         }
     }
 }

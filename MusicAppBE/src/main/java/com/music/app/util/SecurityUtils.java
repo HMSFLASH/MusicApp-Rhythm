@@ -13,6 +13,12 @@ public class SecurityUtils {
         if (principal == null) {
             throw new AppException(ErrorCode.UNAUTHORIZED);
         }
+        if (principal instanceof org.springframework.security.oauth2.server.resource.authentication.JwtAuthenticationToken jwtAuth) {
+            String userId = jwtAuth.getToken().getClaimAsString("userId");
+            if (userId != null) {
+                return Long.parseLong(userId);
+            }
+        }
         try {
             return Long.parseLong(principal.getName());
         } catch (NumberFormatException e) {
@@ -24,6 +30,12 @@ public class SecurityUtils {
         Authentication auth = SecurityContextHolder.getContext().getAuthentication();
         if (auth == null || !auth.isAuthenticated()) {
             throw new AppException(ErrorCode.UNAUTHORIZED);
+        }
+        if (auth instanceof org.springframework.security.oauth2.server.resource.authentication.JwtAuthenticationToken jwtAuth) {
+            String userId = jwtAuth.getToken().getClaimAsString("userId");
+            if (userId != null) {
+                return Long.parseLong(userId);
+            }
         }
         try {
             return Long.parseLong(auth.getName());

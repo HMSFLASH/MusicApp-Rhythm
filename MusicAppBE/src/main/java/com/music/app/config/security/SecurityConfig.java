@@ -1,6 +1,7 @@
 package com.music.app.config.security;
 
 import lombok.RequiredArgsConstructor;
+import org.springframework.beans.factory.annotation.Value;
 import org.springframework.context.annotation.Bean;
 import org.springframework.context.annotation.Configuration;
 import org.springframework.http.HttpMethod;
@@ -14,6 +15,8 @@ import org.springframework.security.web.SecurityFilterChain;
 import org.springframework.web.cors.CorsConfiguration;
 import org.springframework.web.cors.UrlBasedCorsConfigurationSource;
 import org.springframework.web.filter.CorsFilter;
+import org.springframework.security.oauth2.client.registration.ClientRegistrationRepository;
+import org.springframework.security.oauth2.client.web.DefaultOAuth2AuthorizationRequestResolver;
 
 import org.springframework.security.oauth2.server.resource.web.DefaultBearerTokenResolver;
 
@@ -26,7 +29,7 @@ public class SecurityConfig {
         private final CustomJwtDecoder customJwtDecoder;
         private final JwtAuthenticationEntryPoint jwtAuthenticationEntryPoint;
         private final OAuth2LoginSuccessHandler oAuth2LoginSuccessHandler;
-        private final org.springframework.security.oauth2.client.registration.ClientRegistrationRepository clientRegistrationRepository;
+        private final ClientRegistrationRepository clientRegistrationRepository;
 
         private static final String[] PUBLIC_ENDPOINTS = {
                         "/api/auth/**",
@@ -50,7 +53,7 @@ public class SecurityConfig {
                                 .jwt(jwtConfigurer -> jwtConfigurer.decoder(customJwtDecoder))
                                 .authenticationEntryPoint(jwtAuthenticationEntryPoint));
 
-                org.springframework.security.oauth2.client.web.DefaultOAuth2AuthorizationRequestResolver authorizationRequestResolver = new org.springframework.security.oauth2.client.web.DefaultOAuth2AuthorizationRequestResolver(
+                DefaultOAuth2AuthorizationRequestResolver authorizationRequestResolver = new DefaultOAuth2AuthorizationRequestResolver(
                                 clientRegistrationRepository, "/oauth2/authorization");
                 authorizationRequestResolver.setAuthorizationRequestCustomizer(customizer -> customizer
                                 .additionalParameters(params -> {
@@ -72,7 +75,7 @@ public class SecurityConfig {
         }
 
         @Bean
-        public CorsFilter corsFilter(@org.springframework.beans.factory.annotation.Value("${app.frontend-url}") String frontendUrl) {
+        public CorsFilter corsFilter(@Value("${app.frontend-url}") String frontendUrl) {
                 CorsConfiguration corsConfiguration = new CorsConfiguration();
                 if ("*".equals(frontendUrl)) {
                         corsConfiguration.addAllowedOriginPattern("*");

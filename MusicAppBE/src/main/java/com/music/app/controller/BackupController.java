@@ -9,6 +9,7 @@ import lombok.extern.slf4j.Slf4j;
 import org.springframework.web.bind.annotation.*;
 
 import java.security.Principal;
+import java.util.Map;
 
 @RestController
 @RequestMapping("/api/backup")
@@ -28,9 +29,9 @@ public class BackupController {
     }
 
     @GetMapping("/drive")
-    public ApiResponse<java.util.Map<String, Object>> restoreFromDrive(Principal principal) {
+    public ApiResponse<Map<String, Object>> restoreFromDrive(Principal principal) {
         Long userId = SecurityUtils.extractUserId(principal);
-        return ApiResponse.<java.util.Map<String, Object>>builder()
+        return ApiResponse.<Map<String, Object>>builder()
                 .result(backupService.restoreFromDrive(userId))
                 .build();
     }

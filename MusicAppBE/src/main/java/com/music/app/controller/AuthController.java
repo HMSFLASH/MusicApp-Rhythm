@@ -13,6 +13,7 @@ import jakarta.validation.Valid;
 
 import java.util.Map;
 import org.springframework.security.core.context.SecurityContextHolder;
+import org.springframework.security.core.Authentication;
 import com.music.app.dto.SetPasswordRequest;
 
 @RestController
@@ -63,7 +64,7 @@ public class AuthController {
     @PostMapping("/set-password")
     public ResponseEntity<ApiResponse<?>> setPassword(@RequestBody SetPasswordRequest request) {
         try {
-            org.springframework.security.core.Authentication auth = SecurityContextHolder.getContext().getAuthentication();
+            Authentication auth = SecurityContextHolder.getContext().getAuthentication();
             if (auth == null || auth.getName().equals("anonymousUser")) {
                 return ResponseEntity.status(401).body(ApiResponse.builder().code(401).message("Not authenticated").build());
             }

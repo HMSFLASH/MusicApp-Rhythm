@@ -21,6 +21,7 @@ import org.springframework.stereotype.Service;
 import org.springframework.transaction.annotation.Transactional;
 
 import java.util.List;
+import java.util.Map;
 import java.util.stream.Collectors;
 
 @Service
@@ -40,7 +41,7 @@ public class BackupService {
             .registerModule(new com.fasterxml.jackson.datatype.jsr310.JavaTimeModule())
             .disable(com.fasterxml.jackson.databind.SerializationFeature.WRITE_DATES_AS_TIMESTAMPS);
 
-    public void backupToDrive(java.util.Map<String, Object> config, Long userId) {
+    public void backupToDrive(Map<String, Object> config, Long userId) {
         User user = userRepository.findById(userId).orElseThrow(() -> new AppException(ErrorCode.UNAUTHENTICATED));
         if (user.getRefreshToken() == null) {
             throw new AppException(ErrorCode.DRIVE_NOT_LINKED);
@@ -76,7 +77,7 @@ public class BackupService {
     }
 
     @Transactional
-    public java.util.Map<String, Object> restoreFromDrive(Long userId) {
+    public Map<String, Object> restoreFromDrive(Long userId) {
         User user = userRepository.findById(userId).orElseThrow(() -> new AppException(ErrorCode.UNAUTHENTICATED));
         if (user.getRefreshToken() == null) {
             throw new AppException(ErrorCode.DRIVE_NOT_LINKED);
