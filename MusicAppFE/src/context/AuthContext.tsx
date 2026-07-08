@@ -2,12 +2,31 @@ import { createContext, useContext, useState, useEffect } from 'react';
 import type { ReactNode } from 'react';
 import { axiosClient } from '../api/axiosClient';
 
+type AuthUser = {
+  id?: string | number;
+  email?: string;
+  loginId?: string;
+  username?: string;
+  name?: string;
+  fullName?: string;
+  avatarUrl?: string;
+  isGoogleLinked?: boolean;
+  hasPassword?: boolean;
+};
+
+type DriveTokenResponse = {
+  accessToken?: string;
+  result?: {
+    accessToken?: string;
+  };
+};
+
 interface AuthContextType {
   isAuthenticated: boolean;
   setIsAuthenticated: (auth: boolean) => void;
   driveToken: string;
   fetchDriveToken: () => Promise<string>;
-  user: any | null;
+  user: AuthUser | null;
 }
 
 const AuthContext = createContext<AuthContextType | undefined>(undefined);
@@ -17,7 +36,7 @@ export function AuthProvider({ children }: { children: ReactNode }) {
     return localStorage.getItem('music_app_logged_in') === 'true';
   });
   const [driveToken, setDriveTokenState] = useState<string>('');
-  const [user, setUser] = useState<any | null>(null);
+  const [user, setUser] = useState<AuthUser | null>(null);
 
   const setIsAuthenticated = (auth: boolean) => {
     if (auth) {
@@ -31,9 +50,8 @@ export function AuthProvider({ children }: { children: ReactNode }) {
 
   const fetchDriveToken = async () => {
     try {
-      const response = await axiosClient.get('/api/music/drive-token');
-      // eslint-disable-next-line @typescript-eslint/no-explicit-any
-      const token = (response as any).accessToken || (response as any).result?.accessToken || '';
+      const response = await axiosClient.get('/api/music/drive-token') as unknown as DriveTokenResponse;
+      const token = response.accessToken || response.result?.accessToken || '';
       if (token) {
         setDriveTokenState(token);
       }
@@ -47,11 +65,13 @@ export function AuthProvider({ children }: { children: ReactNode }) {
   useEffect(() => {
     if (isAuthenticated) {
       axiosClient.get('/api/auth/me')
-        .then((res: any) => setUser(res))
+        .then((res) => setUser(res as unknown as AuthUser))
         .catch(() => setIsAuthenticated(false));
       
       if (!driveToken) {
-        fetchDriveToken();
+        window.setTimeout(() => {
+          void fetchDriveToken();
+        }, 0);
       }
     }
   // eslint-disable-next-line react-hooks/exhaustive-deps

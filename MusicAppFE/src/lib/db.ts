@@ -64,7 +64,7 @@ export const db = {
     });
   },
 
-  async getAllData(): Promise<Record<string, any>> {
+  async getAllData(): Promise<Record<string, unknown>> {
     const database = await openDB();
     return new Promise((resolve, reject) => {
       const transaction = database.transaction(STORE_NAME, 'readonly');
@@ -73,7 +73,7 @@ export const db = {
       const keysRequest = store.getAllKeys();
 
       transaction.oncomplete = () => {
-        const data: Record<string, any> = {};
+        const data: Record<string, unknown> = {};
         const keys = keysRequest.result;
         const values = request.result;
         for (let i = 0; i < keys.length; i++) {
@@ -85,7 +85,7 @@ export const db = {
     });
   },
 
-  async importData(data: Record<string, any>): Promise<void> {
+  async importData(data: Record<string, unknown>): Promise<void> {
     const database = await openDB();
     return new Promise((resolve, reject) => {
       const transaction = database.transaction(STORE_NAME, 'readwrite');

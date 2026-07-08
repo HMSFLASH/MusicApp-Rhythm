@@ -3,11 +3,26 @@ import type { Track, SongEndMode, QueueEndMode } from './audioTypes';
 import { PLAYBACK_STORAGE_KEY } from './audioStorage';
 import { db } from '../lib/db';
 
-// eslint-disable-next-line @typescript-eslint/no-explicit-any
-export function useAudioQueue(savedState: any) {
+type SavedAudioQueueState = Partial<{
+  isShuffleState: boolean;
+  songEndMode: SongEndMode;
+  queueEndMode: QueueEndMode;
+  repeatMode: 'simple' | 'advanced';
+  upcomingQueues: Track[][];
+  cycleQueues: boolean;
+}>;
+
+export function useAudioQueue(savedState: SavedAudioQueueState) {
   const [currentTrack, setCurrentTrack] = useState<Track | null>(null);
   const [queue, setQueue] = useState<Track[]>([]);
   const [loaded, setLoaded] = useState(false);
+  const [isShuffleState, setIsShuffleState] = useState<boolean>(savedState.isShuffleState ?? false);
+  const [originalQueue, setOriginalQueue] = useState<Track[]>([]);
+  const [songEndMode, setSongEndMode] = useState<SongEndMode>(savedState.songEndMode ?? 'next');
+  const [queueEndMode, setQueueEndMode] = useState<QueueEndMode>(savedState.queueEndMode ?? 'stop');
+  const [repeatMode, setRepeatMode] = useState<'simple' | 'advanced'>(savedState.repeatMode ?? 'simple');
+  const [upcomingQueues, setUpcomingQueues] = useState<Track[][]>(savedState.upcomingQueues || []);
+  const [cycleQueues, setCycleQueues] = useState<boolean>(savedState.cycleQueues || false);
 
   useEffect(() => {
     db.get<{currentTrack: Track | null, queue: Track[]}>(PLAYBACK_STORAGE_KEY).then(saved => {
@@ -15,9 +30,9 @@ export function useAudioQueue(savedState: any) {
         let parsedQueue = saved.queue || [];
         let parsedTrack = saved.currentTrack || null;
         
-        parsedQueue = parsedQueue.filter((t: any) => t.sourceType !== 'LOCAL');
-        parsedQueue.forEach((t: any) => {
-          if (t.imageUrl?.startsWith('blob:')) t.imageUrl = '';
+        parsedQueue = parsedQueue.filter((track) => track.sourceType !== 'LOCAL');
+        parsedQueue.forEach((track) => {
+          if (track.imageUrl?.startsWith('blob:')) track.imageUrl = '';
         });
 
         if (parsedTrack) {
@@ -53,16 +68,7 @@ export function useAudioQueue(savedState: any) {
 
     window.addEventListener('music-deleted', handleMusicDeleted);
     return () => window.removeEventListener('music-deleted', handleMusicDeleted);
-  }, []);
-
-  const [isShuffleState, setIsShuffleState] = useState<boolean>(savedState.isShuffleState ?? false);
-  const [originalQueue, setOriginalQueue] = useState<Track[]>([]);
-  
-  const [songEndMode, setSongEndMode] = useState<SongEndMode>(savedState.songEndMode ?? 'next');
-  const [queueEndMode, setQueueEndMode] = useState<QueueEndMode>(savedState.queueEndMode ?? 'stop');
-  const [repeatMode, setRepeatMode] = useState<'simple' | 'advanced'>(savedState.repeatMode ?? 'simple');
-  const [upcomingQueues, setUpcomingQueues] = useState<Track[][]>(savedState.upcomingQueues || []);
-  const [cycleQueues, setCycleQueues] = useState<boolean>(savedState.cycleQueues || false);
+  }, [setOriginalQueue, setUpcomingQueues]);
 
   const setIsShuffle = useCallback((newShuffle: boolean | ((prev: boolean) => boolean)) => {
     setIsShuffleState(prev => {
@@ -99,7 +105,7 @@ export function useAudioQueue(savedState: any) {
       }
       return next;
     });
-  }, [currentTrack, originalQueue]);
+  }, [currentTrack, originalQueue, setOriginalQueue]);
 
   const addToCurrentQueue = useCallback((tracks: Track[]) => {
     setQueue(prev => {
@@ -115,7 +121,7 @@ export function useAudioQueue(savedState: any) {
       if (isDuplicate) return prev;
       return [...prev, tracks];
     });
-  }, []);
+  }, [setUpcomingQueues]);
 
   const removeUpcomingQueue = useCallback((index: number) => {
     setUpcomingQueues(prev => {

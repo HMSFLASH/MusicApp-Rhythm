@@ -14,6 +14,21 @@ interface LibraryContextType {
   syncLibrary: () => Promise<void>;
 }
 
+type BackendTrack = {
+  id: string | number;
+  name?: string;
+  fileName?: string;
+  sourceType: Track['sourceType'];
+  driveFileId?: string;
+  imageUrl?: string;
+  artist?: string;
+  title?: string;
+  album?: string;
+  genre?: string;
+  durationSeconds?: number;
+  lyrics?: string;
+};
+
 const LibraryContext = createContext<LibraryContextType | undefined>(undefined);
 
 const metadataFields: Array<keyof Track> = [
@@ -33,7 +48,7 @@ const metadataFields: Array<keyof Track> = [
   'lyrics',
 ];
 
-const parseTrack = (d: any): Track => ({
+const parseTrack = (d: BackendTrack): Track => ({
   id: d.id,
   fileName: d.name || d.fileName || '',
   sourceType: d.sourceType,
@@ -230,7 +245,7 @@ export function LibraryProvider({ children }: { children: ReactNode }) {
       } else {
         await axiosClient.post(`/api/favorites/${track.id}`);
       }
-    } catch (err: any) {
+    } catch (err: unknown) {
       console.error(err);
       // Revert on error
       if (isFav) {
@@ -247,7 +262,10 @@ export function LibraryProvider({ children }: { children: ReactNode }) {
         });
       }
       // Suppress UI crash for duplicate rapid clicks
-      if (err.response?.status !== 404 && err.response?.status !== 400 && err.response?.status !== 409) {
+      const status = typeof err === 'object' && err && 'response' in err
+        ? (err as { response?: { status?: number } }).response?.status
+        : undefined;
+      if (status !== 404 && status !== 400 && status !== 409) {
         throw err;
       }
     }
@@ -286,6 +304,7 @@ export function LibraryProvider({ children }: { children: ReactNode }) {
   );
 }
 
+// eslint-disable-next-line react-refresh/only-export-components
 export function useLibrary() {
   const context = useContext(LibraryContext);
   if (context === undefined) {

@@ -47,7 +47,7 @@ export function LyricsView({ lyrics, currentTime, onSeek }: LyricsViewProps) {
       }
     }
     return -1;
-  }, [parsedLyrics, currentTime, parsedLyrics.lines.length]);
+  }, [parsedLyrics, currentTime]);
 
   useEffect(() => {
     if (parsedLyrics.isSynced && activeIndex !== -1 && containerRef.current) {

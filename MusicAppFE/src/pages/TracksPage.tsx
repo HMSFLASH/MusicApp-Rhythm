@@ -63,6 +63,12 @@ export function TracksPage() {
   
   const totalPages = Math.ceil(displayTracks.length / ITEMS_PER_PAGE);
   const currentTracks = displayTracks.slice((currentPage - 1) * ITEMS_PER_PAGE, currentPage * ITEMS_PER_PAGE);
+  const infoTrackMetadata = infoTrack ? playerState.getTrackMetadata(infoTrack.id) : undefined;
+  const infoTrackFileSize = infoTrack?.fileSize ?? infoTrackMetadata?.fileSize;
+  const infoTrackBitrate = infoTrack?.bitrate ?? infoTrackMetadata?.bitrate;
+  const infoTrackChannels = infoTrack?.numberOfChannels ?? infoTrackMetadata?.numberOfChannels;
+  const infoTrackSampleRate = infoTrack?.sampleRate ?? infoTrackMetadata?.sampleRate;
+  const infoTrackBitsPerSample = infoTrack?.bitsPerSample ?? infoTrackMetadata?.bitsPerSample;
 
   return (
     <div className="w-full h-full flex flex-col p-4 md:p-8 max-w-6xl mx-auto pb-32 overflow-y-auto">
@@ -285,24 +291,21 @@ export function TracksPage() {
             <div className="p-5 flex flex-col gap-4 overflow-y-auto max-h-[70vh]">
               <div className="bg-white/5 rounded-xl p-4 flex flex-col gap-3">
                 {[
-                  { label: 'Title', value: infoTrack.title || playerState.getTrackMetadata(infoTrack.id)?.title },
-                  { label: 'Artist', value: infoTrack.artist || playerState.getTrackMetadata(infoTrack.id)?.artist },
-                  { label: 'Album', value: infoTrack.album || playerState.getTrackMetadata(infoTrack.id)?.album },
-                  { label: 'Genre', value: infoTrack.genre || playerState.getTrackMetadata(infoTrack.id)?.genre },
+                  { label: 'Title', value: infoTrack.title || infoTrackMetadata?.title },
+                  { label: 'Artist', value: infoTrack.artist || infoTrackMetadata?.artist },
+                  { label: 'Album', value: infoTrack.album || infoTrackMetadata?.album },
+                  { label: 'Genre', value: infoTrack.genre || infoTrackMetadata?.genre },
                   { label: 'Duration', value: infoTrack.durationSeconds ? `${Math.floor(infoTrack.durationSeconds / 60)}:${Math.floor(infoTrack.durationSeconds % 60).toString().padStart(2, '0')}` : null },
                   { label: 'File Name', value: infoTrack.fileName },
                   { label: 'Source', value: infoTrack.sourceType },
                   { label: 'Track ID', value: String(infoTrack.id) },
-                  { label: 'File Type', value: infoTrack.fileFormat || playerState.getTrackMetadata(infoTrack.id)?.fileFormat },
-                  { label: 'Codec', value: infoTrack.codec || playerState.getTrackMetadata(infoTrack.id)?.codec },
-                  // eslint-disable-next-line @typescript-eslint/no-non-null-asserted-optional-chain
-                  { label: 'Size', value: (infoTrack.fileSize || playerState.getTrackMetadata(infoTrack.id)?.fileSize) ? `${((infoTrack.fileSize || playerState.getTrackMetadata(infoTrack.id)?.fileSize!) / 1024 / 1024).toFixed(2)} MB` : null },
-                  // eslint-disable-next-line @typescript-eslint/no-non-null-asserted-optional-chain
-                  { label: 'Bit Rate', value: (infoTrack.bitrate || playerState.getTrackMetadata(infoTrack.id)?.bitrate) ? `${Math.round((infoTrack.bitrate || playerState.getTrackMetadata(infoTrack.id)?.bitrate!) / 1000)} kbps` : null },
-                  // eslint-disable-next-line @typescript-eslint/no-non-null-asserted-optional-chain
-                  { label: 'Channels', value: (infoTrack.numberOfChannels || playerState.getTrackMetadata(infoTrack.id)?.numberOfChannels) ? `${infoTrack.numberOfChannels || playerState.getTrackMetadata(infoTrack.id)?.numberOfChannels} ${[2].includes(infoTrack.numberOfChannels || playerState.getTrackMetadata(infoTrack.id)?.numberOfChannels!) ? '(stereo)' : ''}` : null },
-                  { label: 'Audio Sample Rate', value: (infoTrack.sampleRate || playerState.getTrackMetadata(infoTrack.id)?.sampleRate) ? `${((infoTrack.sampleRate || playerState.getTrackMetadata(infoTrack.id)?.sampleRate!) / 1000).toFixed(3)} kHz` : null },
-                  { label: 'Bit Depth', value: (infoTrack.bitsPerSample || playerState.getTrackMetadata(infoTrack.id)?.bitsPerSample) ? `${infoTrack.bitsPerSample || playerState.getTrackMetadata(infoTrack.id)?.bitsPerSample} bit` : null }
+                  { label: 'File Type', value: infoTrack.fileFormat || infoTrackMetadata?.fileFormat },
+                  { label: 'Codec', value: infoTrack.codec || infoTrackMetadata?.codec },
+                  { label: 'Size', value: infoTrackFileSize ? `${(infoTrackFileSize / 1024 / 1024).toFixed(2)} MB` : null },
+                  { label: 'Bit Rate', value: infoTrackBitrate ? `${Math.round(infoTrackBitrate / 1000)} kbps` : null },
+                  { label: 'Channels', value: infoTrackChannels ? `${infoTrackChannels} ${infoTrackChannels === 2 ? '(stereo)' : ''}` : null },
+                  { label: 'Audio Sample Rate', value: infoTrackSampleRate ? `${(infoTrackSampleRate / 1000).toFixed(3)} kHz` : null },
+                  { label: 'Bit Depth', value: infoTrackBitsPerSample ? `${infoTrackBitsPerSample} bit` : null }
                 ].map((item, index) => (
                   <div key={index} className="flex flex-col gap-1">
                     <span className="text-[10px] uppercase tracking-wider text-white/40 font-semibold">{item.label}</span>

@@ -16,10 +16,38 @@ interface PlaylistProps {
   currentTrackId?: string | number;
 }
 
+type PlaylistSummary = {
+  id: number;
+  name: string;
+  trackCount?: number;
+  imageUrl?: string;
+};
+
+type PlaylistTrackResponse = {
+  id: string | number;
+  name?: string;
+  fileName?: string;
+  sourceType: Track['sourceType'];
+  driveFileId?: string;
+  imageUrl?: string;
+  artist?: string;
+  title?: string;
+  album?: string;
+  genre?: string;
+  durationSeconds?: number;
+};
+
+type PlaylistDetailsResponse = PlaylistSummary & {
+  tracks?: PlaylistTrackResponse[];
+};
+
+type PlaylistDetails = PlaylistSummary & {
+  tracks: Track[];
+};
+
 export function Playlist({ isAuthenticated, onPlay, currentTrackId }: PlaylistProps) {
   const { t } = useTranslation();
-  // eslint-disable-next-line @typescript-eslint/no-explicit-any
-  const [playlists, setPlaylists] = useState<any[]>([]);
+  const [playlists, setPlaylists] = useState<PlaylistSummary[]>([]);
   const [searchParams, setSearchParams] = useSearchParams();
   const selectedPlaylistId = searchParams.get('playlistId') ? parseInt(searchParams.get('playlistId')!) : null;
   
@@ -30,8 +58,7 @@ export function Playlist({ isAuthenticated, onPlay, currentTrackId }: PlaylistPr
       setSearchParams({});
     }
   };
-  // eslint-disable-next-line @typescript-eslint/no-explicit-any
-  const [selectedPlaylistDetails, setSelectedPlaylistDetails] = useState<any | null>(null);
+  const [selectedPlaylistDetails, setSelectedPlaylistDetails] = useState<PlaylistDetails | null>(null);
   const { playerState } = useGlobalAudio();
   const { favorites, toggleFavorite } = useLibrary();
   const [loading, setLoading] = useState(false);
@@ -85,9 +112,8 @@ export function Playlist({ isAuthenticated, onPlay, currentTrackId }: PlaylistPr
   const fetchPlaylists = async () => {
     try {
       setLoading(true);
-      const data = await axiosClient.get('/api/playlists');
-      // eslint-disable-next-line @typescript-eslint/no-explicit-any
-      setPlaylists(data as unknown as any[]);
+      const data = await axiosClient.get('/api/playlists') as unknown as PlaylistSummary[];
+      setPlaylists(data);
       db.set('sonic_playlists', data);
     } catch (e) {
       console.error(e);
@@ -99,13 +125,11 @@ export function Playlist({ isAuthenticated, onPlay, currentTrackId }: PlaylistPr
   const fetchPlaylistDetails = async (id: number) => {
     try {
       setLoading(true);
-      // eslint-disable-next-line @typescript-eslint/no-explicit-any
-      const data: any = await axiosClient.get(`/api/playlists/${id}`);
+      const data = await axiosClient.get(`/api/playlists/${id}`) as unknown as PlaylistDetailsResponse;
       // Map backend tracks to our Track interface
-      // eslint-disable-next-line @typescript-eslint/no-explicit-any
-      const mappedTracks = (data.tracks || []).map((d: any) => ({
+      const mappedTracks: Track[] = (data.tracks || []).map((d) => ({
           id: d.id,
-          fileName: d.name,
+          fileName: d.name || d.fileName || '',
           sourceType: d.sourceType,
           driveFileId: d.driveFileId,
           imageUrl: d.imageUrl,
@@ -115,7 +139,7 @@ export function Playlist({ isAuthenticated, onPlay, currentTrackId }: PlaylistPr
           genre: d.genre,
           durationSeconds: d.durationSeconds
       }));
-      const details = { ...data, tracks: mappedTracks };
+      const details: PlaylistDetails = { ...data, tracks: mappedTracks };
       setSelectedPlaylistDetails(details);
       db.set(`sonic_playlist_${id}`, details);
     } catch (e) {
@@ -127,24 +151,33 @@ export function Playlist({ isAuthenticated, onPlay, currentTrackId }: PlaylistPr
 
   useEffect(() => {
     if (isAuthenticated) {
-      db.get<any[]>('sonic_playlists').then(cached => {
+      db.get<PlaylistSummary[]>('sonic_playlists').then(cached => {
         if (cached) setPlaylists(cached);
       });
-      fetchPlaylists();
+      const timeoutId = window.setTimeout(() => {
+        void fetchPlaylists();
+      }, 0);
+      return () => window.clearTimeout(timeoutId);
     }
   }, [isAuthenticated]);
 
   useEffect(() => {
+    const timeoutId = window.setTimeout(() => {
+      setIsEditingName(false);
+      if (!selectedPlaylistId) {
+        setSelectedPlaylistDetails(null);
+        return;
+      }
+
+      void fetchPlaylistDetails(selectedPlaylistId);
+    }, 0);
+
     if (selectedPlaylistId) {
-      db.get<any>(`sonic_playlist_${selectedPlaylistId}`).then(cached => {
+      db.get<PlaylistDetails>(`sonic_playlist_${selectedPlaylistId}`).then(cached => {
         if (cached) setSelectedPlaylistDetails(cached);
       });
-      fetchPlaylistDetails(selectedPlaylistId);
-      setIsEditingName(false);
-    } else {
-      setSelectedPlaylistDetails(null);
-      setIsEditingName(false);
     }
+    return () => window.clearTimeout(timeoutId);
   }, [selectedPlaylistId]);
 
   useEffect(() => {
@@ -239,6 +272,13 @@ export function Playlist({ isAuthenticated, onPlay, currentTrackId }: PlaylistPr
       console.error(e);
     }
   };
+
+  const infoTrackMetadata = infoTrack ? playerState.getTrackMetadata(infoTrack.id) : undefined;
+  const infoTrackFileSize = infoTrack?.fileSize ?? infoTrackMetadata?.fileSize;
+  const infoTrackBitrate = infoTrack?.bitrate ?? infoTrackMetadata?.bitrate;
+  const infoTrackChannels = infoTrack?.numberOfChannels ?? infoTrackMetadata?.numberOfChannels;
+  const infoTrackSampleRate = infoTrack?.sampleRate ?? infoTrackMetadata?.sampleRate;
+  const infoTrackBitsPerSample = infoTrack?.bitsPerSample ?? infoTrackMetadata?.bitsPerSample;
 
   return (
     <div className="bg-surface rounded-xl p-6 shadow-2xl border border-white/5 flex flex-col h-full">
@@ -604,25 +644,21 @@ export function Playlist({ isAuthenticated, onPlay, currentTrackId }: PlaylistPr
             <div className="p-5 flex flex-col gap-4 overflow-y-auto max-h-[70vh]">
               <div className="bg-white/5 rounded-xl p-4 flex flex-col gap-3">
                 {[
-                  { label: 'Title', value: infoTrack.title || playerState.getTrackMetadata(infoTrack.id)?.title },
-                  { label: 'Artist', value: infoTrack.artist || playerState.getTrackMetadata(infoTrack.id)?.artist },
-                  { label: 'Album', value: infoTrack.album || playerState.getTrackMetadata(infoTrack.id)?.album },
-                  { label: 'Genre', value: infoTrack.genre || playerState.getTrackMetadata(infoTrack.id)?.genre },
+                  { label: 'Title', value: infoTrack.title || infoTrackMetadata?.title },
+                  { label: 'Artist', value: infoTrack.artist || infoTrackMetadata?.artist },
+                  { label: 'Album', value: infoTrack.album || infoTrackMetadata?.album },
+                  { label: 'Genre', value: infoTrack.genre || infoTrackMetadata?.genre },
                   { label: 'Duration', value: infoTrack.durationSeconds ? `${Math.floor(infoTrack.durationSeconds / 60)}:${Math.floor(infoTrack.durationSeconds % 60).toString().padStart(2, '0')}` : null },
                   { label: 'File Name', value: infoTrack.fileName },
                   { label: 'Source', value: infoTrack.sourceType },
                   { label: 'Track ID', value: String(infoTrack.id) },
-                  { label: 'File Type', value: infoTrack.fileFormat || playerState.getTrackMetadata(infoTrack.id)?.fileFormat },
-                  { label: 'Codec', value: infoTrack.codec || playerState.getTrackMetadata(infoTrack.id)?.codec },
-                  // eslint-disable-next-line @typescript-eslint/no-non-null-asserted-optional-chain
-                  { label: 'Size', value: (infoTrack.fileSize || playerState.getTrackMetadata(infoTrack.id)?.fileSize) ? `${((infoTrack.fileSize || playerState.getTrackMetadata(infoTrack.id)?.fileSize!) / 1024 / 1024).toFixed(2)} MB` : null },
-                  // eslint-disable-next-line @typescript-eslint/no-non-null-asserted-optional-chain
-                  { label: 'Bit Rate', value: (infoTrack.bitrate || playerState.getTrackMetadata(infoTrack.id)?.bitrate) ? `${Math.round((infoTrack.bitrate || playerState.getTrackMetadata(infoTrack.id)?.bitrate!) / 1000)} kbps` : null },
-                  // eslint-disable-next-line @typescript-eslint/no-non-null-asserted-optional-chain
-                  { label: 'Channels', value: (infoTrack.numberOfChannels || playerState.getTrackMetadata(infoTrack.id)?.numberOfChannels) ? `${infoTrack.numberOfChannels || playerState.getTrackMetadata(infoTrack.id)?.numberOfChannels} ${[2].includes(infoTrack.numberOfChannels || playerState.getTrackMetadata(infoTrack.id)?.numberOfChannels!) ? '(stereo)' : ''}` : null },
-                  // eslint-disable-next-line @typescript-eslint/no-non-null-asserted-optional-chain
-                  { label: 'Audio Sample Rate', value: (infoTrack.sampleRate || playerState.getTrackMetadata(infoTrack.id)?.sampleRate) ? `${((infoTrack.sampleRate || playerState.getTrackMetadata(infoTrack.id)?.sampleRate!) / 1000).toFixed(3)} kHz` : null },
-                  { label: 'Bit Depth', value: (infoTrack.bitsPerSample || playerState.getTrackMetadata(infoTrack.id)?.bitsPerSample) ? `${infoTrack.bitsPerSample || playerState.getTrackMetadata(infoTrack.id)?.bitsPerSample} bit` : null }
+                  { label: 'File Type', value: infoTrack.fileFormat || infoTrackMetadata?.fileFormat },
+                  { label: 'Codec', value: infoTrack.codec || infoTrackMetadata?.codec },
+                  { label: 'Size', value: infoTrackFileSize ? `${(infoTrackFileSize / 1024 / 1024).toFixed(2)} MB` : null },
+                  { label: 'Bit Rate', value: infoTrackBitrate ? `${Math.round(infoTrackBitrate / 1000)} kbps` : null },
+                  { label: 'Channels', value: infoTrackChannels ? `${infoTrackChannels} ${infoTrackChannels === 2 ? '(stereo)' : ''}` : null },
+                  { label: 'Audio Sample Rate', value: infoTrackSampleRate ? `${(infoTrackSampleRate / 1000).toFixed(3)} kHz` : null },
+                  { label: 'Bit Depth', value: infoTrackBitsPerSample ? `${infoTrackBitsPerSample} bit` : null }
                 ].map((item, idx) => (
                   <div key={idx} className="flex flex-col gap-1">
                     <span className="text-[10px] uppercase tracking-wider text-white/40 font-semibold">{item.label}</span>

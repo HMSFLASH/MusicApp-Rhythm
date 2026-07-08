@@ -765,7 +765,9 @@ export function useAudioPlayback(
 
 
   const preloadAdjacentTracks = async (currentId: string | number, currentQueue: Track[], shouldPreload = true) => {
-    const { allowedIds, prev1, next1 } = getAdjacentTrackWindow(currentId, currentQueue);
+    const { allowedIds, prev1, next1 } = getAdjacentTrackWindow(currentId, currentQueue, {
+      wrap: queueEndMode === 'repeat',
+    });
     allowedIdsRef.current = allowedIds;
     prunePrecalculatedQueueBuffers(allowedIds);
 
@@ -824,7 +826,9 @@ export function useAudioPlayback(
     if (!currentQueue) currentQueue = [startingTrack];
     setCurrentTrack(startingTrack);
     setQueue(currentQueue);
-    const trackWindow = getAdjacentTrackWindow(startingTrack.id, currentQueue);
+    const trackWindow = getAdjacentTrackWindow(startingTrack.id, currentQueue, {
+      wrap: queueEndMode === 'repeat',
+    });
     allowedIdsRef.current = trackWindow.allowedIds;
     prunePrecalculatedQueueBuffers(trackWindow.allowedIds);
     setLoadingTrackId(String(startingTrack.id));

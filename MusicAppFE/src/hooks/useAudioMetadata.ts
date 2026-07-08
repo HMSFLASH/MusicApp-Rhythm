@@ -18,14 +18,7 @@ export function useAudioMetadata(isAuthenticated: boolean, queueState: any) {
     const imageCacheRef = useRef<Map<string, string>>(new Map());
     const blobCacheRef = useRef<Map<string, string>>(new Map());
 
-    useEffect(() => {
-        if (currentTrack && !metadataCacheRef.current.has(String(currentTrack.id))) {
-            extractMetadata(currentTrack);
-        }
-        // eslint-disable-next-line react-hooks/exhaustive-deps
-    }, [currentTrack]);
-
-    const extractMetadata = async (track: Track) => {
+    async function extractMetadata(track: Track) {
         const trackId = String(track.id);
         if (metadataCacheRef.current.has(trackId)) return;
         if (track.sourceType !== 'LOCAL' && !isAuthenticated) return;
@@ -39,7 +32,7 @@ export function useAudioMetadata(isAuthenticated: boolean, queueState: any) {
                 const idbCover = await getCover(trackId);
                 
                 if (idbCover) {
-                    const imgUrl = URL.createObjectURL(new Blob([idbCover.data as any], { type: idbCover.mimeType }));
+                    const imgUrl = URL.createObjectURL(new Blob([idbCover.data.buffer as ArrayBuffer], { type: idbCover.mimeType }));
                     parsed.imageUrl = imgUrl;
                     imageCacheRef.current.set(trackId, imgUrl);
                 }
@@ -194,15 +187,17 @@ export function useAudioMetadata(isAuthenticated: boolean, queueState: any) {
             }
             let extractedLyrics = '';
             if (metadata.common.lyrics && metadata.common.lyrics.length > 0) {
-                extractedLyrics = metadata.common.lyrics.map((l: any) => typeof l === 'string' ? l : (l.text || JSON.stringify(l))).join('\n\n');
+                extractedLyrics = metadata.common.lyrics.map((lyric: { text?: string } | string) => typeof lyric === 'string' ? lyric : (lyric.text || JSON.stringify(lyric))).join('\n\n');
             }
             if (!extractedLyrics && metadata.native) {
                 for (const tagType in metadata.native) {
                     const tags = metadata.native[tagType];
                     if (Array.isArray(tags)) {
-                        const lyricTag = tags.find((t: any) => t.id === 'USLT' || t.id === 'SYLT' || t.id === 'LYRICS' || t.id === 'WM/Lyrics');
+                        const lyricTag = tags.find((tag: { id?: string; value?: unknown }) => tag.id === 'USLT' || tag.id === 'SYLT' || tag.id === 'LYRICS' || tag.id === 'WM/Lyrics');
                         if (lyricTag && lyricTag.value) {
-                            extractedLyrics = typeof lyricTag.value === 'string' ? lyricTag.value : (lyricTag.value.text || JSON.stringify(lyricTag.value));
+                            extractedLyrics = typeof lyricTag.value === 'string'
+                                ? lyricTag.value
+                                : ((lyricTag.value as { text?: string }).text || JSON.stringify(lyricTag.value));
                             break;
                         }
                     }
@@ -259,7 +254,14 @@ export function useAudioMetadata(isAuthenticated: boolean, queueState: any) {
             metadataCacheRef.current.set(trackId, {});
             setMetadataVersion(v => v + 1);
         }
-    };
+    }
+
+    useEffect(() => {
+        if (currentTrack && !metadataCacheRef.current.has(String(currentTrack.id))) {
+            void extractMetadata(currentTrack);
+        }
+        // eslint-disable-next-line react-hooks/exhaustive-deps
+    }, [currentTrack]);
 
     return {
         extractMetadata,

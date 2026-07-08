@@ -43,8 +43,8 @@ export function LocalFilePicker() {
   const fileInputRef = useRef<HTMLInputElement>(null);
   const folderInputRef = useRef<HTMLInputElement>(null);
   const { playerState } = useGlobalAudio();
-  const { playTrack, setQueue } = playerState;
-  const handleFiles = useLocalFileImport({ playTrack, setQueue });
+  const { playTrack, setCurrentTrack, setQueue } = playerState;
+  const handleFiles = useLocalFileImport({ playTrack, setCurrentTrack, setQueue });
 
   const openLocalFolderPicker = () => {
     const shouldContinue = window.confirm(

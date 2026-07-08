@@ -8,7 +8,8 @@ export const getCurrentTrackIndex = (currentTrack: Track | null, queue: Track[])
 
 export const getAdjacentTrackWindow = (
   currentId: string | number,
-  currentQueue: Track[]
+  currentQueue: Track[],
+  options: { wrap?: boolean } = {}
 ) => {
   const allowedIds = new Set<string>();
   const currentTrackId = String(currentId);
@@ -22,8 +23,8 @@ export const getAdjacentTrackWindow = (
     prev1 = currentQueue[idx - 1];
     next1 = currentQueue[idx + 1];
 
-    if (!prev1 && currentQueue.length > 0) prev1 = currentQueue[currentQueue.length - 1];
-    if (!next1 && currentQueue.length > 0) next1 = currentQueue[0];
+    if (options.wrap && !prev1 && currentQueue.length > 0) prev1 = currentQueue[currentQueue.length - 1];
+    if (options.wrap && !next1 && currentQueue.length > 0) next1 = currentQueue[0];
 
     if (prev1) allowedIds.add(String(prev1.id));
     if (next1) allowedIds.add(String(next1.id));

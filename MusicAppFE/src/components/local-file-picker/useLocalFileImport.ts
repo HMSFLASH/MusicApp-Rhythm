@@ -9,11 +9,13 @@ import {
 
 type UseLocalFileImportOptions = {
   playTrack: (track: Track, queue: Track[], autoPlay?: boolean) => void;
+  setCurrentTrack: Dispatch<SetStateAction<Track | null>>;
   setQueue: Dispatch<SetStateAction<Track[]>>;
 };
 
 export function useLocalFileImport({
   playTrack,
+  setCurrentTrack,
   setQueue,
 }: UseLocalFileImportOptions) {
   return useCallback((files: FileList | null) => {
@@ -25,11 +27,14 @@ export function useLocalFileImport({
     const tracks = audioFiles.map(buildLocalTrackStub);
     playTrack(tracks[0], tracks, true);
 
-    tracks.slice(1).forEach(async (stub) => {
+    tracks.forEach(async (stub) => {
       try {
         const update = await readLocalTrackMetadata(stub);
         if (Object.keys(update).length === 0) return;
 
+        setCurrentTrack((currentTrack) => (
+          currentTrack?.id === stub.id ? { ...currentTrack, ...update } : currentTrack
+        ));
         setQueue((previousQueue) => (
           previousQueue.map((track) => (
             track.id === stub.id ? { ...track, ...update } : track
@@ -39,5 +44,5 @@ export function useLocalFileImport({
         console.warn('Metadata skipped for', stub.fileName, e);
       }
     });
-  }, [playTrack, setQueue]);
+  }, [playTrack, setCurrentTrack, setQueue]);
 }
