@@ -1,48 +1,19 @@
 import { useState, useRef, useEffect, useCallback } from 'react';
 import type { Track } from './audioTypes';
 import { LOCAL_STORAGE_KEY } from './audioStorage';
-import { axiosClient } from '../api/axiosClient';
 import { clamp } from './audioMath';
 import { getBufferProgressIntervalMs, getFullCoreCount, isLikelyConstrainedDevice } from './audioDevice';
 import { createSilentWavUrl } from './audioGraph';
-import { getTrackMimeType } from './audioMime';
 import { createRenderSignature as createAudioRenderSignature } from './audioRenderSignature';
 import { renderOfflineAudio } from './offlineAudioRenderer';
-
-const DRIVE_MEDIA_URL = 'https://www.googleapis.com/drive/v3/files';
-const MAX_PRECALCULATED_BUFFER_CACHE_SIZE = 3;
-const MAX_RENDER_SIGNATURE_CACHE_ENTRIES = 24;
-type LoadingTrackPhase = 'downloading' | 'processing';
-type QueuePrecalculateStatus = {
-  isRunning: boolean;
-  total: number;
-  completed: number;
-  failed: number;
-  cores: number;
-};
-
-const getAdjacentTrackWindow = (currentId: string | number, currentQueue: Track[]) => {
-  const allowedIds = new Set<string>();
-  const currentTrackId = String(currentId);
-  allowedIds.add(currentTrackId);
-
-  let prev1: Track | undefined;
-  let next1: Track | undefined;
-  const idx = currentQueue.findIndex((track) => String(track.id) === currentTrackId);
-
-  if (idx !== -1) {
-    prev1 = currentQueue[idx - 1];
-    next1 = currentQueue[idx + 1];
-
-    if (!prev1 && currentQueue.length > 0) prev1 = currentQueue[currentQueue.length - 1];
-    if (!next1 && currentQueue.length > 0) next1 = currentQueue[0];
-
-    if (prev1) allowedIds.add(String(prev1.id));
-    if (next1) allowedIds.add(String(next1.id));
-  }
-
-  return { allowedIds, prev1, next1 };
-};
+import {
+  getAdjacentTrackWindow,
+  MAX_PRECALCULATED_BUFFER_CACHE_SIZE,
+  MAX_RENDER_SIGNATURE_CACHE_ENTRIES,
+  type LoadingTrackPhase,
+  type QueuePrecalculateStatus,
+} from './audioPlaybackHelpers';
+import { loadTrackAudioUrl } from './audioTrackSource';
 
 export function useAudioPlayback(
   isAuthenticated: boolean,
@@ -401,80 +372,13 @@ export function useAudioPlayback(
   }, [audioRef, bufferVolumeNodeRef]);
 
   const getTrackAudioUrl = useCallback(async (track: Track) => {
-    const trackId = String(track.id);
-    const cachedUrl = blobCacheRef.current.get(trackId);
-    if (cachedUrl) return cachedUrl;
-
-    if (track.sourceType === 'LOCAL' && track.localFile instanceof Blob) {
-      const objectUrl = URL.createObjectURL(track.localFile);
-      blobCacheRef.current.set(trackId, objectUrl);
-      return objectUrl;
-    }
-
-    if (track.sourceType !== 'LOCAL') {
-      let driveFileId = track.driveFileId;
-      if (!driveFileId) {
-        try {
-          // eslint-disable-next-line @typescript-eslint/no-explicit-any
-          const library = await axiosClient.get('/api/music/list') as any[];
-          const latestTrack = Array.isArray(library)
-            ? library.find((item) => String(item.id) === trackId)
-            : null;
-          driveFileId = latestTrack?.driveFileId;
-          if (driveFileId) {
-            track.driveFileId = driveFileId;
-          }
-        } catch (e) {
-          console.error("[Audio] Failed to refresh track Drive metadata", e);
-        }
-      }
-
-      if (!driveFileId) {
-        console.error("[Audio] Cannot load remote track because driveFileId is missing", track);
-        return '';
-      }
-
-      const pendingBlobUrl = blobLoadingPromisesRef.current.get(trackId);
-      if (pendingBlobUrl) return pendingBlobUrl;
-
-      const loadPromise = (async () => {
-        const token = driveToken || await fetchDriveToken?.();
-        if (!token) {
-          console.error("[Audio] Cannot load remote track because Drive access token is missing");
-          return '';
-        }
-
-        const url = `${DRIVE_MEDIA_URL}/${encodeURIComponent(driveFileId)}?alt=media`;
-        console.log("[Audio] Downloading track into RAM", track.title || track.fileName || track.id);
-        const response = await fetch(url, {
-          mode: 'cors',
-          headers: {
-            Authorization: `Bearer ${token}`,
-          },
-        });
-        if (!response.ok) {
-          throw new Error(`Drive audio fetch failed: HTTP ${response.status}`);
-        }
-
-        const rawBlob = await response.blob();
-        const mimeType = getTrackMimeType(track, rawBlob.type);
-        const audioBlob = rawBlob.type === mimeType ? rawBlob : new Blob([rawBlob], { type: mimeType });
-        const objectUrl = URL.createObjectURL(audioBlob);
-
-        blobCacheRef.current.set(trackId, objectUrl);
-        console.log("[Audio] Track loaded into RAM", track.title || track.fileName || track.id, `${(audioBlob.size / 1024 / 1024).toFixed(2)} MB`);
-        return objectUrl;
-      })();
-
-      blobLoadingPromisesRef.current.set(trackId, loadPromise);
-      try {
-        return await loadPromise;
-      } finally {
-        blobLoadingPromisesRef.current.delete(trackId);
-      }
-    }
-
-    return '';
+    return loadTrackAudioUrl({
+      track,
+      blobCache: blobCacheRef.current,
+      blobLoadingPromises: blobLoadingPromisesRef.current,
+      driveToken,
+      fetchDriveToken,
+    });
   }, [blobCacheRef, driveToken, fetchDriveToken]);
 
   const connectBufferOutputChain = useCallback(() => {

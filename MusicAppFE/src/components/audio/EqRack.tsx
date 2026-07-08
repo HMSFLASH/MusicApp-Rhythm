@@ -1,9 +1,10 @@
 import { useState } from 'react';
-import { Plus, Power, ChevronDown, X, Edit2, Trash2 } from 'lucide-react';
+import { Plus, ChevronDown, X, Edit2, Trash2 } from 'lucide-react';
 import { VerticalFader } from '../VerticalFader';
 import { EQ_PRESETS, STYLISTIC_PRESETS } from '../../hooks/useAudioPlayer';
 import { useGlobalAudio } from '../../context/AudioContext';
 import { useTranslation } from 'react-i18next';
+import { EffectPowerButton } from './AudioEffectPanel';
 
 const formatFreq = (f: number) => {
   if (f >= 1000) return (f / 1000) + 'k';
@@ -42,12 +43,12 @@ export function EqRack() {
       {/* EQ Header */}
       <div className="flex items-center justify-between p-4 border-b border-white/5 bg-white/[0.02]">
         <div className="flex items-center gap-4">
-          <button aria-label="Action"
+          <EffectPowerButton
+            size="lg"
+            active={playerState.fxEnabled.eq}
             onClick={() => playerState.toggleFx('eq')}
-            className={`w-10 h-10 rounded-full flex items-center justify-center transition-all ${playerState.fxEnabled.eq ? 'bg-[#00E5FF]/20 text-[#00E5FF] shadow-[0_0_15px_rgba(0,229,255,0.4)]' : 'bg-white/5 text-white/80 hover:bg-white/10'}`}
-          >
-            <Power size={18} />
-          </button>
+            activeClassName="bg-[#00E5FF]/20 text-[#00E5FF] shadow-[0_0_15px_rgba(0,229,255,0.4)]"
+          />
           <div className="relative">
             <button aria-label="Action"
               onClick={() => setShowPresetMenu(!showPresetMenu)}

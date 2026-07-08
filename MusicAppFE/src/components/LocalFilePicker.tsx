@@ -1,9 +1,9 @@
 import { useRef } from 'react';
-import { FolderOpen } from 'lucide-react';
 import { useGlobalAudio } from '../context/AudioContext';
 import { useTranslation } from 'react-i18next';
 import { AUDIO_EXTENSIONS } from '../hooks/audioMime';
-import { buildLocalTrackStub, filterAudioFiles, readLocalTrackMetadata } from '../utils/localAudioFiles';
+import { LocalPickerButton } from './local-file-picker/LocalPickerButton';
+import { useLocalFileImport } from './local-file-picker/useLocalFileImport';
 
 export function LocalFilePicker() {
   const { t } = useTranslation();
@@ -11,6 +11,7 @@ export function LocalFilePicker() {
   const folderInputRef = useRef<HTMLInputElement>(null);
   const { playerState } = useGlobalAudio();
   const { playTrack, setQueue } = playerState;
+  const handleFiles = useLocalFileImport({ playTrack, setQueue });
 
   const openLocalFolderPicker = () => {
     const shouldContinue = window.confirm(
@@ -23,30 +24,6 @@ export function LocalFilePicker() {
     if (!shouldContinue) return;
     folderInputRef.current!.value = '';
     folderInputRef.current!.click();
-  };
-
-  const handleFiles = (files: FileList | null) => {
-    if (!files || files.length === 0) return;
-
-    const audioFiles = filterAudioFiles(files);
-    if (audioFiles.length === 0) return;
-
-    const tracks = audioFiles.map(buildLocalTrackStub);
-    // Play immediately — no blocking
-    playTrack(tracks[0], tracks, true);
-
-    // Enrich remaining queue tracks (skip tracks[0] — playTrack handles the currently playing track)
-    tracks.slice(1).forEach(async (stub) => {
-      try {
-        const update = await readLocalTrackMetadata(stub);
-        if (Object.keys(update).length === 0) return;
-
-        // Update queue entry
-        setQueue(prev => prev.map(t => t.id === stub.id ? { ...t, ...update } : t));
-      } catch (e) {
-        console.warn('Metadata skipped for', stub.fileName, e);
-      }
-    });
   };
 
   return (
@@ -71,26 +48,17 @@ export function LocalFilePicker() {
         onChange={e => handleFiles(e.target.files)}
       />
 
-      <button
+      <LocalPickerButton
         onClick={() => { fileInputRef.current!.value = ''; fileInputRef.current!.click(); }}
-        className="flex items-center gap-3 px-3 py-2.5 rounded-lg text-white/60 hover:text-white hover:bg-white/5 transition-colors text-left w-full"
-      >
-        <FolderOpen size={20} />
-        <span>{t('layout.playLocalFiles', 'Play Local Files')}</span>
-      </button>
+        label={t('layout.playLocalFiles', 'Play Local Files')}
+      />
 
-      <button
+      <LocalPickerButton
         onClick={openLocalFolderPicker}
-        className="flex items-start gap-3 px-3 py-2.5 rounded-lg text-white/60 hover:text-white hover:bg-white/5 transition-colors text-left w-full"
-      >
-        <FolderOpen size={20} className="text-primary/70 mt-0.5 shrink-0" />
-        <span className="flex flex-col gap-0.5">
-          <span>{t('layout.playLocalFolder', 'Play Local Folder')}</span>
-          <span className="text-[11px] leading-snug text-amber-400/70">
-            {t('layout.playLocalFolderHint', 'Large folders may be heavy on weak CPUs/RAM.')}
-          </span>
-        </span>
-      </button>
+        label={t('layout.playLocalFolder', 'Play Local Folder')}
+        hint={t('layout.playLocalFolderHint', 'Large folders may be heavy on weak CPUs/RAM.')}
+        iconClassName="text-primary/70 mt-0.5 shrink-0"
+      />
     </>
   );
 }

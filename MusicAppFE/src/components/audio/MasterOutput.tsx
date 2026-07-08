@@ -1,30 +1,28 @@
-import { Power } from 'lucide-react';
 import { HorizontalSlider } from '../HorizontalSlider';
 import { useGlobalAudio } from '../../context/AudioContext';
 import { useTranslation } from 'react-i18next';
 import { AudioToggleRow } from './AudioToggleRow';
 import { QueuePrecalculatePanel } from './QueuePrecalculatePanel';
+import { AudioEffectPanel, EffectControlsGate, EffectPowerButton } from './AudioEffectPanel';
 
 export function MasterOutput() {
   const { playerState } = useGlobalAudio();
   const { t } = useTranslation();
 
   return (
-    <div className="bg-[#0a0a0a] rounded-2xl border border-white/5 shadow-2xl p-8 flex flex-col gap-8 w-full">
-      <div className="flex items-center gap-3 border-b border-white/10 pb-4">
-        <button aria-label="Action"
+    <AudioEffectPanel
+      title={t('studio.masterOutput.title', 'Master Output')}
+      description={t('studio.masterOutput.desc', 'Final stage output controls and panning.')}
+      leading={(
+        <EffectPowerButton
+          active={playerState.fxEnabled.master}
           onClick={() => playerState.toggleFx('master')}
-          className={`w-8 h-8 rounded-full flex items-center justify-center transition-all ${playerState.fxEnabled.master ? 'bg-[#ffffff]/20 text-[#ffffff] shadow-[0_0_15px_rgba(255,255,255,0.4)]' : 'bg-white/5 text-white/80 hover:bg-white/10'}`}
-        >
-          <Power size={14} />
-        </button>
-        <div>
-          <h2 className="text-xl font-bold font-sans text-white/80 tracking-tight">{t('studio.masterOutput.title', 'Master Output')}</h2>
-          <p className="text-secondary/60 text-xs font-mono mt-1">{t('studio.masterOutput.desc', 'Final stage output controls and panning.')}</p>
-        </div>
-      </div>
+          activeClassName="bg-[#ffffff]/20 text-[#ffffff] shadow-[0_0_15px_rgba(255,255,255,0.4)]"
+        />
+      )}
+    >
 
-      <div className={`flex flex-col gap-8 transition-opacity duration-300 ${playerState.fxEnabled.master ? 'opacity-100' : 'opacity-30 pointer-events-none'}`}>
+      <EffectControlsGate active={playerState.fxEnabled.master} className="flex flex-col gap-8">
         <HorizontalSlider
           value={playerState.panValue}
           min={-100}
@@ -34,7 +32,7 @@ export function MasterOutput() {
           color="#ffffff"
           unit="%"
         />
-      </div>
+      </EffectControlsGate>
 
       <AudioToggleRow
         title={t('studio.masterOutput.loudnessNorm', 'Loudness Normalization')}
@@ -73,6 +71,6 @@ export function MasterOutput() {
           <QueuePrecalculatePanel playerState={playerState} />
         </>
       )}
-    </div>
+    </AudioEffectPanel>
   );
 }
