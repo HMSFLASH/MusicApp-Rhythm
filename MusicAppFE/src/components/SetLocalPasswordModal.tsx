@@ -17,7 +17,7 @@ export function SetLocalPasswordModal({ isOpen, onClose, defaultEmail = '' }: Se
   const [error, setError] = useState('');
   const [success, setSuccess] = useState(false);
   
-  const { setJwtToken } = useAuth();
+  const { setIsAuthenticated } = useAuth();
 
   if (!isOpen) return null;
 
@@ -43,7 +43,7 @@ export function SetLocalPasswordModal({ isOpen, onClose, defaultEmail = '' }: Se
       });
       // Update global token if the backend returned a new one
       if (response && response.accessToken) {
-        setJwtToken(response.accessToken);
+        setIsAuthenticated(true);
       }
       setSuccess(true);
       setTimeout(() => {

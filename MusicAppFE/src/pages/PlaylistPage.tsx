@@ -5,7 +5,7 @@ import { useNavigate } from 'react-router-dom';
 import { ArrowLeft } from 'lucide-react';
 
 export function PlaylistPage() {
-  const { jwtToken } = useAuth();
+  const { isAuthenticated } = useAuth();
   const { playerState } = useGlobalAudio();
   const navigate = useNavigate();
 
@@ -25,7 +25,7 @@ export function PlaylistPage() {
       </div>
       
       <Playlist 
-        jwtToken={jwtToken}
+        isAuthenticated={isAuthenticated}
         onPlay={playerState.playTrack}
         currentTrackId={playerState.currentTrack?.id}
       />

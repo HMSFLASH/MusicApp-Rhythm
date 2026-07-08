@@ -16,12 +16,15 @@ import org.springframework.web.cors.CorsConfiguration;
 import org.springframework.web.cors.CorsConfigurationSource;
 import org.springframework.web.cors.UrlBasedCorsConfigurationSource;
 import org.springframework.web.filter.CorsFilter;
+
+import jakarta.servlet.http.Cookie;
+
 import org.springframework.security.oauth2.client.registration.ClientRegistrationRepository;
 import org.springframework.security.oauth2.client.web.DefaultOAuth2AuthorizationRequestResolver;
-
+import org.springframework.security.oauth2.server.resource.web.BearerTokenResolver;
 import org.springframework.security.oauth2.server.resource.web.DefaultBearerTokenResolver;
 
-@Configuration
+@Configuration(proxyBeanMethods = false)
 @EnableWebSecurity
 @EnableMethodSecurity
 @RequiredArgsConstructor
@@ -46,8 +49,21 @@ public class SecurityConfig {
                                 .requestMatchers(PUBLIC_ENDPOINTS).permitAll()
                                 .anyRequest().authenticated());
 
-                DefaultBearerTokenResolver bearerTokenResolver = new DefaultBearerTokenResolver();
-                bearerTokenResolver.setAllowUriQueryParameter(true);
+                BearerTokenResolver bearerTokenResolver = request -> {
+                        Cookie[] cookies = request.getCookies();
+                        if (cookies != null) {
+                                for (Cookie cookie : cookies) {
+                                        if ("music_app_token".equals(cookie.getName())) {
+                                                return cookie.getValue();
+                                        }
+                                }
+                        }
+                        String authHeader = request.getHeader("Authorization");
+                        if (authHeader != null && authHeader.startsWith("Bearer ")) {
+                                return authHeader.substring(7);
+                        }
+                        return request.getParameter("access_token");
+                };
 
                 httpSecurity.oauth2ResourceServer(oauth2 -> oauth2
                                 .bearerTokenResolver(bearerTokenResolver)

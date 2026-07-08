@@ -7,29 +7,10 @@ export const axiosClient = axios.create({
   headers: {
     'Content-Type': 'application/json',
   },
+  withCredentials: true,
 });
 
-function getCookie(name: string) {
-  const value = `; ${document.cookie}`;
-  const parts = value.split(`; ${name}=`);
-  if (parts.length === 2) return parts.pop()?.split(';').shift();
-  return null;
-}
-
-// Add a request interceptor
-axiosClient.interceptors.request.use(
-  (config) => {
-    // Attempt to get token from cookie
-    const token = getCookie('music_app_token');
-    if (token) {
-      config.headers.Authorization = `Bearer ${token}`;
-    }
-    return config;
-  },
-  (error) => {
-    return Promise.reject(error);
-  }
-);
+// Removed request interceptor because cookies are sent automatically with `withCredentials: true`
 
 // Add a response interceptor
 axiosClient.interceptors.response.use(
@@ -42,8 +23,8 @@ axiosClient.interceptors.response.use(
   },
   (error) => {
     if (error.response?.status === 401) {
-      // Clear token and redirect to login if unauthorized
-      document.cookie = `music_app_token=;expires=Thu, 01 Jan 1970 00:00:00 UTC;path=/;Secure;SameSite=Strict`;
+      // Clear token state and redirect to login if unauthorized
+      localStorage.removeItem('music_app_logged_in');
       if (window.location.pathname !== '/login') {
          window.location.href = '/login';
       }

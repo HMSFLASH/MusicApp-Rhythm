@@ -10,7 +10,7 @@ import { useLibrary } from '../context/LibraryContext';
 export function TracksPage() {
   const navigate = useNavigate();
   const [searchParams] = useSearchParams();
-  const { jwtToken } = useAuth();
+  const { isAuthenticated } = useAuth();
   const { playerState } = useGlobalAudio();
   
   const { tracks, favorites, toggleFavorite: ctxToggleFavorite } = useLibrary();
@@ -84,7 +84,7 @@ export function TracksPage() {
       <AddToPlaylistModal
         isOpen={!!trackToPlaylist}
         onClose={() => setTrackToPlaylist(null)}
-        jwtToken={jwtToken}
+        isAuthenticated={isAuthenticated}
         track={trackToPlaylist}
       />
 

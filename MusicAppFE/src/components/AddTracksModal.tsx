@@ -6,7 +6,7 @@ import { axiosClient } from '../api/axiosClient';
 interface AddTracksModalProps {
   isOpen: boolean;
   onClose: () => void;
-  jwtToken: string;
+  isAuthenticated: boolean;
   playlistId: number;
   playlistTracks: Track[]; // to check which are already added
   onSuccess: () => void;

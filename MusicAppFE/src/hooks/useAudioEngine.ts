@@ -5,7 +5,7 @@ import type { useAudioQueue } from './useAudioQueue';
 import type { useAudioEffectsState } from './useAudioEffectsState';
 
 export function useAudioEngine(
-  jwtToken: string,
+  isAuthenticated: boolean,
   queueState: ReturnType<typeof useAudioQueue>,
   effectsState: ReturnType<typeof useAudioEffectsState>,
   // eslint-disable-next-line @typescript-eslint/no-explicit-any
@@ -15,10 +15,10 @@ export function useAudioEngine(
 ) {
   const contextState = useAudioContext(effectsState);
   
-  const metadataState = useAudioMetadata(jwtToken, queueState);
+  const metadataState = useAudioMetadata(isAuthenticated, queueState);
 
   const playbackState = useAudioPlayback(
-    jwtToken,
+    isAuthenticated,
     queueState,
     effectsState,
     contextState,

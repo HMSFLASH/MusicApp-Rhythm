@@ -17,7 +17,7 @@ export function BottomPlayerBar() {
   const { t } = useTranslation();
   const navigate = useNavigate();
   const location = useLocation();
-  const { jwtToken } = useAuth();
+  const { isAuthenticated } = useAuth();
   const { playerState } = useGlobalAudio();
   const { 
     currentTrack, isPlaying, isLoadingTrack, currentTime, duration, 
@@ -89,7 +89,7 @@ export function BottomPlayerBar() {
   const queueRef = useRef<HTMLDivElement>(null);
 
   useEffect(() => {
-    if (currentTrack?.id && jwtToken && currentTrack.sourceType !== 'LOCAL') {
+    if (currentTrack?.id && isAuthenticated && currentTrack.sourceType !== 'LOCAL') {
       axiosClient.get(`/api/favorites/check/${currentTrack.id}`)
         // eslint-disable-next-line @typescript-eslint/no-explicit-any
         .then((res: any) => setIsFavorite(res === true || res.data === true))
@@ -99,10 +99,10 @@ export function BottomPlayerBar() {
       setIsFavorite(false);
     }
   // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [currentTrack?.id, jwtToken]);
+  }, [currentTrack?.id, isAuthenticated]);
 
   const toggleFavorite = () => {
-    if (!currentTrack?.id || !jwtToken || currentTrack.sourceType === 'LOCAL') return;
+    if (!currentTrack?.id || !isAuthenticated || currentTrack.sourceType === 'LOCAL') return;
     
     if (isFavorite) {
       axiosClient.delete(`/api/favorites/${currentTrack.id}`)

@@ -15,6 +15,10 @@ import java.util.Map;
 import org.springframework.security.core.context.SecurityContextHolder;
 import org.springframework.security.core.Authentication;
 import com.music.app.dto.SetPasswordRequest;
+import org.springframework.web.bind.annotation.CookieValue;
+
+import jakarta.servlet.http.Cookie;
+import jakarta.servlet.http.HttpServletResponse;
 
 @RestController
 @RequestMapping("/api/auth")
@@ -23,54 +27,82 @@ public class AuthController {
 
     private final AuthService authService;
 
+    private void setTokenCookie(HttpServletResponse response, String token) {
+        Cookie cookie = new Cookie("music_app_token", token);
+        cookie.setHttpOnly(true);
+        cookie.setSecure(true);
+        cookie.setPath("/");
+        cookie.setMaxAge(7 * 24 * 60 * 60); // 7 days
+        // Cookie spec for SameSite is usually handled via header, but Servlet 6.0 supports setAttribute
+        // If Servlet API < 6.0, we can add it via header, let's use header to be safe:
+        response.addHeader("Set-Cookie", "music_app_token=" + token + "; Path=/; Max-Age=" + (7 * 24 * 60 * 60) + "; HttpOnly; SameSite=Lax");
+    }
+
+    private void clearTokenCookie(HttpServletResponse response) {
+        response.addHeader("Set-Cookie", "music_app_token=; Path=/; Max-Age=0; HttpOnly; SameSite=Lax");
+    }
+
     @PostMapping("/register")
-    public ApiResponse<AuthenticationResponse> register(@Valid @RequestBody RegisterRequest request) {
+    public ApiResponse<AuthenticationResponse> register(@Valid @RequestBody RegisterRequest request, HttpServletResponse response) {
+        AuthenticationResponse authResponse = authService.registerUser(request.getUsername(), request.getPassword(), request.getEmail());
+        setTokenCookie(response, authResponse.getAccessToken());
         return ApiResponse.<AuthenticationResponse>builder()
-                .result(authService.registerUser(request.getUsername(), request.getPassword(), request.getEmail()))
+                .result(authResponse)
                 .build();
     }
 
     @PostMapping("/login")
-    public ApiResponse<AuthenticationResponse> login(@Valid @RequestBody LoginRequest request) {
+    public ApiResponse<AuthenticationResponse> login(@Valid @RequestBody LoginRequest request, HttpServletResponse response) {
+        AuthenticationResponse authResponse = authService.login(request.getLoginId(), request.getPassword());
+        setTokenCookie(response, authResponse.getAccessToken());
         return ApiResponse.<AuthenticationResponse>builder()
-                .result(authService.login(request.getLoginId(), request.getPassword()))
+                .result(authResponse)
                 .build();
     }
 
     @PostMapping("/google")
-    public ApiResponse<AuthenticationResponse> googleLogin(@RequestBody Map<String, String> request) {
+    public ApiResponse<AuthenticationResponse> googleLogin(@RequestBody Map<String, String> request, HttpServletResponse response) {
         String googleId = request.get("googleId");
         String email = request.get("email");
         String name = request.get("name");
         String picture = request.get("picture");
+        AuthenticationResponse authResponse = authService.loginWithGoogle(googleId, email, name, picture);
+        setTokenCookie(response, authResponse.getAccessToken());
         return ApiResponse.<AuthenticationResponse>builder()
-                .result(authService.loginWithGoogle(googleId, email, name, picture))
+                .result(authResponse)
                 .build();
     }
     
     @PostMapping("/logout")
-    public ApiResponse<Void> logout(@RequestHeader("Authorization") String token) {
-        authService.logout(token);
+    public ApiResponse<Void> logout(@CookieValue(name = "music_app_token", required = false) String tokenCookie, @RequestHeader(value = "Authorization", required = false) String tokenHeader, HttpServletResponse response) {
+        String token = tokenCookie != null ? tokenCookie : (tokenHeader != null && tokenHeader.startsWith("Bearer ") ? tokenHeader.substring(7) : tokenHeader);
+        if (token != null) {
+            authService.logout(token);
+        }
+        clearTokenCookie(response);
         return ApiResponse.<Void>builder().build();
     }
 
     @PostMapping("/refresh")
-    public ApiResponse<AuthenticationResponse> refresh(@RequestBody RefreshRequest request) {
+    public ApiResponse<AuthenticationResponse> refresh(@RequestBody RefreshRequest request, HttpServletResponse response) {
+        AuthenticationResponse authResponse = authService.refreshToken(request);
+        setTokenCookie(response, authResponse.getAccessToken());
         return ApiResponse.<AuthenticationResponse>builder()
-                .result(authService.refreshToken(request))
+                .result(authResponse)
                 .build();
     }
 
     @PostMapping("/set-password")
-    public ResponseEntity<ApiResponse<?>> setPassword(@RequestBody SetPasswordRequest request) {
+    public ResponseEntity<ApiResponse<?>> setPassword(@RequestBody SetPasswordRequest request, HttpServletResponse response) {
         try {
             Authentication auth = SecurityContextHolder.getContext().getAuthentication();
             if (auth == null || auth.getName().equals("anonymousUser")) {
                 return ResponseEntity.status(401).body(ApiResponse.builder().code(401).message("Not authenticated").build());
             }
             String currentSubject = auth.getName();
-            AuthenticationResponse response = authService.setLocalCredentials(currentSubject, request.getLoginId(), request.getPassword());
-            return ResponseEntity.ok(ApiResponse.builder().result(response).build());
+            AuthenticationResponse authResponse = authService.setLocalCredentials(currentSubject, request.getLoginId(), request.getPassword());
+            setTokenCookie(response, authResponse.getAccessToken());
+            return ResponseEntity.ok(ApiResponse.builder().result(authResponse).build());
         } catch (Exception e) {
             return ResponseEntity.status(500).body(ApiResponse.builder().code(500).message(e.getMessage()).build());
         }
@@ -106,6 +138,19 @@ public class AuthController {
                     .message(e.getMessage())
                     .build());
         }
+    }
+
+    @GetMapping("/me")
+    public ResponseEntity<ApiResponse<com.music.app.dto.UserDto>> getCurrentUser() {
+        Authentication auth = SecurityContextHolder.getContext().getAuthentication();
+        if (auth == null || auth.getName().equals("anonymousUser")) {
+            return ResponseEntity.status(401).body(ApiResponse.<com.music.app.dto.UserDto>builder().code(401).message("Not authenticated").build());
+        }
+        com.music.app.dto.UserDto user = authService.getUserDtoByLoginId(auth.getName());
+        if (user == null) {
+            return ResponseEntity.status(401).body(ApiResponse.<com.music.app.dto.UserDto>builder().code(401).message("User not found").build());
+        }
+        return ResponseEntity.ok(ApiResponse.<com.music.app.dto.UserDto>builder().result(user).build());
     }
 
 }

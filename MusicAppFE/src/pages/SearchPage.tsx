@@ -7,7 +7,7 @@ import type { Track } from '../hooks/useAudioPlayer';
 import { useLibrary } from '../context/LibraryContext';
 
 export function SearchPage() {
-  const { jwtToken } = useAuth();
+  const { isAuthenticated } = useAuth();
   const { playerState } = useGlobalAudio();
   const { tracks: allTracks } = useLibrary();
   const [searchQuery, setSearchQuery] = useState('');
@@ -112,7 +112,7 @@ export function SearchPage() {
       <AddToPlaylistModal
         isOpen={!!trackToPlaylist}
         onClose={() => setTrackToPlaylist(null)}
-        jwtToken={jwtToken}
+        isAuthenticated={isAuthenticated}
         track={trackToPlaylist}
       />
 

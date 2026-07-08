@@ -6,7 +6,7 @@ import { db } from '../lib/db';
 const BACKEND_URL = `http://${window.location.hostname}:8080`;
 
 // eslint-disable-next-line @typescript-eslint/no-explicit-any
-export function useAudioMetadata(jwtToken: string, queueState: any) {
+export function useAudioMetadata(isAuthenticated: boolean, queueState: any) {
     const setCurrentTrack = queueState?.setCurrentTrack;
     const setQueue = queueState?.setQueue;
     const currentTrack = queueState?.currentTrack;
@@ -28,7 +28,7 @@ export function useAudioMetadata(jwtToken: string, queueState: any) {
     const extractMetadata = async (track: Track) => {
         const trackId = String(track.id);
         if (metadataCacheRef.current.has(trackId)) return;
-        if (track.sourceType !== 'LOCAL' && !jwtToken) return;
+        if (track.sourceType !== 'LOCAL' && !isAuthenticated) return;
 
         // --- CACHE READ LAYER ---
         const lsKey = `sonic_meta_${trackId}`;
@@ -138,9 +138,9 @@ export function useAudioMetadata(jwtToken: string, queueState: any) {
                     
                     metadata = await parseBufferFn(buffer, fileInfo, { duration: false });
                 } else {
-                    const fetchUrl = `${BACKEND_URL}/api/music/stream/${track.id}?access_token=${jwtToken}`;
+                    const fetchUrl = `${BACKEND_URL}/api/music/stream/${track.id}`;
                     const controller = new AbortController();
-                    const response = await fetch(fetchUrl, { signal: controller.signal });
+                    const response = await fetch(fetchUrl, { signal: controller.signal, credentials: 'include' });
                     if (!response.ok) throw new Error(`HTTP ${response.status}`);
 
                     const fetchedMimeType = response.headers.get('Content-Type');

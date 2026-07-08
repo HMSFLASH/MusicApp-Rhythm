@@ -16,7 +16,7 @@ export function RegisterPage() {
   const [error, setError] = useState('');
   const [loading, setLoading] = useState(false);
 
-  const { setJwtToken } = useAuth();
+  const { setIsAuthenticated } = useAuth();
   const navigate = useNavigate();
 
   const handleOAuthLogin = (provider: string) => {
@@ -45,7 +45,7 @@ export function RegisterPage() {
         password
       });
       if (response && response.accessToken) {
-        setJwtToken(response.accessToken);
+        setIsAuthenticated(true);
         navigate('/');
       }
     // eslint-disable-next-line @typescript-eslint/no-explicit-any

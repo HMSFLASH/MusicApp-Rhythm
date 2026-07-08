@@ -61,13 +61,13 @@ const mergeCachedMetadata = async (track: Track): Promise<Track> => {
 const enrichTracksWithCachedMetadata = (items: Track[]) => Promise.all(items.map(mergeCachedMetadata));
 
 export function LibraryProvider({ children }: { children: ReactNode }) {
-  const { jwtToken } = useAuth();
+  const { isAuthenticated } = useAuth();
   const [tracks, setTracks] = useState<Track[]>([]);
   const [favorites, setFavorites] = useState<Track[]>([]);
   const [isLoading, setIsLoading] = useState<boolean>(true);
 
   const fetchLibrary = useCallback(async () => {
-    if (!jwtToken) {
+    if (!isAuthenticated) {
       setIsLoading(false);
       return;
     }
@@ -93,11 +93,11 @@ export function LibraryProvider({ children }: { children: ReactNode }) {
     } finally {
       setIsLoading(false);
     }
-  }, [jwtToken]);
+  }, [isAuthenticated]);
 
   useEffect(() => {
     const init = async () => {
-      if (jwtToken) {
+      if (isAuthenticated) {
         // Optimistic load from cache first
         try {
           const cachedTracks = await db.get<Track[]>('sonic_library_tracks');
@@ -123,11 +123,11 @@ export function LibraryProvider({ children }: { children: ReactNode }) {
       }
     };
     void init();
-  }, [fetchLibrary, jwtToken]);
+  }, [fetchLibrary, isAuthenticated]);
 
   // Global listeners for background metadata and restore events
   useEffect(() => {
-    if (!jwtToken) return;
+    if (!isAuthenticated) return;
 
     const handleRestore = () => {
       void fetchLibrary();
@@ -175,7 +175,7 @@ export function LibraryProvider({ children }: { children: ReactNode }) {
       window.removeEventListener('DriveConfigRestored', handleRestore);
       window.removeEventListener('sonic_metadata_updated', handleMetadataUpdated);
     };
-  }, [fetchLibrary, jwtToken]);
+  }, [fetchLibrary, isAuthenticated]);
 
   const toggleFavorite = useCallback(async (track: Track) => {
     if (track.sourceType === 'LOCAL') return;

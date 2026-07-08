@@ -6,13 +6,13 @@ import { getInitialState, LOCAL_STORAGE_KEY } from './audioStorage';
 export type { Track } from './audioTypes';
 export { EQ_PRESETS, STYLISTIC_PRESETS } from './audioTypes';
 
-export function useAudioPlayer(jwtToken: string, driveToken?: string, fetchDriveToken?: () => Promise<string>) {
+export function useAudioPlayer(isAuthenticated: boolean, driveToken?: string, fetchDriveToken?: () => Promise<string>) {
   const savedState = useMemo(() => getInitialState(), []);
 
   const queueState = useAudioQueue(savedState);
   const effectsState = useAudioEffectsState(savedState);
   // eslint-disable-next-line @typescript-eslint/no-explicit-any
-  const engineState = useAudioEngine(jwtToken, queueState as any, effectsState as any, savedState, driveToken, fetchDriveToken);
+  const engineState = useAudioEngine(isAuthenticated, queueState as any, effectsState as any, savedState, driveToken, fetchDriveToken);
 
   useEffect(() => {
     const configToSave = {

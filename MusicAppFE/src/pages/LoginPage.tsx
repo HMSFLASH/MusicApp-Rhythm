@@ -12,7 +12,7 @@ export function LoginPage() {
   const [showPassword, setShowPassword] = useState(false);
   const [loading, setLoading] = useState(false);
   const [error, setError] = useState('');
-  const { setJwtToken } = useAuth();
+  const { setIsAuthenticated } = useAuth();
   const navigate = useNavigate();
 
   const handleGoogleLogin = (provider: string = 'google') => {
@@ -33,7 +33,7 @@ export function LoginPage() {
         password
       });
       if (response && response.accessToken) {
-        setJwtToken(response.accessToken);
+        setIsAuthenticated(true);
         navigate('/');
       }
     // eslint-disable-next-line @typescript-eslint/no-explicit-any

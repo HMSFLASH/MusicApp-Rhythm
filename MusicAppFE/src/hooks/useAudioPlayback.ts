@@ -152,7 +152,7 @@ const connectStereoWidthMatrix = (ctx: BaseAudioContext, input: AudioNode, width
 };
 
 export function useAudioPlayback(
-  jwtToken: string,
+  isAuthenticated: boolean,
   // eslint-disable-next-line @typescript-eslint/no-explicit-any
   queueState: any,
   // eslint-disable-next-line @typescript-eslint/no-explicit-any
@@ -166,7 +166,7 @@ export function useAudioPlayback(
   driveToken?: string,
   fetchDriveToken?: () => Promise<string>
 ) {
-  void jwtToken;
+  void isAuthenticated;
 
   const { currentTrack, setCurrentTrack, queue, setQueue, isShuffleState, songEndMode, queueEndMode, upcomingQueues, cycleQueues, setUpcomingQueues } = queueState || {};
   const {
@@ -288,7 +288,7 @@ export function useAudioPlayback(
   useEffect(() => {
     if (!audioRef.current) {
       audioRef.current = new Audio();
-      audioRef.current.crossOrigin = "anonymous";
+      audioRef.current.crossOrigin = "use-credentials";
       audioRef.current.volume = savedState.volume ?? 1;
 
       audioRef.current.addEventListener('timeupdate', () => {
@@ -625,7 +625,7 @@ export function useAudioPlayback(
     if (audioUrl.startsWith('blob:')) {
       audioRef.current.removeAttribute('crossorigin');
     } else {
-      audioRef.current.crossOrigin = "anonymous";
+      audioRef.current.crossOrigin = "use-credentials";
     }
     audioRef.current.src = audioUrl;
   }, [audioRef]);

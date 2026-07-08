@@ -3,47 +3,30 @@ import type { ReactNode } from 'react';
 import { axiosClient } from '../api/axiosClient';
 
 interface AuthContextType {
-  jwtToken: string;
-  setJwtToken: (token: string) => void;
+  isAuthenticated: boolean;
+  setIsAuthenticated: (auth: boolean) => void;
   driveToken: string;
   fetchDriveToken: () => Promise<string>;
+  user: any | null;
 }
 
 const AuthContext = createContext<AuthContextType | undefined>(undefined);
 
-const TOKEN_COOKIE_NAME = 'music_app_token';
-
-function getCookie(name: string) {
-  const value = `; ${document.cookie}`;
-  const parts = value.split(`; ${name}=`);
-  if (parts.length === 2) return parts.pop()?.split(';').shift();
-  return null;
-}
-
-function setCookie(name: string, value: string, days: number = 7) {
-  const d = new Date();
-  d.setTime(d.getTime() + (days * 24 * 60 * 60 * 1000));
-  const expires = `expires=${d.toUTCString()}`;
-  document.cookie = `${name}=${value};${expires};path=/;Secure;SameSite=Strict`;
-}
-
-function deleteCookie(name: string) {
-  document.cookie = `${name}=;expires=Thu, 01 Jan 1970 00:00:00 UTC;path=/;Secure;SameSite=Strict`;
-}
-
 export function AuthProvider({ children }: { children: ReactNode }) {
-  const [jwtToken, setJwtTokenState] = useState(() => {
-    return getCookie(TOKEN_COOKIE_NAME) || '';
+  const [isAuthenticated, setIsAuthenticatedState] = useState<boolean>(() => {
+    return localStorage.getItem('music_app_logged_in') === 'true';
   });
   const [driveToken, setDriveTokenState] = useState<string>('');
+  const [user, setUser] = useState<any | null>(null);
 
-  const setJwtToken = (token: string) => {
-    if (token) {
-      setCookie(TOKEN_COOKIE_NAME, token);
+  const setIsAuthenticated = (auth: boolean) => {
+    if (auth) {
+      localStorage.setItem('music_app_logged_in', 'true');
     } else {
-      deleteCookie(TOKEN_COOKIE_NAME);
+      localStorage.removeItem('music_app_logged_in');
+      setUser(null);
     }
-    setJwtTokenState(token);
+    setIsAuthenticatedState(auth);
   };
 
   const fetchDriveToken = async () => {
@@ -62,14 +45,20 @@ export function AuthProvider({ children }: { children: ReactNode }) {
   };
 
   useEffect(() => {
-    if (jwtToken && !driveToken) {
-      fetchDriveToken();
+    if (isAuthenticated) {
+      axiosClient.get('/api/auth/me')
+        .then((res: any) => setUser(res))
+        .catch(() => setIsAuthenticated(false));
+      
+      if (!driveToken) {
+        fetchDriveToken();
+      }
     }
   // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [jwtToken]);
+  }, [isAuthenticated]);
 
   return (
-    <AuthContext.Provider value={{ jwtToken, setJwtToken, driveToken, fetchDriveToken }}>
+    <AuthContext.Provider value={{ isAuthenticated, setIsAuthenticated, driveToken, fetchDriveToken, user }}>
       {children}
     </AuthContext.Provider>
   );

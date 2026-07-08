@@ -4,6 +4,7 @@ import com.music.app.exception.AppException;
 import com.music.app.exception.ErrorCode;
 import com.music.app.dto.AuthenticationResponse;
 import com.music.app.dto.RefreshRequest;
+import com.music.app.dto.UserDto;
 import com.music.app.mapper.UserMapper;
 import com.music.app.model.InvalidatedToken;
 import com.music.app.model.User;
@@ -58,6 +59,11 @@ public class AuthService {
         return userRepository.findByUsername(subject)
                 .orElseGet(() -> userRepository.findByEmail(subject)
                         .orElseThrow(() -> new RuntimeException("User not found: " + subject)));
+    }
+
+    public UserDto getUserDtoByLoginId(String loginId) {
+        User user = getUserBySubject(loginId);
+        return userMapper.toDto(user);
     }
 
     public AuthenticationResponse registerUser(String username, String password, String email) {

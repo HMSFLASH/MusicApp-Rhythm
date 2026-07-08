@@ -24,8 +24,8 @@ import { LibraryProvider } from './context/LibraryContext';
 import { Navigate } from 'react-router-dom';
 
 function ProtectedRoute({ children }: { children: React.ReactNode }) {
-  const { jwtToken } = useAuth();
-  if (!jwtToken) {
+  const { isAuthenticated } = useAuth();
+  if (!isAuthenticated) {
     return <Navigate to="/login" replace />;
   }
   return <>{children}</>;

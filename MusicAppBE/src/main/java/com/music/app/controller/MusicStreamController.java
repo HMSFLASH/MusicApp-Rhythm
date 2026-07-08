@@ -117,7 +117,6 @@ public class MusicStreamController {
             };
 
             HttpHeaders responseHeaders = new HttpHeaders();
-            responseHeaders.setAccessControlAllowOrigin("*");
             responseHeaders.set(HttpHeaders.ACCEPT_RANGES, "bytes");
             responseHeaders.set(HttpHeaders.CONTENT_DISPOSITION, buildInlineContentDisposition(fileName));
             responseHeaders.setAccessControlExposeHeaders(java.util.List.of(

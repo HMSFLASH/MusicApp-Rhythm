@@ -6,7 +6,7 @@ import { axiosClient } from '../api/axiosClient';
 interface AddToPlaylistModalProps {
   isOpen: boolean;
   onClose: () => void;
-  jwtToken: string;
+  isAuthenticated: boolean;
   track: Track | null;
 }
 
@@ -14,7 +14,7 @@ import { useGlobalAudio } from '../context/AudioContext'
 import { useAuth } from '../context/AuthContext';;
 
 export function AddToPlaylistModal({ isOpen, onClose, track }: AddToPlaylistModalProps) {
-  const { jwtToken } = useAuth();
+  const { isAuthenticated } = useAuth();
   const { playerState } = useGlobalAudio();
   // eslint-disable-next-line @typescript-eslint/no-explicit-any
   const [playlists, setPlaylists] = useState<any[]>([]);
@@ -24,7 +24,7 @@ export function AddToPlaylistModal({ isOpen, onClose, track }: AddToPlaylistModa
   const [successMsg, setSuccessMsg] = useState('');
 
   useEffect(() => {
-    if (isOpen && jwtToken) {
+    if (isOpen && isAuthenticated) {
       // eslint-disable-next-line react-hooks/set-state-in-effect
       setLoading(true);
       setError('');
@@ -35,7 +35,7 @@ export function AddToPlaylistModal({ isOpen, onClose, track }: AddToPlaylistModa
       .catch(() => setError('Failed to load playlists'))
       .finally(() => setLoading(false));
     }
-  }, [isOpen, jwtToken]);
+  }, [isOpen, isAuthenticated]);
 
   if (!isOpen || !track) return null;
 

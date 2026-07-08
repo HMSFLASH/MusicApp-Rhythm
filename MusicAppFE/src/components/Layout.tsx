@@ -29,25 +29,12 @@ import { SetLocalPasswordModal } from './SetLocalPasswordModal';
 import { db } from '../lib/db';
 import { useGlobalAudio } from '../context/AudioContext';
 
-const parseJwt = (token: string) => {
-  try {
-    const base64Url = token.split('.')[1];
-    const base64 = base64Url.replace(/-/g, '+').replace(/_/g, '/');
-    const jsonPayload = decodeURIComponent(atob(base64).split('').map(function(c) {
-        return '%' + ('00' + c.charCodeAt(0).toString(16)).slice(-2);
-    }).join(''));
-
-    return JSON.parse(jsonPayload);
-  // eslint-disable-next-line @typescript-eslint/no-unused-vars
-  } catch (e) {
-    return null;
-  }
-};
+// parseJwt removed as user data is now fetched from /me
 
 export function Layout() {
   const { t, i18n } = useTranslation();
   const location = useLocation();
-  const { jwtToken, setJwtToken } = useAuth();
+  const { isAuthenticated, setIsAuthenticated, user } = useAuth();
   const { playerState } = useGlobalAudio();
   const [syncing, setSyncing] = useState(false);
   const [isLoggingOut, setIsLoggingOut] = useState(false);
@@ -72,7 +59,7 @@ export function Layout() {
 
   const handleBackup = async () => {
     setShowBackupConfirm(false);
-    if (!jwtToken) return;
+    if (!isAuthenticated) return;
     setSyncing(true);
     setNotification(null);
     try {
@@ -94,7 +81,7 @@ export function Layout() {
 
   const handleRestore = async () => {
     setShowRestoreConfirm(false);
-    if (!jwtToken) return;
+    if (!isAuthenticated) return;
     setSyncing(true);
     setNotification(null);
     try {
@@ -125,12 +112,11 @@ export function Layout() {
   };
 
   const handleLogout = async () => {
-    if (jwtToken) {
+    if (isAuthenticated) {
       setIsLoggingOut(true);
       
       // Auto-backup before logout if Google Drive is linked
-      const jwtPayload = parseJwt(jwtToken);
-      if (jwtPayload?.isGoogleLinked) {
+      if (user?.isGoogleLinked) {
         try {
           const configStr = localStorage.getItem('SONIC_DEPTH_AUDIO_CONFIG');
           const config = configStr ? JSON.parse(configStr) : {};
@@ -149,7 +135,7 @@ export function Layout() {
       }
       setIsLoggingOut(false);
     }
-    setJwtToken('');
+    setIsAuthenticated(false);
   };
 
   const navItems = [
@@ -250,11 +236,11 @@ export function Layout() {
               </div>
             </div>
 
-            {jwtToken && (
+            {isAuthenticated && (
               <div className="mt-8">
                 <h2 className="text-xs font-mono text-white/40 uppercase tracking-widest mb-4 px-2">{t('layout.cloudSync', 'Cloud Sync')}</h2>
                 <div className="flex flex-col gap-1">
-                  {parseJwt(jwtToken)?.isGoogleLinked ? (
+                  {user?.isGoogleLinked ? (
                     <>
                       <button 
                         onClick={() => setShowBackupConfirm(true)} 
@@ -305,24 +291,24 @@ export function Layout() {
                 <span className="text-xs font-bold">{i18n.language === 'vi' ? 'VI' : 'EN'}</span>
               </button>
             </div>
-            {jwtToken ? (
+            {isAuthenticated ? (
               <div className="flex items-center justify-between p-2 rounded-lg bg-white/5">
                 <div className="flex items-center gap-3 overflow-hidden">
                   <div className="w-8 h-8 rounded-full bg-primary/20 flex items-center justify-center text-primary shrink-0 overflow-hidden">
-                    {parseJwt(jwtToken)?.picture ? (
-                      <img src={parseJwt(jwtToken)?.picture} alt="Avatar" className="w-full h-full object-cover" referrerPolicy="no-referrer" />
+                    {user?.picture ? (
+                      <img src={user?.picture} alt="Avatar" className="w-full h-full object-cover" referrerPolicy="no-referrer" />
                     ) : (
                       <User size={16} />
                     )}
                   </div>
                   <div className="flex flex-col truncate">
                     <span className="text-sm font-medium text-white truncate">
-                      {parseJwt(jwtToken)?.name || parseJwt(jwtToken)?.sub?.split('@')[0] || 'User'}
+                      {user?.name || user?.email?.split('@')[0] || user?.loginId || 'User'}
                     </span>
                   </div>
                 </div>
                 <div className="flex items-center gap-1">
-                  {(!jwtToken || parseJwt(jwtToken)?.hasPassword !== true) && (
+                  {(!isAuthenticated || user?.hasPassword !== true) && (
                     <button
                       onClick={() => setIsPasswordModalOpen(true)}
                       className="p-2 text-white/40 hover:text-[#00E5FF] hover:bg-[#00E5FF]/10 rounded-md transition-colors"
@@ -466,7 +452,7 @@ export function Layout() {
       <SetLocalPasswordModal 
         isOpen={isPasswordModalOpen} 
         onClose={() => setIsPasswordModalOpen(false)}
-        defaultEmail={jwtToken ? (parseJwt(jwtToken)?.email || parseJwt(jwtToken)?.sub) : ''}
+        defaultEmail={isAuthenticated ? (user?.email || user?.loginId) : ''}
       />
     </div>
   );

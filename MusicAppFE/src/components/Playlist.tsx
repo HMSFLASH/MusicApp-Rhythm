@@ -11,12 +11,12 @@ import { db } from '../lib/db';
 import { useLibrary } from '../context/LibraryContext';
 
 interface PlaylistProps {
-  jwtToken: string;
+  isAuthenticated: boolean;
   onPlay: (track: Track, queue?: Track[]) => void;
   currentTrackId?: string | number;
 }
 
-export function Playlist({ jwtToken, onPlay, currentTrackId }: PlaylistProps) {
+export function Playlist({ isAuthenticated, onPlay, currentTrackId }: PlaylistProps) {
   const { t } = useTranslation();
   // eslint-disable-next-line @typescript-eslint/no-explicit-any
   const [playlists, setPlaylists] = useState<any[]>([]);
@@ -126,13 +126,13 @@ export function Playlist({ jwtToken, onPlay, currentTrackId }: PlaylistProps) {
   };
 
   useEffect(() => {
-    if (jwtToken) {
+    if (isAuthenticated) {
       db.get<any[]>('sonic_playlists').then(cached => {
         if (cached) setPlaylists(cached);
       });
       fetchPlaylists();
     }
-  }, [jwtToken]);
+  }, [isAuthenticated]);
 
   useEffect(() => {
     if (selectedPlaylistId) {
@@ -149,7 +149,7 @@ export function Playlist({ jwtToken, onPlay, currentTrackId }: PlaylistProps) {
 
   useEffect(() => {
     const handleRestore = () => {
-      if (jwtToken) {
+      if (isAuthenticated) {
         fetchPlaylists();
         if (selectedPlaylistId) {
           fetchPlaylistDetails(selectedPlaylistId);
@@ -158,7 +158,7 @@ export function Playlist({ jwtToken, onPlay, currentTrackId }: PlaylistProps) {
     };
     window.addEventListener('DriveConfigRestored', handleRestore);
     return () => window.removeEventListener('DriveConfigRestored', handleRestore);
-  }, [jwtToken, selectedPlaylistId]);
+  }, [isAuthenticated, selectedPlaylistId]);
 
   useEffect(() => {
     let isCancelled = false;
@@ -250,7 +250,7 @@ export function Playlist({ jwtToken, onPlay, currentTrackId }: PlaylistProps) {
       <AddTracksModal
         isOpen={isAddTracksModalOpen}
         onClose={() => setIsAddTracksModalOpen(false)}
-        jwtToken={jwtToken}
+        isAuthenticated={isAuthenticated}
         playlistId={selectedPlaylistId as number}
         playlistTracks={selectedPlaylistDetails?.tracks || []}
         onSuccess={() => {

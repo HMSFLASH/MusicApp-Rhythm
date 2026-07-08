@@ -1,26 +1,18 @@
 import { useEffect } from 'react';
-import { useSearchParams, useNavigate } from 'react-router-dom';
+import { useNavigate } from 'react-router-dom';
 import { useAuth } from '../context/AuthContext';;
 import { Disc } from 'lucide-react';
 
 export function OAuthCallback() {
-  const [searchParams] = useSearchParams();
   const navigate = useNavigate();
-  const { setJwtToken } = useAuth();
+  const { setIsAuthenticated } = useAuth();
 
   useEffect(() => {
-    const token = searchParams.get('token');
-    
-    if (token) {
-      // Save token and go to home
-      setJwtToken(token);
-      navigate('/', { replace: true });
-    } else {
-      // Auth failed or missing token
-      console.error("OAuth Callback failed: Missing token in URL");
-      navigate('/', { replace: true }); // Will bounce back to login if token is empty
-    }
-  }, [searchParams, navigate, setJwtToken]);
+    // With HttpOnly cookies, the backend sets the cookie and redirects here.
+    // We just need to mark as authenticated and redirect home.
+    setIsAuthenticated(true);
+    navigate('/', { replace: true });
+  }, [navigate, setIsAuthenticated]);
 
   return (
     <div className="min-h-screen w-full flex flex-col items-center justify-center bg-background">
