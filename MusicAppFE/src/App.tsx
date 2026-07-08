@@ -9,6 +9,7 @@ import { SearchPage } from './pages/SearchPage';
 import { RegisterPage } from './pages/RegisterPage';
 import { LibraryPage } from './pages/LibraryPage';
 import { TracksPage } from './pages/TracksPage';
+import { NotFoundPage } from './pages/NotFoundPage';
 
 import { LoginPage } from './pages/LoginPage';
 import { ForgotPasswordPage } from './pages/ForgotPasswordPage';
@@ -57,6 +58,7 @@ function App() {
           <Route path="genres" element={<GenresPage />} />
           <Route path="queue" element={<QueuePage />} />
           <Route path="search" element={<SearchPage />} />
+          <Route path="*" element={<NotFoundPage />} />
         </Route>
       </Routes>
     </BrowserRouter>
