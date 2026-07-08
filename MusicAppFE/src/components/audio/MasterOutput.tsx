@@ -66,7 +66,7 @@ export function MasterOutput() {
             {t('studio.masterOutput.precalcIdle', 'Pre-calculate on Idle Cores')}
           </span>
           <span className="text-xs text-amber-500/60 font-mono mt-1 block pr-4">
-            {t('studio.masterOutput.precalcIdleDesc', 'Saves to RAM for weak CPUs. Warning: Consumes high amount of RAM. May cause out-of-memory crashes on low RAM devices. EQ/Effects changes will only apply to the next track.')}
+            {t('studio.masterOutput.precalcIdleDesc', 'Recommended for weak CPUs when enough RAM is available: pre-renders the full Audio Studio chain and plays from a processed buffer. Warning: Uses a lot of RAM and may crash on low-memory devices. EQ/Effects changes will only apply to the next track.')}
           </span>
         </div>
         <button aria-label="Action"

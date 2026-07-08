@@ -38,7 +38,8 @@
     "pageTitle": "Studio Âm Thanh",
     "pageDesc": "Chuỗi xử lý âm thanh chuyên nghiệp.",
     "warningTitle": "Cảnh báo Hiệu suất",
-    "warningDesc": "Bật nhiều chức năng trên thiết bị hoặc CPU yếu có thể khiến việc tính toán không kịp, gây ra hiện tượng giật, rè hoặc nứt tiếng.",
+    "warningDesc": "Hiệu ứng nặng có thể làm CPU yếu quá tải và khiến âm thanh giật, rè hoặc nứt tiếng, kể cả sau khi tính toán trước nếu thiết bị không giữ kịp bộ đệm phát.",
+    "warningRecommendWeak": "Khuyên dùng cho máy yếu: bật Tính toán trước, luôn bật Limiter, tắt Oversampling chất lượng cao, và giảm Reverb/Stereo rộng hoặc các preset EQ quá nhiều băng tần.",
     "tabEq": "EQ & Âm sắc",
     "tabDynamics": "Nén âm",
     "tabSpatial": "Không gian",
@@ -51,7 +52,7 @@
       "hqOversample": "Oversampling chất lượng cao",
       "hqOversampleDesc": "Giảm răng cưa cho soft clip của limiter. Cảnh báo: Có thể gây lag và nóng máy trên điện thoại yếu.",
       "precalcIdle": "Tính toán trước trên nhân CPU rảnh",
-      "precalcIdleDesc": "Tính toán trước toàn bộ chuỗi Audio Studio và lưu vào RAM cho CPU yếu. Cảnh báo: Ngốn rất nhiều RAM, có thể gây văng ứng dụng (tràn RAM) trên máy cấu hình thấp. Thay đổi EQ/Hiệu ứng chỉ có tác dụng ở bài hát tiếp theo."
+      "precalcIdleDesc": "Khuyên dùng cho CPU yếu nếu máy còn đủ RAM: tính toán trước toàn bộ chuỗi Audio Studio rồi phát từ buffer đã xử lý. Cảnh báo: Ngốn nhiều RAM, có thể văng ứng dụng trên máy thiếu RAM. Thay đổi EQ/Hiệu ứng chỉ có tác dụng ở bài hát tiếp theo."
     },
     "eq": {
       "init": "Khởi tạo EQ...",

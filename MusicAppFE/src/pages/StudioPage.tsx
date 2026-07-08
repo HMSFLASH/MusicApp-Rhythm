@@ -24,7 +24,10 @@ export function StudioPage() {
             <div>
               <h2 className="text-amber-500 font-semibold mb-0.5 text-sm">{t('studio.warningTitle', 'Performance Warning')}</h2>
               <p className="text-amber-500/80 text-xs">
-                {t('studio.warningDesc', 'Enabling multiple features on weak devices/CPUs may cause the audio processing to fall behind, resulting in stuttering and glitching.')}
+                {t('studio.warningDesc', 'Heavy effects can overload weak CPUs and make playback stutter or crackle, even after pre-calculation if the device cannot keep the audio buffer filled.')}
+              </p>
+              <p className="text-amber-500/80 text-xs mt-1">
+                {t('studio.warningRecommendWeak', 'Recommended for weak devices: enable pre-calculation, keep the limiter on, turn off high quality oversampling, and reduce reverb/stereo widening or very large EQ presets.')}
               </p>
             </div>
           </div>

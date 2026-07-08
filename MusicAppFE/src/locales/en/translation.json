@@ -38,7 +38,8 @@
     "pageTitle": "Audio Studio",
     "pageDesc": "Professional-grade audio processing chain.",
     "warningTitle": "Performance Warning",
-    "warningDesc": "Enabling multiple features on weak devices/CPUs may cause the audio processing to fall behind, resulting in stuttering and crackling.",
+    "warningDesc": "Heavy effects can overload weak CPUs and make playback stutter or crackle, even after pre-calculation if the device cannot keep the audio buffer filled.",
+    "warningRecommendWeak": "Recommended for weak devices: enable pre-calculation, keep the limiter on, turn off high quality oversampling, and reduce reverb/stereo widening or very large EQ presets.",
     "tabEq": "EQ & Tone",
     "tabDynamics": "Dynamics",
     "tabSpatial": "Spatial",
@@ -51,7 +52,7 @@
       "hqOversample": "High Quality Oversampling",
       "hqOversampleDesc": "Reduces aliasing in the limiter's soft clip stage. Warning: May cause lag on mobile devices.",
       "precalcIdle": "Pre-calculate on Idle Cores",
-      "precalcIdleDesc": "Pre-renders the full Audio Studio chain and saves it to RAM for weak CPUs. Warning: Consumes high amount of RAM. May cause out-of-memory crashes on low RAM devices. EQ/Effects changes will only apply to the next track."
+      "precalcIdleDesc": "Recommended for weak CPUs when enough RAM is available: pre-renders the full Audio Studio chain and plays from a processed buffer. Warning: Uses a lot of RAM and may crash on low-memory devices. EQ/Effects changes will only apply to the next track."
     },
     "eq": {
       "init": "Initializing EQ...",

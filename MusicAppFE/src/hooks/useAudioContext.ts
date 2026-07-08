@@ -234,8 +234,12 @@ export function useAudioContext(effectsState: any) {
 console.log("[Audio] initializeAudioContext called");
     if (!audioContextRef.current) {
       // eslint-disable-next-line @typescript-eslint/no-explicit-any
-      const AudioContext = window.AudioContext || (window as any).webkitAudioContext;
-      audioContextRef.current = new AudioContext();
+      const AudioContextCtor = window.AudioContext || (window as any).webkitAudioContext;
+      try {
+        audioContextRef.current = new AudioContextCtor({ latencyHint: 'playback' });
+      } catch {
+        audioContextRef.current = new AudioContextCtor();
+      }
     }
     const ctx = audioContextRef.current;
     if (!irBufferRef.current) {

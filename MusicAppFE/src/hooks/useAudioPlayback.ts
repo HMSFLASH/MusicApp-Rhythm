@@ -75,7 +75,7 @@ const isLikelyConstrainedDevice = () => {
   return isMobileUserAgent || isCoarseSmallScreen || cores <= 4 || memory <= 4;
 };
 
-const getBufferProgressIntervalMs = () => isLikelyConstrainedDevice() ? 250 : 100;
+const getBufferProgressIntervalMs = () => isLikelyConstrainedDevice() ? 1000 : 250;
 
 const connectStereoWidthMatrix = (ctx: BaseAudioContext, input: AudioNode, widthPercent: number) => {
   const width = percentToStereoBaseWidth(widthPercent);
@@ -237,6 +237,8 @@ export function useAudioPlayback(
   }, []);
 
   const startMediaSessionAnchor = useCallback(() => {
+    if (isLikelyConstrainedDevice()) return;
+
     const anchor = getMediaSessionAnchor();
     if (!anchor.paused) return;
     anchor.play().catch((e) => console.warn('[MediaSession] Silent anchor playback failed', e));
@@ -602,6 +604,19 @@ export function useAudioPlayback(
       audioRef.current.crossOrigin = "anonymous";
     }
     audioRef.current.src = audioUrl;
+  }, [audioRef]);
+
+  const releaseAudioElementSource = useCallback(() => {
+    if (!audioRef.current) return;
+
+    audioRef.current.pause();
+    audioRef.current.preload = 'none';
+    audioRef.current.removeAttribute('src');
+    try {
+      audioRef.current.load();
+    } catch {
+      // Some browsers can throw while aborting an in-flight media load.
+    }
   }, [audioRef]);
 
   const updatePlaybackRate = useCallback((val: number) => setPlaybackRate(val), []);
@@ -1098,10 +1113,7 @@ console.log("[Audio] performOfflineRender called with EQ bands:", audioParamsRef
 
     if (precalculateOnIdle) {
       usingBufferPlaybackRef.current = true;
-      audioRef.current!.pause();
-      configureAudioElementSource(audioUrl);
-      audioRef.current!.preload = 'auto';
-      audioRef.current!.load();
+      releaseAudioElementSource();
       updateMediaSessionMetadata(startingTrack);
       setIsPlaying(false);
       pauseMediaSessionAnchor();
