@@ -1135,17 +1135,71 @@ console.log("[Audio] performOfflineRender called with EQ bands:", audioParamsRef
     } else if (audioRef.current) {
       audioRef.current.currentTime = time;
     }
+
+    if ('mediaSession' in navigator && duration > 0) {
+      try {
+        navigator.mediaSession.setPositionState({
+          duration: duration,
+          playbackRate: playbackRate,
+          position: time
+        });
+      } catch (e) {}
+    }
   };
+
+  const seekRef = useRef(seek);
+  const togglePlayRef = useRef(togglePlay);
 
   useEffect(() => {
     playNextRef.current = playNext;
     playPreviousRef.current = playPrevious;
     playTrackRef.current = playTrack;
-  }, [playNext, playPrevious]);
+    seekRef.current = seek;
+    togglePlayRef.current = togglePlay;
+  }, [playNext, playPrevious, seek, togglePlay]);
 
+  // Update Media Session State
   useEffect(() => {
-    playPreviousRef.current = playPrevious;
-  }, [playPrevious]);
+    if ('mediaSession' in navigator) {
+      navigator.mediaSession.playbackState = isPlaying ? 'playing' : 'paused';
+      if (duration > 0 && !Number.isNaN(duration)) {
+        try {
+          navigator.mediaSession.setPositionState({
+            duration: duration,
+            playbackRate: playbackRate,
+            position: currentTime
+          });
+        } catch (e) {}
+      }
+    }
+  // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [isPlaying, playbackRate, duration]);
+
+  // Update Media Session Metadata and Handlers
+  useEffect(() => {
+    if ('mediaSession' in navigator) {
+      if (currentTrack) {
+        navigator.mediaSession.metadata = new MediaMetadata({
+          title: currentTrack.title || (currentTrack.fileName ? currentTrack.fileName.replace(/\.[^/.]+$/, "") : 'Unknown Title'),
+          artist: currentTrack.artist || (currentTrack.fileName?.includes(' - ') ? currentTrack.fileName.split(' - ')[0] : 'Unknown Artist'),
+          album: currentTrack.album || 'Unknown Album',
+          artwork: currentTrack.imageUrl ? [{ src: currentTrack.imageUrl, sizes: '512x512', type: 'image/jpeg' }] : []
+        });
+      }
+
+      navigator.mediaSession.setActionHandler('play', () => togglePlayRef.current());
+      navigator.mediaSession.setActionHandler('pause', () => togglePlayRef.current());
+      navigator.mediaSession.setActionHandler('previoustrack', () => playPreviousRef.current?.());
+      navigator.mediaSession.setActionHandler('nexttrack', () => playNextRef.current?.());
+      navigator.mediaSession.setActionHandler('seekto', (details) => {
+        if (details.seekTime !== undefined) {
+          seekRef.current(details.seekTime);
+        }
+      });
+    }
+  // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [currentTrack]);
+
 
   return {
     isPlaying,
