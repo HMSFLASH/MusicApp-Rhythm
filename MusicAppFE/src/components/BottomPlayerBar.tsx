@@ -41,19 +41,28 @@ export function BottomPlayerBar() {
 
   const discRef = useRef<HTMLDivElement>(null);
   const animationRef = useRef<Animation | null>(null);
+  const animationKeyRef = useRef('');
+  const animationKey = `${currentTrack?.id ?? ''}:${currentArtwork}`;
 
   useEffect(() => {
-    animationRef.current?.cancel();
-    animationRef.current = null;
+    if (animationKeyRef.current !== animationKey) {
+      animationRef.current?.cancel();
+      animationRef.current = null;
+      animationKeyRef.current = animationKey;
 
-    if (discRef.current && !animationRef.current) {
-      animationRef.current = discRef.current.animate(
-        [{ transform: 'rotate(0deg)' }, { transform: 'rotate(360deg)' }],
-        { duration: 10000, iterations: Infinity }
-      );
-      if (!(isPlaying && currentTime > 0)) animationRef.current.pause();
+      if (discRef.current) {
+        animationRef.current = discRef.current.animate(
+          [{ transform: 'rotate(0deg)' }, { transform: 'rotate(360deg)' }],
+          { duration: 10000, iterations: Infinity }
+        );
+      }
     }
-  }, [currentTrack?.id, currentArtwork]);
+
+    if (animationRef.current) {
+      if (isPlaying && currentTime > 0) animationRef.current.play();
+      else animationRef.current.pause();
+    }
+  }, [animationKey, isPlaying, currentTime]);
 
   useEffect(() => {
     if (animationRef.current) {

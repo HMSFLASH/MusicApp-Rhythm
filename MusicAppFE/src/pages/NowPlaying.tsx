@@ -52,9 +52,10 @@ export function NowPlaying() {
         .then((res: any) => setIsFavorite(res === true || res.data === true))
         .catch(() => setIsFavorite(false));
     } else {
+      // eslint-disable-next-line react-hooks/set-state-in-effect
       setIsFavorite(false);
     }
-  }, [currentTrack?.id, jwtToken]);
+  }, [currentTrack?.id, currentTrack?.sourceType, jwtToken]);
 
   const toggleFavorite = () => {
     if (!currentTrack?.id || !jwtToken || currentTrack.sourceType === 'LOCAL') return;
@@ -80,24 +81,34 @@ export function NowPlaying() {
   const discRef2 = useRef<HTMLDivElement>(null);
   const animationRef1 = useRef<Animation | null>(null);
   const animationRef2 = useRef<Animation | null>(null);
+  const animationKeyRef = useRef('');
+  const animationKey = `${currentTrack?.id ?? ''}:${currentArtwork}`;
 
   useEffect(() => {
     const keyframes = [{ transform: 'rotate(0deg)' }, { transform: 'rotate(360deg)' }];
     const options: KeyframeAnimationOptions = { duration: 10000, iterations: Infinity };
-    animationRef1.current?.cancel();
-    animationRef2.current?.cancel();
-    animationRef1.current = null;
-    animationRef2.current = null;
 
-    if (discRef1.current && !animationRef1.current) {
-      animationRef1.current = discRef1.current.animate(keyframes, options);
-      if (!isPlaying) animationRef1.current.pause();
+    if (animationKeyRef.current !== animationKey) {
+      animationRef1.current?.cancel();
+      animationRef2.current?.cancel();
+      animationRef1.current = null;
+      animationRef2.current = null;
+      animationKeyRef.current = animationKey;
+
+      if (discRef1.current) {
+        animationRef1.current = discRef1.current.animate(keyframes, options);
+      }
+      if (discRef2.current) {
+        animationRef2.current = discRef2.current.animate(keyframes, options);
+      }
     }
-    if (discRef2.current && !animationRef2.current) {
-      animationRef2.current = discRef2.current.animate(keyframes, options);
-      if (!isPlaying) animationRef2.current.pause();
-    }
-  }, [currentTrack?.id, currentArtwork]);
+
+    [animationRef1.current, animationRef2.current].forEach((animation) => {
+      if (!animation) return;
+      if (isPlaying) animation.play();
+      else animation.pause();
+    });
+  }, [animationKey, isPlaying]);
 
   useEffect(() => {
     if (animationRef1.current) {
