@@ -295,15 +295,15 @@ export function Layout() {
               <div className="flex items-center justify-between p-2 rounded-lg bg-white/5">
                 <div className="flex items-center gap-3 overflow-hidden">
                   <div className="w-8 h-8 rounded-full bg-primary/20 flex items-center justify-center text-primary shrink-0 overflow-hidden">
-                    {user?.picture ? (
-                      <img src={user?.picture} alt="Avatar" className="w-full h-full object-cover" referrerPolicy="no-referrer" />
+                    {user?.avatarUrl ? (
+                      <img src={user?.avatarUrl} alt="Avatar" className="w-full h-full object-cover" referrerPolicy="no-referrer" />
                     ) : (
                       <User size={16} />
                     )}
                   </div>
                   <div className="flex flex-col truncate">
                     <span className="text-sm font-medium text-white truncate">
-                      {user?.name || user?.email?.split('@')[0] || user?.loginId || 'User'}
+                      {user?.fullName || user?.email?.split('@')[0] || user?.username || 'User'}
                     </span>
                   </div>
                 </div>
