@@ -35,6 +35,7 @@ export function UploadProvider({ children }: { children: ReactNode }) {
         if (taskIndex === -1) break;
         
         const nextTask = uploadQueueRef.current[taskIndex];
+        const taskId = nextTask.id;
         const file = nextTask.file;
         
         uploadQueueRef.current[taskIndex].status = 'uploading';
@@ -112,11 +113,17 @@ export function UploadProvider({ children }: { children: ReactNode }) {
             headers: { 'Content-Type': 'multipart/form-data' },
             timeout: 5 * 60 * 1000, // 5 minutes timeout for large files
           });
-          uploadQueueRef.current[taskIndex].status = 'success';
+          const currentIndex = uploadQueueRef.current.findIndex(t => t.id === taskId);
+          if (currentIndex !== -1) {
+            uploadQueueRef.current[currentIndex].status = 'success';
+          }
           window.dispatchEvent(new CustomEvent('music-uploaded'));
         } catch (e) {
           console.error(`Error uploading ${file.name}:`, e);
-          uploadQueueRef.current[taskIndex].status = 'error';
+          const currentIndex = uploadQueueRef.current.findIndex(t => t.id === taskId);
+          if (currentIndex !== -1) {
+            uploadQueueRef.current[currentIndex].status = 'error';
+          }
         }
         setUploadTasks([...uploadQueueRef.current]);
       }
