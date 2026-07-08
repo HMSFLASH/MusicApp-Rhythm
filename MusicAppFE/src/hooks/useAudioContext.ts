@@ -329,10 +329,10 @@ console.log("[Audio] initializeAudioContext called");
     pseudoMonoRef.current.channelCount = 1;
     pseudoMonoRef.current.channelCountMode = 'explicit';
     pseudoMonoRef.current.channelInterpretation = 'speakers';
-    pseudoDelayRef.current.delayTime.value = 0.012 + 0.008 * pseudoAmount;
+    pseudoDelayRef.current.delayTime.value = 0.006 + 0.007 * pseudoAmount;
     pseudoLeftGainRef.current.gain.value = 1;
     pseudoRightGainRef.current.gain.value = 1;
-    haasWetGainRef.current.gain.value = 0.16 * pseudoAmount;
+    haasWetGainRef.current.gain.value = pseudoAmount > 0 ? 0.07 + 0.07 * pseudoAmount : 0;
 
     currentNode.connect(pseudoMonoRef.current);
     pseudoMonoRef.current.connect(pseudoLeftGainRef.current);
@@ -471,8 +471,16 @@ if (preampNodeRef.current) {
     }
     if (haasWetGainRef.current && pseudoDelayRef.current) {
       const pseudoAmount = fxEnabled.stereo ? percentToPseudoStereoAmount(stereoWidth) : 0;
-      pseudoDelayRef.current.delayTime.value = 0.012 + 0.008 * pseudoAmount;
-      haasWetGainRef.current.gain.value = 0.16 * pseudoAmount;
+      const targetDelay = 0.006 + 0.007 * pseudoAmount;
+      const targetGain = pseudoAmount > 0 ? 0.07 + 0.07 * pseudoAmount : 0;
+      
+      if (audioContextRef.current) {
+        pseudoDelayRef.current.delayTime.setTargetAtTime(targetDelay, audioContextRef.current.currentTime, 0.02);
+        haasWetGainRef.current.gain.setTargetAtTime(targetGain, audioContextRef.current.currentTime, 0.02);
+      } else {
+        pseudoDelayRef.current.delayTime.value = targetDelay;
+        haasWetGainRef.current.gain.value = targetGain;
+      }
     }
   }, [stereoWidth, fxEnabled.stereo]);
 

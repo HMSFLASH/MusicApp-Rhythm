@@ -20,8 +20,8 @@ export const percentToStereoBaseWidth = (value: number) => {
 };
 
 export const percentToPseudoStereoAmount = (value: number) => {
-  const amount = clamp((value - 100) / (STEREO_WIDTH_MAX_PERCENT - 100), 0, 1);
-  return Math.pow(amount, 0.65) * 1.35;
+  const normalized = clamp((value - 100) / (STEREO_WIDTH_MAX_PERCENT - 100), 0, 1);
+  return 1 - Math.exp(-normalized * 2.2);
 };
 
 export const isNeutralDbGain = (value: number) => Math.abs(value || 0) < NEUTRAL_EPSILON;
