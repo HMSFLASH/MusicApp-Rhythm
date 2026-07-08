@@ -2,7 +2,10 @@ const DB_NAME = 'SonicDB';
 const DB_VERSION = 1;
 const STORE_NAME = 'store';
 
+let dbInstance: IDBDatabase | null = null;
+
 function openDB(): Promise<IDBDatabase> {
+  if (dbInstance) return Promise.resolve(dbInstance);
   return new Promise((resolve, reject) => {
     const request = indexedDB.open(DB_NAME, DB_VERSION);
 
@@ -14,7 +17,8 @@ function openDB(): Promise<IDBDatabase> {
     };
 
     request.onsuccess = (event) => {
-      resolve((event.target as IDBOpenDBRequest).result);
+      dbInstance = (event.target as IDBOpenDBRequest).result;
+      resolve(dbInstance);
     };
 
     request.onerror = (event) => {

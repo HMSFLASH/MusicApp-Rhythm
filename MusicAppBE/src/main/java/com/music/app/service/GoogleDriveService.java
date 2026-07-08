@@ -25,6 +25,26 @@ public class GoogleDriveService {
 
     private NetHttpTransport httpTransport;
     private final GsonFactory jsonFactory = GsonFactory.getDefaultInstance();
+    private final java.util.Map<String, Drive> driveCache = new java.util.concurrent.ConcurrentHashMap<>();
+
+    private Drive getDrive(String refreshToken) {
+        return driveCache.computeIfAbsent(refreshToken, token -> {
+            UserCredentials credentials = UserCredentials.newBuilder()
+                    .setClientId(clientId)
+                    .setClientSecret(clientSecret)
+                    .setRefreshToken(token)
+                    .build();
+
+            HttpCredentialsAdapter requestInitializer = new HttpCredentialsAdapter(credentials);
+
+            return new Drive.Builder(
+                    httpTransport,
+                    jsonFactory,
+                    requestInitializer)
+                    .setApplicationName("MusicApp")
+                    .build();
+        });
+    }
 
     @PostConstruct
     public void init() throws Exception {
@@ -74,20 +94,7 @@ public class GoogleDriveService {
     }
 
     public String uploadAudioStream(InputStream stream, long contentLength, String refreshToken, String fileName) throws Exception {
-        UserCredentials credentials = UserCredentials.newBuilder()
-                .setClientId(clientId)
-                .setClientSecret(clientSecret)
-                .setRefreshToken(refreshToken)
-                .build();
-
-        HttpCredentialsAdapter requestInitializer = new HttpCredentialsAdapter(credentials);
-
-        Drive drive = new Drive.Builder(
-                httpTransport,
-                jsonFactory,
-                requestInitializer)
-                .setApplicationName("MusicApp")
-                .build();
+        Drive drive = getDrive(refreshToken);
 
         File fileMetadata = new File();
         String folderId = getOrCreateFolder(drive);
@@ -102,22 +109,18 @@ public class GoogleDriveService {
 
         String mimeType = determineMimeType(fileName);
 
-        // Read stream into byte array to avoid InputStream issues with resumable upload
-        log.info("Reading file into memory: fileName={}, contentLength={}", fileName, contentLength);
-        byte[] fileBytes = stream.readAllBytes();
-        log.info("File read complete: {} bytes", fileBytes.length);
-
-        com.google.api.client.http.ByteArrayContent mediaContent =
-                new com.google.api.client.http.ByteArrayContent(mimeType, fileBytes);
-
-        log.info("Creating Drive upload request: fileName={}, mimeType={}, size={}", fileName, mimeType, fileBytes.length);
+        log.info("Creating Drive upload request: fileName={}, mimeType={}, size={}", fileName, mimeType, contentLength);
+        
+        com.google.api.client.http.InputStreamContent mediaContent =
+                new com.google.api.client.http.InputStreamContent(mimeType, stream);
+        mediaContent.setLength(contentLength);
 
         Drive.Files.Create createRequest = drive.files().create(fileMetadata, mediaContent)
                 .setFields("id");
 
         // Add progress listener for debugging
         createRequest.getMediaHttpUploader()
-                .setDirectUploadEnabled(fileBytes.length < 5 * 1024 * 1024)
+                .setDirectUploadEnabled(false)
                 .setProgressListener(uploader -> {
                     switch (uploader.getUploadState()) {
                         case INITIATION_STARTED -> log.info("Drive upload initiation started");
@@ -137,20 +140,7 @@ public class GoogleDriveService {
     }
 
     public List<File> listFiles(String refreshToken) throws Exception {
-        UserCredentials credentials = UserCredentials.newBuilder()
-                .setClientId(clientId)
-                .setClientSecret(clientSecret)
-                .setRefreshToken(refreshToken)
-                .build();
-
-        HttpCredentialsAdapter requestInitializer = new HttpCredentialsAdapter(credentials);
-
-        Drive drive = new Drive.Builder(
-                httpTransport,
-                jsonFactory,
-                requestInitializer)
-                .setApplicationName("MusicApp")
-                .build();
+        Drive drive = getDrive(refreshToken);
 
         String folderId = getOrCreateFolder(drive);
 
@@ -164,20 +154,7 @@ public class GoogleDriveService {
     }
 
     public com.music.app.dto.DriveStreamResponse streamFile(String fileId, String rangeHeader, String refreshToken) throws Exception {
-        UserCredentials credentials = UserCredentials.newBuilder()
-                .setClientId(clientId)
-                .setClientSecret(clientSecret)
-                .setRefreshToken(refreshToken)
-                .build();
-
-        HttpCredentialsAdapter requestInitializer = new HttpCredentialsAdapter(credentials);
-
-        Drive drive = new Drive.Builder(
-                httpTransport,
-                jsonFactory,
-                requestInitializer)
-                .setApplicationName("MusicApp")
-                .build();
+        Drive drive = getDrive(refreshToken);
 
         Drive.Files.Get getRequest = drive.files().get(fileId);
         
@@ -197,16 +174,7 @@ public class GoogleDriveService {
     }
 
     public void uploadJsonFile(String jsonData, String fileName, String refreshToken) throws Exception {
-        UserCredentials credentials = UserCredentials.newBuilder()
-                .setClientId(clientId)
-                .setClientSecret(clientSecret)
-                .setRefreshToken(refreshToken)
-                .build();
-
-        HttpCredentialsAdapter requestInitializer = new HttpCredentialsAdapter(credentials);
-        Drive drive = new Drive.Builder(httpTransport, jsonFactory, requestInitializer)
-                .setApplicationName("MusicApp")
-                .build();
+        Drive drive = getDrive(refreshToken);
 
         String folderId = getOrCreateFolder(drive);
 
@@ -236,16 +204,7 @@ public class GoogleDriveService {
     }
 
     public String downloadJsonFile(String fileName, String refreshToken) throws Exception {
-        UserCredentials credentials = UserCredentials.newBuilder()
-                .setClientId(clientId)
-                .setClientSecret(clientSecret)
-                .setRefreshToken(refreshToken)
-                .build();
-
-        HttpCredentialsAdapter requestInitializer = new HttpCredentialsAdapter(credentials);
-        Drive drive = new Drive.Builder(httpTransport, jsonFactory, requestInitializer)
-                .setApplicationName("MusicApp")
-                .build();
+        Drive drive = getDrive(refreshToken);
 
         String folderId = getOrCreateFolder(drive);
 

@@ -2,10 +2,14 @@ package com.music.app.controller;
 
 import com.music.app.dto.AuthenticationResponse;
 import com.music.app.dto.RefreshRequest;
+import com.music.app.dto.RegisterRequest;
+import com.music.app.dto.LoginRequest;
+import com.music.app.dto.ApiResponse;
 import com.music.app.service.AuthService;
 import lombok.RequiredArgsConstructor;
 import org.springframework.http.ResponseEntity;
 import org.springframework.web.bind.annotation.*;
+import jakarta.validation.Valid;
 
 import java.util.Map;
 import org.springframework.security.core.context.SecurityContextHolder;
@@ -19,77 +23,87 @@ public class AuthController {
     private final AuthService authService;
 
     @PostMapping("/register")
-    public ResponseEntity<AuthenticationResponse> register(@RequestBody Map<String, String> request) {
-        String username = request.get("username");
-        String password = request.get("password");
-        String email = request.get("email");
-        return ResponseEntity.ok(authService.registerUser(username, password, email));
+    public ApiResponse<AuthenticationResponse> register(@Valid @RequestBody RegisterRequest request) {
+        return ApiResponse.<AuthenticationResponse>builder()
+                .result(authService.registerUser(request.getUsername(), request.getPassword(), request.getEmail()))
+                .build();
     }
 
     @PostMapping("/login")
-    public ResponseEntity<AuthenticationResponse> login(@RequestBody Map<String, String> request) {
-        String loginId = request.get("loginId");
-        String password = request.get("password");
-        return ResponseEntity.ok(authService.login(loginId, password));
+    public ApiResponse<AuthenticationResponse> login(@Valid @RequestBody LoginRequest request) {
+        return ApiResponse.<AuthenticationResponse>builder()
+                .result(authService.login(request.getLoginId(), request.getPassword()))
+                .build();
     }
 
     @PostMapping("/google")
-    public ResponseEntity<AuthenticationResponse> googleLogin(@RequestBody Map<String, String> request) {
+    public ApiResponse<AuthenticationResponse> googleLogin(@RequestBody Map<String, String> request) {
         String googleId = request.get("googleId");
         String email = request.get("email");
         String name = request.get("name");
         String picture = request.get("picture");
-        // Verify google token here if needed (omitted for brevity)
-        return ResponseEntity.ok(authService.loginWithGoogle(googleId, email, name, picture));
+        return ApiResponse.<AuthenticationResponse>builder()
+                .result(authService.loginWithGoogle(googleId, email, name, picture))
+                .build();
     }
     
     @PostMapping("/logout")
-    public ResponseEntity<Void> logout(@RequestHeader("Authorization") String token) {
+    public ApiResponse<Void> logout(@RequestHeader("Authorization") String token) {
         authService.logout(token);
-        return ResponseEntity.ok().build();
+        return ApiResponse.<Void>builder().build();
     }
 
     @PostMapping("/refresh")
-    public ResponseEntity<AuthenticationResponse> refresh(@RequestBody RefreshRequest request) {
-        return ResponseEntity.ok(authService.refreshToken(request));
+    public ApiResponse<AuthenticationResponse> refresh(@RequestBody RefreshRequest request) {
+        return ApiResponse.<AuthenticationResponse>builder()
+                .result(authService.refreshToken(request))
+                .build();
     }
 
     @PostMapping("/set-password")
-    public ResponseEntity<?> setPassword(@RequestBody SetPasswordRequest request) {
+    public ResponseEntity<ApiResponse<?>> setPassword(@RequestBody SetPasswordRequest request) {
         try {
             org.springframework.security.core.Authentication auth = SecurityContextHolder.getContext().getAuthentication();
             if (auth == null || auth.getName().equals("anonymousUser")) {
-                return ResponseEntity.status(401).body(Map.of("message", "Not authenticated"));
+                return ResponseEntity.status(401).body(ApiResponse.builder().code(401).message("Not authenticated").build());
             }
             String currentSubject = auth.getName();
-            com.music.app.dto.AuthenticationResponse response = authService.setLocalCredentials(currentSubject, request.getLoginId(), request.getPassword());
-            return ResponseEntity.ok(response);
+            AuthenticationResponse response = authService.setLocalCredentials(currentSubject, request.getLoginId(), request.getPassword());
+            return ResponseEntity.ok(ApiResponse.builder().result(response).build());
         } catch (Exception e) {
-            e.printStackTrace();
-            return ResponseEntity.status(500).body(Map.of("message", e.getMessage()));
+            return ResponseEntity.status(500).body(ApiResponse.builder().code(500).message(e.getMessage()).build());
         }
     }
+    
     @PostMapping("/forgot-password")
-    public ResponseEntity<?> forgotPassword(@RequestBody Map<String, String> request) {
+    public ApiResponse<Map<String, String>> forgotPassword(@RequestBody Map<String, String> request) {
         try {
             String email = request.get("email");
             authService.generatePasswordResetToken(email);
-            return ResponseEntity.ok(Map.of("message", "If your email is registered, you will receive a password reset link shortly."));
+            return ApiResponse.<Map<String, String>>builder()
+                    .result(Map.of("message", "If your email is registered, you will receive a password reset link shortly."))
+                    .build();
         } catch (Exception e) {
-            // Do not reveal if email exists or not to prevent user enumeration
-            return ResponseEntity.ok(Map.of("message", "If your email is registered, you will receive a password reset link shortly."));
+            return ApiResponse.<Map<String, String>>builder()
+                    .result(Map.of("message", "If your email is registered, you will receive a password reset link shortly."))
+                    .build();
         }
     }
 
     @PostMapping("/reset-password")
-    public ResponseEntity<?> resetPassword(@RequestBody Map<String, String> request) {
+    public ResponseEntity<ApiResponse<Map<String, String>>> resetPassword(@RequestBody Map<String, String> request) {
         try {
             String token = request.get("token");
             String newPassword = request.get("newPassword");
             authService.resetPassword(token, newPassword);
-            return ResponseEntity.ok(Map.of("message", "Password has been successfully reset."));
+            return ResponseEntity.ok(ApiResponse.<Map<String, String>>builder()
+                    .result(Map.of("message", "Password has been successfully reset."))
+                    .build());
         } catch (Exception e) {
-            return ResponseEntity.status(400).body(Map.of("message", e.getMessage()));
+            return ResponseEntity.status(400).body(ApiResponse.<Map<String, String>>builder()
+                    .code(400)
+                    .message(e.getMessage())
+                    .build());
         }
     }
 

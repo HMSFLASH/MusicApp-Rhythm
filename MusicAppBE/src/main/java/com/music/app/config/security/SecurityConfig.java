@@ -23,70 +23,70 @@ import org.springframework.security.oauth2.server.resource.web.DefaultBearerToke
 @RequiredArgsConstructor
 public class SecurityConfig {
 
-    private final CustomJwtDecoder customJwtDecoder;
-    private final JwtAuthenticationEntryPoint jwtAuthenticationEntryPoint;
-    private final OAuth2LoginSuccessHandler oAuth2LoginSuccessHandler;
-    private final org.springframework.security.oauth2.client.registration.ClientRegistrationRepository clientRegistrationRepository;
+        private final CustomJwtDecoder customJwtDecoder;
+        private final JwtAuthenticationEntryPoint jwtAuthenticationEntryPoint;
+        private final OAuth2LoginSuccessHandler oAuth2LoginSuccessHandler;
+        private final org.springframework.security.oauth2.client.registration.ClientRegistrationRepository clientRegistrationRepository;
 
-    private static final String[] PUBLIC_ENDPOINTS = {
-            "/api/auth/**",
-            "/v3/api-docs/**",
-            "/swagger-ui/**",
-            "/swagger-ui.html"
-    };
+        private static final String[] PUBLIC_ENDPOINTS = {
+                        "/api/auth/**",
+                        "/v3/api-docs/**",
+                        "/swagger-ui/**",
+                        "/swagger-ui.html"
+        };
 
-    @Bean
-    public SecurityFilterChain filterChain(HttpSecurity httpSecurity) throws Exception {
-        httpSecurity.authorizeHttpRequests(request -> request
-                .requestMatchers(HttpMethod.OPTIONS, "/**").permitAll()
-                .requestMatchers(PUBLIC_ENDPOINTS).permitAll()
-                .anyRequest().authenticated());
+        @Bean
+        public SecurityFilterChain filterChain(HttpSecurity httpSecurity) throws Exception {
+                httpSecurity.authorizeHttpRequests(request -> request
+                                .requestMatchers(HttpMethod.OPTIONS, "/**").permitAll()
+                                .requestMatchers(PUBLIC_ENDPOINTS).permitAll()
+                                .anyRequest().authenticated());
 
-        DefaultBearerTokenResolver bearerTokenResolver = new DefaultBearerTokenResolver();
-        bearerTokenResolver.setAllowUriQueryParameter(true);
+                DefaultBearerTokenResolver bearerTokenResolver = new DefaultBearerTokenResolver();
+                bearerTokenResolver.setAllowUriQueryParameter(true);
 
-        httpSecurity.oauth2ResourceServer(oauth2 -> oauth2
-                .bearerTokenResolver(bearerTokenResolver)
-                .jwt(jwtConfigurer -> jwtConfigurer.decoder(customJwtDecoder))
-                .authenticationEntryPoint(jwtAuthenticationEntryPoint));
+                httpSecurity.oauth2ResourceServer(oauth2 -> oauth2
+                                .bearerTokenResolver(bearerTokenResolver)
+                                .jwt(jwtConfigurer -> jwtConfigurer.decoder(customJwtDecoder))
+                                .authenticationEntryPoint(jwtAuthenticationEntryPoint));
 
-        org.springframework.security.oauth2.client.web.DefaultOAuth2AuthorizationRequestResolver authorizationRequestResolver =
-                new org.springframework.security.oauth2.client.web.DefaultOAuth2AuthorizationRequestResolver(
-                        clientRegistrationRepository, "/oauth2/authorization");
-        authorizationRequestResolver.setAuthorizationRequestCustomizer(customizer -> customizer
-                .additionalParameters(params -> {
-                    params.put("access_type", "offline");
-                    params.put("prompt", "consent");
-                }));
+                org.springframework.security.oauth2.client.web.DefaultOAuth2AuthorizationRequestResolver authorizationRequestResolver = new org.springframework.security.oauth2.client.web.DefaultOAuth2AuthorizationRequestResolver(
+                                clientRegistrationRepository, "/oauth2/authorization");
+                authorizationRequestResolver.setAuthorizationRequestCustomizer(customizer -> customizer
+                                .additionalParameters(params -> {
+                                        params.put("access_type", "offline");
+                                        params.put("prompt", "consent");
+                                }));
 
-        httpSecurity.oauth2Login(oauth2 -> oauth2
-                .authorizationEndpoint(auth -> auth.authorizationRequestResolver(authorizationRequestResolver))
-                .successHandler(oAuth2LoginSuccessHandler)
-        );
+                httpSecurity.oauth2Login(oauth2 -> oauth2
+                                .authorizationEndpoint(
+                                                auth -> auth.authorizationRequestResolver(authorizationRequestResolver))
+                                .successHandler(oAuth2LoginSuccessHandler));
 
-        httpSecurity.csrf(AbstractHttpConfigurer::disable);
-        httpSecurity.cors(cors -> {});
-        httpSecurity.httpBasic(AbstractHttpConfigurer::disable);
+                httpSecurity.csrf(AbstractHttpConfigurer::disable);
+                httpSecurity.cors(cors -> {
+                });
+                httpSecurity.httpBasic(AbstractHttpConfigurer::disable);
 
-        return httpSecurity.build();
-    }
+                return httpSecurity.build();
+        }
 
-    @Bean
-    public CorsFilter corsFilter() {
-        CorsConfiguration corsConfiguration = new CorsConfiguration();
-        corsConfiguration.addAllowedOriginPattern("*");
-        corsConfiguration.addAllowedMethod("*");
-        corsConfiguration.addAllowedHeader("*");
-        corsConfiguration.setAllowCredentials(true);
+        @Bean
+        public CorsFilter corsFilter() {
+                CorsConfiguration corsConfiguration = new CorsConfiguration();
+                corsConfiguration.addAllowedOrigin("${app.frontend-url}");
+                corsConfiguration.addAllowedMethod("*");
+                corsConfiguration.addAllowedHeader("*");
+                corsConfiguration.setAllowCredentials(true);
 
-        UrlBasedCorsConfigurationSource urlBasedCorsConfigurationSource = new UrlBasedCorsConfigurationSource();
-        urlBasedCorsConfigurationSource.registerCorsConfiguration("/**", corsConfiguration);
+                UrlBasedCorsConfigurationSource urlBasedCorsConfigurationSource = new UrlBasedCorsConfigurationSource();
+                urlBasedCorsConfigurationSource.registerCorsConfiguration("/**", corsConfiguration);
 
-        return new CorsFilter(urlBasedCorsConfigurationSource);
-    }
+                return new CorsFilter(urlBasedCorsConfigurationSource);
+        }
 
-    @Bean
-    public PasswordEncoder passwordEncoder() {
-        return new BCryptPasswordEncoder(10);
-    }
+        @Bean
+        public PasswordEncoder passwordEncoder() {
+                return new BCryptPasswordEncoder(10);
+        }
 }

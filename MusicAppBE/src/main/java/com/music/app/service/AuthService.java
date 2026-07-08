@@ -51,6 +51,9 @@ public class AuthService {
     @Value("${jwt.refreshable-duration}")
     private long refreshableDuration;
 
+    @Value("${app.frontend-url}")
+    private String frontendUrl;
+
     public User getUserBySubject(String subject) {
         return userRepository.findByUsername(subject)
                 .orElseGet(() -> userRepository.findByEmail(subject)
@@ -163,7 +166,7 @@ public class AuthService {
     }
 
     public void generatePasswordResetToken(String email) {
-        User user = userRepository.findByEmail(email).orElseThrow(() -> new AppException(ErrorCode.USER_NOT_FOUND));
+        User user = userRepository.findByEmail(email).orElseThrow(() -> new AppException(ErrorCode.USER_NOT_EXISTED));
         // Delete old tokens for this user
         passwordResetTokenRepository.deleteByUser(user);
 
@@ -178,7 +181,7 @@ public class AuthService {
         passwordResetTokenRepository.save(token);
 
         // Send email (fallback to console if SMTP not configured)
-        String resetLink = "http://localhost:5173/reset-password?token=" + tokenStr;
+        String resetLink = frontendUrl + "/reset-password?token=" + tokenStr;
         emailService.sendPasswordResetEmail(user.getEmail(), resetLink);
     }
 
