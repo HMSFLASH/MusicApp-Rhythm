@@ -63,7 +63,10 @@ export function LyricsView({ lyrics, currentTime, onSeek }: LyricsViewProps) {
 
   if (!parsedLyrics.isSynced) {
     return (
-      <div className="text-white/80 font-medium whitespace-pre-wrap leading-relaxed text-center overflow-y-auto max-h-[60vh] h-[60vh] no-scrollbar pb-8 relative mask-image-fade">
+      <div 
+        className="text-white/80 font-medium whitespace-pre-wrap leading-relaxed text-center overflow-y-auto overflow-x-hidden flex-1 w-full py-8 relative mask-image-fade scrollbar-thin scrollbar-thumb-white/20 scrollbar-track-transparent hover:scrollbar-thumb-white/40"
+        style={{ WebkitMaskImage: 'linear-gradient(to bottom, transparent, black 10%, black 90%, transparent)' }}
+      >
         {lyrics}
       </div>
     );
@@ -72,7 +75,7 @@ export function LyricsView({ lyrics, currentTime, onSeek }: LyricsViewProps) {
   return (
     <div 
       ref={containerRef} 
-      className="flex flex-col gap-6 overflow-y-auto max-h-[60vh] h-[60vh] no-scrollbar scroll-smooth pb-[30vh] pt-[20vh] relative mask-image-fade"
+      className="flex-1 w-full h-full flex flex-col gap-6 overflow-y-auto overflow-x-hidden scroll-smooth py-32 relative mask-image-fade scrollbar-thin scrollbar-thumb-white/20 scrollbar-track-transparent hover:scrollbar-thumb-white/40"
       style={{ WebkitMaskImage: 'linear-gradient(to bottom, transparent, black 10%, black 90%, transparent)' }}
     >
       {parsedLyrics.lines.map((line, idx) => {

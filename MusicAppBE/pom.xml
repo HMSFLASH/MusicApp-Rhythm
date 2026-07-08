@@ -120,6 +120,13 @@
 			<version>3.0.1</version>
 		</dependency>
 		
+		<!-- Vorbis Java Core for Opus Support -->
+		<dependency>
+			<groupId>org.gagravarr</groupId>
+			<artifactId>vorbis-java-core</artifactId>
+			<version>0.8</version>
+		</dependency>
+
 		<!-- Mail Support -->
 		<dependency>
 			<groupId>org.springframework.boot</groupId>

@@ -62,7 +62,7 @@ export function NowPlaying() {
 
   const toggleFavorite = () => {
     if (!currentTrack?.id || !isAuthenticated || currentTrack.sourceType === 'LOCAL') return;
-    
+
     if (isFavorite) {
       axiosClient.delete(`/api/favorites/${currentTrack.id}`)
         .then(() => setIsFavorite(false))
@@ -157,7 +157,6 @@ export function NowPlaying() {
   // Lyrics Modal state
   const [showLyrics, setShowLyrics] = useState(false);
 
-  const [rightTab, setRightTab] = useState<'queue' | 'lyrics'>('lyrics');
   const trackLyrics = currentTrack?.lyrics || (currentTrack ? playerState.getTrackMetadata(currentTrack.id)?.lyrics : undefined);
   const hasLyrics = !!trackLyrics;
 
@@ -231,46 +230,58 @@ export function NowPlaying() {
 
         {/* Left Side: Player */}
         <div className="flex-1 flex flex-col items-center w-full max-w-lg mx-auto gap-8 pt-8">
-          {/* Album Art / Big Vinyl Record Wrapper */}
+          {/* Album Art / Lyrics Wrapper */}
           <div
-            className="flex-shrink-0 flex items-center justify-center transition-opacity duration-0"
-            style={{ width: cdSize, height: cdSize, opacity: cdOpacity }}
+            className={`flex items-center justify-center transition-all duration-500 relative w-full ${showLyrics && hasLyrics ? 'flex-shrink-0' : 'flex-shrink-0'}`}
+            style={{
+              height: cdSize,
+              width: (showLyrics && hasLyrics) ? '100%' : cdSize,
+              opacity: (showLyrics && hasLyrics) ? 1 : cdOpacity
+            }}
           >
-            {currentArtwork ? (
-              <div
-                className={`relative flex items-center justify-center w-full h-full rounded-full shadow-[0_0_40px_rgba(0,0,0,0.5)] border-[8px] border-[#111] overflow-hidden mb-4 ${isPlaying ? 'scale-100 opacity-100' : 'scale-90 opacity-60'}`}
-                style={{ transition: 'transform 0.7s cubic-bezier(0.34, 1.56, 0.64, 1), opacity 0.7s ease' }}
-              >
-                <div ref={discRef1} className="w-full h-full">
-                  <img src={currentArtwork} alt="Album Art" className="w-full h-full object-cover" />
-                  <div className="absolute inset-0 bg-black/10"></div>
-                  {/* Center hole */}
-                  <div className="absolute z-20 w-[8%] h-[8%] bg-background rounded-full border-2 border-black/40 top-1/2 left-1/2 -translate-x-1/2 -translate-y-1/2"></div>
-                </div>
-              </div>
-            ) : (
-              <div
-                className={`relative flex items-center justify-center w-full h-full rounded-full border-2 border-white/5 shadow-2xl ${isPlaying ? 'scale-100 opacity-100' : 'scale-90 opacity-60'}`}
-                style={{ transition: 'transform 0.7s cubic-bezier(0.34, 1.56, 0.64, 1), opacity 0.7s ease' }}
-              >
-                <div ref={discRef2} className="w-full h-full">
-                  <div className="absolute inset-0 rounded-full bg-gradient-to-tr from-[#111] to-[#333]"></div>
-                  {/* Vinyl grooves */}
-                  <div className="absolute inset-2 rounded-full border border-black/40"></div>
-                  <div className="absolute inset-6 rounded-full border border-black/30"></div>
-                  <div className="absolute inset-10 rounded-full border border-black/20"></div>
-                  <div className="absolute inset-14 rounded-full border border-black/10"></div>
+            <div className={`w-full h-full flex flex-col min-h-0 relative overflow-hidden animate-fade-in ${showLyrics && hasLyrics ? 'block' : 'hidden'}`}>
+              {showLyrics && hasLyrics && (
+                <LyricsView lyrics={trackLyrics!} currentTime={currentTime} onSeek={playerState.seek} />
+              )}
+            </div>
 
-                  {/* Center Label */}
-                  <div className="absolute z-10 w-1/3 h-1/3 bg-primary/20 rounded-full flex items-center justify-center border-4 border-[#111] top-1/2 left-1/2 -translate-x-1/2 -translate-y-1/2">
-                    <Disc size={32} className="text-primary" />
+            <div className={`w-full h-full relative ${showLyrics && hasLyrics ? 'hidden' : 'block'}`}>
+              {currentArtwork ? (
+                <div
+                  className={`absolute inset-0 flex items-center justify-center w-full h-full rounded-full shadow-[0_0_40px_rgba(0,0,0,0.5)] border-[8px] border-[#111] overflow-hidden mb-4 ${isPlaying ? 'scale-100 opacity-100' : 'scale-90 opacity-60'}`}
+                  style={{ transition: 'transform 0.7s cubic-bezier(0.34, 1.56, 0.64, 1), opacity 0.7s ease' }}
+                >
+                  <div ref={discRef1} className="w-full h-full">
+                    <img src={currentArtwork} alt="Album Art" className="w-full h-full object-cover" />
+                    <div className="absolute inset-0 bg-black/10"></div>
+                    {/* Center hole */}
+                    <div className="absolute z-20 w-[8%] h-[8%] bg-background rounded-full border-2 border-black/40 top-1/2 left-1/2 -translate-x-1/2 -translate-y-1/2"></div>
                   </div>
-
-                  {/* Inner hole */}
-                  <div className="absolute z-20 w-4 h-4 bg-background rounded-full top-1/2 left-1/2 -translate-x-1/2 -translate-y-1/2"></div>
                 </div>
-              </div>
-            )}
+              ) : (
+                <div
+                  className={`absolute inset-0 flex items-center justify-center w-full h-full rounded-full border-2 border-white/5 shadow-2xl ${isPlaying ? 'scale-100 opacity-100' : 'scale-90 opacity-60'}`}
+                  style={{ transition: 'transform 0.7s cubic-bezier(0.34, 1.56, 0.64, 1), opacity 0.7s ease' }}
+                >
+                  <div ref={discRef2} className="w-full h-full">
+                    <div className="absolute inset-0 rounded-full bg-gradient-to-tr from-[#111] to-[#333]"></div>
+                    {/* Vinyl grooves */}
+                    <div className="absolute inset-2 rounded-full border border-black/40"></div>
+                    <div className="absolute inset-6 rounded-full border border-black/30"></div>
+                    <div className="absolute inset-10 rounded-full border border-black/20"></div>
+                    <div className="absolute inset-14 rounded-full border border-black/10"></div>
+
+                    {/* Center Label */}
+                    <div className="absolute z-10 w-1/3 h-1/3 bg-primary/20 rounded-full flex items-center justify-center border-4 border-[#111] top-1/2 left-1/2 -translate-x-1/2 -translate-y-1/2">
+                      <Disc size={32} className="text-primary" />
+                    </div>
+
+                    {/* Inner hole */}
+                    <div className="absolute z-20 w-4 h-4 bg-background rounded-full top-1/2 left-1/2 -translate-x-1/2 -translate-y-1/2"></div>
+                  </div>
+                </div>
+              )}
+            </div>
           </div>
 
           <div className="text-center px-4 w-full">
@@ -291,7 +302,7 @@ export function NowPlaying() {
                   onClick={toggleFavorite}
                   className={`
                     ${isFavorite ? 'text-primary drop-shadow-[0_0_12px_var(--tw-colors-primary)] scale-110' : 'text-white/40 hover:text-white'} 
-                    transition-all duration-300 p-2 -ml-2 rounded-full
+                    transition-all duration-300 p-2 rounded-full
                     active:scale-95
                   `}
                   aria-label={isFavorite ? "Remove from Favorites" : "Add to Favorites"}
@@ -299,77 +310,79 @@ export function NowPlaying() {
                   <Heart size={24} fill={isFavorite ? "currentColor" : "none"} className={`transition-all duration-300`} />
                 </button>
               ) : (
-                <div className="w-10 h-10 -ml-2"></div>
+                <div className="w-10 h-10"></div>
               )}
-              <button onClick={() => setShowMetadata(true)} className="hover:text-white transition-colors"><Info size={22} /></button>
+              
+              {hasLyrics && (
+                <button 
+                  onClick={() => setShowLyrics(!showLyrics)}
+                  className={`transition-all p-2 rounded-full ${showLyrics ? 'text-primary bg-primary/20 shadow-[0_0_12px_var(--tw-colors-primary)]' : 'hover:bg-white/10 hover:text-white'}`}
+                  title={showLyrics ? 'Show Disc' : t('nowPlaying.viewLyrics')}
+                >
+                  <Music size={24} />
+                </button>
+              )}
+
+              <button onClick={() => setShowMetadata(true)} className="hover:text-white transition-colors p-2 rounded-full hover:bg-white/10"><Info size={24} /></button>
+              
               {/* More Options (...) Button */}
               <div className="relative" ref={menuRef}>
                 <button
                   onClick={() => setShowMenu(v => !v)}
-                  className={`hover:text-white transition-colors p-1 rounded-full ${showMenu ? 'text-white bg-white/10' : ''}`}
+                  className={`hover:text-white transition-colors p-2 rounded-full ${showMenu ? 'text-white bg-white/10' : ''}`}
                 >
-                  <MoreHorizontal size={22} />
+                  <MoreHorizontal size={24} />
                 </button>
                 {showMenu && (
-                  <div className="absolute bottom-full left-1/2 -translate-x-1/2 mb-3 w-72 bg-[#1e1e1e] border border-white/10 rounded-2xl shadow-2xl overflow-hidden z-50">
-                    <div className="px-4 py-3 border-b border-white/10">
-                      <p className="text-xs text-white/40 font-medium uppercase tracking-wider">{t('nowPlaying.options')}</p>
-                    </div>
-                    {/* Tempo Control */}
-                    <div className="px-4 py-4 border-b border-white/5">
-                      <div className="flex items-center justify-between mb-3">
-                        <div className="flex items-center gap-2 text-white">
-                          <Gauge size={16} className="text-primary" />
-                          <span className="text-sm font-semibold">{t('nowPlaying.playbackSpeed')}</span>
-                        </div>
-                        <button
-                          onClick={togglePreservesPitch}
-                          className={`text-[10px] font-mono px-2 py-1 rounded-full border transition-all ${preservesPitch
-                            ? 'bg-primary/20 text-primary border-primary/50'
-                            : 'bg-white/10 text-white/50 border-white/20'
-                            }`}
-                        >
-                          {preservesPitch ? t('nowPlaying.preservePitch') : t('nowPlaying.vinyl')}
-                        </button>
+                    <div className="absolute bottom-full left-1/2 -translate-x-1/2 mb-3 w-72 bg-[#1e1e1e] border border-white/10 rounded-2xl shadow-2xl overflow-hidden z-50">
+                      <div className="px-4 py-3 border-b border-white/10">
+                        <p className="text-xs text-white/40 font-medium uppercase tracking-wider">{t('nowPlaying.options')}</p>
                       </div>
-                      <HorizontalSlider
-                        value={playbackRate}
-                        min={0.5}
-                        max={2.0}
-                        step={0.05}
-                        onChange={updatePlaybackRate}
-                        label={t('nowPlaying.tempo')}
-                        color="#00f5ff"
-                        unit="x"
-                      />
+                      {/* Tempo Control */}
+                      <div className="px-4 py-4 border-b border-white/5">
+                        <div className="flex items-center justify-between mb-3">
+                          <div className="flex items-center gap-2 text-white">
+                            <Gauge size={16} className="text-primary" />
+                            <span className="text-sm font-semibold">{t('nowPlaying.playbackSpeed')}</span>
+                          </div>
+                          <button
+                            onClick={togglePreservesPitch}
+                            className={`text-[10px] font-mono px-2 py-1 rounded-full border transition-all ${preservesPitch
+                              ? 'bg-primary/20 text-primary border-primary/50'
+                              : 'bg-white/10 text-white/50 border-white/20'
+                              }`}
+                          >
+                            {preservesPitch ? t('nowPlaying.preservePitch') : t('nowPlaying.vinyl')}
+                          </button>
+                        </div>
+                        <HorizontalSlider
+                          value={playbackRate}
+                          min={0.5}
+                          max={2.0}
+                          step={0.05}
+                          onChange={updatePlaybackRate}
+                          label={t('nowPlaying.tempo')}
+                          color="#00f5ff"
+                          unit="x"
+                        />
+                      </div>
+                      {currentTrack.sourceType !== 'LOCAL' && (
+                        <button
+                          onClick={async () => {
+                            if (confirm(`Are you sure you want to delete "${currentTrack.title || currentTrack.fileName}" from your library?`)) {
+                              setShowMenu(false);
+                              await deleteTrack(currentTrack);
+                            }
+                          }}
+                          className="w-full flex items-center gap-3 px-4 py-3 text-sm text-red-400 hover:bg-white/5 hover:text-red-300 transition-colors border-t border-white/5"
+                        >
+                          <Trash2 size={16} />
+                          <span>Delete from Library</span>
+                        </button>
+                      )}
                     </div>
-                    {/* Other menu items */}
-                    <button onClick={() => { setShowMenu(false); setShowLyrics(true); }} className="w-full flex items-center gap-3 px-4 py-3 text-sm text-white/70 hover:bg-white/5 hover:text-white transition-colors">
-                      <Music size={16} />
-                      <span>{t('nowPlaying.viewLyrics')}</span>
-                    </button>
-                    {currentTrack.sourceType !== 'LOCAL' && (
-                      <button
-                        onClick={async () => {
-                          if (confirm(`Are you sure you want to delete "${currentTrack.title || currentTrack.fileName}" from your library?`)) {
-                            setShowMenu(false);
-                            await deleteTrack(currentTrack);
-                            // Remove from queue
-                            const newQueue = playerState.queue.filter(t => t.id !== currentTrack.id);
-                            playerState.setQueue(newQueue);
-                            playNext();
-                          }
-                        }}
-                        className="w-full flex items-center gap-3 px-4 py-3 text-sm text-red-400 hover:bg-white/5 hover:text-red-300 transition-colors border-t border-white/5"
-                      >
-                        <Trash2 size={16} />
-                        <span>Delete from Library</span>
-                      </button>
-                    )}
-
-                  </div>
-                )}
-              </div>
+                  )}
+                </div>
 
               <div className="relative flex items-center gap-2" ref={repeatRef}>
                 {repeatMode === 'simple' ? (
@@ -603,9 +616,9 @@ export function NowPlaying() {
               </div>
 
               <div className="flex items-center gap-6 md:gap-10">
-                <button 
-                  aria-label="Previous track" 
-                  onClick={playPrevious} 
+                <button
+                  aria-label="Previous track"
+                  onClick={playPrevious}
                   disabled={!hasPrevious}
                   className={`transition-colors ${hasPrevious ? 'text-white hover:text-white/80' : 'text-white/20 cursor-not-allowed'}`}
                 >
@@ -624,9 +637,9 @@ export function NowPlaying() {
                     <Play size={40} className="md:w-12 md:h-12" fill="currentColor" />
                   )}
                 </button>
-                <button 
-                  aria-label="Next track" 
-                  onClick={playNext} 
+                <button
+                  aria-label="Next track"
+                  onClick={playNext}
                   disabled={!hasNext}
                   className={`transition-colors ${hasNext ? 'text-white hover:text-white/80' : 'text-white/20 cursor-not-allowed'}`}
                 >
@@ -647,34 +660,17 @@ export function NowPlaying() {
 
         </div>
 
-        {/* Right Side: Playlist / Lyrics */}
+        {/* Right Side: Playlist */}
         <div className="w-full lg:w-[400px] flex-shrink-0">
           <div className="w-full bg-white/5 rounded-2xl p-6 border border-white/10 h-full max-h-[80vh] flex flex-col">
             <div className="flex items-center gap-6 mb-6 border-b border-white/10 pb-1">
-              {hasLyrics && (
-                <button
-                  onClick={() => setRightTab('lyrics')}
-                  className={`font-bold pb-2 border-b-2 transition-colors flex items-center gap-2 ${rightTab === 'lyrics' ? 'border-primary text-primary' : 'border-transparent text-white/50 hover:text-white/80'}`}
-                >
-                  <Music size={18} />
-                  {t('nowPlaying.viewLyrics')}
-                </button>
-              )}
-              <button
-                onClick={() => setRightTab('queue')}
-                className={`font-bold pb-2 border-b-2 transition-colors flex items-center gap-2 ${rightTab === 'queue' || !hasLyrics ? 'border-primary text-primary' : 'border-transparent text-white/50 hover:text-white/80'}`}
-              >
+              <div className="font-bold pb-2 border-b-2 border-primary text-primary flex items-center gap-2">
                 <ListPlus size={18} />
                 {t('player.upNext')}
-              </button>
+              </div>
             </div>
 
-            {(rightTab === 'lyrics' && hasLyrics) ? (
-              <div className="flex-1 overflow-hidden">
-                 <LyricsView lyrics={trackLyrics!} currentTime={currentTime} onSeek={playerState.seek} />
-              </div>
-            ) : (
-              <div id="nowplaying-queue-container" className="flex flex-col gap-3 overflow-y-auto pr-2 relative flex-1">
+            <div id="nowplaying-queue-container" className="flex flex-col gap-3 overflow-y-auto pr-2 relative flex-1">
               {playerState.queue.map((track) => {
                 const isActive = String(currentTrack?.id) === String(track.id);
                 return (
@@ -702,8 +698,7 @@ export function NowPlaying() {
                   </div>
                 );
               })}
-              </div>
-            )}
+            </div>
           </div>
         </div>
 
@@ -756,38 +751,6 @@ export function NowPlaying() {
                     <span className="text-sm text-white/90 font-medium break-all">{item.value || 'unknown'}</span>
                   </div>
                 ))}
-              </div>
-            </div>
-          </div>
-        </div>
-      )}
-
-      {/* Lyrics Modal */}
-      {showLyrics && currentTrack && (
-        <div
-          className="fixed inset-0 z-[100] flex items-center justify-center bg-black/60 backdrop-blur-sm p-4"
-          onClick={() => setShowLyrics(false)}
-        >
-          <div
-            className="bg-[#1a1a1a] border border-white/10 rounded-2xl w-full max-w-2xl shadow-2xl overflow-hidden flex flex-col max-h-[80vh]"
-            onClick={(e) => e.stopPropagation()}
-          >
-            <div className="flex items-center justify-between p-5 border-b border-white/5">
-              <div className="flex items-center gap-3 text-white">
-                <Music size={24} className="text-primary" />
-                <h3 className="font-semibold text-lg">{t('nowPlaying.viewLyrics')}</h3>
-              </div>
-              <button
-                onClick={() => setShowLyrics(false)}
-                className="text-white/40 hover:text-white transition-colors p-1"
-              >
-                <X size={20} />
-              </button>
-            </div>
-
-            <div className="p-6 flex flex-col gap-4 overflow-y-auto no-scrollbar">
-              <div className="text-white/90 font-medium whitespace-pre-wrap leading-relaxed text-center">
-                {currentTrack.lyrics || playerState.getTrackMetadata(currentTrack.id)?.lyrics || t('nowPlaying.noLyrics')}
               </div>
             </div>
           </div>

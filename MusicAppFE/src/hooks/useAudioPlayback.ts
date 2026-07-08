@@ -1523,32 +1523,19 @@ console.log("[Audio] performOfflineRender called with EQ bands:", audioParamsRef
         wasCurrent = true;
       }
       
-      if (setQueue) {
-        // eslint-disable-next-line @typescript-eslint/no-explicit-any
-        setQueue((prev: any[]) => {
-          const nextQueue = prev.filter((t: any) => String(t.id) !== String(deletedId));
-          if (wasCurrent) {
-            setTimeout(() => {
-              if (nextQueue.length > 0 && playNextRef.current) {
-                playNextRef.current();
-              } else if (setCurrentTrack) {
-                setCurrentTrack(null);
-                // Also stop the player
-                if (audioRef.current) {
-                  audioRef.current.pause();
-                  audioRef.current.src = "";
-                }
-              }
-            }, 50);
+      if (wasCurrent) {
+        setTimeout(() => {
+          if (playNextRef.current) {
+            playNextRef.current();
+          } else if (setCurrentTrack) {
+            setCurrentTrack(null);
+            // Also stop the player
+            if (audioRef.current) {
+              audioRef.current.pause();
+              audioRef.current.src = "";
+            }
           }
-          return nextQueue;
-        });
-      } else if (wasCurrent && setCurrentTrack) {
-        setCurrentTrack(null);
-        if (audioRef.current) {
-          audioRef.current.pause();
-          audioRef.current.src = "";
-        }
+        }, 50);
       }
     };
 

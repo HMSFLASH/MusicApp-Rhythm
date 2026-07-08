@@ -12,7 +12,12 @@ import com.music.app.model.User;
 import com.music.app.repository.MusicLibraryRepository;
 import com.music.app.repository.PlaylistRepository;
 import com.music.app.repository.UserRepository;
+
+import jakarta.persistence.EntityNotFoundException;
 import lombok.RequiredArgsConstructor;
+
+import org.hibernate.FetchNotFoundException;
+import org.hibernate.ObjectNotFoundException;
 import org.springframework.stereotype.Service;
 import org.springframework.transaction.annotation.Transactional;
 
@@ -28,7 +33,7 @@ public class PlaylistService {
     private final UserRepository userRepository;
     private final MusicService musicService;
 
-    public PlaylistDto toDto(Playlist p, boolean includeTracks) throws org.hibernate.FetchNotFoundException {
+    public PlaylistDto toDto(Playlist p, boolean includeTracks) throws FetchNotFoundException {
         List<MusicItemDto> tracks = null;
         if (includeTracks) {
             tracks = new java.util.ArrayList<>();
@@ -37,7 +42,7 @@ public class PlaylistService {
                     if (i.getMusicLibrary() != null) {
                         tracks.add(musicService.toDto(i.getMusicLibrary()));
                     }
-                } catch (org.hibernate.ObjectNotFoundException | jakarta.persistence.EntityNotFoundException e) {
+                } catch (ObjectNotFoundException | EntityNotFoundException e) {
                     // Ignore orphaned track
                 }
             }

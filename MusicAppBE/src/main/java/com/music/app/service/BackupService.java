@@ -15,8 +15,12 @@ import com.music.app.repository.FavoriteRepository;
 import com.music.app.repository.MusicLibraryRepository;
 import com.music.app.repository.PlaylistRepository;
 import com.music.app.repository.UserRepository;
+
+import jakarta.persistence.EntityNotFoundException;
 import lombok.RequiredArgsConstructor;
 import lombok.extern.slf4j.Slf4j;
+
+import org.hibernate.ObjectNotFoundException;
 import org.springframework.stereotype.Service;
 import org.springframework.transaction.annotation.Transactional;
 
@@ -59,7 +63,7 @@ public class BackupService {
                     if (f.getMusicLibrary() != null) {
                         favoriteDtos.add(musicService.toDto(f.getMusicLibrary()));
                     }
-                } catch (org.hibernate.ObjectNotFoundException | jakarta.persistence.EntityNotFoundException e) {
+                } catch (ObjectNotFoundException | EntityNotFoundException e) {
                     // Ignore orphaned favorite
                 }
             }

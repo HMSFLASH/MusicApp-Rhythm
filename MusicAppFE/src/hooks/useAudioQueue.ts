@@ -41,6 +41,20 @@ export function useAudioQueue(savedState: any) {
     }
   }, [currentTrack, queue, loaded]);
 
+  useEffect(() => {
+    const handleMusicDeleted = (e: Event) => {
+      const deletedId = (e as CustomEvent).detail;
+      if (!deletedId) return;
+
+      setQueue(prev => prev.filter(t => String(t.id) !== String(deletedId)));
+      setOriginalQueue(prev => prev.filter(t => String(t.id) !== String(deletedId)));
+      setUpcomingQueues(prev => prev.map(q => q.filter(t => String(t.id) !== String(deletedId))));
+    };
+
+    window.addEventListener('music-deleted', handleMusicDeleted);
+    return () => window.removeEventListener('music-deleted', handleMusicDeleted);
+  }, []);
+
   const [isShuffleState, setIsShuffleState] = useState<boolean>(savedState.isShuffleState ?? false);
   const [originalQueue, setOriginalQueue] = useState<Track[]>([]);
   

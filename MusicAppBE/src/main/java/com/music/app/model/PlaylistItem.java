@@ -1,11 +1,14 @@
 package com.music.app.model;
 
+import org.hibernate.annotations.NotFound;
+import org.hibernate.annotations.NotFoundAction;
+
 import jakarta.persistence.*;
 import lombok.*;
 
 @Entity
-@Table(name = "playlist_items",
-    uniqueConstraints = @UniqueConstraint(columnNames = {"playlist_id", "music_library_id"}))
+@Table(name = "playlist_items", uniqueConstraints = @UniqueConstraint(columnNames = { "playlist_id",
+        "music_library_id" }))
 @Getter
 @Setter
 @NoArgsConstructor
@@ -23,6 +26,7 @@ public class PlaylistItem {
 
     @ManyToOne(fetch = FetchType.EAGER)
     @JoinColumn(name = "music_library_id", nullable = false)
+    @NotFound(action = NotFoundAction.IGNORE)
     private MusicLibrary musicLibrary;
 
     @Column(nullable = false)
