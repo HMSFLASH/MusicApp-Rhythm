@@ -31,7 +31,7 @@ export function useAudioMetadata(isAuthenticated: boolean, queueState: any) {
         if (track.sourceType !== 'LOCAL' && !isAuthenticated) return;
 
         // --- CACHE READ LAYER ---
-        const lsKey = `sonic_meta_${trackId}`;
+        const lsKey = `sonic_meta_v2_${trackId}`;
         const lsData = await db.get<Partial<Track>>(lsKey);
         if (lsData) {
             try {
@@ -188,6 +188,14 @@ export function useAudioMetadata(isAuthenticated: boolean, queueState: any) {
             if (metadata.common.title) { up.title = metadata.common.title; cachePayload.title = metadata.common.title; }
             if (metadata.common.artist) { up.artist = metadata.common.artist; cachePayload.artist = metadata.common.artist; }
             if (metadata.common.album) { up.album = metadata.common.album; cachePayload.album = metadata.common.album; }
+            if (metadata.common.genre && metadata.common.genre.length > 0) {
+                up.genre = metadata.common.genre.join(', ');
+                cachePayload.genre = metadata.common.genre.join(', ');
+            }
+            if (metadata.common.lyrics && metadata.common.lyrics.length > 0) {
+                up.lyrics = metadata.common.lyrics.join('\n\n');
+                cachePayload.lyrics = metadata.common.lyrics.join('\n\n');
+            }
             
             if (metadata.format) {
                 const isPartialBuffer = trueFileSize > 0 && parsedBufferLength < trueFileSize;

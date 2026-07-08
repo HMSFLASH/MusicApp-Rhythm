@@ -1,4 +1,4 @@
-import { Heart, ListMusic, Album, Mic2, Music, Disc, CloudUpload } from 'lucide-react';
+import { Heart, ListMusic, Album, Mic2, Music, Disc, CloudUpload, RefreshCw } from 'lucide-react';
 import { useNavigate } from 'react-router-dom';
 import { useEffect, useMemo } from 'react';
 import { useGlobalAudio } from '../context/AudioContext'
@@ -10,7 +10,7 @@ export function LibraryPage() {
   const navigate = useNavigate();
   const { playerState } = useGlobalAudio();
   const { queueFiles } = useUploadQueue();
-  const { tracks, favorites, refreshLibrary } = useLibrary();
+  const { tracks, favorites, refreshLibrary, isLoading } = useLibrary();
 
   const handleUpload = (e: React.ChangeEvent<HTMLInputElement>) => {
     if (!e.target.files || e.target.files.length === 0) return;
@@ -53,7 +53,16 @@ export function LibraryPage() {
           <h1 className="text-3xl font-bold font-sans text-white tracking-tight">Your Library</h1>
           <p className="text-white/80 text-sm mt-1">{tracks.length} songs across all your collections.</p>
         </div>
-        <div className="flex gap-2">
+        <div className="flex items-center gap-2">
+          <button
+            onClick={() => refreshLibrary()}
+            disabled={isLoading}
+            className="flex items-center gap-2 px-4 py-2 rounded-xl border border-white/10 hover:border-white/20 bg-white/5 hover:bg-white/10 transition-colors disabled:opacity-50 text-white/80 hover:text-white"
+            title="Reload library"
+          >
+            <RefreshCw size={16} className={isLoading ? 'animate-spin text-primary' : ''} />
+            <span className="text-sm font-medium hidden md:inline">Reload</span>
+          </button>
           <input
             type="file"
             accept="audio/*"

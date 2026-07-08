@@ -28,6 +28,7 @@ const metadataFields: Array<keyof Track> = [
   'fileFormat',
   'codec',
   'fileSize',
+  'lyrics',
 ];
 
 const parseTrack = (d: any): Track => ({
@@ -44,7 +45,7 @@ const parseTrack = (d: any): Track => ({
 });
 
 const mergeCachedMetadata = async (track: Track): Promise<Track> => {
-  const cached = await db.get<Partial<Track>>(`sonic_meta_${track.id}`);
+  const cached = await db.get<Partial<Track>>(`sonic_meta_v2_${track.id}`);
   if (!cached) return track;
 
   const merged = { ...track };
@@ -138,7 +139,7 @@ export function LibraryProvider({ children }: { children: ReactNode }) {
       if (!trackId) return;
 
       const applyCachedMetadata = async () => {
-        const metadata = await db.get<Partial<Track>>(`sonic_meta_${trackId}`);
+        const metadata = await db.get<Partial<Track>>(`sonic_meta_v2_${trackId}`);
         if (!metadata) return;
 
         const applyToTracks = (items: Track[]) => items.map((track) => {

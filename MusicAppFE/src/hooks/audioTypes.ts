@@ -110,6 +110,7 @@ export interface Track {
   fileFormat?: string;
   codec?: string;
   fileSize?: number;
+  lyrics?: string;
 }
 
 export type SongEndMode = 'stop' | 'preload' | 'next' | 'repeat_one';

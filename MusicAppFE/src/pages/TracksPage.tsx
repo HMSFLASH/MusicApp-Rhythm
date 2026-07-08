@@ -1,6 +1,6 @@
 import { useState } from 'react';
 import { useNavigate, useSearchParams } from 'react-router-dom';
-import { Heart, ListMusic, Cloud, Star, Clock, ListPlus, Play, ArrowLeft, Shuffle, MoreHorizontal, Info, X, ListEnd, ListStart } from 'lucide-react';
+import { Heart, ListMusic, Cloud, Star, Clock, ListPlus, Play, ArrowLeft, Shuffle, MoreHorizontal, Info, X, ListEnd, ListStart, RefreshCw } from 'lucide-react';
 import { AddToPlaylistModal } from '../components/AddToPlaylistModal';
 import { useGlobalAudio } from '../context/AudioContext'
 import { useAuth } from '../context/AuthContext';;
@@ -13,7 +13,7 @@ export function TracksPage() {
   const { isAuthenticated } = useAuth();
   const { playerState } = useGlobalAudio();
   
-  const { tracks, favorites, toggleFavorite: ctxToggleFavorite } = useLibrary();
+  const { tracks, favorites, toggleFavorite: ctxToggleFavorite, refreshLibrary, isLoading } = useLibrary();
   const activeTab = searchParams.get('tab') === 'favorites' ? 'favorites' : 'all';
   const [trackToPlaylist, setTrackToPlaylist] = useState<Track | null>(null);
   const [openMenuId, setOpenMenuId] = useState<string | number | null>(null);
@@ -89,9 +89,19 @@ export function TracksPage() {
       />
 
       <div className="flex items-center justify-between mb-4 mt-2 flex-wrap gap-4">
-        <h2 className="text-lg md:text-xl font-bold text-white flex items-center gap-2">
-          {activeTab === 'all' ? <><Clock size={18} className="text-[#00E5FF]" /> Songs List</> : <><Star size={18} className="text-yellow-400" /> Favorites List</>}
-        </h2>
+        <div className="flex items-center gap-3">
+          <h2 className="text-lg md:text-xl font-bold text-white flex items-center gap-2">
+            {activeTab === 'all' ? <><Clock size={18} className="text-[#00E5FF]" /> Songs List</> : <><Star size={18} className="text-yellow-400" /> Favorites List</>}
+          </h2>
+          <button
+            onClick={() => refreshLibrary()}
+            disabled={isLoading}
+            className="p-1.5 rounded-full bg-white/5 border border-white/10 hover:bg-white/10 text-white/60 hover:text-white transition-colors disabled:opacity-50"
+            title="Reload"
+          >
+            <RefreshCw size={16} className={isLoading ? 'animate-spin text-primary' : ''} />
+          </button>
+        </div>
         {displayTracks.length > 0 && (
           <div className="flex items-center gap-2 flex-wrap">
             <button
