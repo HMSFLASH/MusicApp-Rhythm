@@ -54,7 +54,14 @@
       "hqOversample": "High Quality Oversampling",
       "hqOversampleDesc": "Reduces aliasing in the limiter's soft clip stage. Warning: May cause lag on mobile devices.",
       "precalcIdle": "Pre-calculate on Idle Cores",
-      "precalcIdleDesc": "Recommended for weak CPUs when enough RAM is available: pre-renders the full Audio Studio chain and plays from a processed buffer. Warning: Uses a lot of RAM and may crash on low-memory devices. EQ/Effects changes will only apply to the next track."
+      "precalcIdleDesc": "Recommended for weak CPUs when enough RAM is available: pre-renders the full Audio Studio chain and plays from a processed buffer. Warning: Uses a lot of RAM and may crash on low-memory devices. EQ/Effects changes will only apply to the next track.",
+      "queuePrecalcTitle": "Full Queue Pre-calculate",
+      "queuePrecalcDesc": "Uses all {{cores}} CPU cores the browser exposes and keeps rendered buffers in RAM until audio settings change.",
+      "queuePrecalcButton": "Pre-calculate Entire Queue",
+      "queuePrecalcRunningButton": "Calculating...",
+      "queuePrecalcRunning": "Rendering {{completed}}/{{total}} on {{cores}} cores. Failed: {{failed}}.",
+      "queuePrecalcDone": "Ready: {{completed}}/{{total}} rendered. Failed: {{failed}}.",
+      "queuePrecalcWarning": "You are about to make the browser pre-render the entire {{count}}-track queue using every CPU core it reports ({{cores}} cores). If your machine is strong, hit OK and prove it. If not, expect heat, lag, RAM pressure, or a crashed tab. Continue?"
     },
     "eq": {
       "init": "Initializing EQ...",

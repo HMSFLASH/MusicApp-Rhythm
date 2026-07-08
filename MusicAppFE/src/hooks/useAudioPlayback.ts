@@ -17,6 +17,13 @@ const percentToPseudoStereoAmount = (value: number) => clamp((value - 100) / 100
 const REVERB_WET_GAIN = 0.75;
 const DRIVE_MEDIA_URL = 'https://www.googleapis.com/drive/v3/files';
 type LoadingTrackPhase = 'downloading' | 'processing';
+type QueuePrecalculateStatus = {
+  isRunning: boolean;
+  total: number;
+  completed: number;
+  failed: number;
+  cores: number;
+};
 
 const createSilentWavUrl = () => {
   const sampleRate = 8000;
@@ -75,6 +82,7 @@ const isLikelyConstrainedDevice = () => {
   return isMobileUserAgent || isCoarseSmallScreen || cores <= 4 || memory <= 4;
 };
 
+const getFullCoreCount = () => Math.max(1, navigator.hardwareConcurrency ?? 4);
 const getBufferProgressIntervalMs = () => isLikelyConstrainedDevice() ? 1000 : 250;
 
 const connectStereoWidthMatrix = (ctx: BaseAudioContext, input: AudioNode, widthPercent: number) => {
@@ -189,6 +197,13 @@ export function useAudioPlayback(
   const [isLoadingTrack, setIsLoadingTrack] = useState(false);
   const [loadingTrackId, setLoadingTrackId] = useState<string | null>(null);
   const [loadingTrackPhase, setLoadingTrackPhase] = useState<LoadingTrackPhase | null>(null);
+  const [queuePrecalculateStatus, setQueuePrecalculateStatus] = useState<QueuePrecalculateStatus>({
+    isRunning: false,
+    total: 0,
+    completed: 0,
+    failed: 0,
+    cores: getFullCoreCount(),
+  });
   const [currentTime, setCurrentTime] = useState(0);
   const [duration, setDuration] = useState(0);
 
@@ -202,9 +217,12 @@ export function useAudioPlayback(
   const rafRef = useRef<number | null>(null);
   const isDecodingRef = useRef<boolean>(false);
   const precalculatedNextBufferRef = useRef<{ trackId: string, buffer: AudioBuffer } | null>(null);
+  const precalculatedQueueBuffersRef = useRef<Map<string, AudioBuffer>>(new Map());
   const isPrecalculatingNextRef = useRef<boolean>(false);
+  const queuePrecalculateSessionRef = useRef<symbol | null>(null);
   const precalculateOnIdleRef = useRef<boolean>(precalculateOnIdle);
   const previousPrecalculateOnIdleRef = useRef<boolean>(precalculateOnIdle);
+  const renderSettingsVersionRef = useRef<number>(0);
   const decodeSessionRef = useRef<symbol | null>(null);
   const playNextRef = useRef<(() => void) | null>(null);
   const playPreviousRef = useRef<(() => void) | null>(null);
@@ -427,7 +445,13 @@ export function useAudioPlayback(
   ]);
 
   useEffect(() => {
+    renderSettingsVersionRef.current += 1;
     precalculatedNextBufferRef.current = null;
+    precalculatedQueueBuffersRef.current.clear();
+    queuePrecalculateSessionRef.current = null;
+    setQueuePrecalculateStatus((previous) => (
+      previous.isRunning ? { ...previous, isRunning: false } : previous
+    ));
   }, [
     bassGain,
     compAttack,
@@ -662,6 +686,11 @@ export function useAudioPlayback(
     decodeSessionRef.current = transitionSessionId;
     isDecodingRef.current = false;
     precalculatedNextBufferRef.current = null;
+    precalculatedQueueBuffersRef.current.clear();
+    queuePrecalculateSessionRef.current = null;
+    setQueuePrecalculateStatus((previous) => (
+      previous.isRunning ? { ...previous, isRunning: false } : previous
+    ));
 
     const trackToResume = currentTrackSnapshotRef.current;
     const resumeAt = currentTimeSnapshotRef.current;
@@ -948,6 +977,76 @@ console.log("[Audio] performOfflineRender called with EQ bands:", audioParamsRef
     return renderedBuffer;
   };
 
+  const precalculateTrackBuffer = async (track: Track) => {
+    const trackId = String(track.id);
+    const cachedBuffer = precalculatedQueueBuffersRef.current.get(trackId);
+    if (cachedBuffer) return cachedBuffer;
+
+    const renderVersion = renderSettingsVersionRef.current;
+    const audioUrl = await getTrackAudioUrl(track);
+    if (!audioUrl) {
+      throw new Error(`No audio URL for track ${trackId}`);
+    }
+
+    const response = await fetch(audioUrl);
+    const arrayBuffer = await response.arrayBuffer();
+    const audioBuffer = await audioContextRef.current!.decodeAudioData(arrayBuffer);
+    const finalRenderedBuffer = await performOfflineRender(audioBuffer);
+
+    if (renderSettingsVersionRef.current !== renderVersion) {
+      throw new Error('Audio settings changed while pre-calculating');
+    }
+
+    precalculatedQueueBuffersRef.current.set(trackId, finalRenderedBuffer);
+    return finalRenderedBuffer;
+  };
+
+  const precalculateEntireQueue = async () => {
+    if (!precalculateOnIdleRef.current || !Array.isArray(queue) || queue.length === 0) return;
+    if (queuePrecalculateSessionRef.current) return;
+
+    initializeAudioContext();
+
+    const tracks = [...queue];
+    const total = tracks.length;
+    const cores = getFullCoreCount();
+    const workerCount = Math.min(cores, total);
+    const sessionId = Symbol();
+    let cursor = 0;
+    let completed = 0;
+    let failed = 0;
+
+    queuePrecalculateSessionRef.current = sessionId;
+    setQueuePrecalculateStatus({ isRunning: true, total, completed, failed, cores });
+
+    const runWorker = async () => {
+      while (queuePrecalculateSessionRef.current === sessionId) {
+        const index = cursor;
+        cursor += 1;
+        if (index >= total) return;
+
+        const track = tracks[index];
+        try {
+          await precalculateTrackBuffer(track);
+          completed += 1;
+        } catch (e) {
+          failed += 1;
+          console.error('[Queue Precalculate] Failed for track', track.title || track.fileName || track.id, e);
+        }
+
+        if (queuePrecalculateSessionRef.current !== sessionId) return;
+        setQueuePrecalculateStatus({ isRunning: true, total, completed, failed, cores });
+      }
+    };
+
+    await Promise.all(Array.from({ length: workerCount }, runWorker));
+
+    if (queuePrecalculateSessionRef.current === sessionId) {
+      queuePrecalculateSessionRef.current = null;
+      setQueuePrecalculateStatus({ isRunning: false, total, completed, failed, cores });
+    }
+  };
+
   // Download tracks into RAM-backed blob URLs. The backend only provides the
   // Drive access token; playback happens from the browser's blob cache.
   const preloadTrack = async (track: Track) => {
@@ -989,13 +1088,7 @@ console.log("[Audio] performOfflineRender called with EQ bands:", audioParamsRef
       isPrecalculatingNextRef.current = true;
       console.log("[Lookahead] Precalculating next track:", nextTrack.title || nextTrack.fileName);
 
-      const audioUrl = await getTrackAudioUrl(nextTrack);
-      if (!audioUrl) return;
-
-      const response = await fetch(audioUrl);
-      const arrayBuffer = await response.arrayBuffer();
-      const audioBuffer = await audioContextRef.current!.decodeAudioData(arrayBuffer);
-      const finalRenderedBuffer = await performOfflineRender(audioBuffer);
+      const finalRenderedBuffer = await precalculateTrackBuffer(nextTrack);
 
       if (!precalculateOnIdleRef.current) return;
       precalculatedNextBufferRef.current = { trackId: String(nextTrack.id), buffer: finalRenderedBuffer };
@@ -1123,16 +1216,15 @@ console.log("[Audio] performOfflineRender called with EQ bands:", audioParamsRef
         try {
           isDecodingRef.current = true;
 
-          let finalRenderedBuffer = null;
-          if (precalculatedNextBufferRef.current?.trackId === String(startingTrack.id)) {
+          let finalRenderedBuffer: AudioBuffer | null = null;
+          const cachedRenderedBuffer = precalculatedQueueBuffersRef.current.get(String(startingTrack.id));
+          if (cachedRenderedBuffer) {
+            finalRenderedBuffer = cachedRenderedBuffer;
+          } else if (precalculatedNextBufferRef.current?.trackId === String(startingTrack.id)) {
             finalRenderedBuffer = precalculatedNextBufferRef.current.buffer;
+            precalculatedQueueBuffersRef.current.set(String(startingTrack.id), finalRenderedBuffer);
           } else {
-            const response = await fetch(audioUrl);
-            const arrayBuffer = await response.arrayBuffer();
-            const audioBuffer = await audioContextRef.current!.decodeAudioData(arrayBuffer);
-
-            const renderedBuffer = await performOfflineRender(audioBuffer);
-            finalRenderedBuffer = renderedBuffer;
+            finalRenderedBuffer = await precalculateTrackBuffer(startingTrack);
           }
 
           // Check if session changed while decoding
@@ -1444,6 +1536,8 @@ console.log("[Audio] performOfflineRender called with EQ bands:", audioParamsRef
     updatePlaybackRate,
     preservesPitch,
     togglePreservesPitch,
+    queuePrecalculateStatus,
+    precalculateEntireQueue,
     playTrack,
     playNext,
     playPrevious,

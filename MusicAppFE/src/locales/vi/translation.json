@@ -54,7 +54,14 @@
       "hqOversample": "Oversampling chất lượng cao",
       "hqOversampleDesc": "Giảm răng cưa cho soft clip của limiter. Cảnh báo: Có thể gây lag và nóng máy trên điện thoại yếu.",
       "precalcIdle": "Tính toán trước trên nhân CPU rảnh",
-      "precalcIdleDesc": "Khuyên dùng cho CPU yếu nếu máy còn đủ RAM: tính toán trước toàn bộ chuỗi Audio Studio rồi phát từ buffer đã xử lý. Cảnh báo: Ngốn nhiều RAM, có thể văng ứng dụng trên máy thiếu RAM. Thay đổi EQ/Hiệu ứng chỉ có tác dụng ở bài hát tiếp theo."
+      "precalcIdleDesc": "Khuyên dùng cho CPU yếu nếu máy còn đủ RAM: tính toán trước toàn bộ chuỗi Audio Studio rồi phát từ buffer đã xử lý. Cảnh báo: Ngốn nhiều RAM, có thể văng ứng dụng trên máy thiếu RAM. Thay đổi EQ/Hiệu ứng chỉ có tác dụng ở bài hát tiếp theo.",
+      "queuePrecalcTitle": "Tính toán trước toàn bộ hàng chờ",
+      "queuePrecalcDesc": "Dùng toàn bộ {{cores}} nhân CPU trình duyệt báo và giữ buffer đã render trong RAM cho tới khi đổi hiệu ứng.",
+      "queuePrecalcButton": "Tính toán trước toàn bộ hàng chờ",
+      "queuePrecalcRunningButton": "Đang tính...",
+      "queuePrecalcRunning": "Đang render {{completed}}/{{total}} bằng {{cores}} nhân. Lỗi: {{failed}}.",
+      "queuePrecalcDone": "Sẵn sàng: đã render {{completed}}/{{total}}. Lỗi: {{failed}}.",
+      "queuePrecalcWarning": "Bạn sắp bắt trình duyệt render toàn bộ {{count}} bài trong hàng chờ bằng tất cả nhân CPU mà nó dám khai báo ({{cores}} nhân). Máy mạnh thì bấm OK và chứng minh; máy yếu có thể nóng, giật, ngốn RAM hoặc văng tab. Tiếp tục?"
     },
     "eq": {
       "init": "Khởi tạo EQ...",
