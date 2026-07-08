@@ -671,7 +671,7 @@ export function NowPlaying() {
 
             {(rightTab === 'lyrics' && hasLyrics) ? (
               <div className="flex-1 overflow-hidden">
-                 <LyricsView lyrics={trackLyrics!} currentTime={currentTime} />
+                 <LyricsView lyrics={trackLyrics!} currentTime={currentTime} onSeek={playerState.seek} />
               </div>
             ) : (
               <div id="nowplaying-queue-container" className="flex flex-col gap-3 overflow-y-auto pr-2 relative flex-1">
