@@ -6,7 +6,7 @@ import { db } from '../lib/db';
 const BACKEND_URL = `http://${window.location.hostname}:8080`;
 
 // eslint-disable-next-line @typescript-eslint/no-explicit-any
-export function useAudioMetadata(jwtToken: string, queueState: any, driveToken?: string) {
+export function useAudioMetadata(jwtToken: string, queueState: any) {
     const setCurrentTrack = queueState?.setCurrentTrack;
     const setQueue = queueState?.setQueue;
     const currentTrack = queueState?.currentTrack;
@@ -219,7 +219,7 @@ export function useAudioMetadata(jwtToken: string, queueState: any, driveToken?:
 
             // Always mark as cached so we don't infinitely retry
             metadataCacheRef.current.set(trackId, cachePayload);
-            db.set(lsKey, cachePayload);
+            await db.set(lsKey, cachePayload);
             setMetadataVersion(v => v + 1);
 
             if (Object.keys(up).length > 0) {

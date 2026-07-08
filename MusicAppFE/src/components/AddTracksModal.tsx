@@ -1,4 +1,4 @@
-import { useState, useEffect } from 'react';
+import { useState } from 'react';
 import { X, Loader2, Plus, Check } from 'lucide-react';
 import type { Track } from '../hooks/useAudioPlayer';
 import { axiosClient } from '../api/axiosClient';
@@ -13,7 +13,6 @@ interface AddTracksModalProps {
 }
 
 import { useGlobalAudio } from '../context/AudioContext'
-import { useAuth } from '../context/AuthContext';;
 import { useLibrary } from '../context/LibraryContext';
 
 export function AddTracksModal({ isOpen, onClose, playlistId, playlistTracks, onSuccess }: AddTracksModalProps) {

@@ -15,7 +15,7 @@ export function useAudioEngine(
 ) {
   const contextState = useAudioContext(effectsState);
   
-  const metadataState = useAudioMetadata(jwtToken, queueState, driveToken);
+  const metadataState = useAudioMetadata(jwtToken, queueState);
 
   const playbackState = useAudioPlayback(
     jwtToken,

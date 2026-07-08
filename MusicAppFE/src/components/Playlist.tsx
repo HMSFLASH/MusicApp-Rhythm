@@ -7,7 +7,6 @@ import { CreatePlaylistModal } from './CreatePlaylistModal';
 import { AddTracksModal } from './AddTracksModal';
 import { axiosClient } from '../api/axiosClient';
 import { useGlobalAudio } from '../context/AudioContext'
-import { useAuth } from '../context/AuthContext';;
 import { db } from '../lib/db';
 import { useLibrary } from '../context/LibraryContext';
 

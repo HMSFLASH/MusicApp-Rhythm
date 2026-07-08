@@ -1,11 +1,10 @@
-import { useState, useEffect } from 'react';
+import { useState } from 'react';
 import { useNavigate, useSearchParams } from 'react-router-dom';
 import { Heart, ListMusic, Cloud, Star, Clock, ListPlus, Play, ArrowLeft, Shuffle, MoreHorizontal, Info, X, ListEnd, ListStart } from 'lucide-react';
 import { AddToPlaylistModal } from '../components/AddToPlaylistModal';
 import { useGlobalAudio } from '../context/AudioContext'
 import { useAuth } from '../context/AuthContext';;
 import type { Track } from '../hooks/useAudioPlayer';
-import { axiosClient } from '../api/axiosClient';
 import { useLibrary } from '../context/LibraryContext';
 
 export function TracksPage() {

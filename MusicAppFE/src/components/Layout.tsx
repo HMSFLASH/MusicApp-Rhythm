@@ -22,8 +22,7 @@ import { useState, useEffect } from 'react';
 import { useTranslation } from 'react-i18next';
 import { axiosClient } from '../api/axiosClient';
 import { BottomPlayerBar } from './BottomPlayerBar';
-import { useGlobalAudio } from '../context/AudioContext'
-import { useAuth } from '../context/AuthContext';;
+import { useAuth } from '../context/AuthContext';
 import { LocalFilePicker } from './LocalFilePicker';
 import { UploadQueuePanel } from './UploadQueuePanel';
 import { SetLocalPasswordModal } from './SetLocalPasswordModal';
@@ -97,7 +96,8 @@ export function Layout() {
     setSyncing(true);
     setNotification(null);
     try {
-      const response = await axiosClient.get('/api/backup/drive');
+      // eslint-disable-next-line @typescript-eslint/no-explicit-any
+      const response = await axiosClient.get('/api/backup/drive') as any;
       let config = response;
       
       if (response && response.config) {

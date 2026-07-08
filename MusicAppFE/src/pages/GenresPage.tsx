@@ -1,8 +1,7 @@
-import React, { useState, useEffect } from 'react';
+import React from 'react';
 import { useNavigate } from 'react-router-dom';
 import { ArrowLeft, Music, Play } from 'lucide-react';
 import { useGlobalAudio } from '../context/AudioContext';
-import type { Track } from '../hooks/useAudioPlayer';
 import { useLibrary } from '../context/LibraryContext';
 
 export function GenresPage() {

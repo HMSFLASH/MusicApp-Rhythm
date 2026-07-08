@@ -1,8 +1,7 @@
 import { useState } from 'react';
 import { X, Key, User, Lock, Loader2 } from 'lucide-react';
 import { axiosClient } from '../api/axiosClient';
-import { useGlobalAudio } from '../context/AudioContext'
-import { useAuth } from '../context/AuthContext';;
+import { useAuth } from '../context/AuthContext';
 
 interface SetLocalPasswordModalProps {
   isOpen: boolean;

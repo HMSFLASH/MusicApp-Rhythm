@@ -1,16 +1,13 @@
 import { Heart, ListMusic, Album, Mic2, Music, Disc, CloudUpload } from 'lucide-react';
 import { useNavigate } from 'react-router-dom';
-import { useState, useEffect, useRef, useMemo } from 'react';
+import { useEffect, useMemo } from 'react';
 import { useGlobalAudio } from '../context/AudioContext'
-import { useAuth } from '../context/AuthContext';;
 import { useUploadQueue } from '../context/UploadContext';
-import type { Track } from '../hooks/useAudioPlayer';
 
 import { useLibrary } from '../context/LibraryContext';
 
 export function LibraryPage() {
   const navigate = useNavigate();
-  const { jwtToken } = useAuth();
   const { playerState } = useGlobalAudio();
   const { queueFiles } = useUploadQueue();
   const { tracks, favorites, refreshLibrary } = useLibrary();
