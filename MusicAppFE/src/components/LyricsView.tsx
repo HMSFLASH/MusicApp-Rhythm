@@ -75,7 +75,7 @@ export function LyricsView({ lyrics, currentTime, onSeek }: LyricsViewProps) {
   return (
     <div 
       ref={containerRef} 
-      className="flex-1 w-full h-full flex flex-col gap-6 overflow-y-auto overflow-x-hidden scroll-smooth py-32 relative mask-image-fade scrollbar-thin scrollbar-thumb-white/20 scrollbar-track-transparent hover:scrollbar-thumb-white/40"
+      className="flex-1 w-full h-full flex flex-col gap-6 overflow-y-auto overflow-x-hidden scroll-smooth pt-8 pb-[50%] relative mask-image-fade scrollbar-thin scrollbar-thumb-white/20 scrollbar-track-transparent hover:scrollbar-thumb-white/40"
       style={{ WebkitMaskImage: 'linear-gradient(to bottom, transparent, black 10%, black 90%, transparent)' }}
     >
       {parsedLyrics.lines.map((line, idx) => {
@@ -90,7 +90,7 @@ export function LyricsView({ lyrics, currentTime, onSeek }: LyricsViewProps) {
                 onSeek(line.time);
               }
             }}
-            className={`transition-all duration-500 text-center md:text-lg font-bold ${onSeek && line.time >= 0 ? 'cursor-pointer hover:text-white/80' : ''} ${isActive ? 'text-primary scale-110 drop-shadow-[0_0_8px_rgba(0,229,255,0.8)]' : isPassed ? 'text-white/40' : 'text-white/20'}`}
+            className={`max-w-[85%] mx-auto transition-all duration-500 text-center md:text-lg font-bold ${onSeek && line.time >= 0 ? 'cursor-pointer hover:text-white/80' : ''} ${isActive ? 'text-primary scale-110 drop-shadow-[0_0_8px_rgba(0,229,255,0.8)]' : isPassed ? 'text-white/40' : 'text-white/20'}`}
           >
             {line.text || '...'}
           </div>
