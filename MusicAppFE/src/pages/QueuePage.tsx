@@ -224,13 +224,15 @@ export function QueuePage() {
                         >
                           <ChevronsDown size={14} /> Move to Bottom
                         </button>
-                        <button
-                          onClick={(e) => handleToggleFavorite(track, e)}
-                          className="w-full flex items-center gap-3 px-4 py-2 text-sm text-left text-white/80 hover:bg-white/10"
-                        >
-                          <Heart size={14} fill={favorites.some(f => f.id === track.id) ? "currentColor" : "none"} className={favorites.some(f => f.id === track.id) ? "text-primary" : ""} /> 
-                          {favorites.some(f => f.id === track.id) ? "Remove from Favorites" : "Add to Favorites"}
-                        </button>
+                        {track.sourceType !== 'LOCAL' && (
+                          <button
+                            onClick={(e) => handleToggleFavorite(track, e)}
+                            className="w-full flex items-center gap-3 px-4 py-2 text-sm text-left text-white/80 hover:bg-white/10"
+                          >
+                            <Heart size={14} fill={favorites.some(f => f.id === track.id) ? "currentColor" : "none"} className={favorites.some(f => f.id === track.id) ? "text-primary" : ""} /> 
+                            {favorites.some(f => f.id === track.id) ? "Remove from Favorites" : "Add to Favorites"}
+                          </button>
+                        )}
                         <button
                           onClick={(e) => { e.stopPropagation(); setInfoTrack(track); setOpenMenuIndex(null); }}
                           className="w-full flex items-center gap-3 px-4 py-2 text-sm text-left text-white/80 hover:bg-white/10"

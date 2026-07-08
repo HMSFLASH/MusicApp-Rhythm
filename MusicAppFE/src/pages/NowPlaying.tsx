@@ -277,17 +277,21 @@ export function NowPlaying() {
 
             {/* Top Action Bar */}
             <div className="flex items-center justify-between px-2 mb-8 text-white/60">
-              <button 
-                onClick={toggleFavorite}
-                className={`
-                  ${isFavorite ? 'text-primary drop-shadow-[0_0_12px_var(--tw-colors-primary)] scale-110' : 'text-white/40 hover:text-white'} 
-                  transition-all duration-300 p-2 -ml-2 rounded-full
-                  active:scale-95
-                `}
-                aria-label={isFavorite ? "Remove from Favorites" : "Add to Favorites"}
-              >
-                <Heart size={24} fill={isFavorite ? "currentColor" : "none"} className={`transition-all duration-300`} />
-              </button>
+              {currentTrack.sourceType !== 'LOCAL' ? (
+                <button 
+                  onClick={toggleFavorite}
+                  className={`
+                    ${isFavorite ? 'text-primary drop-shadow-[0_0_12px_var(--tw-colors-primary)] scale-110' : 'text-white/40 hover:text-white'} 
+                    transition-all duration-300 p-2 -ml-2 rounded-full
+                    active:scale-95
+                  `}
+                  aria-label={isFavorite ? "Remove from Favorites" : "Add to Favorites"}
+                >
+                  <Heart size={24} fill={isFavorite ? "currentColor" : "none"} className={`transition-all duration-300`} />
+                </button>
+              ) : (
+                <div className="w-10 h-10 -ml-2"></div>
+              )}
               <button onClick={() => setShowMetadata(true)} className="hover:text-white transition-colors"><Info size={22} /></button>
               {/* More Options (...) Button */}
               <div className="relative" ref={menuRef}>

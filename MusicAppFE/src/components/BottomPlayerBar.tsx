@@ -151,17 +151,21 @@ export function BottomPlayerBar() {
             <span className="truncate">{currentTrack.artist || playerState.getTrackMetadata(currentTrack.id)?.artist || (currentTrack.fileName?.includes(' - ') ? currentTrack.fileName.split(' - ')[0] : 'Unknown Artist')}</span>
           </span>
         </div>
-        <button 
-          onClick={(e) => { e.stopPropagation(); toggleFavorite(); }}
-          className={`
-            ${isFavorite ? 'text-primary drop-shadow-[0_0_8px_var(--tw-colors-primary)] scale-110' : 'text-white/40 hover:text-white'} 
-            transition-all duration-300 ml-1 md:ml-2 p-1.5 md:p-1 rounded-full
-            active:scale-95
-          `}
-          aria-label={isFavorite ? "Remove from Favorites" : "Add to Favorites"}
-        >
-          <Heart size={18} fill={isFavorite ? "currentColor" : "none"} className={`transition-all duration-300`} />
-        </button>
+        {currentTrack.sourceType !== 'LOCAL' ? (
+          <button 
+            onClick={(e) => { e.stopPropagation(); toggleFavorite(); }}
+            className={`
+              ${isFavorite ? 'text-primary drop-shadow-[0_0_8px_var(--tw-colors-primary)] scale-110' : 'text-white/40 hover:text-white'} 
+              transition-all duration-300 ml-1 md:ml-2 p-1.5 md:p-1 rounded-full
+              active:scale-95
+            `}
+            aria-label={isFavorite ? "Remove from Favorites" : "Add to Favorites"}
+          >
+            <Heart size={18} fill={isFavorite ? "currentColor" : "none"} className={`transition-all duration-300`} />
+          </button>
+        ) : (
+          <div className="w-[30px] ml-1 md:ml-2"></div>
+        )}
       </div>
 
       {/* Center: Controls & Seek Bar */}

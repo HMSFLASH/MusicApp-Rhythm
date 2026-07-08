@@ -178,6 +178,7 @@ export function LibraryProvider({ children }: { children: ReactNode }) {
   }, [fetchLibrary, jwtToken]);
 
   const toggleFavorite = useCallback(async (track: Track) => {
+    if (track.sourceType === 'LOCAL') return;
     const isFav = favorites.some(f => f.id === track.id);
     try {
       if (isFav) {
