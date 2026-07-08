@@ -1,8 +1,10 @@
 import { useState, useRef, useEffect } from 'react';
 import { useGlobalAudio } from '../context/AudioContext'
 import { useAuth } from '../context/AuthContext';;
-import { Disc, Play, Pause, SkipBack, SkipForward, Shuffle, Repeat, Heart, Info, ListPlus, MoreHorizontal, Repeat1, User, Volume2, VolumeX, BarChart2, Gauge, Music, Check, X, ArrowRight, Square, PauseCircle, ListX, Loader2 } from 'lucide-react';
+import { Disc, Play, Pause, SkipBack, SkipForward, Shuffle, Repeat, Heart, Info, ListPlus, MoreHorizontal, Repeat1, User, Volume2, VolumeX, BarChart2, Gauge, Music, Check, X, ArrowRight, Square, PauseCircle, ListX, Loader2, Trash2 } from 'lucide-react';
 import { HorizontalSlider } from '../components/HorizontalSlider';
+import { useLibrary } from '../context/LibraryContext';
+import { LyricsView } from '../components/LyricsView';
 import { useNavigate } from 'react-router-dom';
 import { useTranslation } from 'react-i18next';
 import { axiosClient } from '../api/axiosClient';
@@ -17,6 +19,7 @@ export function NowPlaying() {
   const { t } = useTranslation();
   const { isAuthenticated } = useAuth();
   const { playerState } = useGlobalAudio();
+  const { deleteTrack } = useLibrary();
   const navigate = useNavigate();
   const {
     isPlaying, isLoadingTrack, currentTrack, currentTime, duration,
@@ -153,6 +156,10 @@ export function NowPlaying() {
   const [showMetadata, setShowMetadata] = useState(false);
   // Lyrics Modal state
   const [showLyrics, setShowLyrics] = useState(false);
+
+  const [rightTab, setRightTab] = useState<'queue' | 'lyrics'>('lyrics');
+  const trackLyrics = currentTrack?.lyrics || (currentTrack ? playerState.getTrackMetadata(currentTrack.id)?.lyrics : undefined);
+  const hasLyrics = !!trackLyrics;
 
   type SongEndMode = 'stop' | 'preload' | 'next' | 'repeat_one';
   type QueueEndMode = 'stop' | 'next' | 'repeat';
@@ -341,6 +348,24 @@ export function NowPlaying() {
                       <Music size={16} />
                       <span>{t('nowPlaying.viewLyrics')}</span>
                     </button>
+                    {currentTrack.sourceType !== 'LOCAL' && (
+                      <button
+                        onClick={async () => {
+                          if (confirm(`Are you sure you want to delete "${currentTrack.title || currentTrack.fileName}" from your library?`)) {
+                            setShowMenu(false);
+                            await deleteTrack(currentTrack);
+                            // Remove from queue
+                            const newQueue = playerState.queue.filter(t => t.id !== currentTrack.id);
+                            playerState.setQueue(newQueue);
+                            playNext();
+                          }
+                        }}
+                        className="w-full flex items-center gap-3 px-4 py-3 text-sm text-red-400 hover:bg-white/5 hover:text-red-300 transition-colors border-t border-white/5"
+                      >
+                        <Trash2 size={16} />
+                        <span>Delete from Library</span>
+                      </button>
+                    )}
 
                   </div>
                 )}
@@ -622,15 +647,34 @@ export function NowPlaying() {
 
         </div>
 
-        {/* Right Side: Playlist */}
+        {/* Right Side: Playlist / Lyrics */}
         <div className="w-full lg:w-[400px] flex-shrink-0">
-          {/* F8 Up Next Playlist */}
-          <div className="w-full bg-white/5 rounded-2xl p-6 border border-white/10">
-            <h3 className="font-bold text-white mb-6 flex items-center gap-2">
-              <ListPlus size={20} className="text-primary" />
-              {t('player.upNext')}
-            </h3>
-            <div id="nowplaying-queue-container" className="flex flex-col gap-3 max-h-[60vh] overflow-y-auto pr-2 relative">
+          <div className="w-full bg-white/5 rounded-2xl p-6 border border-white/10 h-full max-h-[80vh] flex flex-col">
+            <div className="flex items-center gap-6 mb-6 border-b border-white/10 pb-1">
+              {hasLyrics && (
+                <button
+                  onClick={() => setRightTab('lyrics')}
+                  className={`font-bold pb-2 border-b-2 transition-colors flex items-center gap-2 ${rightTab === 'lyrics' ? 'border-primary text-primary' : 'border-transparent text-white/50 hover:text-white/80'}`}
+                >
+                  <Music size={18} />
+                  {t('nowPlaying.viewLyrics')}
+                </button>
+              )}
+              <button
+                onClick={() => setRightTab('queue')}
+                className={`font-bold pb-2 border-b-2 transition-colors flex items-center gap-2 ${rightTab === 'queue' || !hasLyrics ? 'border-primary text-primary' : 'border-transparent text-white/50 hover:text-white/80'}`}
+              >
+                <ListPlus size={18} />
+                {t('player.upNext')}
+              </button>
+            </div>
+
+            {(rightTab === 'lyrics' && hasLyrics) ? (
+              <div className="flex-1 overflow-hidden">
+                 <LyricsView lyrics={trackLyrics!} currentTime={currentTime} />
+              </div>
+            ) : (
+              <div id="nowplaying-queue-container" className="flex flex-col gap-3 overflow-y-auto pr-2 relative flex-1">
               {playerState.queue.map((track) => {
                 const isActive = String(currentTrack?.id) === String(track.id);
                 return (
@@ -658,7 +702,8 @@ export function NowPlaying() {
                   </div>
                 );
               })}
-            </div>
+              </div>
+            )}
           </div>
         </div>
 

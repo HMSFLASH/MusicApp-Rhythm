@@ -1513,6 +1513,48 @@ console.log("[Audio] performOfflineRender called with EQ bands:", audioParamsRef
     }
   }, [currentTrack, updateMediaSessionMetadata]);
 
+  useEffect(() => {
+    const handleMusicDeleted = (e: Event) => {
+      const deletedId = (e as CustomEvent).detail;
+      if (!deletedId) return;
+      
+      let wasCurrent = false;
+      if (currentTrackSnapshotRef.current && String(currentTrackSnapshotRef.current.id) === String(deletedId)) {
+        wasCurrent = true;
+      }
+      
+      if (setQueue) {
+        // eslint-disable-next-line @typescript-eslint/no-explicit-any
+        setQueue((prev: any[]) => {
+          const nextQueue = prev.filter((t: any) => String(t.id) !== String(deletedId));
+          if (wasCurrent) {
+            setTimeout(() => {
+              if (nextQueue.length > 0 && playNextRef.current) {
+                playNextRef.current();
+              } else if (setCurrentTrack) {
+                setCurrentTrack(null);
+                // Also stop the player
+                if (audioRef.current) {
+                  audioRef.current.pause();
+                  audioRef.current.src = "";
+                }
+              }
+            }, 50);
+          }
+          return nextQueue;
+        });
+      } else if (wasCurrent && setCurrentTrack) {
+        setCurrentTrack(null);
+        if (audioRef.current) {
+          audioRef.current.pause();
+          audioRef.current.src = "";
+        }
+      }
+    };
+
+    window.addEventListener('music-deleted', handleMusicDeleted);
+    return () => window.removeEventListener('music-deleted', handleMusicDeleted);
+  }, [setQueue, setCurrentTrack]);
 
   // Compute hasNext and hasPrevious
   // eslint-disable-next-line @typescript-eslint/no-explicit-any

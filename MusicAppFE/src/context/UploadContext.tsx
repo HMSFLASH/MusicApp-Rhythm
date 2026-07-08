@@ -82,6 +82,27 @@ export function UploadProvider({ children }: { children: ReactNode }) {
               formData.append('imageUrl', `data:${pic.format};base64,${base64String}`);
             }
           }
+            let extractedLyrics = '';
+            if (metadata.common.lyrics && metadata.common.lyrics.length > 0) {
+                // eslint-disable-next-line @typescript-eslint/no-explicit-any
+                extractedLyrics = metadata.common.lyrics.map((l: any) => typeof l === 'string' ? l : (l.text || JSON.stringify(l))).join('\n\n');
+            }
+            if (!extractedLyrics && metadata.native) {
+                for (const tagType in metadata.native) {
+                    const tags = metadata.native[tagType];
+                    if (Array.isArray(tags)) {
+                        // eslint-disable-next-line @typescript-eslint/no-explicit-any
+                        const lyricTag = tags.find((t: any) => t.id === 'USLT' || t.id === 'SYLT' || t.id === 'LYRICS' || t.id === 'WM/Lyrics');
+                        if (lyricTag && lyricTag.value) {
+                            extractedLyrics = typeof lyricTag.value === 'string' ? lyricTag.value : (lyricTag.value.text || JSON.stringify(lyricTag.value));
+                            break;
+                        }
+                    }
+                }
+            }
+            if (extractedLyrics) {
+                formData.append('lyrics', extractedLyrics);
+            }
         } catch (err) {
           console.warn(`[Upload] Metadata parse skipped for ${file.name}:`, err);
         }

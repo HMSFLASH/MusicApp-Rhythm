@@ -9,8 +9,8 @@ import { useLibrary } from '../context/LibraryContext';
 export function LibraryPage() {
   const navigate = useNavigate();
   const { playerState } = useGlobalAudio();
-  const { queueFiles } = useUploadQueue();
-  const { tracks, favorites, refreshLibrary, isLoading } = useLibrary();
+  const { queueFiles, uploadTasks } = useUploadQueue();
+  const { tracks, favorites, syncLibrary, isLoading } = useLibrary();
 
   const handleUpload = (e: React.ChangeEvent<HTMLInputElement>) => {
     if (!e.target.files || e.target.files.length === 0) return;
@@ -20,7 +20,12 @@ export function LibraryPage() {
     const skippedFiles: File[] = [];
 
     for (const f of files) {
-      if (tracks.some(t => t.fileName === f.name)) {
+      const isDuplicate = 
+        tracks.some(t => t.fileName === f.name) ||
+        uploadTasks.some(t => t.file.name === f.name && t.status !== 'error') ||
+        pendingFiles.some(p => p.name === f.name);
+
+      if (isDuplicate) {
         skippedFiles.push(f);
       } else {
         pendingFiles.push(f);
@@ -33,11 +38,11 @@ export function LibraryPage() {
 
   useEffect(() => {
     const handleUploadSuccess = () => {
-      refreshLibrary();
+      syncLibrary();
     };
     window.addEventListener('music-uploaded', handleUploadSuccess);
     return () => window.removeEventListener('music-uploaded', handleUploadSuccess);
-  }, [refreshLibrary]);
+  }, [syncLibrary]);
 
   const albumsCount = useMemo(() => new Set(tracks.map(t => t.album).filter(Boolean)).size, [tracks]);
   const genresCount = useMemo(() => new Set(tracks.map(t => t.genre).filter(Boolean)).size, [tracks]);
@@ -55,7 +60,7 @@ export function LibraryPage() {
         </div>
         <div className="flex items-center gap-2">
           <button
-            onClick={() => refreshLibrary()}
+            onClick={() => syncLibrary()}
             disabled={isLoading}
             className="flex items-center gap-2 px-4 py-2 rounded-xl border border-white/10 hover:border-white/20 bg-white/5 hover:bg-white/10 transition-colors disabled:opacity-50 text-white/80 hover:text-white"
             title="Reload library"

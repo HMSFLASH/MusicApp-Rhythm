@@ -9,7 +9,9 @@ interface LibraryContextType {
   favorites: Track[];
   isLoading: boolean;
   toggleFavorite: (track: Track) => Promise<void>;
+  deleteTrack: (track: Track) => Promise<void>;
   refreshLibrary: () => Promise<void>;
+  syncLibrary: () => Promise<void>;
 }
 
 const LibraryContext = createContext<LibraryContextType | undefined>(undefined);
@@ -41,11 +43,12 @@ const parseTrack = (d: any): Track => ({
   title: d.title,
   album: d.album,
   genre: d.genre,
-  durationSeconds: d.durationSeconds
+  durationSeconds: d.durationSeconds,
+  lyrics: d.lyrics
 });
 
 const mergeCachedMetadata = async (track: Track): Promise<Track> => {
-  const cached = await db.get<Partial<Track>>(`sonic_meta_v2_${track.id}`);
+  const cached = await db.get<Partial<Track>>(`sonic_meta_v4_${track.id}`);
   if (!cached) return track;
 
   const merged = { ...track };
@@ -96,6 +99,30 @@ export function LibraryProvider({ children }: { children: ReactNode }) {
     }
   }, [isAuthenticated]);
 
+  const syncLibrary = useCallback(async () => {
+    if (!isAuthenticated) return;
+    try {
+      setIsLoading(true);
+      const [listData, favData] = await Promise.all([
+        axiosClient.post('/api/music/sync'),
+        axiosClient.get('/api/favorites')
+      ]);
+
+      const parsedTracks = Array.isArray(listData) ? await enrichTracksWithCachedMetadata(listData.map(parseTrack)) : [];
+      const parsedFavs = Array.isArray(favData) ? await enrichTracksWithCachedMetadata(favData.map(parseTrack)) : [];
+
+      setTracks(parsedTracks);
+      setFavorites(parsedFavs);
+
+      await db.set('sonic_library_tracks', parsedTracks);
+      await db.set('sonic_favorites', parsedFavs);
+    } catch (err) {
+      console.error('Failed to sync library', err);
+    } finally {
+      setIsLoading(false);
+    }
+  }, [isAuthenticated]);
+
   useEffect(() => {
     const init = async () => {
       if (isAuthenticated) {
@@ -139,7 +166,7 @@ export function LibraryProvider({ children }: { children: ReactNode }) {
       if (!trackId) return;
 
       const applyCachedMetadata = async () => {
-        const metadata = await db.get<Partial<Track>>(`sonic_meta_v2_${trackId}`);
+        const metadata = await db.get<Partial<Track>>(`sonic_meta_v4_${trackId}`);
         if (!metadata) return;
 
         const applyToTracks = (items: Track[]) => items.map((track) => {
@@ -203,9 +230,30 @@ export function LibraryProvider({ children }: { children: ReactNode }) {
     }
   }, [favorites]);
 
+  const deleteTrack = useCallback(async (track: Track) => {
+    if (track.sourceType === 'LOCAL') return;
+    try {
+      await axiosClient.delete(`/api/music/${track.id}`);
+      setTracks(prev => {
+        const next = prev.filter(t => t.id !== track.id);
+        void db.set('sonic_library_tracks', next);
+        return next;
+      });
+      setFavorites(prev => {
+        const next = prev.filter(t => t.id !== track.id);
+        void db.set('sonic_favorites', next);
+        return next;
+      });
+      window.dispatchEvent(new CustomEvent('music-deleted', { detail: track.id }));
+    } catch (err) {
+      console.error(err);
+      throw err;
+    }
+  }, []);
+
   const value = useMemo(
-    () => ({ tracks, favorites, isLoading, toggleFavorite, refreshLibrary: fetchLibrary }),
-    [tracks, favorites, isLoading, toggleFavorite, fetchLibrary],
+    () => ({ tracks, favorites, isLoading, toggleFavorite, deleteTrack, refreshLibrary: fetchLibrary, syncLibrary }),
+    [tracks, favorites, isLoading, toggleFavorite, deleteTrack, fetchLibrary, syncLibrary],
   );
 
   return (

@@ -1,6 +1,6 @@
 import { useState } from 'react';
 import { useNavigate, useSearchParams } from 'react-router-dom';
-import { Heart, ListMusic, Cloud, Star, Clock, ListPlus, Play, ArrowLeft, Shuffle, MoreHorizontal, Info, X, ListEnd, ListStart, RefreshCw } from 'lucide-react';
+import { Heart, ListMusic, Cloud, Star, Clock, ListPlus, Play, ArrowLeft, Shuffle, MoreHorizontal, Info, X, ListEnd, ListStart, RefreshCw, Trash2 } from 'lucide-react';
 import { AddToPlaylistModal } from '../components/AddToPlaylistModal';
 import { useGlobalAudio } from '../context/AudioContext'
 import { useAuth } from '../context/AuthContext';;
@@ -12,8 +12,7 @@ export function TracksPage() {
   const [searchParams] = useSearchParams();
   const { isAuthenticated } = useAuth();
   const { playerState } = useGlobalAudio();
-  
-  const { tracks, favorites, toggleFavorite: ctxToggleFavorite, refreshLibrary, isLoading } = useLibrary();
+  const { tracks, favorites, toggleFavorite: ctxToggleFavorite, deleteTrack, syncLibrary, isLoading } = useLibrary();
   const activeTab = searchParams.get('tab') === 'favorites' ? 'favorites' : 'all';
   const [trackToPlaylist, setTrackToPlaylist] = useState<Track | null>(null);
   const [openMenuId, setOpenMenuId] = useState<string | number | null>(null);
@@ -94,7 +93,7 @@ export function TracksPage() {
             {activeTab === 'all' ? <><Clock size={18} className="text-[#00E5FF]" /> Songs List</> : <><Star size={18} className="text-yellow-400" /> Favorites List</>}
           </h2>
           <button
-            onClick={() => refreshLibrary()}
+            onClick={() => syncLibrary()}
             disabled={isLoading}
             className="p-1.5 rounded-full bg-white/5 border border-white/10 hover:bg-white/10 text-white/60 hover:text-white transition-colors disabled:opacity-50"
             title="Reload"
@@ -213,6 +212,20 @@ export function TracksPage() {
                   >
                     <Info size={14} /> Info
                   </button>
+                  {track.sourceType !== 'LOCAL' && (
+                    <button
+                      onClick={async (e) => {
+                        e.stopPropagation();
+                        if (confirm(`Are you sure you want to delete "${track.title || track.fileName}" from your library?`)) {
+                          await deleteTrack(track);
+                          setOpenMenuId(null);
+                        }
+                      }}
+                      className="w-full flex items-center gap-3 px-4 py-2 text-sm text-left text-red-400 hover:bg-white/10 hover:text-red-300"
+                    >
+                      <Trash2 size={14} /> Delete
+                    </button>
+                  )}
                 </div>
               )}
             </div>

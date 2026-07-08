@@ -31,7 +31,7 @@ export function useAudioMetadata(isAuthenticated: boolean, queueState: any) {
         if (track.sourceType !== 'LOCAL' && !isAuthenticated) return;
 
         // --- CACHE READ LAYER ---
-        const lsKey = `sonic_meta_v2_${trackId}`;
+        const lsKey = `sonic_meta_v4_${trackId}`;
         const lsData = await db.get<Partial<Track>>(lsKey);
         if (lsData) {
             try {
@@ -152,7 +152,7 @@ export function useAudioMetadata(isAuthenticated: boolean, queueState: any) {
                         cachePayload.fileSize = fileSize;
                         trueFileSize = fileSize;
                     }
-                    const maxMetadataSize = fileSize > 15 * 1024 * 1024 ? 1.2 * 1024 * 1024 : 512 * 1024;
+                    const maxMetadataSize = fileSize > 15 * 1024 * 1024 ? 5 * 1024 * 1024 : 3 * 1024 * 1024;
 
                     const reader = response.body!.getReader();
                     const chunks: Uint8Array[] = [];
@@ -192,9 +192,25 @@ export function useAudioMetadata(isAuthenticated: boolean, queueState: any) {
                 up.genre = metadata.common.genre.join(', ');
                 cachePayload.genre = metadata.common.genre.join(', ');
             }
+            let extractedLyrics = '';
             if (metadata.common.lyrics && metadata.common.lyrics.length > 0) {
-                up.lyrics = metadata.common.lyrics.join('\n\n');
-                cachePayload.lyrics = metadata.common.lyrics.join('\n\n');
+                extractedLyrics = metadata.common.lyrics.map((l: any) => typeof l === 'string' ? l : (l.text || JSON.stringify(l))).join('\n\n');
+            }
+            if (!extractedLyrics && metadata.native) {
+                for (const tagType in metadata.native) {
+                    const tags = metadata.native[tagType];
+                    if (Array.isArray(tags)) {
+                        const lyricTag = tags.find((t: any) => t.id === 'USLT' || t.id === 'SYLT' || t.id === 'LYRICS' || t.id === 'WM/Lyrics');
+                        if (lyricTag && lyricTag.value) {
+                            extractedLyrics = typeof lyricTag.value === 'string' ? lyricTag.value : (lyricTag.value.text || JSON.stringify(lyricTag.value));
+                            break;
+                        }
+                    }
+                }
+            }
+            if (extractedLyrics) {
+                up.lyrics = extractedLyrics;
+                cachePayload.lyrics = extractedLyrics;
             }
             
             if (metadata.format) {

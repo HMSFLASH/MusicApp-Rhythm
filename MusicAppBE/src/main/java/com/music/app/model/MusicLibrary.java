@@ -38,9 +38,11 @@ public class MusicLibrary {
     /** Thể loại */
     private String genre;
 
-    /** URL hình bìa */
     @Column(name = "image_url", columnDefinition = "TEXT")
     private String imageUrl;
+
+    @Column(name = "lyrics", columnDefinition = "TEXT")
+    private String lyrics;
 
     /** Thời lượng (giây) */
     @Column(name = "duration_seconds")

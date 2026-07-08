@@ -1,5 +1,6 @@
 package com.music.app.service;
 
+import com.google.api.services.drive.model.File;
 import com.music.app.dto.MusicItemDto;
 import com.music.app.exception.AppException;
 import com.music.app.exception.ErrorCode;
@@ -11,6 +12,11 @@ import lombok.RequiredArgsConstructor;
 import lombok.extern.slf4j.Slf4j;
 import org.springframework.stereotype.Service;
 import org.springframework.web.multipart.MultipartFile;
+import org.jaudiotagger.audio.AudioFile;
+import org.jaudiotagger.audio.AudioFileIO;
+import org.jaudiotagger.tag.Tag;
+import org.jaudiotagger.tag.FieldKey;
+import java.io.FileInputStream;
 import java.util.List;
 import java.util.stream.Collectors;
 
@@ -32,6 +38,7 @@ public class MusicService {
                 .album(lib.getAlbum())
                 .genre(lib.getGenre())
                 .imageUrl(lib.getImageUrl())
+                .lyrics(lib.getLyrics())
                 .durationSeconds(lib.getDurationSeconds())
                 .sourceType(lib.getSourceType())
                 .driveFileId(lib.getDriveFileId())
@@ -47,34 +54,183 @@ public class MusicService {
     public MusicItemDto updateMetadata(Long id, MusicItemDto dto, Long userId) {
         MusicLibrary lib = musicLibraryRepository.findById(id)
                 .orElseThrow(() -> new AppException(ErrorCode.NOT_FOUND));
-                
+
         if (!lib.getUser().getId().equals(userId)) {
             throw new AppException(ErrorCode.FORBIDDEN);
         }
 
-        if (dto.getTitle() != null) lib.setTitle(dto.getTitle());
-        if (dto.getArtist() != null) lib.setArtist(dto.getArtist());
-        if (dto.getAlbum() != null) lib.setAlbum(dto.getAlbum());
-        if (dto.getGenre() != null) lib.setGenre(dto.getGenre());
-        if (dto.getImageUrl() != null) lib.setImageUrl(dto.getImageUrl());
-        if (dto.getDurationSeconds() != null) lib.setDurationSeconds(dto.getDurationSeconds());
+        if (dto.getTitle() != null)
+            lib.setTitle(dto.getTitle());
+        if (dto.getArtist() != null)
+            lib.setArtist(dto.getArtist());
+        if (dto.getAlbum() != null)
+            lib.setAlbum(dto.getAlbum());
+        if (dto.getGenre() != null)
+            lib.setGenre(dto.getGenre());
+        if (dto.getImageUrl() != null)
+            lib.setImageUrl(dto.getImageUrl());
+        if (dto.getLyrics() != null)
+            lib.setLyrics(dto.getLyrics());
+        if (dto.getDurationSeconds() != null)
+            lib.setDurationSeconds(dto.getDurationSeconds());
 
         return toDto(musicLibraryRepository.save(lib));
     }
 
-    public MusicItemDto uploadToDrive(MultipartFile file, String title, String artist, String album, String genre, String imageUrl, Long userId) {
+    public List<MusicItemDto> syncWithDrive(Long userId) {
+        User user = userRepository.findById(userId)
+                .orElseThrow(() -> new AppException(ErrorCode.USER_NOT_EXISTED));
+        if (user.getRefreshToken() == null) {
+            return listMusic(userId);
+        }
+
+        try {
+            List<File> driveFiles = googleDriveService.listFiles(user.getRefreshToken());
+            List<String> driveFileIds = driveFiles.stream()
+                    .map(File::getId)
+                    .collect(Collectors.toList());
+
+            List<MusicLibrary> dbFiles = musicLibraryRepository.findByUserId(userId);
+            List<MusicLibrary> toDelete = dbFiles.stream()
+                    .filter(lib -> "DRIVE".equals(lib.getSourceType()) && lib.getDriveFileId() != null
+                            && !driveFileIds.contains(lib.getDriveFileId()))
+                    .collect(Collectors.toList());
+
+            if (!toDelete.isEmpty()) {
+                musicLibraryRepository.deleteAll(toDelete);
+                log.info("Synced with Drive: deleted {} missing files from DB for user {}", toDelete.size(), userId);
+            }
+
+            // Return updated list
+            return listMusic(userId);
+        } catch (Exception e) {
+            log.error("Failed to sync with drive", e);
+            return listMusic(userId); // fallback to db list
+        }
+    }
+
+    public void deleteMusic(Long id, Long userId) {
+        MusicLibrary lib = musicLibraryRepository.findById(id)
+                .orElseThrow(() -> new AppException(ErrorCode.NOT_FOUND));
+        if (!lib.getUser().getId().equals(userId)) {
+            throw new AppException(ErrorCode.FORBIDDEN);
+        }
+
+        if ("DRIVE".equals(lib.getSourceType()) && lib.getDriveFileId() != null) {
+            try {
+                googleDriveService.deleteFile(lib.getDriveFileId(), lib.getUser().getRefreshToken());
+            } catch (Exception e) {
+                log.error("Failed to delete file from Google Drive, proceeding to delete from DB anyway", e);
+            }
+        }
+
+        musicLibraryRepository.delete(lib);
+    }
+
+    public MusicItemDto uploadToDrive(MultipartFile file, String title, String artist, String album, String genre,
+            String imageUrl, String lyrics, Long userId) {
         try {
             User user = userRepository.findById(userId)
                     .orElseThrow(() -> new AppException(ErrorCode.USER_NOT_EXISTED));
-                    
+
             if (user.getRefreshToken() == null) {
                 throw new AppException(ErrorCode.FORBIDDEN, "User Google Drive not linked");
             }
 
-            String driveFileId = googleDriveService.uploadAudioStream(file.getInputStream(), file.getSize(), user.getRefreshToken(), file.getOriginalFilename());
+            String originalFilename = file.getOriginalFilename() != null ? file.getOriginalFilename() : "Unknown Audio";
+
+            // Check for duplicates
+            boolean exists = musicLibraryRepository.findByUserId(userId).stream()
+                    .anyMatch(lib -> originalFilename.equals(lib.getName()));
+            if (exists) {
+                throw new AppException(ErrorCode.UNCATEGORIZED_EXCEPTION, "File already exists in library");
+            }
+
+            // Extract metadata via jaudiotagger
+            String ext = ".tmp";
+            if (originalFilename.lastIndexOf(".") != -1) {
+                ext = originalFilename.substring(originalFilename.lastIndexOf("."));
+            }
+            java.io.File tempFile = java.io.File.createTempFile("musicapp_", ext);
+            String driveFileId;
+            try {
+                java.nio.file.Files.copy(file.getInputStream(), tempFile.toPath(),
+                        java.nio.file.StandardCopyOption.REPLACE_EXISTING);
+
+                try {
+                    AudioFile audioFile = AudioFileIO.read(tempFile);
+                    Tag tag = audioFile.getTag();
+                    if (tag != null) {
+                        if (title == null || title.isBlank())
+                            title = tag.getFirst(FieldKey.TITLE);
+                        if (artist == null || artist.isBlank())
+                            artist = tag.getFirst(FieldKey.ARTIST);
+                        if (album == null || album.isBlank())
+                            album = tag.getFirst(FieldKey.ALBUM);
+                        if (genre == null || genre.isBlank())
+                            genre = tag.getFirst(FieldKey.GENRE);
+
+                        String tagLyrics = tag.getFirst(FieldKey.LYRICS);
+                        if (tagLyrics == null || tagLyrics.isBlank()) {
+                            try { tagLyrics = tag.getFirst("UNSYNCEDLYRICS"); } catch(Exception ex){}
+                        }
+                        if (tagLyrics == null || tagLyrics.isBlank()) {
+                            try { tagLyrics = tag.getFirst("UNSYNCED LYRICS"); } catch(Exception ex){}
+                        }
+                        if (tagLyrics == null || tagLyrics.isBlank()) {
+                            try { tagLyrics = tag.getFirst("USLT"); } catch(Exception ex){}
+                        }
+                        if (tagLyrics == null || tagLyrics.isBlank()) {
+                            try { tagLyrics = tag.getFirst("SYLT"); } catch(Exception ex){}
+                        }
+                        
+                        if (tagLyrics == null || tagLyrics.isBlank()) {
+                            java.util.Iterator<org.jaudiotagger.tag.TagField> fields = tag.getFields();
+                            while(fields.hasNext()) {
+                                org.jaudiotagger.tag.TagField field = fields.next();
+                                String id = field.getId();
+                                String content = field.toString();
+                                
+                                log.info("=== METADATA TAG === ID: [{}], CONTENT length: {}, startsWith: [{}]", 
+                                    id, 
+                                    content == null ? 0 : content.length(),
+                                    content != null && content.length() > 50 ? content.substring(0, 50).replace("\n", " ") + "..." : (content != null ? content.replace("\n", " ") : "null")
+                                );
+                                
+                                String upperId = id.toUpperCase();
+                                if (content != null && content.contains("\n") && content.length() > 20) {
+                                    tagLyrics = content;
+                                    // Clean up Jaudiotagger's toString format like: ID="Lyrics..."
+                                    if (tagLyrics.contains("=\"")) {
+                                        tagLyrics = tagLyrics.substring(tagLyrics.indexOf("=\"") + 2);
+                                        if (tagLyrics.endsWith("\"")) tagLyrics = tagLyrics.substring(0, tagLyrics.length() - 1);
+                                    }
+                                    // Don't break, keep logging the rest!
+                                }
+                            }
+                        }
+
+                        if (tagLyrics != null && !tagLyrics.isBlank()) {
+                            lyrics = tagLyrics;
+                            log.info("Extracted lyrics from file tags via jaudiotagger, length: {}", lyrics.length());
+                        } else {
+                            log.info("No lyrics found in file tags via jaudiotagger");
+                        }
+                    }
+                } catch (Exception e) {
+                    log.error("Failed to extract metadata with jaudiotagger", e);
+                }
+
+                try (FileInputStream is = new FileInputStream(tempFile)) {
+                    driveFileId = googleDriveService.uploadAudioStream(is, tempFile.length(),
+                            user.getRefreshToken(), originalFilename);
+                }
+            } finally {
+                tempFile.delete();
+            }
 
             MusicLibrary lib = MusicLibrary.builder()
-                    .name(file.getOriginalFilename() != null ? file.getOriginalFilename() : "Unknown Audio")
+                    .name(originalFilename)
                     .sourceType("DRIVE")
                     .driveFileId(driveFileId)
                     .title(title)
@@ -82,9 +238,10 @@ public class MusicService {
                     .album(album)
                     .genre(genre)
                     .imageUrl(imageUrl)
+                    .lyrics(lyrics)
                     .user(user)
                     .build();
-                    
+
             return toDto(musicLibraryRepository.save(lib));
         } catch (AppException e) {
             throw e;
@@ -98,7 +255,7 @@ public class MusicService {
         try {
             User user = userRepository.findById(userId)
                     .orElseThrow(() -> new AppException(ErrorCode.USER_NOT_EXISTED));
-                    
+
             if (user.getRefreshToken() == null) {
                 throw new AppException(ErrorCode.FORBIDDEN, "User Google Drive not linked");
             }

@@ -71,7 +71,13 @@ public class MusicStreamController {
                     fileName = lib.getName();
                     if ("DRIVE".equals(lib.getSourceType()) && lib.getDriveFileId() != null) {
                         driveFileIdToUse = lib.getDriveFileId();
+                    } else {
+                        // Not a drive file or no drive file ID
+                        return ResponseEntity.status(HttpStatus.NOT_FOUND).build();
                     }
+                } else {
+                    // Not found in database
+                    return ResponseEntity.status(HttpStatus.NOT_FOUND).build();
                 }
             }
 

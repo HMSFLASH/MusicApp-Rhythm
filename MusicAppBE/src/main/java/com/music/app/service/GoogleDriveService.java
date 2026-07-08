@@ -176,6 +176,17 @@ public class GoogleDriveService {
         return result.getFiles();
     }
 
+    public void deleteFile(String fileId, String refreshToken) throws Exception {
+        Drive drive = getDrive(refreshToken);
+        try {
+            drive.files().delete(fileId).execute();
+            log.info("Deleted file {} from Drive", fileId);
+        } catch (Exception e) {
+            log.error("Failed to delete file {} from Drive", fileId, e);
+            throw e;
+        }
+    }
+
     public com.music.app.dto.DriveStreamResponse streamFile(String fileId, String rangeHeader, String refreshToken) throws Exception {
         Drive drive = getDrive(refreshToken);
 

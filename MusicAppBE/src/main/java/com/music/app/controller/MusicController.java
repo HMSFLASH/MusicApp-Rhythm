@@ -6,7 +6,6 @@ import com.music.app.service.MusicService;
 import com.music.app.util.SecurityUtils;
 import lombok.RequiredArgsConstructor;
 import lombok.extern.slf4j.Slf4j;
-import org.springframework.http.ResponseEntity;
 import org.springframework.web.bind.annotation.*;
 import org.springframework.web.multipart.MultipartFile;
 import org.springframework.http.MediaType;
@@ -31,13 +30,30 @@ public class MusicController {
                 .build();
     }
 
+    @PostMapping("/sync")
+    public ApiResponse<List<MusicItemDto>> syncWithDrive(Principal principal) {
+        Long userId = SecurityUtils.extractUserId(principal);
+        return ApiResponse.<List<MusicItemDto>>builder()
+                .result(musicService.syncWithDrive(userId))
+                .build();
+    }
+
     @PutMapping("/{id}/metadata")
     public ApiResponse<MusicItemDto> updateMetadata(@PathVariable Long id,
-                                                    @RequestBody MusicItemDto dto,
-                                                    Principal principal) {
+            @RequestBody MusicItemDto dto,
+            Principal principal) {
         Long userId = SecurityUtils.extractUserId(principal);
         return ApiResponse.<MusicItemDto>builder()
                 .result(musicService.updateMetadata(id, dto, userId))
+                .build();
+    }
+
+    @DeleteMapping("/{id}")
+    public ApiResponse<Void> deleteMusic(@PathVariable Long id, Principal principal) {
+        Long userId = SecurityUtils.extractUserId(principal);
+        musicService.deleteMusic(id, userId);
+        return ApiResponse.<Void>builder()
+                .result(null)
                 .build();
     }
 
@@ -49,11 +65,12 @@ public class MusicController {
             @RequestParam(value = "album", required = false) String album,
             @RequestParam(value = "genre", required = false) String genre,
             @RequestParam(value = "imageUrl", required = false) String imageUrl,
+            @RequestParam(value = "lyrics", required = false) String lyrics,
             Principal principal) {
-            
+
         Long userId = SecurityUtils.extractUserId(principal);
         return ApiResponse.<MusicItemDto>builder()
-                .result(musicService.uploadToDrive(file, title, artist, album, genre, imageUrl, userId))
+                .result(musicService.uploadToDrive(file, title, artist, album, genre, imageUrl, lyrics, userId))
                 .build();
     }
 

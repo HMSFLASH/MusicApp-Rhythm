@@ -108,6 +108,7 @@ public class BackupService {
                                 .album(trackDto.getAlbum())
                                 .genre(trackDto.getGenre())
                                 .imageUrl(trackDto.getImageUrl())
+                                .lyrics(trackDto.getLyrics())
                                 .build();
                     } else {
                         lib.setTitle(trackDto.getTitle());
@@ -115,6 +116,7 @@ public class BackupService {
                         lib.setAlbum(trackDto.getAlbum());
                         lib.setGenre(trackDto.getGenre());
                         lib.setImageUrl(trackDto.getImageUrl());
+                        lib.setLyrics(trackDto.getLyrics());
                     }
                     musicLibraryRepository.save(lib);
                 }
@@ -156,6 +158,7 @@ public class BackupService {
                                             .album(trackDto.getAlbum())
                                             .genre(trackDto.getGenre())
                                             .imageUrl(trackDto.getImageUrl())
+                                            .lyrics(trackDto.getLyrics())
                                             .build());
                                 }
                             }
@@ -197,6 +200,7 @@ public class BackupService {
                                     .album(trackDto.getAlbum())
                                     .genre(trackDto.getGenre())
                                     .imageUrl(trackDto.getImageUrl())
+                                    .lyrics(trackDto.getLyrics())
                                     .build());
                         }
                     }
