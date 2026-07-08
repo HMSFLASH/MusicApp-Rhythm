@@ -3,17 +3,25 @@ import type { Track } from './audioTypes';
 import { LOCAL_STORAGE_KEY } from './audioStorage';
 import { clamp } from './audioMath';
 import { getBufferProgressIntervalMs, getFullCoreCount, isLikelyConstrainedDevice } from './audioDevice';
-import { createSilentWavUrl } from './audioGraph';
 import { createRenderSignature as createAudioRenderSignature } from './audioRenderSignature';
 import { renderOfflineAudio } from './offlineAudioRenderer';
+import { useMediaSessionPlayback } from './useMediaSessionPlayback';
+import {
+  cachePrecalculatedQueueBuffer as cachePrecalculatedQueueBufferEntry,
+  cacheRenderSignatureBuffer as cacheRenderSignatureBufferEntry,
+  getCachedPrecalculatedQueueBuffer as getCachedPrecalculatedQueueBufferEntry,
+  getCachedRenderSignatureBuffer as getCachedRenderSignatureBufferEntry,
+  prunePrecalculatedQueueBuffers as prunePrecalculatedQueueBufferEntries,
+  type LoadingTrackPhase,
+  type PrecalculatedNextBuffer,
+  type QueuePrecalculateStatus,
+} from './audioPlaybackCache';
 import {
   getAdjacentTrackWindow,
-  MAX_PRECALCULATED_BUFFER_CACHE_SIZE,
-  MAX_RENDER_SIGNATURE_CACHE_ENTRIES,
-  type LoadingTrackPhase,
-  type QueuePrecalculateStatus,
-} from './audioPlaybackHelpers';
-import { loadTrackAudioUrl } from './audioTrackSource';
+  getCurrentTrackIndex,
+  getPlaybackAvailability,
+} from './audioPlaybackQueue';
+import { loadTrackAudioUrl } from './audioTrackLoader';
 
 export function useAudioPlayback(
   isAuthenticated: boolean,
@@ -81,7 +89,7 @@ export function useAudioPlayback(
   const bufferPausedTimeRef = useRef<number>(0);
   const rafRef = useRef<number | null>(null);
   const isDecodingRef = useRef<boolean>(false);
-  const precalculatedNextBufferRef = useRef<{ trackId: string, buffer: AudioBuffer } | null>(null);
+  const precalculatedNextBufferRef = useRef<PrecalculatedNextBuffer | null>(null);
   const precalculatedQueueBuffersRef = useRef<Map<string, AudioBuffer>>(new Map());
   const renderSignatureBuffersRef = useRef<Map<string, AudioBuffer>>(new Map());
   const fullQueuePrecalculateCacheRef = useRef<boolean>(false);
@@ -94,14 +102,14 @@ export function useAudioPlayback(
   const decodeSessionRef = useRef<symbol | null>(null);
   const playNextRef = useRef<(() => void) | null>(null);
   const playPreviousRef = useRef<(() => void) | null>(null);
+  const seekRef = useRef<((time: number) => void) | null>(null);
+  const togglePlayRef = useRef<(() => void) | null>(null);
   // eslint-disable-next-line @typescript-eslint/no-explicit-any
   const playTrackRef = useRef<((...args: any[]) => void) | null>(null);
   const currentTimeSnapshotRef = useRef<number>(0);
   const isPlayingSnapshotRef = useRef<boolean>(false);
   const currentTrackSnapshotRef = useRef<Track | null>(currentTrack ?? null);
   const usingBufferPlaybackRef = useRef<boolean>(false);
-  const mediaSessionAnchorRef = useRef<HTMLAudioElement | null>(null);
-  const mediaSessionAnchorUrlRef = useRef<string | null>(null);
 
   const clearTrackLoading = useCallback(() => {
     setIsLoadingTrack(false);
@@ -117,49 +125,23 @@ export function useAudioPlayback(
     }, 0);
   }, []);
 
-  const getMediaSessionAnchor = useCallback(() => {
-    if (!mediaSessionAnchorRef.current) {
-      const anchor = new Audio();
-      anchor.loop = true;
-      anchor.preload = 'auto';
-      anchor.src = mediaSessionAnchorUrlRef.current || createSilentWavUrl();
-      mediaSessionAnchorUrlRef.current = anchor.src;
-      mediaSessionAnchorRef.current = anchor;
-    }
-
-    return mediaSessionAnchorRef.current;
-  }, []);
-
-  const startMediaSessionAnchor = useCallback(() => {
-    if (isLikelyConstrainedDevice()) return;
-
-    const anchor = getMediaSessionAnchor();
-    if (!anchor.paused) return;
-    anchor.play().catch((e) => console.warn('[MediaSession] Silent anchor playback failed', e));
-  }, [getMediaSessionAnchor]);
-
-  const pauseMediaSessionAnchor = useCallback(() => {
-    const anchor = mediaSessionAnchorRef.current;
-    if (!anchor) return;
-
-    anchor.pause();
-    try {
-      anchor.currentTime = 0;
-    } catch {
-      // Some browsers reject seeks while the silent anchor is still loading.
-    }
-  }, []);
-
-  const updateMediaSessionMetadata = useCallback((track: Track | null) => {
-    if (!('mediaSession' in navigator) || !track) return;
-
-    navigator.mediaSession.metadata = new MediaMetadata({
-      title: track.title || (track.fileName ? track.fileName.replace(/\.[^/.]+$/, "") : 'Unknown Title'),
-      artist: track.artist || (track.fileName?.includes(' - ') ? track.fileName.split(' - ')[0] : 'Unknown Artist'),
-      album: track.album || 'Unknown Album',
-      artwork: track.imageUrl ? [{ src: track.imageUrl, sizes: '512x512', type: 'image/jpeg' }] : []
-    });
-  }, []);
+  const {
+    startMediaSessionAnchor,
+    pauseMediaSessionAnchor,
+    cleanupMediaSessionAnchor,
+    updateMediaSessionMetadata,
+  } = useMediaSessionPlayback({
+    currentTrack: currentTrack ?? null,
+    isPlaying,
+    currentTime,
+    duration,
+    playbackRate,
+    onPlay: () => togglePlayRef.current?.(),
+    onPause: () => togglePlayRef.current?.(),
+    onPreviousTrack: () => playPreviousRef.current?.(),
+    onNextTrack: () => playNextRef.current?.(),
+    onSeekTo: (time) => seekRef.current?.(time),
+  });
 
   useEffect(() => {
     if (!audioRef.current) {
@@ -239,15 +221,7 @@ export function useAudioPlayback(
         audioContextRef.current.close().catch(console.error);
         audioContextRef.current = null;
       }
-      pauseMediaSessionAnchor();
-      if (mediaSessionAnchorRef.current) {
-        mediaSessionAnchorRef.current.src = "";
-        mediaSessionAnchorRef.current = null;
-      }
-      if (mediaSessionAnchorUrlRef.current) {
-        URL.revokeObjectURL(mediaSessionAnchorUrlRef.current);
-        mediaSessionAnchorUrlRef.current = null;
-      }
+      cleanupMediaSessionAnchor();
     };
   // eslint-disable-next-line react-hooks/exhaustive-deps
   }, []);
@@ -596,77 +570,36 @@ export function useAudioPlayback(
     return createAudioRenderSignature(audioParamsRef.current, fxEnabledRef.current || {});
   };
 
-  const getRenderSignatureCacheKey = (trackId: string, signature = createRenderSignature()) => (
-    `${trackId}::${signature}`
-  );
-
-  const pruneRenderSignatureCache = () => {
-    const cache = renderSignatureBuffersRef.current;
-    while (cache.size > MAX_RENDER_SIGNATURE_CACHE_ENTRIES) {
-      const oldestKey = cache.keys().next().value;
-      if (oldestKey === undefined) break;
-      cache.delete(oldestKey);
-    }
-  };
-
   const getCachedRenderSignatureBuffer = (trackId: string, signature = createRenderSignature()) => {
-    if (!renderSignatureCacheEnabledRef.current) return null;
-
-    const cache = renderSignatureBuffersRef.current;
-    const key = getRenderSignatureCacheKey(trackId, signature);
-    const cachedBuffer = cache.get(key);
-    if (!cachedBuffer) return null;
-
-    cache.delete(key);
-    cache.set(key, cachedBuffer);
-    return cachedBuffer;
+    return getCachedRenderSignatureBufferEntry({
+      cache: renderSignatureBuffersRef.current,
+      enabled: renderSignatureCacheEnabledRef.current,
+      trackId,
+      signature,
+    });
   };
 
   const cacheRenderSignatureBuffer = (trackId: string, signature: string, buffer: AudioBuffer) => {
-    if (!renderSignatureCacheEnabledRef.current) return;
-
-    const cache = renderSignatureBuffersRef.current;
-    const key = getRenderSignatureCacheKey(trackId, signature);
-    cache.delete(key);
-    cache.set(key, buffer);
-    pruneRenderSignatureCache();
+    cacheRenderSignatureBufferEntry({
+      cache: renderSignatureBuffersRef.current,
+      enabled: renderSignatureCacheEnabledRef.current,
+      trackId,
+      signature,
+      buffer,
+    });
   };
 
   const prunePrecalculatedQueueBuffers = (preferredAllowedIds = allowedIdsRef.current) => {
-    if (fullQueuePrecalculateCacheRef.current) return;
-
-    const cache = precalculatedQueueBuffersRef.current;
-
-    if (preferredAllowedIds.size > 0) {
-      for (const key of cache.keys()) {
-        if (!preferredAllowedIds.has(String(key))) {
-          cache.delete(key);
-        }
-      }
-
-      if (
-        precalculatedNextBufferRef.current &&
-        !preferredAllowedIds.has(precalculatedNextBufferRef.current.trackId)
-      ) {
-        precalculatedNextBufferRef.current = null;
-      }
-    }
-
-    while (cache.size > MAX_PRECALCULATED_BUFFER_CACHE_SIZE) {
-      const oldestKey = cache.keys().next().value;
-      if (oldestKey === undefined) break;
-      cache.delete(oldestKey);
-    }
+    precalculatedNextBufferRef.current = prunePrecalculatedQueueBufferEntries({
+      cache: precalculatedQueueBuffersRef.current,
+      preferredAllowedIds,
+      nextBuffer: precalculatedNextBufferRef.current,
+      fullQueuePrecalculateCache: fullQueuePrecalculateCacheRef.current,
+    });
   };
 
   const getCachedPrecalculatedQueueBuffer = (trackId: string) => {
-    const cache = precalculatedQueueBuffersRef.current;
-    const cachedBuffer = cache.get(trackId);
-    if (!cachedBuffer) return null;
-
-    cache.delete(trackId);
-    cache.set(trackId, cachedBuffer);
-    return cachedBuffer;
+    return getCachedPrecalculatedQueueBufferEntry(precalculatedQueueBuffersRef.current, trackId);
   };
 
   const cachePrecalculatedQueueBuffer = (
@@ -674,10 +607,14 @@ export function useAudioPlayback(
     buffer: AudioBuffer,
     preferredAllowedIds = allowedIdsRef.current
   ) => {
-    const cache = precalculatedQueueBuffersRef.current;
-    cache.delete(trackId);
-    cache.set(trackId, buffer);
-    prunePrecalculatedQueueBuffers(preferredAllowedIds);
+    precalculatedNextBufferRef.current = cachePrecalculatedQueueBufferEntry({
+      cache: precalculatedQueueBuffersRef.current,
+      trackId,
+      buffer,
+      preferredAllowedIds,
+      nextBuffer: precalculatedNextBufferRef.current,
+      fullQueuePrecalculateCache: fullQueuePrecalculateCacheRef.current,
+    });
   };
 
   const performOfflineRender = async (audioBuffer: AudioBuffer) =>
@@ -794,8 +731,7 @@ export function useAudioPlayback(
 
     // Find next track
     let nextTrack: Track | null = null;
-    // eslint-disable-next-line @typescript-eslint/no-explicit-any
-    const idx = currentQueue.findIndex((t: any) => String(t.id) === String(currentTrack.id));
+    const idx = getCurrentTrackIndex(currentTrack, currentQueue);
     if (idx !== -1 && idx < currentQueue.length - 1) {
       nextTrack = currentQueue[idx + 1];
     } else if (queueEndMode === 'repeat' && idx === currentQueue.length - 1) {
@@ -1074,8 +1010,7 @@ export function useAudioPlayback(
     const latestPlayTrack = playTrackRef.current;
     if (!latestPlayTrack) return;
 
-    // eslint-disable-next-line @typescript-eslint/no-explicit-any
-    const idx = queue.findIndex((t: any) => String(t.id) === String(currentTrack.id));
+    const idx = getCurrentTrackIndex(currentTrack, queue);
     if (idx !== -1 && idx < queue.length - 1) {
       latestPlayTrack(queue[idx + 1], queue, !isPreload);
     } else if (queueEndMode === 'repeat' && idx === queue.length - 1) {
@@ -1117,8 +1052,7 @@ export function useAudioPlayback(
     // Use playTrackRef to always call the latest playTrack (avoids stale closure)
     const latestPlayTrack = playTrackRef.current;
     if (!latestPlayTrack) return;
-    // eslint-disable-next-line @typescript-eslint/no-explicit-any
-    const idx = queue.findIndex((t: any) => String(t.id) === String(currentTrack.id));
+    const idx = getCurrentTrackIndex(currentTrack, queue);
     if (idx > 0) {
       latestPlayTrack(queue[idx - 1], queue);
     } else if (idx === 0 && queueEndMode === 'repeat' && queue.length > 1) {
@@ -1179,9 +1113,6 @@ export function useAudioPlayback(
     }
   };
 
-  const seekRef = useRef(seek);
-  const togglePlayRef = useRef(togglePlay);
-
   useEffect(() => {
     playNextRef.current = playNext;
     playPreviousRef.current = playPrevious;
@@ -1189,42 +1120,6 @@ export function useAudioPlayback(
     seekRef.current = seek;
     togglePlayRef.current = togglePlay;
   });
-
-  // Update Media Session State
-  useEffect(() => {
-    if ('mediaSession' in navigator) {
-      navigator.mediaSession.playbackState = isPlaying ? 'playing' : 'paused';
-      if (duration > 0 && !Number.isNaN(duration)) {
-        try {
-          navigator.mediaSession.setPositionState({
-            duration: duration,
-            playbackRate: playbackRate,
-            position: currentTime
-          });
-        } catch {
-          // Some browsers reject position updates while metadata is incomplete.
-        }
-      }
-    }
-  // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [isPlaying, playbackRate, duration]);
-
-  // Update Media Session Metadata and Handlers
-  useEffect(() => {
-    if ('mediaSession' in navigator) {
-      updateMediaSessionMetadata(currentTrack ?? null);
-
-      navigator.mediaSession.setActionHandler('play', () => togglePlayRef.current());
-      navigator.mediaSession.setActionHandler('pause', () => togglePlayRef.current());
-      navigator.mediaSession.setActionHandler('previoustrack', () => playPreviousRef.current?.());
-      navigator.mediaSession.setActionHandler('nexttrack', () => playNextRef.current?.());
-      navigator.mediaSession.setActionHandler('seekto', (details) => {
-        if (details.seekTime !== undefined) {
-          seekRef.current(details.seekTime);
-        }
-      });
-    }
-  }, [currentTrack, updateMediaSessionMetadata]);
 
   useEffect(() => {
     const handleMusicDeleted = (e: Event) => {
@@ -1256,16 +1151,13 @@ export function useAudioPlayback(
     return () => window.removeEventListener('music-deleted', handleMusicDeleted);
   }, [audioRef, setCurrentTrack]);
 
-  // Compute hasNext and hasPrevious
-  // eslint-disable-next-line @typescript-eslint/no-explicit-any
-  const currentIdx = currentTrack ? queue.findIndex((t: any) => String(t.id) === String(currentTrack.id)) : -1;
-  const hasPrevious = currentIdx > 0 || (currentIdx === 0 && queueEndMode === 'repeat' && queue.length > 1);
-  const hasNext = currentIdx !== -1 && (
-    currentIdx < queue.length - 1 ||
-    (queueEndMode === 'repeat' && queue.length > 1) ||
-    (queueEndMode === 'next' && upcomingQueues && upcomingQueues.length > 0) ||
-    (queueEndMode === 'next' && cycleQueues && queue.length > 0)
-  );
+  const { hasPrevious, hasNext } = getPlaybackAvailability({
+    currentTrack: currentTrack ?? null,
+    queue,
+    queueEndMode,
+    upcomingQueues,
+    cycleQueues,
+  });
 
   return {
     isPlaying,

@@ -1,9 +1,42 @@
-import { useRef } from 'react';
+import { useRef, type ReactNode } from 'react';
+import { FolderOpen } from 'lucide-react';
 import { useGlobalAudio } from '../context/AudioContext';
 import { useTranslation } from 'react-i18next';
 import { AUDIO_EXTENSIONS } from '../hooks/audioMime';
-import { LocalPickerButton } from './local-file-picker/LocalPickerButton';
 import { useLocalFileImport } from './local-file-picker/useLocalFileImport';
+
+type LocalPickerButtonProps = {
+  label: ReactNode;
+  hint?: ReactNode;
+  onClick: () => void;
+  iconClassName?: string;
+};
+
+function LocalPickerButton({
+  label,
+  hint,
+  onClick,
+  iconClassName,
+}: LocalPickerButtonProps) {
+  return (
+    <button
+      onClick={onClick}
+      className="flex items-start gap-3 px-3 py-2.5 rounded-lg text-white/60 hover:text-white hover:bg-white/5 transition-colors text-left w-full"
+    >
+      <FolderOpen size={20} className={iconClassName} />
+      {hint ? (
+        <span className="flex flex-col gap-0.5">
+          <span>{label}</span>
+          <span className="text-[11px] leading-snug text-amber-400/70">
+            {hint}
+          </span>
+        </span>
+      ) : (
+        <span>{label}</span>
+      )}
+    </button>
+  );
+}
 
 export function LocalFilePicker() {
   const { t } = useTranslation();

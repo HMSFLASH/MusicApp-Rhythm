@@ -1,7 +1,8 @@
 import { axiosClient } from '../api/axiosClient';
 import { getTrackMimeType } from './audioMime';
 import type { Track } from './audioTypes';
-import { DRIVE_MEDIA_URL } from './audioPlaybackHelpers';
+
+const DRIVE_MEDIA_URL = 'https://www.googleapis.com/drive/v3/files';
 
 type LoadTrackAudioUrlOptions = {
   track: Track;
