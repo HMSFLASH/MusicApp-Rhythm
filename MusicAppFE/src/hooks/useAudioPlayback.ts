@@ -75,6 +75,8 @@ const isLikelyConstrainedDevice = () => {
   return isMobileUserAgent || isCoarseSmallScreen || cores <= 4 || memory <= 4;
 };
 
+const getBufferProgressIntervalMs = () => isLikelyConstrainedDevice() ? 250 : 100;
+
 const connectStereoWidthMatrix = (ctx: BaseAudioContext, input: AudioNode, widthPercent: number) => {
   const width = percentToStereoBaseWidth(widthPercent);
   const pseudoAmount = percentToPseudoStereoAmount(widthPercent);
@@ -545,6 +547,27 @@ export function useAudioPlayback(
     bufferVolumeNodeRef.current.connect(audioContextRef.current.destination);
   }, [audioContextRef, bufferVolumeNodeRef]);
 
+  const startBufferProgressTimer = useCallback(() => {
+    if (rafRef.current) window.clearInterval(rafRef.current);
+
+    const updateTime = () => {
+      if (document.hidden) return;
+      if (!audioContextRef.current) return;
+
+      const elapsed = (audioContextRef.current.currentTime - bufferStartTimeRef.current) * playbackRate;
+      const boundedElapsed = audioBufferRef.current
+        ? clamp(elapsed, 0, audioBufferRef.current.duration)
+        : Math.max(0, elapsed);
+
+      setCurrentTime((previous) => (
+        Math.abs(previous - boundedElapsed) < 0.05 ? previous : boundedElapsed
+      ));
+    };
+
+    updateTime();
+    rafRef.current = window.setInterval(updateTime, getBufferProgressIntervalMs());
+  }, [audioContextRef, playbackRate]);
+
   const stopBufferPlayback = useCallback(() => {
     if (bufferSourceRef.current) {
       try {
@@ -970,7 +993,7 @@ console.log("[Audio] performOfflineRender called with EQ bands:", audioParamsRef
   };
 
 
-  const preloadAdjacentTracks = async (currentId: string | number, currentQueue: Track[]) => {
+  const preloadAdjacentTracks = async (currentId: string | number, currentQueue: Track[], shouldPreload = true) => {
     const allowedIds = new Set<string>();
     allowedIds.add(String(currentId));
 
@@ -1002,6 +1025,8 @@ console.log("[Audio] performOfflineRender called with EQ bands:", audioParamsRef
         console.log(`[Cache Cleanup] Removed blob ${key} from RAM`);
       }
     }
+
+    if (!shouldPreload) return;
 
     // 2. Preload the next and prev tracks
     if (next1) {
@@ -1035,16 +1060,7 @@ console.log("[Audio] performOfflineRender called with EQ bands:", audioParamsRef
     bufferStartTimeRef.current = audioContextRef.current.currentTime - (offset / playbackRate);
     source.start(0, offset);
     startMediaSessionAnchor();
-
-    if (rafRef.current) window.clearInterval(rafRef.current);
-    const updateTime = () => {
-      if (document.hidden) return;
-      if (audioContextRef.current) {
-        const elapsed = (audioContextRef.current.currentTime - bufferStartTimeRef.current) * playbackRate;
-        setCurrentTime(elapsed);
-      }
-    };
-    rafRef.current = window.setInterval(updateTime, 25);
+    startBufferProgressTimer();
     setIsPlaying(true);
   };
 
@@ -1141,15 +1157,7 @@ console.log("[Audio] performOfflineRender called with EQ bands:", audioParamsRef
             startMediaSessionAnchor();
             clearTrackLoading();
             setIsPlaying(true);
-
-            const updateTime = () => {
-              if (document.hidden) return;
-              if (audioContextRef.current) {
-                const elapsed = (audioContextRef.current.currentTime - bufferStartTimeRef.current) * playbackRate;
-                setCurrentTime(elapsed);
-              }
-            };
-            rafRef.current = window.setInterval(updateTime, 25);
+            startBufferProgressTimer();
           } else {
             bufferPausedTimeRef.current = 0;
             clearTrackLoading();
@@ -1200,7 +1208,11 @@ console.log("[Audio] performOfflineRender called with EQ bands:", audioParamsRef
     }
 
     // Keep only the active neighborhood in RAM: current, previous, and next.
-    preloadAdjacentTracks(startingTrack.id, currentQueue!);
+    preloadAdjacentTracks(
+      startingTrack.id,
+      currentQueue!,
+      !(precalculateOnIdleRef.current && isLikelyConstrainedDevice())
+    );
     
     
   };

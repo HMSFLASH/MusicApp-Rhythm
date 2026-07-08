@@ -286,7 +286,6 @@ console.log("[Audio] initializeAudioContext called");
     if (agcPreGainRef.current) agcPreGainRef.current.disconnect();
     if (agcCompressorRef.current) agcCompressorRef.current.disconnect();
     if (agcMakeupRef.current) agcMakeupRef.current.disconnect();
-    if (bufferVolumeNodeRef.current) bufferVolumeNodeRef.current.disconnect();
     if (limiterNodeRef.current) limiterNodeRef.current.disconnect();
     if (softClipNodeRef.current) softClipNodeRef.current.disconnect();
     if (panNodeRef.current) panNodeRef.current.disconnect();
@@ -480,11 +479,6 @@ console.log("[Audio] initializeAudioContext called");
     currentNode.connect(headroomRecoverRef.current);
     currentNode = headroomRecoverRef.current;
 
-    if (bufferVolumeNodeRef.current) {
-      currentNode.connect(bufferVolumeNodeRef.current);
-      currentNode = bufferVolumeNodeRef.current;
-    }
-    
     if (!limiterNodeRef.current) {
       limiterNodeRef.current = ctx.createDynamicsCompressor();
     }
