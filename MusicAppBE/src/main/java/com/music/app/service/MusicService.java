@@ -8,6 +8,9 @@ import com.music.app.model.MusicLibrary;
 import com.music.app.model.User;
 import com.music.app.repository.MusicLibraryRepository;
 import com.music.app.repository.UserRepository;
+
+import jakarta.persistence.EntityManager;
+import jakarta.persistence.PersistenceContext;
 import lombok.RequiredArgsConstructor;
 import lombok.extern.slf4j.Slf4j;
 import org.springframework.stereotype.Service;
@@ -28,6 +31,9 @@ public class MusicService {
     private final MusicLibraryRepository musicLibraryRepository;
     private final GoogleDriveService googleDriveService;
     private final UserRepository userRepository;
+
+    @PersistenceContext
+    private EntityManager entityManager;
 
     public MusicItemDto toDto(MusicLibrary lib) {
         return MusicItemDto.builder()
@@ -109,11 +115,25 @@ public class MusicService {
         }
     }
 
+    @org.springframework.transaction.annotation.Transactional
     public void deleteMusic(Long id, Long userId) {
         MusicLibrary lib = musicLibraryRepository.findById(id)
                 .orElseThrow(() -> new AppException(ErrorCode.NOT_FOUND));
         if (!lib.getUser().getId().equals(userId)) {
             throw new AppException(ErrorCode.FORBIDDEN);
+        }
+
+        // Fix logic error when deleting songs that are in favorites or playlists
+        try {
+            entityManager.createQuery("DELETE FROM PlaylistItem p WHERE p.musicLibrary.id = :id")
+                    .setParameter("id", id)
+                    .executeUpdate();
+
+            entityManager.createQuery("DELETE FROM Favorite f WHERE f.musicLibrary.id = :id")
+                    .setParameter("id", id)
+                    .executeUpdate();
+        } catch (Exception e) {
+            log.error("Failed to delete related records for music id: {}", id, e);
         }
 
         if ("DRIVE".equals(lib.getSourceType()) && lib.getDriveFileId() != null) {
@@ -172,11 +192,14 @@ public class MusicService {
                                 genre = tags.getGenre();
 
                             java.util.List<String> lyricsList = tags.getComments("LYRICS");
-                            if (lyricsList == null || lyricsList.isEmpty()) lyricsList = tags.getComments("UNSYNCEDLYRICS");
-                            if (lyricsList == null || lyricsList.isEmpty()) lyricsList = tags.getComments("UNSYNCED LYRICS");
+                            if (lyricsList == null || lyricsList.isEmpty())
+                                lyricsList = tags.getComments("UNSYNCEDLYRICS");
+                            if (lyricsList == null || lyricsList.isEmpty())
+                                lyricsList = tags.getComments("UNSYNCED LYRICS");
                             if (lyricsList == null || lyricsList.isEmpty()) {
                                 java.util.Map<String, java.util.List<String>> allComments = tags.getAllComments();
-                                for (java.util.Map.Entry<String, java.util.List<String>> entry : allComments.entrySet()) {
+                                for (java.util.Map.Entry<String, java.util.List<String>> entry : allComments
+                                        .entrySet()) {
                                     String id = entry.getKey().toUpperCase();
                                     if (id.contains("LYRICS") || id.equals("USLT") || id.equals("SYLT")) {
                                         lyricsList = entry.getValue();
@@ -186,7 +209,8 @@ public class MusicService {
                             }
                             if (lyricsList != null && !lyricsList.isEmpty()) {
                                 lyrics = lyricsList.get(0);
-                                log.info("Extracted lyrics from Opus tags via vorbis-java-core, length: {}", lyrics.length());
+                                log.info("Extracted lyrics from Opus tags via vorbis-java-core, length: {}",
+                                        lyrics.length());
                             } else {
                                 log.info("No lyrics found in Opus tags");
                             }
@@ -206,38 +230,52 @@ public class MusicService {
 
                             String tagLyrics = tag.getFirst(FieldKey.LYRICS);
                             if (tagLyrics == null || tagLyrics.isBlank()) {
-                                try { tagLyrics = tag.getFirst("UNSYNCEDLYRICS"); } catch(Exception ex){}
+                                try {
+                                    tagLyrics = tag.getFirst("UNSYNCEDLYRICS");
+                                } catch (Exception ex) {
+                                }
                             }
                             if (tagLyrics == null || tagLyrics.isBlank()) {
-                                try { tagLyrics = tag.getFirst("UNSYNCED LYRICS"); } catch(Exception ex){}
+                                try {
+                                    tagLyrics = tag.getFirst("UNSYNCED LYRICS");
+                                } catch (Exception ex) {
+                                }
                             }
                             if (tagLyrics == null || tagLyrics.isBlank()) {
-                                try { tagLyrics = tag.getFirst("USLT"); } catch(Exception ex){}
+                                try {
+                                    tagLyrics = tag.getFirst("USLT");
+                                } catch (Exception ex) {
+                                }
                             }
                             if (tagLyrics == null || tagLyrics.isBlank()) {
-                                try { tagLyrics = tag.getFirst("SYLT"); } catch(Exception ex){}
+                                try {
+                                    tagLyrics = tag.getFirst("SYLT");
+                                } catch (Exception ex) {
+                                }
                             }
-                            
+
                             if (tagLyrics == null || tagLyrics.isBlank()) {
                                 java.util.Iterator<org.jaudiotagger.tag.TagField> fields = tag.getFields();
-                                while(fields.hasNext()) {
+                                while (fields.hasNext()) {
                                     org.jaudiotagger.tag.TagField field = fields.next();
                                     String id = field.getId();
                                     String content = field.toString();
-                                    
-                                    log.info("=== METADATA TAG === ID: [{}], CONTENT length: {}, startsWith: [{}]", 
-                                        id, 
-                                        content == null ? 0 : content.length(),
-                                        content != null && content.length() > 50 ? content.substring(0, 50).replace("\n", " ") + "..." : (content != null ? content.replace("\n", " ") : "null")
-                                    );
-                                    
+
+                                    log.info("=== METADATA TAG === ID: [{}], CONTENT length: {}, startsWith: [{}]",
+                                            id,
+                                            content == null ? 0 : content.length(),
+                                            content != null && content.length() > 50
+                                                    ? content.substring(0, 50).replace("\n", " ") + "..."
+                                                    : (content != null ? content.replace("\n", " ") : "null"));
+
                                     String upperId = id.toUpperCase();
                                     if (content != null && content.contains("\n") && content.length() > 20) {
                                         tagLyrics = content;
                                         // Clean up Jaudiotagger's toString format like: ID="Lyrics..."
                                         if (tagLyrics.contains("=\"")) {
                                             tagLyrics = tagLyrics.substring(tagLyrics.indexOf("=\"") + 2);
-                                            if (tagLyrics.endsWith("\"")) tagLyrics = tagLyrics.substring(0, tagLyrics.length() - 1);
+                                            if (tagLyrics.endsWith("\""))
+                                                tagLyrics = tagLyrics.substring(0, tagLyrics.length() - 1);
                                         }
                                         // Don't break, keep logging the rest!
                                     }
@@ -246,7 +284,8 @@ public class MusicService {
 
                             if (tagLyrics != null && !tagLyrics.isBlank()) {
                                 lyrics = tagLyrics;
-                                log.info("Extracted lyrics from file tags via jaudiotagger, length: {}", lyrics.length());
+                                log.info("Extracted lyrics from file tags via jaudiotagger, length: {}",
+                                        lyrics.length());
                             } else {
                                 log.info("No lyrics found in file tags via jaudiotagger");
                             }

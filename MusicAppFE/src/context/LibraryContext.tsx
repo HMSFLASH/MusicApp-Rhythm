@@ -208,25 +208,48 @@ export function LibraryProvider({ children }: { children: ReactNode }) {
   const toggleFavorite = useCallback(async (track: Track) => {
     if (track.sourceType === 'LOCAL') return;
     const isFav = favorites.some(f => f.id === track.id);
+    
+    // Optimistic UI update
+    if (isFav) {
+      setFavorites(prev => {
+        const newFavs = prev.filter(f => f.id !== track.id);
+        void db.set('sonic_favorites', newFavs);
+        return newFavs;
+      });
+    } else {
+      setFavorites(prev => {
+        const newFavs = [...prev, track];
+        void db.set('sonic_favorites', newFavs);
+        return newFavs;
+      });
+    }
+
     try {
       if (isFav) {
         await axiosClient.delete(`/api/favorites/${track.id}`);
-        setFavorites(prev => {
-          const newFavs = prev.filter(f => f.id !== track.id);
-          void db.set('sonic_favorites', newFavs);
-          return newFavs;
-        });
       } else {
         await axiosClient.post(`/api/favorites/${track.id}`);
+      }
+    } catch (err: any) {
+      console.error(err);
+      // Revert on error
+      if (isFav) {
         setFavorites(prev => {
           const newFavs = [...prev, track];
           void db.set('sonic_favorites', newFavs);
           return newFavs;
         });
+      } else {
+        setFavorites(prev => {
+          const newFavs = prev.filter(f => f.id !== track.id);
+          void db.set('sonic_favorites', newFavs);
+          return newFavs;
+        });
       }
-    } catch (err) {
-      console.error(err);
-      throw err;
+      // Suppress UI crash for duplicate rapid clicks
+      if (err.response?.status !== 404 && err.response?.status !== 400 && err.response?.status !== 409) {
+        throw err;
+      }
     }
   }, [favorites]);
 
