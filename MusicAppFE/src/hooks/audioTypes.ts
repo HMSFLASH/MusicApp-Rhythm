@@ -95,6 +95,7 @@ export interface Track {
   id: string | number;
   fileName: string;
   sourceType: 'DRIVE' | 'LOCAL';
+  driveFileId?: string;
   localFile?: File;
   imageUrl?: string;
   title?: string;

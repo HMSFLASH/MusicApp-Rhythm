@@ -34,6 +34,7 @@ public class MusicService {
                 .imageUrl(lib.getImageUrl())
                 .durationSeconds(lib.getDurationSeconds())
                 .sourceType(lib.getSourceType())
+                .driveFileId(lib.getDriveFileId())
                 .build();
     }
 
@@ -90,6 +91,24 @@ public class MusicService {
         } catch (Exception e) {
             log.error("Failed to upload file to drive", e);
             throw new AppException(ErrorCode.UNCATEGORIZED_EXCEPTION, "Failed to upload file to drive");
+        }
+    }
+
+    public String getDriveToken(Long userId) {
+        try {
+            User user = userRepository.findById(userId)
+                    .orElseThrow(() -> new AppException(ErrorCode.USER_NOT_EXISTED));
+                    
+            if (user.getRefreshToken() == null) {
+                throw new AppException(ErrorCode.FORBIDDEN, "User Google Drive not linked");
+            }
+
+            return googleDriveService.getAccessToken(user.getRefreshToken());
+        } catch (AppException e) {
+            throw e;
+        } catch (Exception e) {
+            log.error("Failed to get drive token", e);
+            throw new AppException(ErrorCode.UNCATEGORIZED_EXCEPTION, "Failed to get drive token");
         }
     }
 }

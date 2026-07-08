@@ -54,6 +54,17 @@ public class GoogleDriveService {
         });
     }
 
+    public String getAccessToken(String refreshToken) throws Exception {
+        UserCredentials credentials = UserCredentials.newBuilder()
+                .setClientId(clientId)
+                .setClientSecret(clientSecret)
+                .setRefreshToken(refreshToken)
+                .build();
+        credentials.refreshAccessToken();
+        return credentials.getAccessToken().getTokenValue();
+    }
+
+
     @PostConstruct
     public void init() throws Exception {
         this.httpTransport = GoogleNetHttpTransport.newTrustedTransport();

@@ -106,7 +106,9 @@ export function useAudioPlayback(
   // eslint-disable-next-line @typescript-eslint/no-explicit-any
   metadataState: any,
   // eslint-disable-next-line @typescript-eslint/no-explicit-any
-  savedState: any
+  savedState: any,
+  driveToken?: string,
+  fetchDriveToken?: () => Promise<string>
 ) {
   const { currentTrack, setCurrentTrack, queue, setQueue, isShuffleState, songEndMode, queueEndMode, upcomingQueues, cycleQueues, setUpcomingQueues } = queueState || {};
   const {
@@ -340,11 +342,14 @@ export function useAudioPlayback(
     }
 
     if (track.sourceType !== 'LOCAL') {
+      if (track.driveFileId && driveToken) {
+        return `https://www.googleapis.com/drive/v3/files/${track.driveFileId}?alt=media&access_token=${driveToken}`;
+      }
       return `${BACKEND_URL}/api/music/stream/${track.id}?access_token=${jwtToken}`;
     }
 
     return '';
-  }, [blobCacheRef, jwtToken]);
+  }, [blobCacheRef, jwtToken, driveToken]);
 
   const connectBufferOutputChain = useCallback(() => {
     if (!audioContextRef.current || !bufferVolumeNodeRef.current) return;
@@ -722,8 +727,11 @@ console.log("[Audio] performOfflineRender called with EQ bands:", audioParamsRef
       if (!jwtToken) return;
 
       console.log(`[preloadTrack] Fetching blob for ${track.title || track.fileName || 'Unknown Track'}...`);
-      const streamUrl = `${BACKEND_URL}/api/music/stream/${track.id}`;
-      const fetchUrl = `${streamUrl}?_t=${Date.now()}`;
+      let streamUrl = `${BACKEND_URL}/api/music/stream/${track.id}`;
+      if (track.driveFileId && driveToken) {
+        streamUrl = `https://www.googleapis.com/drive/v3/files/${track.driveFileId}?alt=media&access_token=${driveToken}`;
+      }
+      const fetchUrl = track.driveFileId && driveToken ? streamUrl : `${streamUrl}?_t=${Date.now()}`;
       const res = await axiosClient.get(fetchUrl, { responseType: 'blob' });
       const rawBlob = res as unknown as Blob;
       console.log(`[preloadTrack] Blob downloaded for ${track.title || track.fileName || 'Unknown Track'}`);

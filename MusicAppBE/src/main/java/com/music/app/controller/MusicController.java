@@ -13,6 +13,7 @@ import org.springframework.http.MediaType;
 
 import java.security.Principal;
 import java.util.List;
+import java.util.Map;
 
 @RestController
 @RequestMapping("/api/music")
@@ -53,6 +54,15 @@ public class MusicController {
         Long userId = SecurityUtils.extractUserId(principal);
         return ApiResponse.<MusicItemDto>builder()
                 .result(musicService.uploadToDrive(file, title, artist, album, genre, imageUrl, userId))
+                .build();
+    }
+
+    @GetMapping("/drive-token")
+    public ApiResponse<Map<String, String>> getDriveToken(Principal principal) {
+        Long userId = SecurityUtils.extractUserId(principal);
+        String token = musicService.getDriveToken(userId);
+        return ApiResponse.<Map<String, String>>builder()
+                .result(Map.of("accessToken", token))
                 .build();
     }
 }

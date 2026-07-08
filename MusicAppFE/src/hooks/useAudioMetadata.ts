@@ -6,7 +6,7 @@ import { db } from '../lib/db';
 const BACKEND_URL = `http://${window.location.hostname}:8080`;
 
 // eslint-disable-next-line @typescript-eslint/no-explicit-any
-export function useAudioMetadata(jwtToken: string, queueState: any) {
+export function useAudioMetadata(jwtToken: string, queueState: any, driveToken?: string) {
     const setCurrentTrack = queueState?.setCurrentTrack;
     const setQueue = queueState?.setQueue;
     const currentTrack = queueState?.currentTrack;
@@ -138,7 +138,10 @@ export function useAudioMetadata(jwtToken: string, queueState: any) {
                     
                     metadata = await parseBufferFn(buffer, fileInfo, { duration: false });
                 } else {
-                    const fetchUrl = `${BACKEND_URL}/api/music/stream/${track.id}?access_token=${jwtToken}`;
+                    let fetchUrl = `${BACKEND_URL}/api/music/stream/${track.id}?access_token=${jwtToken}`;
+                    if (track.driveFileId && driveToken) {
+                        fetchUrl = `https://www.googleapis.com/drive/v3/files/${track.driveFileId}?alt=media&access_token=${driveToken}`;
+                    }
                     const controller = new AbortController();
                     const response = await fetch(fetchUrl, { signal: controller.signal });
                     if (!response.ok) throw new Error(`HTTP ${response.status}`);

@@ -19,4 +19,5 @@ public class MusicItemDto {
     private String imageUrl;
     private Long durationSeconds;
     private String sourceType;
+    private String driveFileId;
 }

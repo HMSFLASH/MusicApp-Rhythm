@@ -9,11 +9,13 @@ export function useAudioEngine(
   queueState: ReturnType<typeof useAudioQueue>,
   effectsState: ReturnType<typeof useAudioEffectsState>,
   // eslint-disable-next-line @typescript-eslint/no-explicit-any
-  savedState: any
+  savedState: any,
+  driveToken?: string,
+  fetchDriveToken?: () => Promise<string>
 ) {
   const contextState = useAudioContext(effectsState);
   
-  const metadataState = useAudioMetadata(jwtToken, queueState);
+  const metadataState = useAudioMetadata(jwtToken, queueState, driveToken);
 
   const playbackState = useAudioPlayback(
     jwtToken,
@@ -21,7 +23,9 @@ export function useAudioEngine(
     effectsState,
     contextState,
     metadataState,
-    savedState
+    savedState,
+    driveToken,
+    fetchDriveToken
   );
 
   return {
