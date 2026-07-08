@@ -1,6 +1,7 @@
 import { useRef, useEffect, useState } from 'react';
 import type { Track } from './audioTypes';
 import { getCover, saveCover } from '../utils/idb';
+import { db } from '../lib/db';
 
 const BACKEND_URL = `http://${window.location.hostname}:8080`;
 
@@ -31,10 +32,10 @@ export function useAudioMetadata(jwtToken: string, queueState: any) {
 
         // --- CACHE READ LAYER ---
         const lsKey = `sonic_meta_${trackId}`;
-        const lsData = localStorage.getItem(lsKey);
+        const lsData = await db.get<Partial<Track>>(lsKey);
         if (lsData) {
             try {
-                const parsed = JSON.parse(lsData);
+                const parsed = lsData;
                 const idbCover = await getCover(trackId);
                 
                 if (idbCover) {
@@ -218,7 +219,7 @@ export function useAudioMetadata(jwtToken: string, queueState: any) {
 
             // Always mark as cached so we don't infinitely retry
             metadataCacheRef.current.set(trackId, cachePayload);
-            localStorage.setItem(lsKey, JSON.stringify(cachePayload));
+            db.set(lsKey, cachePayload);
             setMetadataVersion(v => v + 1);
 
             if (Object.keys(up).length > 0) {
