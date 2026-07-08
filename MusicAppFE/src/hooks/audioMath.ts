@@ -16,12 +16,12 @@ export const percentToStereoWidth = (value: number) =>
 
 export const percentToStereoBaseWidth = (value: number) => {
   const width = percentToStereoWidth(value);
-  return width <= 1 ? width : clamp(1 + Math.pow(width - 1, 0.85) * 0.9, 1, 3.3);
+  return width <= 1 ? width : clamp(1 + Math.pow(width - 1, 0.85) * 0.45, 1, 2.2);
 };
 
 export const percentToPseudoStereoAmount = (value: number) => {
   const normalized = clamp((value - 100) / (STEREO_WIDTH_MAX_PERCENT - 100), 0, 1);
-  return 1 - Math.exp(-normalized * 2.2);
+  return (1 - Math.exp(-normalized * 2.2)) / (1 - Math.exp(-2.2));
 };
 
 export const isNeutralDbGain = (value: number) => Math.abs(value || 0) < NEUTRAL_EPSILON;
