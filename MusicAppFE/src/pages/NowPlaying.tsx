@@ -100,6 +100,15 @@ export function NowPlaying() {
   }, [isPlaying]);
 
   useEffect(() => {
+    if (animationRef1.current) {
+      animationRef1.current.playbackRate = playbackRate;
+    }
+    if (animationRef2.current) {
+      animationRef2.current.playbackRate = playbackRate;
+    }
+  }, [playbackRate]);
+
+  useEffect(() => {
     const expectedTime = (currentTime * 1000) % 10000;
     [animationRef1.current, animationRef2.current].forEach(anim => {
       if (anim) {
@@ -527,11 +536,11 @@ export function NowPlaying() {
                 {showVolume && (
                   <div className="absolute bottom-full left-0 mb-4 bg-[#1e1e1e] border border-white/10 p-4 rounded-2xl shadow-2xl z-50 w-40">
                     <HorizontalSlider
-                      value={volume}
+                      value={Math.round(volume * 100)}
                       min={0}
-                      max={1}
-                      step={0.01}
-                      onChange={setVolume}
+                      max={100}
+                      step={1}
+                      onChange={(val) => setVolume(val / 100)}
                       label="Volume"
                       color="#00f5ff"
                       unit="%"

@@ -392,6 +392,20 @@ export function useAudioPlayback(
   const togglePreservesPitch = useCallback(() => setPreservesPitch((prev: any) => !prev), []);
 
   useEffect(() => {
+    if (audioRef.current) {
+      audioRef.current.playbackRate = playbackRate;
+      audioRef.current.preservesPitch = preservesPitch;
+    }
+    if (bufferSourceRef.current) {
+      bufferSourceRef.current.playbackRate.value = playbackRate;
+    }
+    try {
+      const existing = JSON.parse(localStorage.getItem(LOCAL_STORAGE_KEY) || '{}');
+      localStorage.setItem(LOCAL_STORAGE_KEY, JSON.stringify({ ...existing, playbackRate, preservesPitch }));
+    } catch (e) {}
+  }, [playbackRate, preservesPitch, audioRef, bufferSourceRef]);
+
+  useEffect(() => {
     currentTimeSnapshotRef.current = currentTime;
   }, [currentTime]);
 
@@ -490,7 +504,7 @@ console.log("[Audio] performOfflineRender called with EQ bands:", audioParamsRef
 
     const offlineSource = offlineCtx.createBufferSource();
     offlineSource.buffer = audioBuffer;
-    offlineSource.playbackRate.value = rate;
+    offlineSource.playbackRate.value = 1.0;
 
     let currentNode: AudioNode = offlineSource;
     const enabled = fxEnabledRef.current;
@@ -778,7 +792,7 @@ console.log("[Audio] performOfflineRender called with EQ bands:", audioParamsRef
       const response = await fetch(audioUrl);
       const arrayBuffer = await response.arrayBuffer();
       const audioBuffer = await audioContextRef.current!.decodeAudioData(arrayBuffer);
-      const finalRenderedBuffer = await performOfflineRender(audioBuffer, playbackRate);
+      const finalRenderedBuffer = await performOfflineRender(audioBuffer, 1.0);
 
       if (!precalculateOnIdleRef.current) return;
       precalculatedNextBufferRef.current = { trackId: String(nextTrack.id), buffer: finalRenderedBuffer };
@@ -904,7 +918,7 @@ console.log("[Audio] performOfflineRender called with EQ bands:", audioParamsRef
             const arrayBuffer = await response.arrayBuffer();
             const audioBuffer = await audioContextRef.current!.decodeAudioData(arrayBuffer);
 
-            const renderedBuffer = await performOfflineRender(audioBuffer, playbackRate);
+            const renderedBuffer = await performOfflineRender(audioBuffer, 1.0);
             finalRenderedBuffer = renderedBuffer;
           }
 
