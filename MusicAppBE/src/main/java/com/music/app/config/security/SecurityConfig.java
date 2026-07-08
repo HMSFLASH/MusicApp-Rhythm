@@ -72,9 +72,13 @@ public class SecurityConfig {
         }
 
         @Bean
-        public CorsFilter corsFilter() {
+        public CorsFilter corsFilter(@org.springframework.beans.factory.annotation.Value("${app.frontend-url}") String frontendUrl) {
                 CorsConfiguration corsConfiguration = new CorsConfiguration();
-                corsConfiguration.addAllowedOrigin("${app.frontend-url}");
+                if ("*".equals(frontendUrl)) {
+                        corsConfiguration.addAllowedOriginPattern("*");
+                } else {
+                        corsConfiguration.addAllowedOrigin(frontendUrl);
+                }
                 corsConfiguration.addAllowedMethod("*");
                 corsConfiguration.addAllowedHeader("*");
                 corsConfiguration.setAllowCredentials(true);
