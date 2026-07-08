@@ -17,6 +17,8 @@
     "cloudSync": "Cloud Sync",
     "playLocalFiles": "Play Local Files",
     "playLocalFolder": "Play Local Folder",
+    "playLocalFolderHint": "Large folders may be heavy on weak CPUs/RAM.",
+    "playLocalFolderWarning": "Opening a large local folder can use a lot of CPU and RAM while scanning files and reading metadata. On weak devices, choose a smaller folder or disable heavy Audio Studio effects if playback crackles. Continue?",
     "backupToDrive": "Backup Configuration to Drive",
     "restoreFromDrive": "Restore Configuration from Drive",
     "linkGoogleDrive": "Link with Google Drive",

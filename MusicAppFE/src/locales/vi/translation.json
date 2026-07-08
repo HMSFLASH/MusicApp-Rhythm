@@ -17,6 +17,8 @@
     "cloudSync": "Đồng Bộ Đám Mây",
     "playLocalFiles": "Phát Tệp Cục Bộ",
     "playLocalFolder": "Phát Thư Mục Cục Bộ",
+    "playLocalFolderHint": "Thư mục lớn có thể nặng CPU/RAM trên máy yếu.",
+    "playLocalFolderWarning": "Mở thư mục cục bộ lớn có thể dùng nhiều CPU và RAM trong lúc quét tệp và đọc metadata. Trên máy yếu, hãy chọn thư mục nhỏ hơn hoặc tắt bớt hiệu ứng Audio Studio nặng nếu âm thanh bị rè/giật. Bạn muốn tiếp tục?",
     "backupToDrive": "Sao lưu cấu hình lên Drive",
     "restoreFromDrive": "Khôi phục cấu hình từ Drive",
     "linkGoogleDrive": "Liên kết với Google Drive",

@@ -26,6 +26,19 @@ export function LocalFilePicker() {
   const { playerState } = useGlobalAudio();
   const { playTrack, setQueue } = playerState;
 
+  const openLocalFolderPicker = () => {
+    const shouldContinue = window.confirm(
+      t(
+        'layout.playLocalFolderWarning',
+        'Opening a large local folder can use a lot of CPU and RAM while scanning files and reading metadata. On weak devices, choose a smaller folder or disable heavy Audio Studio effects if playback crackles. Continue?'
+      )
+    );
+
+    if (!shouldContinue) return;
+    folderInputRef.current!.value = '';
+    folderInputRef.current!.click();
+  };
+
   const handleFiles = (files: FileList | null) => {
     if (!files || files.length === 0) return;
 
@@ -113,11 +126,16 @@ export function LocalFilePicker() {
       </button>
 
       <button
-        onClick={() => { folderInputRef.current!.value = ''; folderInputRef.current!.click(); }}
-        className="flex items-center gap-3 px-3 py-2.5 rounded-lg text-white/60 hover:text-white hover:bg-white/5 transition-colors text-left w-full"
+        onClick={openLocalFolderPicker}
+        className="flex items-start gap-3 px-3 py-2.5 rounded-lg text-white/60 hover:text-white hover:bg-white/5 transition-colors text-left w-full"
       >
-        <FolderOpen size={20} className="text-primary/70" />
-        <span>{t('layout.playLocalFolder', 'Play Local Folder')}</span>
+        <FolderOpen size={20} className="text-primary/70 mt-0.5 shrink-0" />
+        <span className="flex flex-col gap-0.5">
+          <span>{t('layout.playLocalFolder', 'Play Local Folder')}</span>
+          <span className="text-[11px] leading-snug text-amber-400/70">
+            {t('layout.playLocalFolderHint', 'Large folders may be heavy on weak CPUs/RAM.')}
+          </span>
+        </span>
       </button>
     </>
   );
