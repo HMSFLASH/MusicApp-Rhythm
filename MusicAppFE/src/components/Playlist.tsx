@@ -108,6 +108,7 @@ export function Playlist({ jwtToken, onPlay, currentTrackId }: PlaylistProps) {
           id: d.id,
           fileName: d.name,
           sourceType: d.sourceType,
+          driveFileId: d.driveFileId,
           imageUrl: d.imageUrl,
           artist: d.artist,
           title: d.title,

@@ -35,6 +35,7 @@ export function LibraryProvider({ children }: { children: ReactNode }) {
         id: d.id,
         fileName: d.name,
         sourceType: d.sourceType,
+        driveFileId: d.driveFileId,
         imageUrl: d.imageUrl,
         artist: d.artist,
         title: d.title,

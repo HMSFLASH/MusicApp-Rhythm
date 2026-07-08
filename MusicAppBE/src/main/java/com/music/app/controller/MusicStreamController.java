@@ -16,7 +16,8 @@ import org.springframework.security.oauth2.server.resource.authentication.JwtAut
 import org.springframework.web.bind.annotation.*;
 import org.springframework.web.servlet.mvc.method.annotation.StreamingResponseBody;
 import java.io.InputStream;
-import java.net.URL;
+import java.net.URLEncoder;
+import java.nio.charset.StandardCharsets;
 import java.security.Principal;
 
 @RestController
@@ -29,6 +30,31 @@ public class MusicStreamController {
     private final UserRepository userRepository;
     private final MusicLibraryRepository musicLibraryRepository;
 
+    private String determineAudioMimeType(String fileName) {
+        if (fileName == null) {
+            return "audio/mpeg";
+        }
+
+        String lower = fileName.toLowerCase();
+        if (lower.endsWith(".flac")) return "audio/flac";
+        if (lower.endsWith(".wav")) return "audio/wav";
+        if (lower.endsWith(".ogg")) return "audio/ogg";
+        if (lower.endsWith(".opus")) return "audio/ogg";
+        if (lower.endsWith(".m4a")) return "audio/mp4";
+        if (lower.endsWith(".aac")) return "audio/aac";
+        if (lower.endsWith(".wma")) return "audio/x-ms-wma";
+        return "audio/mpeg";
+    }
+
+    private String buildInlineContentDisposition(String fileName) {
+        if (fileName == null || fileName.isBlank()) {
+            return "inline";
+        }
+
+        String encoded = URLEncoder.encode(fileName, StandardCharsets.UTF_8).replace("+", "%20");
+        return "inline; filename*=UTF-8''" + encoded;
+    }
+
     @GetMapping("/stream/{fileId}")
     public ResponseEntity<StreamingResponseBody> streamMusic(
             @PathVariable String fileId,
@@ -37,10 +63,12 @@ public class MusicStreamController {
         
         try {
             String driveFileIdToUse = fileId;
+            String fileName = null;
             // Kiểm tra xem fileId có phải là một số (MusicLibrary ID) hay không
             if (fileId.matches("\\d+")) {
                 MusicLibrary lib = musicLibraryRepository.findById(Long.valueOf(fileId)).orElse(null);
                 if (lib != null) {
+                    fileName = lib.getName();
                     if ("DRIVE".equals(lib.getSourceType()) && lib.getDriveFileId() != null) {
                         driveFileIdToUse = lib.getDriveFileId();
                     }
@@ -91,11 +119,18 @@ public class MusicStreamController {
             HttpHeaders responseHeaders = new HttpHeaders();
             responseHeaders.setAccessControlAllowOrigin("*");
             responseHeaders.set(HttpHeaders.ACCEPT_RANGES, "bytes");
-            
-            if (driveResponse.getContentType() != null) {
+            responseHeaders.set(HttpHeaders.CONTENT_DISPOSITION, buildInlineContentDisposition(fileName));
+            responseHeaders.setAccessControlExposeHeaders(java.util.List.of(
+                    HttpHeaders.ACCEPT_RANGES,
+                    HttpHeaders.CONTENT_LENGTH,
+                    HttpHeaders.CONTENT_RANGE,
+                    HttpHeaders.CONTENT_TYPE
+            ));
+             
+            if (driveResponse.getContentType() != null && !driveResponse.getContentType().equalsIgnoreCase(MediaType.APPLICATION_OCTET_STREAM_VALUE)) {
                 responseHeaders.setContentType(MediaType.parseMediaType(driveResponse.getContentType()));
             } else {
-                responseHeaders.setContentType(MediaType.parseMediaType("audio/mpeg"));
+                responseHeaders.setContentType(MediaType.parseMediaType(determineAudioMimeType(fileName)));
             }
 
             if (driveResponse.getContentLength() != null) {

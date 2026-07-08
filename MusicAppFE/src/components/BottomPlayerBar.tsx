@@ -37,18 +37,23 @@ export function BottomPlayerBar() {
     hasNext,
     hasPrevious
   } = playerState;
+  const currentArtwork = currentTrack ? (currentTrack.imageUrl || playerState.getTrackImage(currentTrack.id)) : '';
 
   const discRef = useRef<HTMLDivElement>(null);
   const animationRef = useRef<Animation | null>(null);
 
   useEffect(() => {
+    animationRef.current?.cancel();
+    animationRef.current = null;
+
     if (discRef.current && !animationRef.current) {
       animationRef.current = discRef.current.animate(
         [{ transform: 'rotate(0deg)' }, { transform: 'rotate(360deg)' }],
         { duration: 10000, iterations: Infinity }
       );
+      if (!(isPlaying && currentTime > 0)) animationRef.current.pause();
     }
-  }, []);
+  }, [currentTrack?.id, currentArtwork]);
 
   useEffect(() => {
     if (animationRef.current) {
@@ -122,8 +127,8 @@ export function BottomPlayerBar() {
       {/* Left: Track Info */}
       <div className="flex items-center flex-1 w-auto md:w-full max-w-[60%] sm:max-w-[70%] md:max-w-xs gap-2 md:gap-3 cursor-pointer md:cursor-auto" onClick={() => { if (window.innerWidth < 768) navigate('/'); }}>
         <div className={`w-10 h-10 md:w-12 md:h-12 rounded-md bg-background border border-white/10 flex items-center justify-center overflow-hidden shrink-0`}>
-          {currentTrack.imageUrl || playerState.getTrackImage(currentTrack.id) ? (
-            <img src={currentTrack.imageUrl || playerState.getTrackImage(currentTrack.id)} alt="Album Art" className="w-full h-full object-cover" />
+          {currentArtwork ? (
+            <img src={currentArtwork} alt="Album Art" className="w-full h-full object-cover" />
           ) : (
             <div ref={discRef} className="w-8 h-8 rounded-full bg-white/10 flex items-center justify-center">
               <Disc size={20} className="text-white/50" />

@@ -6,6 +6,7 @@ import com.google.api.client.json.gson.GsonFactory;
 import com.google.api.services.drive.Drive;
 import com.google.api.services.drive.model.File;
 import com.google.auth.http.HttpCredentialsAdapter;
+import com.google.auth.oauth2.AccessToken;
 import com.google.auth.oauth2.UserCredentials;
 import lombok.RequiredArgsConstructor;
 import lombok.extern.slf4j.Slf4j;
@@ -60,8 +61,11 @@ public class GoogleDriveService {
                 .setClientSecret(clientSecret)
                 .setRefreshToken(refreshToken)
                 .build();
-        credentials.refreshAccessToken();
-        return credentials.getAccessToken().getTokenValue();
+        AccessToken accessToken = credentials.refreshAccessToken();
+        if (accessToken == null || accessToken.getTokenValue() == null || accessToken.getTokenValue().isBlank()) {
+            throw new IllegalStateException("Google did not return a Drive access token");
+        }
+        return accessToken.getTokenValue();
     }
 
 

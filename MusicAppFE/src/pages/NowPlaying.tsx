@@ -28,6 +28,7 @@ export function NowPlaying() {
     cycleQueues, setCycleQueues,
     hasNext, hasPrevious
   } = playerState;
+  const currentArtwork = currentTrack ? (currentTrack.imageUrl || playerState.getTrackImage(currentTrack.id)) : '';
 
   useEffect(() => {
     if (currentTrack) {
@@ -83,13 +84,20 @@ export function NowPlaying() {
   useEffect(() => {
     const keyframes = [{ transform: 'rotate(0deg)' }, { transform: 'rotate(360deg)' }];
     const options: KeyframeAnimationOptions = { duration: 10000, iterations: Infinity };
+    animationRef1.current?.cancel();
+    animationRef2.current?.cancel();
+    animationRef1.current = null;
+    animationRef2.current = null;
+
     if (discRef1.current && !animationRef1.current) {
       animationRef1.current = discRef1.current.animate(keyframes, options);
+      if (!isPlaying) animationRef1.current.pause();
     }
     if (discRef2.current && !animationRef2.current) {
       animationRef2.current = discRef2.current.animate(keyframes, options);
+      if (!isPlaying) animationRef2.current.pause();
     }
-  }, []);
+  }, [currentTrack?.id, currentArtwork]);
 
   useEffect(() => {
     if (animationRef1.current) {
@@ -208,13 +216,13 @@ export function NowPlaying() {
             className="flex-shrink-0 flex items-center justify-center transition-opacity duration-0"
             style={{ width: cdSize, height: cdSize, opacity: cdOpacity }}
           >
-            {currentTrack.imageUrl || playerState.getTrackImage(currentTrack.id) ? (
+            {currentArtwork ? (
               <div
                 className={`relative flex items-center justify-center w-full h-full rounded-full shadow-[0_0_40px_rgba(0,0,0,0.5)] border-[8px] border-[#111] overflow-hidden mb-4 ${isPlaying ? 'scale-100 opacity-100' : 'scale-90 opacity-60'}`}
                 style={{ transition: 'transform 0.7s cubic-bezier(0.34, 1.56, 0.64, 1), opacity 0.7s ease' }}
               >
                 <div ref={discRef1} className="w-full h-full">
-                  <img src={currentTrack.imageUrl || playerState.getTrackImage(currentTrack.id)} alt="Album Art" className="w-full h-full object-cover" />
+                  <img src={currentArtwork} alt="Album Art" className="w-full h-full object-cover" />
                   <div className="absolute inset-0 bg-black/10"></div>
                   {/* Center hole */}
                   <div className="absolute z-20 w-[8%] h-[8%] bg-background rounded-full border-2 border-black/40 top-1/2 left-1/2 -translate-x-1/2 -translate-y-1/2"></div>

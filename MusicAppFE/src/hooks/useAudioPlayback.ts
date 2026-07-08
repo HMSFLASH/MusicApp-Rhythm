@@ -4,7 +4,6 @@ import { LOCAL_STORAGE_KEY } from './audioStorage';
 import { axiosClient } from '../api/axiosClient';
 import { configureLoudnessNormalization, configureMasterLimiter, createSoftClipCurve } from './useAudioContext';
 
-const BACKEND_URL = `http://${window.location.hostname}:8080`;
 const clamp = (value: number, min: number, max: number) => Math.min(max, Math.max(min, value));
 const msToAudioSeconds = (value: number) => clamp(value / 1000, 0, 1);
 const compressorAttackSeconds = (attackMs: number, rmsSizeMs: number) => msToAudioSeconds(Math.max(attackMs, rmsSizeMs * 0.5));
@@ -16,6 +15,19 @@ const percentToStereoBaseWidth = (value: number) => {
 };
 const percentToPseudoStereoAmount = (value: number) => clamp((value - 100) / 100, 0, 1);
 const REVERB_WET_GAIN = 0.75;
+const DRIVE_MEDIA_URL = 'https://www.googleapis.com/drive/v3/files';
+
+const getTrackMimeType = (track: Track, fallback?: string | null) => {
+  const ext = track.fileName?.split('.').pop()?.toLowerCase();
+  if (ext === 'm4a') return 'audio/mp4';
+  if (ext === 'opus') return 'audio/ogg';
+  if (ext === 'flac') return 'audio/flac';
+  if (ext === 'wav') return 'audio/wav';
+  if (ext === 'ogg') return 'audio/ogg';
+  if (ext === 'aac') return 'audio/aac';
+  if (ext === 'wma') return 'audio/x-ms-wma';
+  return fallback && fallback !== 'application/octet-stream' ? fallback : 'audio/mpeg';
+};
 
 type NavigatorWithDeviceMemory = Navigator & { deviceMemory?: number };
 
@@ -110,6 +122,8 @@ export function useAudioPlayback(
   driveToken?: string,
   fetchDriveToken?: () => Promise<string>
 ) {
+  void jwtToken;
+
   const { currentTrack, setCurrentTrack, queue, setQueue, isShuffleState, songEndMode, queueEndMode, upcomingQueues, cycleQueues, setUpcomingQueues } = queueState || {};
   const {
     useOversample,
@@ -222,8 +236,8 @@ export function useAudioPlayback(
     };
   // eslint-disable-next-line react-hooks/exhaustive-deps
   }, []);
-  const preloadingIdsRef = useRef<Set<string>>(new Set());
   const allowedIdsRef = useRef<Set<string>>(new Set());
+  const blobLoadingPromisesRef = useRef<Map<string, Promise<string>>>(new Map());
   // eslint-disable-next-line @typescript-eslint/no-explicit-any
   const audioParamsRef = useRef<any>({
     preampGain,
@@ -330,7 +344,7 @@ export function useAudioPlayback(
     } catch (e) { }
   }, [audioRef, bufferVolumeNodeRef]);
 
-  const getTrackAudioUrl = useCallback((track: Track) => {
+  const getTrackAudioUrl = useCallback(async (track: Track) => {
     const trackId = String(track.id);
     const cachedUrl = blobCacheRef.current.get(trackId);
     if (cachedUrl) return cachedUrl;
@@ -342,14 +356,70 @@ export function useAudioPlayback(
     }
 
     if (track.sourceType !== 'LOCAL') {
-      if (track.driveFileId && driveToken) {
-        return `https://www.googleapis.com/drive/v3/files/${track.driveFileId}?alt=media&access_token=${driveToken}`;
+      let driveFileId = track.driveFileId;
+      if (!driveFileId) {
+        try {
+          // eslint-disable-next-line @typescript-eslint/no-explicit-any
+          const library = await axiosClient.get('/api/music/list') as any[];
+          const latestTrack = Array.isArray(library)
+            ? library.find((item) => String(item.id) === trackId)
+            : null;
+          driveFileId = latestTrack?.driveFileId;
+          if (driveFileId) {
+            track.driveFileId = driveFileId;
+          }
+        } catch (e) {
+          console.error("[Audio] Failed to refresh track Drive metadata", e);
+        }
       }
-      return `${BACKEND_URL}/api/music/stream/${track.id}?access_token=${jwtToken}`;
+
+      if (!driveFileId) {
+        console.error("[Audio] Cannot load remote track because driveFileId is missing", track);
+        return '';
+      }
+
+      const pendingBlobUrl = blobLoadingPromisesRef.current.get(trackId);
+      if (pendingBlobUrl) return pendingBlobUrl;
+
+      const loadPromise = (async () => {
+        const token = driveToken || await fetchDriveToken?.();
+        if (!token) {
+          console.error("[Audio] Cannot load remote track because Drive access token is missing");
+          return '';
+        }
+
+        const url = `${DRIVE_MEDIA_URL}/${encodeURIComponent(driveFileId)}?alt=media`;
+        console.log("[Audio] Downloading track into RAM", track.title || track.fileName || track.id);
+        const response = await fetch(url, {
+          mode: 'cors',
+          headers: {
+            Authorization: `Bearer ${token}`,
+          },
+        });
+        if (!response.ok) {
+          throw new Error(`Drive audio fetch failed: HTTP ${response.status}`);
+        }
+
+        const rawBlob = await response.blob();
+        const mimeType = getTrackMimeType(track, rawBlob.type);
+        const audioBlob = rawBlob.type === mimeType ? rawBlob : new Blob([rawBlob], { type: mimeType });
+        const objectUrl = URL.createObjectURL(audioBlob);
+
+        blobCacheRef.current.set(trackId, objectUrl);
+        console.log("[Audio] Track loaded into RAM", track.title || track.fileName || track.id, `${(audioBlob.size / 1024 / 1024).toFixed(2)} MB`);
+        return objectUrl;
+      })();
+
+      blobLoadingPromisesRef.current.set(trackId, loadPromise);
+      try {
+        return await loadPromise;
+      } finally {
+        blobLoadingPromisesRef.current.delete(trackId);
+      }
     }
 
     return '';
-  }, [blobCacheRef, jwtToken, driveToken]);
+  }, [blobCacheRef, driveToken, fetchDriveToken]);
 
   const connectBufferOutputChain = useCallback(() => {
     if (!audioContextRef.current || !bufferVolumeNodeRef.current) return;
@@ -407,7 +477,9 @@ export function useAudioPlayback(
     try {
       const existing = JSON.parse(localStorage.getItem(LOCAL_STORAGE_KEY) || '{}');
       localStorage.setItem(LOCAL_STORAGE_KEY, JSON.stringify({ ...existing, playbackRate, preservesPitch }));
-    } catch (e) {}
+    } catch {
+      // Ignore localStorage write failures.
+    }
   }, [playbackRate, preservesPitch, audioRef, bufferSourceRef]);
 
   useEffect(() => {
@@ -448,41 +520,51 @@ export function useAudioPlayback(
       return;
     }
 
-    const audioUrl = getTrackAudioUrl(trackToResume);
-    if (!audioUrl) {
-      setIsPlaying(false);
-      return;
-    }
-
-    configureAudioElementSource(audioUrl);
-
-    const resumeHtmlAudio = () => {
-      if (!audioRef.current) return;
-      if (decodeSessionRef.current !== transitionSessionId || precalculateOnIdleRef.current) return;
-
-      const safeResumeAt = Number.isFinite(audioRef.current.duration)
-        ? clamp(resumeAt, 0, Math.max(0, audioRef.current.duration - 0.05))
-        : Math.max(0, resumeAt);
-
+    (async () => {
       try {
-        audioRef.current.currentTime = safeResumeAt;
-      } catch {
-        // Some streams reject seeking until enough data is loaded.
-      }
+        const audioUrl = await getTrackAudioUrl(trackToResume);
+        if (decodeSessionRef.current !== transitionSessionId || precalculateOnIdleRef.current) return;
+        if (!audioUrl) {
+          setIsPlaying(false);
+          return;
+        }
 
-      if (shouldResume) {
-        // eslint-disable-next-line @typescript-eslint/no-explicit-any
-        audioRef.current.play().catch((e: any) => console.error("Playback failed", e));
-      } else {
-        setIsPlaying(false);
-      }
-    };
+        configureAudioElementSource(audioUrl);
 
-    if (audioRef.current.readyState >= 1) {
-      resumeHtmlAudio();
-    } else {
-      audioRef.current.addEventListener('loadedmetadata', resumeHtmlAudio, { once: true });
-    }
+        const resumeHtmlAudio = () => {
+          if (!audioRef.current) return;
+          if (decodeSessionRef.current !== transitionSessionId || precalculateOnIdleRef.current) return;
+
+          const safeResumeAt = Number.isFinite(audioRef.current.duration)
+            ? clamp(resumeAt, 0, Math.max(0, audioRef.current.duration - 0.05))
+            : Math.max(0, resumeAt);
+
+          try {
+            audioRef.current.currentTime = safeResumeAt;
+          } catch {
+            // Some blob-backed media reject seeking until metadata is ready.
+          }
+
+          if (shouldResume) {
+            // eslint-disable-next-line @typescript-eslint/no-explicit-any
+            audioRef.current.play().catch((e: any) => console.error("Playback failed", e));
+          } else {
+            setIsPlaying(false);
+          }
+        };
+
+        if (audioRef.current.readyState >= 1) {
+          resumeHtmlAudio();
+        } else {
+          audioRef.current.addEventListener('loadedmetadata', resumeHtmlAudio, { once: true });
+        }
+      } catch (e) {
+        if (decodeSessionRef.current === transitionSessionId) {
+          console.error("Failed to restore blob playback", e);
+          setIsPlaying(false);
+        }
+      }
+    })();
   }, [
     audioRef,
     configureAudioElementSource,
@@ -500,7 +582,7 @@ export function useAudioPlayback(
 
   // Define functions in correct dependency order
 
-  const performOfflineRender = async (audioBuffer: AudioBuffer, rate: number = 1.0) => {
+  const performOfflineRender = async (audioBuffer: AudioBuffer) => {
 console.log("[Audio] performOfflineRender called with EQ bands:", audioParamsRef.current.eqBands.length);
     if (!audioBuffer) return audioBuffer;
     const sampleRate = audioBuffer.sampleRate;
@@ -708,59 +790,14 @@ console.log("[Audio] performOfflineRender called with EQ bands:", audioParamsRef
     return renderedBuffer;
   };
 
-  // Preload tracks into RAM
+  // Download tracks into RAM-backed blob URLs. The backend only provides the
+  // Drive access token; playback happens from the browser's blob cache.
   const preloadTrack = async (track: Track) => {
     if (!track) return;
-    if (blobCacheRef.current.has(String(track.id)) || preloadingIdsRef.current.has(String(track.id))) {
-      return;
-    }
-
-    preloadingIdsRef.current.add(String(track.id));
-
     try {
-      if (track.sourceType === 'LOCAL' && track.localFile instanceof Blob) {
-        blobCacheRef.current.set(String(track.id), URL.createObjectURL(track.localFile));
-        return;
-      }
-      
-      if (track.sourceType === 'LOCAL') return;
-      if (!jwtToken) return;
-
-      console.log(`[preloadTrack] Fetching blob for ${track.title || track.fileName || 'Unknown Track'}...`);
-      let streamUrl = `${BACKEND_URL}/api/music/stream/${track.id}`;
-      if (track.driveFileId && driveToken) {
-        streamUrl = `https://www.googleapis.com/drive/v3/files/${track.driveFileId}?alt=media&access_token=${driveToken}`;
-      }
-      const fetchUrl = track.driveFileId && driveToken ? streamUrl : `${streamUrl}?_t=${Date.now()}`;
-      const res = await axiosClient.get(fetchUrl, { responseType: 'blob' });
-      const rawBlob = res as unknown as Blob;
-      console.log(`[preloadTrack] Blob downloaded for ${track.title || track.fileName || 'Unknown Track'}`);
-
-      const ext = track.fileName?.split('.').pop()?.toLowerCase();
-      let mimeType = rawBlob.type;
-      if (ext === 'm4a') mimeType = 'audio/mp4';
-      else if (ext === 'opus') mimeType = 'audio/ogg';
-      else if (ext === 'flac') mimeType = 'audio/flac';
-      else if (ext === 'wav') mimeType = 'audio/wav';
-      else if (ext === 'ogg') mimeType = 'audio/ogg';
-      else if (!mimeType || mimeType === 'application/octet-stream') mimeType = 'audio/mpeg';
-
-      const blob = new Blob([rawBlob], { type: mimeType });
-      const objectUrl = URL.createObjectURL(blob);
-
-      // Prevent memory leak if user skipped tracks before download finished
-      if (allowedIdsRef.current.size > 0 && !allowedIdsRef.current.has(String(track.id))) {
-        URL.revokeObjectURL(objectUrl);
-        console.log(`[Cache Cleanup] Skipped adding ${track.id} to RAM due to race condition`);
-        return;
-      }
-
-      blobCacheRef.current.set(String(track.id), objectUrl);
-
+      await getTrackAudioUrl(track);
     } catch (e) {
       console.error("Preload failed for track", track.id, e);
-    } finally {
-      preloadingIdsRef.current.delete(String(track.id));
     }
   };
 
@@ -794,13 +831,13 @@ console.log("[Audio] performOfflineRender called with EQ bands:", audioParamsRef
       isPrecalculatingNextRef.current = true;
       console.log("[Lookahead] Precalculating next track:", nextTrack.title || nextTrack.fileName);
 
-      const audioUrl = getTrackAudioUrl(nextTrack);
+      const audioUrl = await getTrackAudioUrl(nextTrack);
       if (!audioUrl) return;
 
       const response = await fetch(audioUrl);
       const arrayBuffer = await response.arrayBuffer();
       const audioBuffer = await audioContextRef.current!.decodeAudioData(arrayBuffer);
-      const finalRenderedBuffer = await performOfflineRender(audioBuffer, 1.0);
+      const finalRenderedBuffer = await performOfflineRender(audioBuffer);
 
       if (!precalculateOnIdleRef.current) return;
       precalculatedNextBufferRef.current = { trackId: String(nextTrack.id), buffer: finalRenderedBuffer };
@@ -837,12 +874,12 @@ console.log("[Audio] performOfflineRender called with EQ bands:", audioParamsRef
     }
     allowedIdsRef.current = allowedIds;
 
-    // 1. Memory Cleanup: Only keep current, prev1, and next1 in RAM
+    // 1. Memory Cleanup: only keep current, prev1, and next1 in RAM.
     for (const [key, objectUrl] of blobCacheRef.current.entries()) {
       if (!allowedIds.has(String(key))) {
         URL.revokeObjectURL(objectUrl);
         blobCacheRef.current.delete(key);
-        console.log(`[Cache Cleanup] Removed ${key} from RAM`);
+        console.log(`[Cache Cleanup] Removed blob ${key} from RAM`);
       }
     }
 
@@ -903,8 +940,15 @@ console.log("[Audio] performOfflineRender called with EQ bands:", audioParamsRef
     isDecodingRef.current = false;
     stopBufferPlayback();
 
-    const audioUrl = getTrackAudioUrl(startingTrack);
-    if (!audioUrl) {
+    let audioUrl = '';
+    try {
+      audioUrl = await getTrackAudioUrl(startingTrack);
+      if (!audioUrl) {
+        setIsPlaying(false);
+        return;
+      }
+    } catch (e) {
+      console.error("[Audio] Failed to prepare track for playback", e);
       setIsPlaying(false);
       return;
     }
@@ -926,7 +970,7 @@ console.log("[Audio] performOfflineRender called with EQ bands:", audioParamsRef
             const arrayBuffer = await response.arrayBuffer();
             const audioBuffer = await audioContextRef.current!.decodeAudioData(arrayBuffer);
 
-            const renderedBuffer = await performOfflineRender(audioBuffer, 1.0);
+            const renderedBuffer = await performOfflineRender(audioBuffer);
             finalRenderedBuffer = renderedBuffer;
           }
 
@@ -1005,12 +1049,8 @@ console.log("[Audio] performOfflineRender called with EQ bands:", audioParamsRef
       }
     }
 
-    // Preload adjacent tracks and extract metadata for ALL tracks
-    if (startingTrack.sourceType !== 'LOCAL') {
-      preloadTrack(startingTrack).then(() => {
-        preloadAdjacentTracks(startingTrack.id, currentQueue!);
-      });
-    }
+    // Keep only the active neighborhood in RAM: current, previous, and next.
+    preloadAdjacentTracks(startingTrack.id, currentQueue!);
     
     
   };
@@ -1103,7 +1143,6 @@ console.log("[Audio] performOfflineRender called with EQ bands:", audioParamsRef
     } else if (idx === 0 && queueEndMode === 'repeat' && queue.length > 1) {
       latestPlayTrack(queue[queue.length - 1], queue);
     }
-  // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [currentTrack, queue, queueEndMode]);
 
 
@@ -1153,7 +1192,9 @@ console.log("[Audio] performOfflineRender called with EQ bands:", audioParamsRef
           playbackRate: playbackRate,
           position: time
         });
-      } catch (e) {}
+      } catch {
+        // Some browsers reject position updates while metadata is incomplete.
+      }
     }
   };
 
@@ -1166,7 +1207,7 @@ console.log("[Audio] performOfflineRender called with EQ bands:", audioParamsRef
     playTrackRef.current = playTrack;
     seekRef.current = seek;
     togglePlayRef.current = togglePlay;
-  }, [playNext, playPrevious, seek, togglePlay]);
+  });
 
   // Update Media Session State
   useEffect(() => {
@@ -1179,7 +1220,9 @@ console.log("[Audio] performOfflineRender called with EQ bands:", audioParamsRef
             playbackRate: playbackRate,
             position: currentTime
           });
-        } catch (e) {}
+        } catch {
+          // Some browsers reject position updates while metadata is incomplete.
+        }
       }
     }
   // eslint-disable-next-line react-hooks/exhaustive-deps
@@ -1207,7 +1250,6 @@ console.log("[Audio] performOfflineRender called with EQ bands:", audioParamsRef
         }
       });
     }
-  // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [currentTrack]);
 
 
