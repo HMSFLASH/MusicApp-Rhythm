@@ -41,7 +41,7 @@
     "pageDesc": "Chuỗi xử lý âm thanh chuyên nghiệp.",
     "warningTitle": "Cảnh báo Hiệu suất",
     "warningDesc": "Hiệu ứng nặng có thể làm CPU yếu quá tải và khiến âm thanh giật, rè hoặc nứt tiếng.",
-    "warningRecommendWeak": "Khuyên dùng: Bật Tính toán trước (Lưu ý: càng bật nhiều hiệu ứng, thời gian tính toán sẽ càng lâu hơn).",
+    "warningRecommendWeak": "Khuyên dùng cho thiết bị yếu: Bật Tính toán trước (Lưu ý: càng bật nhiều hiệu ứng, thời gian tính toán sẽ càng lâu hơn).",
     "tabEq": "EQ & Âm sắc",
     "tabDynamics": "Nén âm",
     "tabSpatial": "Không gian",

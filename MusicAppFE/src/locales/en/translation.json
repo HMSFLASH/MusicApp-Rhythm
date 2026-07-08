@@ -41,7 +41,7 @@
     "pageDesc": "Professional-grade audio processing chain.",
     "warningTitle": "Performance Warning",
     "warningDesc": "Heavy effects can overload weak CPUs and make playback stutter or crackle.",
-    "warningRecommendWeak": "Recommended: Enable pre-calculation. (Note: The more effects you enable, the longer the calculation will take).",
+    "warningRecommendWeak": "Recommended for low-powered devices: Enable pre-calculation. (Note: The more effects you enable, the longer the calculation will take).",
     "tabEq": "EQ & Tone",
     "tabDynamics": "Dynamics",
     "tabSpatial": "Spatial",

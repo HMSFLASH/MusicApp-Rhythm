@@ -11,17 +11,37 @@ interface AuthContextType {
 
 const AuthContext = createContext<AuthContextType | undefined>(undefined);
 
+const TOKEN_COOKIE_NAME = 'music_app_token';
+
+function getCookie(name: string) {
+  const value = `; ${document.cookie}`;
+  const parts = value.split(`; ${name}=`);
+  if (parts.length === 2) return parts.pop()?.split(';').shift();
+  return null;
+}
+
+function setCookie(name: string, value: string, days: number = 7) {
+  const d = new Date();
+  d.setTime(d.getTime() + (days * 24 * 60 * 60 * 1000));
+  const expires = `expires=${d.toUTCString()}`;
+  document.cookie = `${name}=${value};${expires};path=/;Secure;SameSite=Strict`;
+}
+
+function deleteCookie(name: string) {
+  document.cookie = `${name}=;expires=Thu, 01 Jan 1970 00:00:00 UTC;path=/;Secure;SameSite=Strict`;
+}
+
 export function AuthProvider({ children }: { children: ReactNode }) {
   const [jwtToken, setJwtTokenState] = useState(() => {
-    return localStorage.getItem('music_app_token') || '';
+    return getCookie(TOKEN_COOKIE_NAME) || '';
   });
   const [driveToken, setDriveTokenState] = useState<string>('');
 
   const setJwtToken = (token: string) => {
     if (token) {
-      localStorage.setItem('music_app_token', token);
+      setCookie(TOKEN_COOKIE_NAME, token);
     } else {
-      localStorage.removeItem('music_app_token');
+      deleteCookie(TOKEN_COOKIE_NAME);
     }
     setJwtTokenState(token);
   };

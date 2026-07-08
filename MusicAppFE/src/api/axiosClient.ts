@@ -9,11 +9,18 @@ export const axiosClient = axios.create({
   },
 });
 
+function getCookie(name: string) {
+  const value = `; ${document.cookie}`;
+  const parts = value.split(`; ${name}=`);
+  if (parts.length === 2) return parts.pop()?.split(';').shift();
+  return null;
+}
+
 // Add a request interceptor
 axiosClient.interceptors.request.use(
   (config) => {
-    // Attempt to get token from localStorage
-    const token = localStorage.getItem('music_app_token');
+    // Attempt to get token from cookie
+    const token = getCookie('music_app_token');
     if (token) {
       config.headers.Authorization = `Bearer ${token}`;
     }
@@ -36,7 +43,7 @@ axiosClient.interceptors.response.use(
   (error) => {
     if (error.response?.status === 401) {
       // Clear token and redirect to login if unauthorized
-      localStorage.removeItem('music_app_token');
+      document.cookie = `music_app_token=;expires=Thu, 01 Jan 1970 00:00:00 UTC;path=/;Secure;SameSite=Strict`;
       if (window.location.pathname !== '/login') {
          window.location.href = '/login';
       }
