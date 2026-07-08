@@ -288,25 +288,29 @@ export function useAudioPlayback(
         }
       });
       audioRef.current.addEventListener('ended', () => {
-        clearTrackLoading();
+        if (!usingBufferPlaybackRef.current) clearTrackLoading();
         if (playNextRef.current) playNextRef.current();
       });
       audioRef.current.addEventListener('play', () => {
-        clearTrackLoading();
-        if (!usingBufferPlaybackRef.current) setIsPlaying(true);
+        if (!usingBufferPlaybackRef.current) {
+          clearTrackLoading();
+          setIsPlaying(true);
+        }
       });
       audioRef.current.addEventListener('playing', () => {
-        clearTrackLoading();
+        if (!usingBufferPlaybackRef.current) clearTrackLoading();
       });
       audioRef.current.addEventListener('canplay', () => {
-        clearTrackLoading();
+        if (!usingBufferPlaybackRef.current) clearTrackLoading();
       });
       audioRef.current.addEventListener('pause', () => {
-        clearTrackLoading();
-        if (!usingBufferPlaybackRef.current) setIsPlaying(false);
+        if (!usingBufferPlaybackRef.current) {
+          clearTrackLoading();
+          setIsPlaying(false);
+        }
       });
       audioRef.current.addEventListener('error', () => {
-        clearTrackLoading();
+        if (!usingBufferPlaybackRef.current) clearTrackLoading();
       });
     }
 
