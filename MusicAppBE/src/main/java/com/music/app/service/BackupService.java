@@ -41,7 +41,7 @@ public class BackupService {
             .registerModule(new com.fasterxml.jackson.datatype.jsr310.JavaTimeModule())
             .disable(com.fasterxml.jackson.databind.SerializationFeature.WRITE_DATES_AS_TIMESTAMPS);
 
-    public void backupToDrive(Map<String, Object> config, Long userId) {
+    public void backupToDrive(Map<String, Object> config, Long userId) throws org.hibernate.FetchNotFoundException {
         User user = userRepository.findById(userId).orElseThrow(() -> new AppException(ErrorCode.UNAUTHENTICATED));
         if (user.getRefreshToken() == null) {
             throw new AppException(ErrorCode.DRIVE_NOT_LINKED);
@@ -49,12 +49,20 @@ public class BackupService {
 
         try {
             List<Playlist> playlists = playlistRepository.findByUserIdOrderByCreatedAtDesc(userId);
-            List<PlaylistDto> playlistDtos = playlists.stream().map(p -> playlistService.toDto(p, true)).collect(Collectors.toList());
+            List<PlaylistDto> playlistDtos = playlists.stream().map(p -> playlistService.toDto(p, true))
+                    .collect(Collectors.toList());
 
             List<Favorite> favorites = favoriteRepository.findByUserId(userId);
-            List<MusicItemDto> favoriteDtos = favorites.stream()
-                    .map(f -> musicService.toDto(f.getMusicLibrary()))
-                    .collect(Collectors.toList());
+            List<MusicItemDto> favoriteDtos = new java.util.ArrayList<>();
+            for (Favorite f : favorites) {
+                try {
+                    if (f.getMusicLibrary() != null) {
+                        favoriteDtos.add(musicService.toDto(f.getMusicLibrary()));
+                    }
+                } catch (org.hibernate.ObjectNotFoundException | jakarta.persistence.EntityNotFoundException e) {
+                    // Ignore orphaned favorite
+                }
+            }
 
             List<MusicLibrary> libraries = musicLibraryRepository.findByUserId(userId);
             List<MusicItemDto> libraryDtos = libraries.stream()
@@ -94,7 +102,8 @@ public class BackupService {
             if (backupData.getLibrary() != null) {
                 for (MusicItemDto trackDto : backupData.getLibrary()) {
                     String trackIdStr = trackDto.getId();
-                    if (trackIdStr == null || trackIdStr.matches("\\d+")) continue;
+                    if (trackIdStr == null || trackIdStr.matches("\\d+"))
+                        continue;
 
                     MusicLibrary lib = musicLibraryRepository.findByDriveFileId(trackIdStr).orElse(null);
                     if (lib == null) {
@@ -140,7 +149,8 @@ public class BackupService {
                         for (int i = 0; i < pDto.getTracks().size(); i++) {
                             MusicItemDto trackDto = pDto.getTracks().get(i);
                             String trackIdStr = trackDto.getId();
-                            if (trackIdStr == null) continue;
+                            if (trackIdStr == null)
+                                continue;
 
                             MusicLibrary lib = null;
                             if (trackIdStr.matches("\\d+")) {
@@ -182,7 +192,8 @@ public class BackupService {
 
                 for (MusicItemDto trackDto : backupData.getFavorites()) {
                     String trackIdStr = trackDto.getId();
-                    if (trackIdStr == null) continue;
+                    if (trackIdStr == null)
+                        continue;
 
                     MusicLibrary lib = null;
                     if (trackIdStr.matches("\\d+")) {

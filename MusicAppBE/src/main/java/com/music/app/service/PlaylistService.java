@@ -28,10 +28,20 @@ public class PlaylistService {
     private final UserRepository userRepository;
     private final MusicService musicService;
 
-    public PlaylistDto toDto(Playlist p, boolean includeTracks) {
-        List<MusicItemDto> tracks = includeTracks
-                ? p.getItems().stream().map(i -> musicService.toDto(i.getMusicLibrary())).collect(Collectors.toList())
-                : null;
+    public PlaylistDto toDto(Playlist p, boolean includeTracks) throws org.hibernate.FetchNotFoundException {
+        List<MusicItemDto> tracks = null;
+        if (includeTracks) {
+            tracks = new java.util.ArrayList<>();
+            for (PlaylistItem i : p.getItems()) {
+                try {
+                    if (i.getMusicLibrary() != null) {
+                        tracks.add(musicService.toDto(i.getMusicLibrary()));
+                    }
+                } catch (org.hibernate.ObjectNotFoundException | jakarta.persistence.EntityNotFoundException e) {
+                    // Ignore orphaned track
+                }
+            }
+        }
 
         return PlaylistDto.builder()
                 .id(p.getId())
@@ -76,9 +86,12 @@ public class PlaylistService {
         Playlist p = playlistRepository.findByIdAndUserId(id, userId)
                 .orElseThrow(() -> new AppException(ErrorCode.NOT_FOUND));
 
-        if (req.getName() != null) p.setName(req.getName());
-        if (req.getDescription() != null) p.setDescription(req.getDescription());
-        if (req.getImageUrl() != null) p.setImageUrl(req.getImageUrl());
+        if (req.getName() != null)
+            p.setName(req.getName());
+        if (req.getDescription() != null)
+            p.setDescription(req.getDescription());
+        if (req.getImageUrl() != null)
+            p.setImageUrl(req.getImageUrl());
         return toDto(playlistRepository.save(p), false);
     }
 
@@ -138,7 +151,7 @@ public class PlaylistService {
         } else {
             p.getItems().removeIf(i -> trackId.equals(i.getMusicLibrary().getDriveFileId()));
         }
-        
+
         for (int i = 0; i < p.getItems().size(); i++) {
             p.getItems().get(i).setPosition(i);
         }
