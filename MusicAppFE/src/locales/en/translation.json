@@ -107,7 +107,7 @@
       "reverbMix": "Reverb Mix",
       "roomSize": "Room Size",
       "stereoTitle": "Stereo Imager",
-      "stereoDesc": "Widen your stereo image using Mid/Side processing. 100% is normal, >100% is wider.",
+      "stereoDesc": "Widen your stereo image using Mid/Side processing. 100% is normal, up to 400% is extra wide.",
       "stereoWidth": "Stereo Width"
     }
   },

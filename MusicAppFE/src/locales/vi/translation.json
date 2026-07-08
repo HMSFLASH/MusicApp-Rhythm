@@ -107,7 +107,7 @@
       "reverbMix": "Tỉ Lệ Vang (Mix)",
       "roomSize": "Kích Thước Phòng (Room Size)",
       "stereoTitle": "Mở Rộng Không Gian (Stereo Imager)",
-      "stereoDesc": "Mở rộng âm thanh nổi. 100% là mặc định, >100% là rộng hơn.",
+      "stereoDesc": "Mở rộng âm thanh nổi. 100% là mặc định, tối đa 400% là rất rộng.",
       "stereoWidth": "Độ Rộng (Width)"
     }
   },

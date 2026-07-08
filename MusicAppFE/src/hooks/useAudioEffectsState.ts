@@ -1,6 +1,7 @@
 import { useState, useCallback, useRef } from 'react';
 import { COMPRESSOR_DEFAULTS, COMPRESSOR_RESET_SETTINGS, EQ_PRESETS, STYLISTIC_PRESETS } from './audioTypes';
 import type { EqBand, CustomEqPreset } from './audioTypes';
+import { clamp, STEREO_WIDTH_MAX_PERCENT } from './audioMath';
 
 type FxKey = 'eq' | 'tone' | 'comp' | 'reverb' | 'master' | 'preamp' | 'limiter' | 'stereo';
 type FxEnabledState = Record<FxKey, boolean>;
@@ -75,7 +76,9 @@ export function useAudioEffectsState(savedState: SavedAudioEffectsState = {}) {
   const [compMakeupGain, setCompMakeupGain] = useState<number>(savedState.compMakeupGain ?? COMPRESSOR_DEFAULTS.makeupGain);
 
   const [panValue, setPanValue] = useState<number>(savedState.panValue ?? 0);
-  const [stereoWidth, setStereoWidth] = useState<number>(savedState.stereoWidth ?? 100);
+  const [stereoWidth, setStereoWidthState] = useState<number>(
+    clamp(savedState.stereoWidth ?? 100, 0, STEREO_WIDTH_MAX_PERCENT)
+  );
   const [reverbMix, setReverbMix] = useState<number>(savedState.reverbMix ?? 0);
   const [reverbTime, setReverbTime] = useState<number>(savedState.reverbTime ?? 2);
 
@@ -94,6 +97,9 @@ export function useAudioEffectsState(savedState: SavedAudioEffectsState = {}) {
         fxEnabledRef.current = next;
         return next;
     });
+  }, []);
+  const setStereoWidth = useCallback((value: number) => {
+    setStereoWidthState(clamp(value, 0, STEREO_WIDTH_MAX_PERCENT));
   }, []);
   const toggleLoudnessNormalization = useCallback(() => setLoudnessNormalization(prev => !prev), []);
 

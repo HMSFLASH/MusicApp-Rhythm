@@ -9,14 +9,20 @@ export const compressorAttackSeconds = (attackMs: number, rmsSizeMs: number) =>
 
 export const percentToPan = (value: number) => clamp(value / 100, -1, 1);
 
-export const percentToStereoWidth = (value: number) => clamp(value / 100, 0, 2);
+export const STEREO_WIDTH_MAX_PERCENT = 400;
+
+export const percentToStereoWidth = (value: number) =>
+  clamp(value / 100, 0, STEREO_WIDTH_MAX_PERCENT / 100);
 
 export const percentToStereoBaseWidth = (value: number) => {
   const width = percentToStereoWidth(value);
-  return width <= 1 ? width : clamp(1 + (width - 1) * 0.5, 1, 1.5);
+  return width <= 1 ? width : clamp(1 + Math.pow(width - 1, 0.85) * 0.9, 1, 3.3);
 };
 
-export const percentToPseudoStereoAmount = (value: number) => clamp((value - 100) / 100, 0, 1);
+export const percentToPseudoStereoAmount = (value: number) => {
+  const amount = clamp((value - 100) / (STEREO_WIDTH_MAX_PERCENT - 100), 0, 1);
+  return Math.pow(amount, 0.65) * 1.35;
+};
 
 export const isNeutralDbGain = (value: number) => Math.abs(value || 0) < NEUTRAL_EPSILON;
 

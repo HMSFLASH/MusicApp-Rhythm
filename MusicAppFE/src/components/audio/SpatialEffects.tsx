@@ -2,6 +2,7 @@ import { HorizontalSlider } from '../HorizontalSlider';
 import { useGlobalAudio } from '../../context/AudioContext';
 import { useTranslation } from 'react-i18next';
 import { AudioEffectPanel, EffectControlsGate, EffectPowerButton } from './AudioEffectPanel';
+import { STEREO_WIDTH_MAX_PERCENT } from '../../hooks/audioMath';
 
 export function SpatialEffects() {
   const { playerState } = useGlobalAudio();
@@ -46,7 +47,7 @@ export function SpatialEffects() {
 
       <AudioEffectPanel
         title={t('studio.spatial.stereoTitle', 'Stereo Imager')}
-        description={t('studio.spatial.stereoDesc', 'Widen your stereo image using Mid/Side processing. 100% is normal, >100% is wider.')}
+        description={t('studio.spatial.stereoDesc', 'Widen your stereo image using Mid/Side processing. 100% is normal, up to 400% is extra wide.')}
         trailing={(
           <EffectPowerButton
             size="lg"
@@ -60,7 +61,7 @@ export function SpatialEffects() {
           <HorizontalSlider
             value={playerState.stereoWidth}
             min={0}
-            max={200}
+            max={STEREO_WIDTH_MAX_PERCENT}
             step={1}
             onChange={playerState.updateStereoWidth}
             label={t('studio.spatial.stereoWidth', 'Stereo Width')}
