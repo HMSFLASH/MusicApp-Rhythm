@@ -29,7 +29,8 @@ export function AuthProvider({ children }: { children: ReactNode }) {
   const fetchDriveToken = async () => {
     try {
       const response = await axiosClient.get('/api/music/drive-token');
-      const token = response.result?.accessToken || '';
+      // eslint-disable-next-line @typescript-eslint/no-explicit-any
+      const token = (response as any).accessToken || (response as any).result?.accessToken || '';
       if (token) {
         setDriveTokenState(token);
       }

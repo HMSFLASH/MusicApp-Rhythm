@@ -138,10 +138,7 @@ export function useAudioMetadata(jwtToken: string, queueState: any, driveToken?:
                     
                     metadata = await parseBufferFn(buffer, fileInfo, { duration: false });
                 } else {
-                    let fetchUrl = `${BACKEND_URL}/api/music/stream/${track.id}?access_token=${jwtToken}`;
-                    if (track.driveFileId && driveToken) {
-                        fetchUrl = `https://www.googleapis.com/drive/v3/files/${track.driveFileId}?alt=media&access_token=${driveToken}`;
-                    }
+                    const fetchUrl = `${BACKEND_URL}/api/music/stream/${track.id}?access_token=${jwtToken}`;
                     const controller = new AbortController();
                     const response = await fetch(fetchUrl, { signal: controller.signal });
                     if (!response.ok) throw new Error(`HTTP ${response.status}`);
