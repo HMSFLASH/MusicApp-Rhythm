@@ -83,10 +83,10 @@ export function MasterOutput() {
       <div className="flex items-center justify-between mt-2 p-4 bg-amber-500/5 rounded-xl border border-amber-500/20">
         <div>
           <span className="text-sm text-amber-500/90 font-bold block flex items-center gap-2">
-            {t('studio.masterOutput.precalcIdle', 'Pre-calculate on Idle Cores')}
+            {t('studio.masterOutput.precalcIdle', 'Pre-calculate for Weak CPUs')}
           </span>
           <span className="text-xs text-amber-500/60 font-mono mt-1 block pr-4">
-            {t('studio.masterOutput.precalcIdleDesc', 'Recommended for weak CPUs when enough RAM is available: pre-renders the full Audio Studio chain and plays from a processed buffer. Warning: Uses a lot of RAM and may crash on low-memory devices. EQ/Effects changes will only apply to the next track.')}
+            {t('studio.masterOutput.precalcIdleDesc', 'For weak CPUs with enough RAM: renders each track before playback so heavy effects do not have to run in real time. This normal mode handles one track at a time, not the whole queue. EQ/Effects changes apply on the next track.')}
           </span>
         </div>
         <button aria-label="Action"

@@ -977,7 +977,7 @@ console.log("[Audio] performOfflineRender called with EQ bands:", audioParamsRef
     return renderedBuffer;
   };
 
-  const precalculateTrackBuffer = async (track: Track) => {
+  const precalculateTrackBuffer = async (track: Track, keepInQueueCache = false) => {
     const trackId = String(track.id);
     const cachedBuffer = precalculatedQueueBuffersRef.current.get(trackId);
     if (cachedBuffer) return cachedBuffer;
@@ -997,7 +997,10 @@ console.log("[Audio] performOfflineRender called with EQ bands:", audioParamsRef
       throw new Error('Audio settings changed while pre-calculating');
     }
 
-    precalculatedQueueBuffersRef.current.set(trackId, finalRenderedBuffer);
+    if (keepInQueueCache) {
+      precalculatedQueueBuffersRef.current.set(trackId, finalRenderedBuffer);
+    }
+
     return finalRenderedBuffer;
   };
 
@@ -1027,7 +1030,7 @@ console.log("[Audio] performOfflineRender called with EQ bands:", audioParamsRef
 
         const track = tracks[index];
         try {
-          await precalculateTrackBuffer(track);
+          await precalculateTrackBuffer(track, true);
           completed += 1;
         } catch (e) {
           failed += 1;
@@ -1222,7 +1225,6 @@ console.log("[Audio] performOfflineRender called with EQ bands:", audioParamsRef
             finalRenderedBuffer = cachedRenderedBuffer;
           } else if (precalculatedNextBufferRef.current?.trackId === String(startingTrack.id)) {
             finalRenderedBuffer = precalculatedNextBufferRef.current.buffer;
-            precalculatedQueueBuffersRef.current.set(String(startingTrack.id), finalRenderedBuffer);
           } else {
             finalRenderedBuffer = await precalculateTrackBuffer(startingTrack);
           }
