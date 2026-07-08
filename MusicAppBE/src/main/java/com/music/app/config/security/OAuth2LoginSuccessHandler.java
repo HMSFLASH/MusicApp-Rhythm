@@ -57,7 +57,24 @@ public class OAuth2LoginSuccessHandler extends SimpleUrlAuthenticationSuccessHan
 
             AuthenticationResponse authResponse = authService.loginWithGoogleAndSaveRefresh(googleId, email, name, picture, refreshToken);
 
-            String targetUrl = "http://localhost:5173/oauth2/callback?token=" + authResponse.getAccessToken();
+            String requestOrigin = request.getHeader("Origin");
+            if (requestOrigin == null || requestOrigin.isEmpty()) {
+                requestOrigin = request.getHeader("Referer");
+            }
+            String host = "localhost:5173";
+            if (requestOrigin != null && !requestOrigin.isEmpty()) {
+                 try {
+                     java.net.URL url = new java.net.URL(requestOrigin);
+                     host = url.getHost() + ":5173";
+                 } catch (Exception e) {
+                     // ignore
+                 }
+            } else {
+                 host = request.getServerName() + ":5173";
+            }
+            
+            String scheme = request.getScheme(); // http or https
+            String targetUrl = scheme + "://" + host + "/oauth2/callback?token=" + authResponse.getAccessToken();
             getRedirectStrategy().sendRedirect(request, response, targetUrl);
         } else {
             super.onAuthenticationSuccess(request, response, authentication);

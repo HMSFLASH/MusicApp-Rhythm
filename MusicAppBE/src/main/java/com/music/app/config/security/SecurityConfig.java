@@ -13,6 +13,7 @@ import org.springframework.security.crypto.bcrypt.BCryptPasswordEncoder;
 import org.springframework.security.crypto.password.PasswordEncoder;
 import org.springframework.security.web.SecurityFilterChain;
 import org.springframework.web.cors.CorsConfiguration;
+import org.springframework.web.cors.CorsConfigurationSource;
 import org.springframework.web.cors.UrlBasedCorsConfigurationSource;
 import org.springframework.web.filter.CorsFilter;
 import org.springframework.security.oauth2.client.registration.ClientRegistrationRepository;
@@ -75,7 +76,7 @@ public class SecurityConfig {
         }
 
         @Bean
-        public CorsFilter corsFilter(@Value("${app.frontend-url}") String frontendUrl) {
+        public CorsConfigurationSource corsConfigurationSource(@Value("${app.frontend-url}") String frontendUrl) {
                 CorsConfiguration corsConfiguration = new CorsConfiguration();
                 if ("*".equals(frontendUrl)) {
                         corsConfiguration.addAllowedOriginPattern("*");
@@ -86,10 +87,10 @@ public class SecurityConfig {
                 corsConfiguration.addAllowedHeader("*");
                 corsConfiguration.setAllowCredentials(true);
 
-                UrlBasedCorsConfigurationSource urlBasedCorsConfigurationSource = new UrlBasedCorsConfigurationSource();
-                urlBasedCorsConfigurationSource.registerCorsConfiguration("/**", corsConfiguration);
+                UrlBasedCorsConfigurationSource source = new UrlBasedCorsConfigurationSource();
+                source.registerCorsConfiguration("/**", corsConfiguration);
 
-                return new CorsFilter(urlBasedCorsConfigurationSource);
+                return source;
         }
 
         @Bean
