@@ -151,6 +151,8 @@ export function NowPlaying() {
 
   // Metadata Modal state
   const [showMetadata, setShowMetadata] = useState(false);
+  // Lyrics Modal state
+  const [showLyrics, setShowLyrics] = useState(false);
 
   type SongEndMode = 'stop' | 'preload' | 'next' | 'repeat_one';
   type QueueEndMode = 'stop' | 'next' | 'repeat';
@@ -335,7 +337,7 @@ export function NowPlaying() {
                       />
                     </div>
                     {/* Other menu items */}
-                    <button className="w-full flex items-center gap-3 px-4 py-3 text-sm text-white/70 hover:bg-white/5 hover:text-white transition-colors">
+                    <button onClick={() => { setShowMenu(false); setShowLyrics(true); }} className="w-full flex items-center gap-3 px-4 py-3 text-sm text-white/70 hover:bg-white/5 hover:text-white transition-colors">
                       <Music size={16} />
                       <span>{t('nowPlaying.viewLyrics')}</span>
                     </button>
@@ -709,6 +711,38 @@ export function NowPlaying() {
                     <span className="text-sm text-white/90 font-medium break-all">{item.value || 'unknown'}</span>
                   </div>
                 ))}
+              </div>
+            </div>
+          </div>
+        </div>
+      )}
+
+      {/* Lyrics Modal */}
+      {showLyrics && currentTrack && (
+        <div
+          className="fixed inset-0 z-[100] flex items-center justify-center bg-black/60 backdrop-blur-sm p-4"
+          onClick={() => setShowLyrics(false)}
+        >
+          <div
+            className="bg-[#1a1a1a] border border-white/10 rounded-2xl w-full max-w-2xl shadow-2xl overflow-hidden flex flex-col max-h-[80vh]"
+            onClick={(e) => e.stopPropagation()}
+          >
+            <div className="flex items-center justify-between p-5 border-b border-white/5">
+              <div className="flex items-center gap-3 text-white">
+                <Music size={24} className="text-primary" />
+                <h3 className="font-semibold text-lg">{t('nowPlaying.viewLyrics')}</h3>
+              </div>
+              <button
+                onClick={() => setShowLyrics(false)}
+                className="text-white/40 hover:text-white transition-colors p-1"
+              >
+                <X size={20} />
+              </button>
+            </div>
+
+            <div className="p-6 flex flex-col gap-4 overflow-y-auto no-scrollbar">
+              <div className="text-white/90 font-medium whitespace-pre-wrap leading-relaxed text-center">
+                {currentTrack.lyrics || playerState.getTrackMetadata(currentTrack.id)?.lyrics || t('nowPlaying.noLyrics')}
               </div>
             </div>
           </div>

@@ -188,6 +188,7 @@
     "repeatSong": "Lặp lại bài hát",
     "repeatQueue": "Lặp lại hàng chờ",
     "switchToNextQueue": "Chuyển sang hàng chờ tiếp theo",
-    "cycleQueues": "Khi hàng chờ cuối cùng kết thúc, chuyển tới hàng chờ đầu tiên và ngược lại"
+    "cycleQueues": "Khi hàng chờ cuối cùng kết thúc, chuyển tới hàng chờ đầu tiên và ngược lại",
+    "noLyrics": "Không có lời bài hát"
   }
 }

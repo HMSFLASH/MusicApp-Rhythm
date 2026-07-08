@@ -188,6 +188,7 @@
     "repeatSong": "Repeat song",
     "repeatQueue": "Repeat queue",
     "switchToNextQueue": "Switch to next queue",
-    "cycleQueues": "When the last queue ends, switch to the first queue and vice versa"
+    "cycleQueues": "When the last queue ends, switch to the first queue and vice versa",
+    "noLyrics": "No lyrics available"
   }
 }
