@@ -11,6 +11,7 @@ import com.music.app.model.PlaylistItem;
 import com.music.app.model.User;
 import com.music.app.repository.MusicLibraryRepository;
 import com.music.app.repository.PlaylistRepository;
+import com.music.app.repository.PlaylistItemRepository;
 import com.music.app.repository.UserRepository;
 
 import jakarta.persistence.EntityNotFoundException;
@@ -29,6 +30,7 @@ import java.util.stream.Collectors;
 public class PlaylistService {
 
     private final PlaylistRepository playlistRepository;
+    private final PlaylistItemRepository playlistItemRepository;
     private final MusicLibraryRepository musicLibraryRepository;
     private final UserRepository userRepository;
     private final MusicService musicService;
@@ -133,33 +135,26 @@ public class PlaylistService {
         }
 
         final Long finalLibId = lib.getId();
-        boolean exists = p.getItems().stream()
-                .anyMatch(i -> i.getMusicLibrary().getId().equals(finalLibId));
-        if (exists) {
+        if (playlistItemRepository.existsByPlaylistIdAndMusicLibraryId(id, finalLibId)) {
             return;
         }
 
-        int pos = p.getItems().size();
+        int maxPos = playlistItemRepository.getMaxPosition(id);
         PlaylistItem item = PlaylistItem.builder()
-                .playlist(p).musicLibrary(lib).position(pos).build();
-        p.getItems().add(item);
-        playlistRepository.save(p);
+                .playlist(p).musicLibrary(lib).position(maxPos + 1).build();
+        playlistItemRepository.save(item);
     }
 
     @Transactional
     public void removeTrack(Long id, String trackId, Long userId) {
-        Playlist p = playlistRepository.findByIdAndUserId(id, userId)
+        // verify playlist exists and belongs to user
+        playlistRepository.findByIdAndUserId(id, userId)
                 .orElseThrow(() -> new AppException(ErrorCode.NOT_FOUND));
 
         if (trackId.matches("\\d+")) {
-            p.getItems().removeIf(i -> i.getMusicLibrary().getId().equals(Long.valueOf(trackId)));
+            playlistItemRepository.deleteByPlaylistIdAndMusicLibraryId(id, Long.valueOf(trackId));
         } else {
-            p.getItems().removeIf(i -> trackId.equals(i.getMusicLibrary().getDriveFileId()));
+            playlistItemRepository.deleteByPlaylistIdAndDriveFileId(id, trackId);
         }
-
-        for (int i = 0; i < p.getItems().size(); i++) {
-            p.getItems().get(i).setPosition(i);
-        }
-        playlistRepository.save(p);
     }
 }
