@@ -1,6 +1,7 @@
 import { useRef, useEffect, useState } from 'react';
 import { useNavigate, useLocation } from 'react-router-dom';
-import { useGlobalAudio } from '../context/AudioContext';
+import { useGlobalAudio } from '../context/AudioContext'
+import { useAuth } from '../context/AuthContext';;
 import { Play, Pause, SkipForward, SkipBack, Cloud, Disc, Heart, Shuffle, Repeat, Repeat1, Square, PauseCircle, ListX, ListPlus, Maximize2, Info, ListMusic, Volume2, VolumeX, X, ArrowRight } from 'lucide-react';
 import { HorizontalSlider } from './HorizontalSlider';
 import { axiosClient } from '../api/axiosClient';
@@ -16,7 +17,8 @@ export function BottomPlayerBar() {
   const { t } = useTranslation();
   const navigate = useNavigate();
   const location = useLocation();
-  const { jwtToken, playerState } = useGlobalAudio();
+  const { jwtToken } = useAuth();
+  const { playerState } = useGlobalAudio();
   const { 
     currentTrack, isPlaying, currentTime, duration, 
     togglePlay, seek, playNext, playPrevious,

@@ -2,7 +2,7 @@ import { Disc, ChevronRight, Loader2, Eye, EyeOff } from 'lucide-react';
 import { NavLink, useNavigate } from 'react-router-dom';
 import { useState } from 'react';
 import { axiosClient } from '../api/axiosClient';
-import { useGlobalAudio } from '../context/AudioContext';
+import { useAuth } from '../context/AuthContext';
 
 const BACKEND_URL = `http://${window.location.hostname}:8080`;
 
@@ -12,7 +12,7 @@ export function LoginPage() {
   const [showPassword, setShowPassword] = useState(false);
   const [loading, setLoading] = useState(false);
   const [error, setError] = useState('');
-  const { setJwtToken } = useGlobalAudio();
+  const { setJwtToken } = useAuth();
   const navigate = useNavigate();
 
   const handleGoogleLogin = (provider: string = 'google') => {

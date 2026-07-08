@@ -2,7 +2,8 @@ import { useState, useEffect } from 'react';
 import { useNavigate, useSearchParams } from 'react-router-dom';
 import { Heart, ListMusic, Cloud, Star, Clock, ListPlus, Play, ArrowLeft, Shuffle, MoreHorizontal, Info, X, ListEnd, ListStart } from 'lucide-react';
 import { AddToPlaylistModal } from '../components/AddToPlaylistModal';
-import { useGlobalAudio } from '../context/AudioContext';
+import { useGlobalAudio } from '../context/AudioContext'
+import { useAuth } from '../context/AuthContext';;
 import type { Track } from '../hooks/useAudioPlayer';
 import { axiosClient } from '../api/axiosClient';
 import { useLibrary } from '../context/LibraryContext';
@@ -10,7 +11,8 @@ import { useLibrary } from '../context/LibraryContext';
 export function TracksPage() {
   const navigate = useNavigate();
   const [searchParams] = useSearchParams();
-  const { jwtToken, playerState } = useGlobalAudio();
+  const { jwtToken } = useAuth();
+  const { playerState } = useGlobalAudio();
   
   const { tracks, favorites, toggleFavorite: ctxToggleFavorite } = useLibrary();
   const activeTab = searchParams.get('tab') === 'favorites' ? 'favorites' : 'all';

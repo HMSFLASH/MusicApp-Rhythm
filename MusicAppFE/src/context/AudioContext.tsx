@@ -1,32 +1,20 @@
-import { createContext, useContext, useState } from 'react';
+import { createContext, useContext } from 'react';
 import type { ReactNode } from 'react';
 import { useAudioPlayer } from '../hooks/useAudioPlayer';
+import { useAuth } from './AuthContext';
 
 interface AudioContextType {
-  jwtToken: string;
-  setJwtToken: (token: string) => void;
   playerState: ReturnType<typeof useAudioPlayer>;
 }
 
 const AudioContext = createContext<AudioContextType | undefined>(undefined);
 
 export function AudioProvider({ children }: { children: ReactNode }) {
-  const [jwtToken, setJwtTokenState] = useState(() => {
-    return localStorage.getItem('music_app_token') || '';
-  });
-
-  const setJwtToken = (token: string) => {
-    if (token) {
-      localStorage.setItem('music_app_token', token);
-    } else {
-      localStorage.removeItem('music_app_token');
-    }
-    setJwtTokenState(token);
-  };
+  const { jwtToken } = useAuth();
   const playerState = useAudioPlayer(jwtToken);
 
   return (
-    <AudioContext.Provider value={{ jwtToken, setJwtToken, playerState }}>
+    <AudioContext.Provider value={{ playerState }}>
       {children}
     </AudioContext.Provider>
   );

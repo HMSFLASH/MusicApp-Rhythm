@@ -1,6 +1,7 @@
 import React, { createContext, useContext, useState, useEffect, type ReactNode } from 'react';
 import { axiosClient } from '../api/axiosClient';
-import { useGlobalAudio } from './AudioContext';
+import { useGlobalAudio } from './AudioContext'
+import { useAuth } from './AuthContext';;
 import type { Track } from '../hooks/useAudioPlayer';
 import { db } from '../lib/db';
 

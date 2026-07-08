@@ -1,7 +1,8 @@
 import { useState } from 'react';
 import { X, Key, User, Lock, Loader2 } from 'lucide-react';
 import { axiosClient } from '../api/axiosClient';
-import { useGlobalAudio } from '../context/AudioContext';
+import { useGlobalAudio } from '../context/AudioContext'
+import { useAuth } from '../context/AuthContext';;
 
 interface SetLocalPasswordModalProps {
   isOpen: boolean;
@@ -17,7 +18,7 @@ export function SetLocalPasswordModal({ isOpen, onClose, defaultEmail = '' }: Se
   const [error, setError] = useState('');
   const [success, setSuccess] = useState(false);
   
-  const { setJwtToken } = useGlobalAudio();
+  const { setJwtToken } = useAuth();
 
   if (!isOpen) return null;
 

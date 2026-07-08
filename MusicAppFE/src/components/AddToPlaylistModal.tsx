@@ -10,10 +10,12 @@ interface AddToPlaylistModalProps {
   track: Track | null;
 }
 
-import { useGlobalAudio } from '../context/AudioContext';
+import { useGlobalAudio } from '../context/AudioContext'
+import { useAuth } from '../context/AuthContext';;
 
 export function AddToPlaylistModal({ isOpen, onClose, track }: AddToPlaylistModalProps) {
-  const { jwtToken, playerState } = useGlobalAudio();
+  const { jwtToken } = useAuth();
+  const { playerState } = useGlobalAudio();
   // eslint-disable-next-line @typescript-eslint/no-explicit-any
   const [playlists, setPlaylists] = useState<any[]>([]);
   const [loading, setLoading] = useState(false);

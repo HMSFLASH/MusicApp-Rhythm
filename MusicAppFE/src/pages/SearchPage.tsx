@@ -1,12 +1,14 @@
 import { useState, useRef, useEffect } from 'react';
 import { Search, Plus, Users, Music, Disc, X, Check, Play, Cloud, ListPlus } from 'lucide-react';
-import { useGlobalAudio } from '../context/AudioContext';
+import { useGlobalAudio } from '../context/AudioContext'
+import { useAuth } from '../context/AuthContext';;
 import { AddToPlaylistModal } from '../components/AddToPlaylistModal';
 import type { Track } from '../hooks/useAudioPlayer';
 import { useLibrary } from '../context/LibraryContext';
 
 export function SearchPage() {
-  const { playerState, jwtToken } = useGlobalAudio();
+  const { jwtToken } = useAuth();
+  const { playerState } = useGlobalAudio();
   const { tracks: allTracks } = useLibrary();
   const [searchQuery, setSearchQuery] = useState('');
   const [trackToPlaylist, setTrackToPlaylist] = useState<Track | null>(null);

@@ -1,12 +1,12 @@
 import { useEffect } from 'react';
 import { useSearchParams, useNavigate } from 'react-router-dom';
-import { useGlobalAudio } from '../context/AudioContext';
+import { useAuth } from '../context/AuthContext';;
 import { Disc } from 'lucide-react';
 
 export function OAuthCallback() {
   const [searchParams] = useSearchParams();
   const navigate = useNavigate();
-  const { setJwtToken } = useGlobalAudio();
+  const { setJwtToken } = useAuth();
 
   useEffect(() => {
     const token = searchParams.get('token');

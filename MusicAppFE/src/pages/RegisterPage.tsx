@@ -2,7 +2,7 @@ import { Disc, ChevronRight, Mail, Eye, EyeOff, IdCard } from 'lucide-react';
 import { NavLink, useNavigate } from 'react-router-dom';
 import { useState } from 'react';
 import { axiosClient } from '../api/axiosClient';
-import { useGlobalAudio } from '../context/AudioContext';
+import { useAuth } from '../context/AuthContext';;
 
 const BACKEND_URL = `http://${window.location.hostname}:8080`;
 
@@ -16,7 +16,7 @@ export function RegisterPage() {
   const [error, setError] = useState('');
   const [loading, setLoading] = useState(false);
 
-  const { setJwtToken } = useGlobalAudio();
+  const { setJwtToken } = useAuth();
   const navigate = useNavigate();
 
   const handleOAuthLogin = (provider: string) => {

@@ -22,7 +22,8 @@ import { useState, useEffect } from 'react';
 import { useTranslation } from 'react-i18next';
 import { axiosClient } from '../api/axiosClient';
 import { BottomPlayerBar } from './BottomPlayerBar';
-import { useGlobalAudio } from '../context/AudioContext';
+import { useGlobalAudio } from '../context/AudioContext'
+import { useAuth } from '../context/AuthContext';;
 import { LocalFilePicker } from './LocalFilePicker';
 import { UploadQueuePanel } from './UploadQueuePanel';
 import { SetLocalPasswordModal } from './SetLocalPasswordModal';
@@ -46,7 +47,7 @@ const parseJwt = (token: string) => {
 export function Layout() {
   const { t, i18n } = useTranslation();
   const location = useLocation();
-  const { jwtToken, setJwtToken } = useGlobalAudio();
+  const { jwtToken, setJwtToken } = useAuth();
   const [syncing, setSyncing] = useState(false);
   const [isLoggingOut, setIsLoggingOut] = useState(false);
   const [isPasswordModalOpen, setIsPasswordModalOpen] = useState(false);

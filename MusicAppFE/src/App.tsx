@@ -1,5 +1,6 @@
 import { BrowserRouter, Routes, Route } from 'react-router-dom';
 import { AudioProvider } from './context/AudioContext';
+import { AuthProvider, useAuth } from './context/AuthContext';
 import { Layout } from './components/Layout';
 import { NowPlaying } from './pages/NowPlaying';
 import { PlaylistPage } from './pages/PlaylistPage';
@@ -17,13 +18,12 @@ import { ArtistsPage } from './pages/ArtistsPage';
 import { GenresPage } from './pages/GenresPage';
 import { QueuePage } from './pages/QueuePage';
 import { OAuthCallback } from './pages/OAuthCallback';
-import { useGlobalAudio } from './context/AudioContext';
 import { UploadProvider } from './context/UploadContext';
 import { LibraryProvider } from './context/LibraryContext';
 import { Navigate } from 'react-router-dom';
 
 function ProtectedRoute({ children }: { children: React.ReactNode }) {
-  const { jwtToken } = useGlobalAudio();
+  const { jwtToken } = useAuth();
   if (!jwtToken) {
     return <Navigate to="/login" replace />;
   }
@@ -65,12 +65,14 @@ function App() {
 
 export default function AppWrapper() {
   return (
-    <AudioProvider>
-      <LibraryProvider>
-        <UploadProvider>
-          <App />
-        </UploadProvider>
-      </LibraryProvider>
-    </AudioProvider>
+    <AuthProvider>
+      <AudioProvider>
+        <LibraryProvider>
+          <UploadProvider>
+            <App />
+          </UploadProvider>
+        </LibraryProvider>
+      </AudioProvider>
+    </AuthProvider>
   );
 }

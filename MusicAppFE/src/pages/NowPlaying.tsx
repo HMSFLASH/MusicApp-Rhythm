@@ -1,5 +1,6 @@
 import { useState, useRef, useEffect } from 'react';
-import { useGlobalAudio } from '../context/AudioContext';
+import { useGlobalAudio } from '../context/AudioContext'
+import { useAuth } from '../context/AuthContext';;
 import { Disc, Play, Pause, SkipBack, SkipForward, Shuffle, Repeat, Heart, Info, ListPlus, MoreHorizontal, Repeat1, User, Volume2, VolumeX, BarChart2, Gauge, Music, Check, X, ArrowRight, Square, PauseCircle, ListX } from 'lucide-react';
 import { HorizontalSlider } from '../components/HorizontalSlider';
 import { useNavigate } from 'react-router-dom';
@@ -14,7 +15,8 @@ const formatTime = (time: number) => {
 
 export function NowPlaying() {
   const { t } = useTranslation();
-  const { playerState, jwtToken } = useGlobalAudio();
+  const { jwtToken } = useAuth();
+  const { playerState } = useGlobalAudio();
   const navigate = useNavigate();
   const {
     isPlaying, currentTrack, currentTime, duration,
