@@ -252,6 +252,17 @@ export function useAudioPlayback(
     }
   }, []);
 
+  const updateMediaSessionMetadata = useCallback((track: Track | null) => {
+    if (!('mediaSession' in navigator) || !track) return;
+
+    navigator.mediaSession.metadata = new MediaMetadata({
+      title: track.title || (track.fileName ? track.fileName.replace(/\.[^/.]+$/, "") : 'Unknown Title'),
+      artist: track.artist || (track.fileName?.includes(' - ') ? track.fileName.split(' - ')[0] : 'Unknown Artist'),
+      album: track.album || 'Unknown Album',
+      artwork: track.imageUrl ? [{ src: track.imageUrl, sizes: '512x512', type: 'image/jpeg' }] : []
+    });
+  }, []);
+
   useEffect(() => {
     if (!audioRef.current) {
       audioRef.current = new Audio();
@@ -1072,10 +1083,12 @@ console.log("[Audio] performOfflineRender called with EQ bands:", audioParamsRef
     if (precalculateOnIdle) {
       usingBufferPlaybackRef.current = true;
       audioRef.current!.pause();
-      audioRef.current!.src = "";
-      setIsPlaying(autoPlay);
-      if (autoPlay) startMediaSessionAnchor();
-      else pauseMediaSessionAnchor();
+      configureAudioElementSource(audioUrl);
+      audioRef.current!.preload = 'auto';
+      audioRef.current!.load();
+      updateMediaSessionMetadata(startingTrack);
+      setIsPlaying(false);
+      pauseMediaSessionAnchor();
       setLoadingTrackPhase(autoPlay ? 'processing' : null);
 
       (async () => {
@@ -1368,14 +1381,7 @@ console.log("[Audio] performOfflineRender called with EQ bands:", audioParamsRef
   // Update Media Session Metadata and Handlers
   useEffect(() => {
     if ('mediaSession' in navigator) {
-      if (currentTrack) {
-        navigator.mediaSession.metadata = new MediaMetadata({
-          title: currentTrack.title || (currentTrack.fileName ? currentTrack.fileName.replace(/\.[^/.]+$/, "") : 'Unknown Title'),
-          artist: currentTrack.artist || (currentTrack.fileName?.includes(' - ') ? currentTrack.fileName.split(' - ')[0] : 'Unknown Artist'),
-          album: currentTrack.album || 'Unknown Album',
-          artwork: currentTrack.imageUrl ? [{ src: currentTrack.imageUrl, sizes: '512x512', type: 'image/jpeg' }] : []
-        });
-      }
+      updateMediaSessionMetadata(currentTrack ?? null);
 
       navigator.mediaSession.setActionHandler('play', () => togglePlayRef.current());
       navigator.mediaSession.setActionHandler('pause', () => togglePlayRef.current());
@@ -1387,7 +1393,7 @@ console.log("[Audio] performOfflineRender called with EQ bands:", audioParamsRef
         }
       });
     }
-  }, [currentTrack]);
+  }, [currentTrack, updateMediaSessionMetadata]);
 
 
   // Compute hasNext and hasPrevious
