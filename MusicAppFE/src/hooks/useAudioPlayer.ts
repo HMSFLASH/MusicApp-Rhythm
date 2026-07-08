@@ -43,6 +43,7 @@ export function useAudioPlayer(isAuthenticated: boolean, driveToken?: string, fe
       loudnessNormalization: effectsState.loudnessNormalization,
       useOversample: effectsState.useOversample,
       precalculateOnIdle: effectsState.precalculateOnIdle,
+      renderSignatureCacheEnabled: effectsState.renderSignatureCacheEnabled,
       fxEnabled: effectsState.fxEnabled
     };
     
@@ -61,7 +62,7 @@ export function useAudioPlayer(isAuthenticated: boolean, driveToken?: string, fe
     effectsState.compAttack, effectsState.compRelease, effectsState.compRmsSize, effectsState.compMakeupGain,
     effectsState.panValue, effectsState.stereoWidth, effectsState.reverbMix, effectsState.reverbTime,
     effectsState.loudnessNormalization, effectsState.useOversample, effectsState.precalculateOnIdle,
-    effectsState.fxEnabled
+    effectsState.renderSignatureCacheEnabled, effectsState.fxEnabled
   ]);
 
   return {

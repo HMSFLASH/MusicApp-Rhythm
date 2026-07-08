@@ -26,6 +26,7 @@ type SavedAudioEffectsState = Partial<{
   loudnessNormalization: boolean;
   useOversample: boolean;
   precalculateOnIdle: boolean;
+  renderSignatureCacheEnabled: boolean;
   fxEnabled: Partial<FxEnabledState>;
 }>;
 
@@ -81,6 +82,7 @@ export function useAudioEffectsState(savedState: SavedAudioEffectsState = {}) {
   const [loudnessNormalization, setLoudnessNormalization] = useState<boolean>(savedState.loudnessNormalization ?? true);
   const [useOversample, setUseOversample] = useState<boolean>(savedState.useOversample ?? false);
   const [precalculateOnIdle, setPrecalculateOnIdle] = useState<boolean>(savedState.precalculateOnIdle ?? false);
+  const [renderSignatureCacheEnabled, setRenderSignatureCacheEnabled] = useState<boolean>(savedState.renderSignatureCacheEnabled ?? false);
 
   const initialFxEnabled: FxEnabledState = { ...DEFAULT_FX_ENABLED, ...savedState.fxEnabled };
   const [fxEnabled, setFxEnabled] = useState<FxEnabledState>(initialFxEnabled);
@@ -210,6 +212,7 @@ export function useAudioEffectsState(savedState: SavedAudioEffectsState = {}) {
     loudnessNormalization, setLoudnessNormalization, toggleLoudnessNormalization,
     useOversample, setUseOversample,
     precalculateOnIdle, setPrecalculateOnIdle,
+    renderSignatureCacheEnabled, setRenderSignatureCacheEnabled,
     fxEnabled, setFxEnabled, toggleFx, fxEnabledRef,
     applyPreset, applyStylisticPreset, setCustomPreset, setParametricPreset,
     saveCustomPreset, applyCustomSavedPreset, renameCustomPreset, deleteCustomPreset,

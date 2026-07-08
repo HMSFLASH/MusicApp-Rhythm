@@ -55,6 +55,8 @@
       "hqOversampleDesc": "Reduces aliasing in the limiter's soft clip stage. Warning: May cause lag on mobile devices.",
       "precalcIdle": "Pre-calculate for Weak CPUs",
       "precalcIdleDesc": "For weak CPUs with enough RAM: renders each track before playback so heavy effects do not have to run in real time. This normal mode handles one track at a time, not the whole queue. EQ/Effects changes apply on the next track.",
+      "renderSignatureCache": "Reusable Render Cache",
+      "renderSignatureCacheDesc": "Keeps rendered buffers by track and audio settings signature so returning to an older EQ/effects setup can reuse RAM cache. Uses extra memory.",
       "queuePrecalcTitle": "Full Queue Pre-calculate",
       "queuePrecalcDesc": "Uses all {{cores}} CPU cores the browser exposes and keeps rendered buffers in RAM until audio settings change.",
       "queuePrecalcButton": "Pre-calculate Entire Queue",

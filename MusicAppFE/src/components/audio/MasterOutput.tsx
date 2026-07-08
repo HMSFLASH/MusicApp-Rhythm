@@ -98,64 +98,83 @@ export function MasterOutput() {
       </div>
 
       {playerState.precalculateOnIdle && (
-        <div className="flex flex-col gap-3 mt-2 p-4 bg-red-500/5 rounded-xl border border-red-500/20">
-          <div className="flex items-start gap-3">
-            <Cpu className="text-red-400 shrink-0 mt-0.5" size={18} />
-            <div className="min-w-0 flex-1">
-              <span className="text-sm text-red-300/90 font-bold block">
-                {t('studio.masterOutput.queuePrecalcTitle', 'Full Queue Pre-calculate')}
+        <>
+          <div className="flex items-center justify-between mt-2 p-4 bg-amber-500/5 rounded-xl border border-amber-500/20">
+            <div>
+              <span className="text-sm text-amber-300/90 font-bold block">
+                {t('studio.masterOutput.renderSignatureCache', 'Reusable Render Cache')}
               </span>
-              <span className="text-xs text-red-300/65 font-mono mt-1 block">
-                {t('studio.masterOutput.queuePrecalcDesc', {
-                  cores: cpuCores,
-                  defaultValue: 'Uses all {{cores}} CPU cores the browser exposes and keeps rendered buffers in RAM until audio settings change.'
-                })}
+              <span className="text-xs text-amber-300/65 font-mono mt-1 block pr-4">
+                {t('studio.masterOutput.renderSignatureCacheDesc', 'Keeps rendered buffers by track and audio settings signature so returning to an older EQ/effects setup can reuse RAM cache. Uses extra memory.')}
               </span>
             </div>
+            <button aria-label="Action"
+              onClick={() => playerState.setRenderSignatureCacheEnabled(!playerState.renderSignatureCacheEnabled)}
+              className={`shrink-0 w-12 h-6 rounded-full relative transition-colors ${playerState.renderSignatureCacheEnabled ? 'bg-amber-500' : 'bg-white/20'}`}
+            >
+              <div className={`absolute top-0.5 left-0.5 w-5 h-5 rounded-full bg-white transition-transform ${playerState.renderSignatureCacheEnabled ? 'translate-x-6' : 'translate-x-0'}`}></div>
+            </button>
           </div>
 
-          <button
-            aria-label={t('studio.masterOutput.queuePrecalcButton', 'Pre-calculate Entire Queue')}
-            title={t('studio.masterOutput.queuePrecalcButton', 'Pre-calculate Entire Queue')}
-            onClick={handlePrecalculateQueue}
-            disabled={queueCount === 0 || queuePrecalculateStatus?.isRunning}
-            className="w-full h-10 rounded-lg bg-red-500/20 hover:bg-red-500/30 disabled:bg-white/5 disabled:text-white/30 disabled:cursor-not-allowed text-red-100 border border-red-400/30 flex items-center justify-center gap-2 text-xs font-bold uppercase transition-colors"
-          >
-            <Zap size={15} />
-            <span>
-              {queuePrecalculateStatus?.isRunning
-                ? t('studio.masterOutput.queuePrecalcRunningButton', 'Calculating...')
-                : t('studio.masterOutput.queuePrecalcButton', 'Pre-calculate Entire Queue')}
-            </span>
-          </button>
-
-          {(queuePrecalculateStatus?.isRunning || totalCount > 0) && (
-            <div className="flex flex-col gap-2">
-              <div className="h-1.5 rounded-full bg-white/10 overflow-hidden">
-                <div
-                  className="h-full bg-red-400 transition-all"
-                  style={{ width: `${progressPercent}%` }}
-                />
-              </div>
-              <span className="text-[11px] text-red-200/70 font-mono">
-                {queuePrecalculateStatus?.isRunning
-                  ? t('studio.masterOutput.queuePrecalcRunning', {
-                    completed: completedCount,
-                    failed: failedCount,
-                    total: totalCount,
+          <div className="flex flex-col gap-3 mt-2 p-4 bg-red-500/5 rounded-xl border border-red-500/20">
+            <div className="flex items-start gap-3">
+              <Cpu className="text-red-400 shrink-0 mt-0.5" size={18} />
+              <div className="min-w-0 flex-1">
+                <span className="text-sm text-red-300/90 font-bold block">
+                  {t('studio.masterOutput.queuePrecalcTitle', 'Full Queue Pre-calculate')}
+                </span>
+                <span className="text-xs text-red-300/65 font-mono mt-1 block">
+                  {t('studio.masterOutput.queuePrecalcDesc', {
                     cores: cpuCores,
-                    defaultValue: 'Rendering {{completed}}/{{total}} on {{cores}} cores. Failed: {{failed}}.'
-                  })
-                  : t('studio.masterOutput.queuePrecalcDone', {
-                    completed: completedCount,
-                    failed: failedCount,
-                    total: totalCount,
-                    defaultValue: 'Ready: {{completed}}/{{total}} rendered. Failed: {{failed}}.'
+                    defaultValue: 'Uses all {{cores}} CPU cores the browser exposes and keeps rendered buffers in RAM until audio settings change.'
                   })}
-              </span>
+                </span>
+              </div>
             </div>
-          )}
-        </div>
+
+            <button
+              aria-label={t('studio.masterOutput.queuePrecalcButton', 'Pre-calculate Entire Queue')}
+              title={t('studio.masterOutput.queuePrecalcButton', 'Pre-calculate Entire Queue')}
+              onClick={handlePrecalculateQueue}
+              disabled={queueCount === 0 || queuePrecalculateStatus?.isRunning}
+              className="w-full h-10 rounded-lg bg-red-500/20 hover:bg-red-500/30 disabled:bg-white/5 disabled:text-white/30 disabled:cursor-not-allowed text-red-100 border border-red-400/30 flex items-center justify-center gap-2 text-xs font-bold uppercase transition-colors"
+            >
+              <Zap size={15} />
+              <span>
+                {queuePrecalculateStatus?.isRunning
+                  ? t('studio.masterOutput.queuePrecalcRunningButton', 'Calculating...')
+                  : t('studio.masterOutput.queuePrecalcButton', 'Pre-calculate Entire Queue')}
+              </span>
+            </button>
+
+            {(queuePrecalculateStatus?.isRunning || totalCount > 0) && (
+              <div className="flex flex-col gap-2">
+                <div className="h-1.5 rounded-full bg-white/10 overflow-hidden">
+                  <div
+                    className="h-full bg-red-400 transition-all"
+                    style={{ width: `${progressPercent}%` }}
+                  />
+                </div>
+                <span className="text-[11px] text-red-200/70 font-mono">
+                  {queuePrecalculateStatus?.isRunning
+                    ? t('studio.masterOutput.queuePrecalcRunning', {
+                      completed: completedCount,
+                      failed: failedCount,
+                      total: totalCount,
+                      cores: cpuCores,
+                      defaultValue: 'Rendering {{completed}}/{{total}} on {{cores}} cores. Failed: {{failed}}.'
+                    })
+                    : t('studio.masterOutput.queuePrecalcDone', {
+                      completed: completedCount,
+                      failed: failedCount,
+                      total: totalCount,
+                      defaultValue: 'Ready: {{completed}}/{{total}} rendered. Failed: {{failed}}.'
+                    })}
+                </span>
+              </div>
+            )}
+          </div>
+        </>
       )}
     </div>
   );

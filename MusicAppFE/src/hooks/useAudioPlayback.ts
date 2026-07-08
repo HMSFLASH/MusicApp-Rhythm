@@ -1,5 +1,5 @@
 import { useState, useRef, useEffect, useCallback } from 'react';
-import type { Track } from './audioTypes';
+import type { EqBand, Track } from './audioTypes';
 import { LOCAL_STORAGE_KEY } from './audioStorage';
 import { axiosClient } from '../api/axiosClient';
 import { configureLoudnessNormalization, configureMasterLimiter, createSoftClipCurve } from './useAudioContext';
@@ -16,6 +16,10 @@ const percentToStereoBaseWidth = (value: number) => {
 const percentToPseudoStereoAmount = (value: number) => clamp((value - 100) / 100, 0, 1);
 const REVERB_WET_GAIN = 0.75;
 const DRIVE_MEDIA_URL = 'https://www.googleapis.com/drive/v3/files';
+const NEUTRAL_EPSILON = 0.0001;
+const MAX_PRECALCULATED_BUFFER_CACHE_SIZE = 3;
+const MAX_RENDER_SIGNATURE_CACHE_ENTRIES = 24;
+const GAIN_BASED_EQ_TYPES = new Set<BiquadFilterType>(['peaking', 'lowshelf', 'highshelf']);
 type LoadingTrackPhase = 'downloading' | 'processing';
 type QueuePrecalculateStatus = {
   isRunning: boolean;
@@ -84,6 +88,35 @@ const isLikelyConstrainedDevice = () => {
 
 const getFullCoreCount = () => Math.max(1, navigator.hardwareConcurrency ?? 4);
 const getBufferProgressIntervalMs = () => isLikelyConstrainedDevice() ? 1000 : 250;
+const isNeutralDbGain = (value: number) => Math.abs(value || 0) < NEUTRAL_EPSILON;
+const isNeutralPercentValue = (value: number, neutralValue: number) => Math.abs((value || 0) - neutralValue) < NEUTRAL_EPSILON;
+// eslint-disable-next-line @typescript-eslint/no-explicit-any
+const isActiveEqBand = (band: any) => {
+  const type = (band.type || 'peaking') as BiquadFilterType;
+  return !GAIN_BASED_EQ_TYPES.has(type) || !isNeutralDbGain(band.gain);
+};
+const getAdjacentTrackWindow = (currentId: string | number, currentQueue: Track[]) => {
+  const allowedIds = new Set<string>();
+  const currentTrackId = String(currentId);
+  allowedIds.add(currentTrackId);
+
+  let prev1: Track | undefined;
+  let next1: Track | undefined;
+  const idx = currentQueue.findIndex((track) => String(track.id) === currentTrackId);
+
+  if (idx !== -1) {
+    prev1 = currentQueue[idx - 1];
+    next1 = currentQueue[idx + 1];
+
+    if (!prev1 && currentQueue.length > 0) prev1 = currentQueue[currentQueue.length - 1];
+    if (!next1 && currentQueue.length > 0) next1 = currentQueue[0];
+
+    if (prev1) allowedIds.add(String(prev1.id));
+    if (next1) allowedIds.add(String(next1.id));
+  }
+
+  return { allowedIds, prev1, next1 };
+};
 
 const connectStereoWidthMatrix = (ctx: BaseAudioContext, input: AudioNode, widthPercent: number) => {
   const width = percentToStereoBaseWidth(widthPercent);
@@ -189,6 +222,7 @@ export function useAudioPlayback(
     stereoWidth,
     panValue,
     loudnessNormalization,
+    renderSignatureCacheEnabled,
   } = effectsState || {};
   const { audioContextRef, audioRef, bufferSourceRef, bufferVolumeNodeRef, initializeAudioContext, irBufferRef } = contextState;
   const { blobCacheRef } = metadataState;
@@ -218,6 +252,9 @@ export function useAudioPlayback(
   const isDecodingRef = useRef<boolean>(false);
   const precalculatedNextBufferRef = useRef<{ trackId: string, buffer: AudioBuffer } | null>(null);
   const precalculatedQueueBuffersRef = useRef<Map<string, AudioBuffer>>(new Map());
+  const renderSignatureBuffersRef = useRef<Map<string, AudioBuffer>>(new Map());
+  const fullQueuePrecalculateCacheRef = useRef<boolean>(false);
+  const renderSignatureCacheEnabledRef = useRef<boolean>(renderSignatureCacheEnabled);
   const isPrecalculatingNextRef = useRef<boolean>(false);
   const queuePrecalculateSessionRef = useRef<symbol | null>(null);
   const precalculateOnIdleRef = useRef<boolean>(precalculateOnIdle);
@@ -239,6 +276,14 @@ export function useAudioPlayback(
     setIsLoadingTrack(false);
     setLoadingTrackId(null);
     setLoadingTrackPhase(null);
+  }, []);
+
+  const stopQueuePrecalculateStatusSoon = useCallback(() => {
+    window.setTimeout(() => {
+      setQueuePrecalculateStatus((previous) => (
+        previous.isRunning ? { ...previous, isRunning: false } : previous
+      ));
+    }, 0);
   }, []);
 
   const getMediaSessionAnchor = useCallback(() => {
@@ -405,6 +450,13 @@ export function useAudioPlayback(
   }, [fxEnabled]);
 
   useEffect(() => {
+    renderSignatureCacheEnabledRef.current = renderSignatureCacheEnabled;
+    if (!renderSignatureCacheEnabled) {
+      renderSignatureBuffersRef.current.clear();
+    }
+  }, [renderSignatureCacheEnabled]);
+
+  useEffect(() => {
     audioParamsRef.current = {
       preampGain,
       eqBands,
@@ -448,10 +500,9 @@ export function useAudioPlayback(
     renderSettingsVersionRef.current += 1;
     precalculatedNextBufferRef.current = null;
     precalculatedQueueBuffersRef.current.clear();
+    fullQueuePrecalculateCacheRef.current = false;
     queuePrecalculateSessionRef.current = null;
-    setQueuePrecalculateStatus((previous) => (
-      previous.isRunning ? { ...previous, isRunning: false } : previous
-    ));
+    stopQueuePrecalculateStatusSoon();
   }, [
     bassGain,
     compAttack,
@@ -465,10 +516,10 @@ export function useAudioPlayback(
     fxEnabled,
     loudnessNormalization,
     panValue,
-    playbackRate,
     preampGain,
     reverbMix,
     reverbTime,
+    stopQueuePrecalculateStatusSoon,
     stereoWidth,
     trebleGain,
     useOversample,
@@ -687,10 +738,9 @@ export function useAudioPlayback(
     isDecodingRef.current = false;
     precalculatedNextBufferRef.current = null;
     precalculatedQueueBuffersRef.current.clear();
+    fullQueuePrecalculateCacheRef.current = false;
     queuePrecalculateSessionRef.current = null;
-    setQueuePrecalculateStatus((previous) => (
-      previous.isRunning ? { ...previous, isRunning: false } : previous
-    ));
+    stopQueuePrecalculateStatusSoon();
 
     const trackToResume = currentTrackSnapshotRef.current;
     const resumeAt = currentTimeSnapshotRef.current;
@@ -758,6 +808,7 @@ export function useAudioPlayback(
     getTrackAudioUrl,
     initializeAudioContext,
     precalculateOnIdle,
+    stopQueuePrecalculateStatusSoon,
     stopBufferPlayback,
   ]);
 
@@ -768,6 +819,133 @@ export function useAudioPlayback(
   }, [bufferVolumeNodeRef, connectBufferOutputChain, precalculateOnIdle]);
 
   // Define functions in correct dependency order
+
+  const createRenderSignature = () => {
+    const params = audioParamsRef.current;
+    const enabled = fxEnabledRef.current || {};
+
+    return JSON.stringify({
+      fxEnabled: {
+        preamp: Boolean(enabled.preamp),
+        eq: Boolean(enabled.eq),
+        tone: Boolean(enabled.tone),
+        comp: Boolean(enabled.comp),
+        reverb: Boolean(enabled.reverb),
+        stereo: Boolean(enabled.stereo),
+        master: Boolean(enabled.master),
+        limiter: Boolean(enabled.limiter),
+      },
+      preampGain: params.preampGain,
+      eqBands: Array.isArray(params.eqBands)
+        ? params.eqBands.map((band: EqBand) => ({
+          frequency: band.frequency,
+          gain: band.gain,
+          q: band.q,
+          channel: band.channel,
+          type: band.type || 'peaking',
+        }))
+        : [],
+      bassGain: params.bassGain,
+      trebleGain: params.trebleGain,
+      compThreshold: params.compThreshold,
+      compRatio: params.compRatio,
+      compKnee: params.compKnee,
+      compAttack: params.compAttack,
+      compRelease: params.compRelease,
+      compRmsSize: params.compRmsSize,
+      compMakeupGain: params.compMakeupGain,
+      reverbMix: params.reverbMix,
+      reverbTime: params.reverbTime,
+      stereoWidth: params.stereoWidth,
+      panValue: params.panValue,
+      useOversample: Boolean(params.useOversample),
+      loudnessNormalization: Boolean(params.loudnessNormalization),
+    });
+  };
+
+  const getRenderSignatureCacheKey = (trackId: string, signature = createRenderSignature()) => (
+    `${trackId}::${signature}`
+  );
+
+  const pruneRenderSignatureCache = () => {
+    const cache = renderSignatureBuffersRef.current;
+    while (cache.size > MAX_RENDER_SIGNATURE_CACHE_ENTRIES) {
+      const oldestKey = cache.keys().next().value;
+      if (oldestKey === undefined) break;
+      cache.delete(oldestKey);
+    }
+  };
+
+  const getCachedRenderSignatureBuffer = (trackId: string, signature = createRenderSignature()) => {
+    if (!renderSignatureCacheEnabledRef.current) return null;
+
+    const cache = renderSignatureBuffersRef.current;
+    const key = getRenderSignatureCacheKey(trackId, signature);
+    const cachedBuffer = cache.get(key);
+    if (!cachedBuffer) return null;
+
+    cache.delete(key);
+    cache.set(key, cachedBuffer);
+    return cachedBuffer;
+  };
+
+  const cacheRenderSignatureBuffer = (trackId: string, signature: string, buffer: AudioBuffer) => {
+    if (!renderSignatureCacheEnabledRef.current) return;
+
+    const cache = renderSignatureBuffersRef.current;
+    const key = getRenderSignatureCacheKey(trackId, signature);
+    cache.delete(key);
+    cache.set(key, buffer);
+    pruneRenderSignatureCache();
+  };
+
+  const prunePrecalculatedQueueBuffers = (preferredAllowedIds = allowedIdsRef.current) => {
+    if (fullQueuePrecalculateCacheRef.current) return;
+
+    const cache = precalculatedQueueBuffersRef.current;
+
+    if (preferredAllowedIds.size > 0) {
+      for (const key of cache.keys()) {
+        if (!preferredAllowedIds.has(String(key))) {
+          cache.delete(key);
+        }
+      }
+
+      if (
+        precalculatedNextBufferRef.current &&
+        !preferredAllowedIds.has(precalculatedNextBufferRef.current.trackId)
+      ) {
+        precalculatedNextBufferRef.current = null;
+      }
+    }
+
+    while (cache.size > MAX_PRECALCULATED_BUFFER_CACHE_SIZE) {
+      const oldestKey = cache.keys().next().value;
+      if (oldestKey === undefined) break;
+      cache.delete(oldestKey);
+    }
+  };
+
+  const getCachedPrecalculatedQueueBuffer = (trackId: string) => {
+    const cache = precalculatedQueueBuffersRef.current;
+    const cachedBuffer = cache.get(trackId);
+    if (!cachedBuffer) return null;
+
+    cache.delete(trackId);
+    cache.set(trackId, cachedBuffer);
+    return cachedBuffer;
+  };
+
+  const cachePrecalculatedQueueBuffer = (
+    trackId: string,
+    buffer: AudioBuffer,
+    preferredAllowedIds = allowedIdsRef.current
+  ) => {
+    const cache = precalculatedQueueBuffersRef.current;
+    cache.delete(trackId);
+    cache.set(trackId, buffer);
+    prunePrecalculatedQueueBuffers(preferredAllowedIds);
+  };
 
   const performOfflineRender = async (audioBuffer: AudioBuffer) => {
 console.log("[Audio] performOfflineRender called with EQ bands:", audioParamsRef.current.eqBands.length);
@@ -791,7 +969,7 @@ console.log("[Audio] performOfflineRender called with EQ bands:", audioParamsRef
     currentNode = headroomDrop;
 
     // 1.5 Preamp
-    if (enabled.preamp) {
+    if (enabled.preamp && !isNeutralDbGain(preampGain)) {
       const preamp = offlineCtx.createGain();
       preamp.gain.value = Math.pow(10, preampGain / 20);
       currentNode.connect(preamp);
@@ -799,9 +977,10 @@ console.log("[Audio] performOfflineRender called with EQ bands:", audioParamsRef
     }
 
     // 2. EQ
-    if (enabled.eq && eqBands && eqBands.length > 0) {
+    const activeEqBands = enabled.eq && eqBands ? eqBands.filter(isActiveEqBand) : [];
+    if (activeEqBands.length > 0) {
       // eslint-disable-next-line @typescript-eslint/no-explicit-any
-      const filters = eqBands.map((band: any) => {
+      const filters = activeEqBands.map((band: any) => {
         const filter = offlineCtx.createBiquadFilter();
         filter.type = band.type || 'peaking';
         filter.frequency.value = band.frequency;
@@ -814,11 +993,11 @@ console.log("[Audio] performOfflineRender called with EQ bands:", audioParamsRef
       const merger = offlineCtx.createChannelMerger(2);
 
       // eslint-disable-next-line @typescript-eslint/no-explicit-any
-      const stereoFilters = filters.filter((_: any, i: number) => eqBands[i].channel === 'L+R');
+      const stereoFilters = filters.filter((_: any, i: number) => activeEqBands[i].channel === 'L+R');
       // eslint-disable-next-line @typescript-eslint/no-explicit-any
-      const leftFilters = filters.filter((_: any, i: number) => eqBands[i].channel === 'L');
+      const leftFilters = filters.filter((_: any, i: number) => activeEqBands[i].channel === 'L');
       // eslint-disable-next-line @typescript-eslint/no-explicit-any
-      const rightFilters = filters.filter((_: any, i: number) => eqBands[i].channel === 'R');
+      const rightFilters = filters.filter((_: any, i: number) => activeEqBands[i].channel === 'R');
 
       // Stereo Chain
       let prevNode = null;
@@ -857,20 +1036,26 @@ console.log("[Audio] performOfflineRender called with EQ bands:", audioParamsRef
     }
 
     // 3. Tone
-    if (enabled.tone) {
-      const bass = offlineCtx.createBiquadFilter();
-      bass.type = 'lowshelf';
-      bass.frequency.value = 150;
-      bass.gain.value = bassGain;
+    if (enabled.tone && (!isNeutralDbGain(bassGain) || !isNeutralDbGain(trebleGain))) {
+      if (!isNeutralDbGain(bassGain)) {
+        const bass = offlineCtx.createBiquadFilter();
+        bass.type = 'lowshelf';
+        bass.frequency.value = 150;
+        bass.gain.value = bassGain;
 
-      const treble = offlineCtx.createBiquadFilter();
-      treble.type = 'highshelf';
-      treble.frequency.value = 4000;
-      treble.gain.value = trebleGain;
+        currentNode.connect(bass);
+        currentNode = bass;
+      }
 
-      currentNode.connect(bass);
-      bass.connect(treble);
-      currentNode = treble;
+      if (!isNeutralDbGain(trebleGain)) {
+        const treble = offlineCtx.createBiquadFilter();
+        treble.type = 'highshelf';
+        treble.frequency.value = 4000;
+        treble.gain.value = trebleGain;
+
+        currentNode.connect(treble);
+        currentNode = treble;
+      }
     }
 
     // 4. Compressor
@@ -894,7 +1079,7 @@ console.log("[Audio] performOfflineRender called with EQ bands:", audioParamsRef
     // eslint-disable-next-line @typescript-eslint/no-explicit-any
     let dryGain: any, wetGain: any;
     let isReverbParallel = false;
-    if (enabled.reverb) {
+    if (enabled.reverb && !isNeutralPercentValue(reverbMix, 0)) {
       const preDelay = offlineCtx.createDelay(1.0);
       preDelay.delayTime.value = 0.02;
 
@@ -930,28 +1115,30 @@ console.log("[Audio] performOfflineRender called with EQ bands:", audioParamsRef
     };
 
     // 5.5 Stereo Width Matrix
-      if (enabled.stereo) {
-        const stereoInput = offlineCtx.createGain();
-        connectToNext(stereoInput);
-        currentNode = connectStereoWidthMatrix(offlineCtx, stereoInput, stereoWidth);
-      }
+    if (enabled.stereo && !isNeutralPercentValue(stereoWidth, 100)) {
+      const stereoInput = offlineCtx.createGain();
+      connectToNext(stereoInput);
+      currentNode = connectStereoWidthMatrix(offlineCtx, stereoInput, stereoWidth);
+    }
 
     // 6. Pan
-    if (enabled.master) {
+    if (enabled.master && !isNeutralPercentValue(panValue, 0)) {
       const panNode = offlineCtx.createStereoPanner();
       panNode.pan.value = percentToPan(panValue);
       connectToNext(panNode);
     }
 
     // 6.5 Loudness Normalization
-    const agcPreGain = offlineCtx.createGain();
-    const agcComp = offlineCtx.createDynamicsCompressor();
-    const agcMakeup = offlineCtx.createGain();
-    configureLoudnessNormalization(agcPreGain, agcComp, agcMakeup, Boolean(loudnessNormalization));
-    connectToNext(agcPreGain);
-    agcPreGain.connect(agcComp);
-    agcComp.connect(agcMakeup);
-    currentNode = agcMakeup;
+    if (loudnessNormalization) {
+      const agcPreGain = offlineCtx.createGain();
+      const agcComp = offlineCtx.createDynamicsCompressor();
+      const agcMakeup = offlineCtx.createGain();
+      configureLoudnessNormalization(agcPreGain, agcComp, agcMakeup, true);
+      connectToNext(agcPreGain);
+      agcPreGain.connect(agcComp);
+      agcComp.connect(agcMakeup);
+      currentNode = agcMakeup;
+    }
 
     // 7. Headroom Recover
     const headroomRecover = offlineCtx.createGain();
@@ -979,8 +1166,17 @@ console.log("[Audio] performOfflineRender called with EQ bands:", audioParamsRef
 
   const precalculateTrackBuffer = async (track: Track, keepInQueueCache = false) => {
     const trackId = String(track.id);
-    const cachedBuffer = precalculatedQueueBuffersRef.current.get(trackId);
+    const cachedBuffer = getCachedPrecalculatedQueueBuffer(trackId);
     if (cachedBuffer) return cachedBuffer;
+
+    const renderSignature = createRenderSignature();
+    const signatureCachedBuffer = getCachedRenderSignatureBuffer(trackId, renderSignature);
+    if (signatureCachedBuffer) {
+      if (keepInQueueCache) {
+        cachePrecalculatedQueueBuffer(trackId, signatureCachedBuffer);
+      }
+      return signatureCachedBuffer;
+    }
 
     const renderVersion = renderSettingsVersionRef.current;
     const audioUrl = await getTrackAudioUrl(track);
@@ -998,8 +1194,9 @@ console.log("[Audio] performOfflineRender called with EQ bands:", audioParamsRef
     }
 
     if (keepInQueueCache) {
-      precalculatedQueueBuffersRef.current.set(trackId, finalRenderedBuffer);
+      cachePrecalculatedQueueBuffer(trackId, finalRenderedBuffer);
     }
+    cacheRenderSignatureBuffer(trackId, renderSignature, finalRenderedBuffer);
 
     return finalRenderedBuffer;
   };
@@ -1020,6 +1217,7 @@ console.log("[Audio] performOfflineRender called with EQ bands:", audioParamsRef
     let failed = 0;
 
     queuePrecalculateSessionRef.current = sessionId;
+    fullQueuePrecalculateCacheRef.current = true;
     setQueuePrecalculateStatus({ isRunning: true, total, completed, failed, cores });
 
     const runWorker = async () => {
@@ -1094,7 +1292,9 @@ console.log("[Audio] performOfflineRender called with EQ bands:", audioParamsRef
       const finalRenderedBuffer = await precalculateTrackBuffer(nextTrack);
 
       if (!precalculateOnIdleRef.current) return;
-      precalculatedNextBufferRef.current = { trackId: String(nextTrack.id), buffer: finalRenderedBuffer };
+      const nextTrackId = String(nextTrack.id);
+      cachePrecalculatedQueueBuffer(nextTrackId, finalRenderedBuffer);
+      precalculatedNextBufferRef.current = { trackId: nextTrackId, buffer: finalRenderedBuffer };
       console.log("[Lookahead] Finished precalculating next track:", nextTrack.title || nextTrack.fileName);
     } catch (e) {
       console.error("[Lookahead] Failed to precalculate:", e);
@@ -1105,28 +1305,9 @@ console.log("[Audio] performOfflineRender called with EQ bands:", audioParamsRef
 
 
   const preloadAdjacentTracks = async (currentId: string | number, currentQueue: Track[], shouldPreload = true) => {
-    const allowedIds = new Set<string>();
-    allowedIds.add(String(currentId));
-
-    let prev1: Track | undefined;
-    let next1: Track | undefined;
-
-    // eslint-disable-next-line @typescript-eslint/no-explicit-any
-    const idx = currentQueue.findIndex((t: any) => String(t.id) === String(currentId));
-    if (idx !== -1) {
-      prev1 = currentQueue[idx - 1];
-      next1 = currentQueue[idx + 1];
-
-      // Assuming queueEndMode logic exists or defaulting to not looping if missing
-      // If we don't have queueEndMode accessible here, we just ignore it for now.
-      // But let's just do a simple next1/prev1 fallback if undefined and queue length > 1
-      if (!prev1 && currentQueue.length > 0) prev1 = currentQueue[currentQueue.length - 1];
-      if (!next1 && currentQueue.length > 0) next1 = currentQueue[0];
-
-      if (prev1) allowedIds.add(String(prev1.id));
-      if (next1) allowedIds.add(String(next1.id));
-    }
+    const { allowedIds, prev1, next1 } = getAdjacentTrackWindow(currentId, currentQueue);
     allowedIdsRef.current = allowedIds;
+    prunePrecalculatedQueueBuffers(allowedIds);
 
     // 1. Memory Cleanup: only keep current, prev1, and next1 in RAM.
     for (const [key, objectUrl] of blobCacheRef.current.entries()) {
@@ -1183,6 +1364,9 @@ console.log("[Audio] performOfflineRender called with EQ bands:", audioParamsRef
     if (!currentQueue) currentQueue = [startingTrack];
     setCurrentTrack(startingTrack);
     setQueue(currentQueue);
+    const trackWindow = getAdjacentTrackWindow(startingTrack.id, currentQueue);
+    allowedIdsRef.current = trackWindow.allowedIds;
+    prunePrecalculatedQueueBuffers(trackWindow.allowedIds);
     setLoadingTrackId(String(startingTrack.id));
     setIsLoadingTrack(autoPlay);
     setLoadingTrackPhase(autoPlay ? 'downloading' : null);
@@ -1220,10 +1404,11 @@ console.log("[Audio] performOfflineRender called with EQ bands:", audioParamsRef
           isDecodingRef.current = true;
 
           let finalRenderedBuffer: AudioBuffer | null = null;
-          const cachedRenderedBuffer = precalculatedQueueBuffersRef.current.get(String(startingTrack.id));
+          const startingTrackId = String(startingTrack.id);
+          const cachedRenderedBuffer = getCachedPrecalculatedQueueBuffer(startingTrackId);
           if (cachedRenderedBuffer) {
             finalRenderedBuffer = cachedRenderedBuffer;
-          } else if (precalculatedNextBufferRef.current?.trackId === String(startingTrack.id)) {
+          } else if (precalculatedNextBufferRef.current?.trackId === startingTrackId) {
             finalRenderedBuffer = precalculatedNextBufferRef.current.buffer;
           } else {
             finalRenderedBuffer = await precalculateTrackBuffer(startingTrack);
@@ -1233,6 +1418,10 @@ console.log("[Audio] performOfflineRender called with EQ bands:", audioParamsRef
           if (decodeSessionRef.current !== playSessionId || !precalculateOnIdleRef.current) return;
 
           audioBufferRef.current = finalRenderedBuffer;
+          cachePrecalculatedQueueBuffer(startingTrackId, finalRenderedBuffer, trackWindow.allowedIds);
+          if (precalculatedNextBufferRef.current?.trackId === startingTrackId) {
+            precalculatedNextBufferRef.current = null;
+          }
           setDuration(finalRenderedBuffer.duration);
 
           bufferSourceRef.current = audioContextRef.current!.createBufferSource();
@@ -1541,7 +1730,7 @@ console.log("[Audio] performOfflineRender called with EQ bands:", audioParamsRef
 
     window.addEventListener('music-deleted', handleMusicDeleted);
     return () => window.removeEventListener('music-deleted', handleMusicDeleted);
-  }, [setQueue, setCurrentTrack]);
+  }, [audioRef, setCurrentTrack]);
 
   // Compute hasNext and hasPrevious
   // eslint-disable-next-line @typescript-eslint/no-explicit-any

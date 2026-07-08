@@ -55,6 +55,8 @@
       "hqOversampleDesc": "Giảm răng cưa cho soft clip của limiter. Cảnh báo: Có thể gây lag và nóng máy trên điện thoại yếu.",
       "precalcIdle": "Tính toán trước cho máy yếu",
       "precalcIdleDesc": "Dành cho CPU yếu nhưng còn đủ RAM: render từng bài trước khi phát để hiệu ứng nặng không phải chạy realtime. Chế độ thường này chỉ xử lý từng bài, không xử lý cả hàng chờ. Thay đổi EQ/Hiệu ứng có tác dụng ở bài tiếp theo.",
+      "renderSignatureCache": "Cache render tái sử dụng",
+      "renderSignatureCacheDesc": "Giữ buffer đã render theo từng bài và chữ ký cấu hình âm thanh, để khi quay lại EQ/hiệu ứng cũ có thể dùng lại RAM cache. Sẽ tốn thêm bộ nhớ.",
       "queuePrecalcTitle": "Tính toán trước toàn bộ hàng chờ",
       "queuePrecalcDesc": "Dùng toàn bộ {{cores}} nhân CPU trình duyệt báo và giữ buffer đã render trong RAM cho tới khi đổi hiệu ứng.",
       "queuePrecalcButton": "Tính toán trước toàn bộ hàng chờ",
