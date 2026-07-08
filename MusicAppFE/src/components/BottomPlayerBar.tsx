@@ -31,7 +31,9 @@ export function BottomPlayerBar() {
     volume,
     setVolume,
     queue,
-    playTrack
+    playTrack,
+    hasNext,
+    hasPrevious
   } = playerState;
 
   const discRef = useRef<HTMLDivElement>(null);
@@ -160,7 +162,8 @@ export function BottomPlayerBar() {
           <button 
             onClick={(e) => { e.stopPropagation(); playPrevious(); }}
             aria-label="Previous track"
-            className="text-white/60 hover:text-white transition-colors"
+            disabled={!hasPrevious}
+            className={`transition-colors ${hasPrevious ? 'text-white/60 hover:text-white' : 'text-white/20 cursor-not-allowed'}`}
           >
             <SkipBack size={18} fill="currentColor" />
           </button>
@@ -178,7 +181,8 @@ export function BottomPlayerBar() {
           <button 
             onClick={(e) => { e.stopPropagation(); playNext(); }}
             aria-label="Next track"
-            className="text-white/60 hover:text-white transition-colors"
+            disabled={!hasNext}
+            className={`transition-colors ${hasNext ? 'text-white/60 hover:text-white' : 'text-white/20 cursor-not-allowed'}`}
           >
             <SkipForward size={18} fill="currentColor" />
           </button>

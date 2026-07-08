@@ -1089,12 +1089,14 @@ console.log("[Audio] performOfflineRender called with EQ bands:", audioParamsRef
     const latestPlayTrack = playTrackRef.current;
     if (!latestPlayTrack) return;
     // eslint-disable-next-line @typescript-eslint/no-explicit-any
-    const idx = queue.findIndex((t: any) => t.id === currentTrack.id);
+    const idx = queue.findIndex((t: any) => String(t.id) === String(currentTrack.id));
     if (idx > 0) {
       latestPlayTrack(queue[idx - 1], queue);
+    } else if (idx === 0 && queueEndMode === 'repeat' && queue.length > 1) {
+      latestPlayTrack(queue[queue.length - 1], queue);
     }
   // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [currentTrack, queue]);
+  }, [currentTrack, queue, queueEndMode]);
 
 
   const togglePlay = () => {
@@ -1201,6 +1203,17 @@ console.log("[Audio] performOfflineRender called with EQ bands:", audioParamsRef
   }, [currentTrack]);
 
 
+  // Compute hasNext and hasPrevious
+  // eslint-disable-next-line @typescript-eslint/no-explicit-any
+  const currentIdx = currentTrack ? queue.findIndex((t: any) => String(t.id) === String(currentTrack.id)) : -1;
+  const hasPrevious = currentIdx > 0 || (currentIdx === 0 && queueEndMode === 'repeat' && queue.length > 1);
+  const hasNext = currentIdx !== -1 && (
+    currentIdx < queue.length - 1 ||
+    (queueEndMode === 'repeat' && queue.length > 1) ||
+    (queueEndMode === 'next' && upcomingQueues && upcomingQueues.length > 0) ||
+    (queueEndMode === 'next' && cycleQueues && queue.length > 0)
+  );
+
   return {
     isPlaying,
     currentTime,
@@ -1216,6 +1229,8 @@ console.log("[Audio] performOfflineRender called with EQ bands:", audioParamsRef
     playPrevious,
     togglePlay,
     seek,
-    preloadTrack
+    preloadTrack,
+    hasNext,
+    hasPrevious
   };
 }

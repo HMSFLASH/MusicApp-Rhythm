@@ -23,7 +23,8 @@ export function NowPlaying() {
     isShuffle, setIsShuffle, songEndMode, setSongEndMode, queueEndMode, setQueueEndMode,
     repeatMode, setRepeatMode,
     volume, setVolume,
-    cycleQueues, setCycleQueues
+    cycleQueues, setCycleQueues,
+    hasNext, hasPrevious
   } = playerState;
 
   useEffect(() => {
@@ -550,7 +551,12 @@ export function NowPlaying() {
               </div>
 
               <div className="flex items-center gap-6 md:gap-10">
-                <button aria-label="Previous track" onClick={playPrevious} className="text-white hover:text-white/80 transition-colors">
+                <button 
+                  aria-label="Previous track" 
+                  onClick={playPrevious} 
+                  disabled={!hasPrevious}
+                  className={`transition-colors ${hasPrevious ? 'text-white hover:text-white/80' : 'text-white/20 cursor-not-allowed'}`}
+                >
                   <SkipBack size={28} className="md:w-8 md:h-8" fill="currentColor" />
                 </button>
                 <button
@@ -564,7 +570,12 @@ export function NowPlaying() {
                     <Play size={40} className="md:w-12 md:h-12" fill="currentColor" />
                   )}
                 </button>
-                <button aria-label="Next track" onClick={playNext} className="text-white hover:text-white/80 transition-colors">
+                <button 
+                  aria-label="Next track" 
+                  onClick={playNext} 
+                  disabled={!hasNext}
+                  className={`transition-colors ${hasNext ? 'text-white hover:text-white/80' : 'text-white/20 cursor-not-allowed'}`}
+                >
                   <SkipForward size={28} className="md:w-8 md:h-8" fill="currentColor" />
                 </button>
               </div>
