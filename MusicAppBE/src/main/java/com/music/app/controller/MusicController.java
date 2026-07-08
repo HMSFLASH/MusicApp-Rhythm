@@ -67,17 +67,6 @@ public class MusicController {
         return ResponseEntity.ok(result);
     }
 
-    /** GET /api/music/search?q={query} — Tìm kiếm nhạc theo tên */
-    @GetMapping("/search")
-    public ResponseEntity<List<MusicItemDto>> searchMusic(@RequestParam String q) {
-        if (q == null || q.isBlank()) {
-            return ResponseEntity.ok(List.of());
-        }
-        List<MusicItemDto> results = musicLibraryRepository.findByNameContainingIgnoreCase(q.trim())
-                .stream()
-                .map(this::toDto).collect(Collectors.toList());
-        return ResponseEntity.ok(results);
-    }
 
     /** PUT /api/music/{id}/metadata — Cập nhật metadata thủ công */
     @PutMapping("/{id}/metadata")
@@ -89,6 +78,7 @@ public class MusicController {
 
         MusicLibrary lib = musicLibraryRepository.findById(id).orElse(null);
         if (lib == null) return ResponseEntity.notFound().build();
+        if (!lib.getUser().getId().equals(userId)) return ResponseEntity.status(HttpStatus.FORBIDDEN).build();
 
         if (dto.getTitle() != null) lib.setTitle(dto.getTitle());
         if (dto.getArtist() != null) lib.setArtist(dto.getArtist());

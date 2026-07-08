@@ -1,12 +1,13 @@
 import { useState, useEffect } from 'react';
 import { useGlobalAudio } from '../context/AudioContext';
+import { useLibrary } from '../context/LibraryContext';
 import { Play, Pause, Trash2, GripVertical, MoreHorizontal, ArrowUp, ArrowDown, ListPlus, Heart, Info, X, ChevronsUp, ChevronsDown } from 'lucide-react';
 import type { Track } from '../hooks/useAudioPlayer';
-import { axiosClient } from '../api/axiosClient';
 
 export function QueuePage() {
-  const { playerState, jwtToken } = useGlobalAudio();
+  const { playerState } = useGlobalAudio();
   const { queue, setQueue, currentTrack, isPlaying, playTrack, togglePlay, upcomingQueues, removeUpcomingQueue } = playerState;
+  const { favorites, toggleFavorite } = useLibrary();
 
   useEffect(() => {
     if (currentTrack) {
@@ -39,50 +40,14 @@ export function QueuePage() {
 
   const [draggedIndex, setDraggedIndex] = useState<number | null>(null);
   const [openMenuIndex, setOpenMenuIndex] = useState<number | null>(null);
-  const [favorites, setFavorites] = useState<Track[]>([]);
+  // Favorites are now handled by LibraryContext
+
   const [infoTrack, setInfoTrack] = useState<Track | null>(null);
 
-  useEffect(() => {
-    if (!jwtToken) return;
-    
-    const cachedFavs = localStorage.getItem('sonic_favorites');
-    if (cachedFavs) {
-      // eslint-disable-next-line react-hooks/set-state-in-effect, @typescript-eslint/no-unused-vars, no-empty
-      try { setFavorites(JSON.parse(cachedFavs)); } catch (e) { }
-    }
-
-    axiosClient.get('/api/favorites')
-      // eslint-disable-next-line @typescript-eslint/no-explicit-any
-      .then((data: any) => {
-        const parsed = data.length > 0
-          // eslint-disable-next-line @typescript-eslint/no-explicit-any
-          ? data.map((d: any) => ({ id: d.id, fileName: d.name, sourceType: d.sourceType, imageUrl: d.imageUrl, artist: d.artist, title: d.title, album: d.album, genre: d.genre, durationSeconds: d.durationSeconds }))
-          : [];
-        setFavorites(parsed);
-        localStorage.setItem('sonic_favorites', JSON.stringify(parsed));
-      })
-      .catch(() => setFavorites([]));
-  }, [jwtToken]);
-
-  const toggleFavorite = async (track: Track, e: React.MouseEvent) => {
+  const handleToggleFavorite = async (track: Track, e: React.MouseEvent) => {
     e.stopPropagation();
-    const isFav = favorites.some(f => f.id === track.id);
     try {
-      if (isFav) {
-        await axiosClient.delete(`/api/favorites/${track.id}`);
-        setFavorites(prev => {
-          const newFavs = prev.filter(f => f.id !== track.id);
-          localStorage.setItem('sonic_favorites', JSON.stringify(newFavs));
-          return newFavs;
-        });
-      } else {
-        await axiosClient.post(`/api/favorites/${track.id}`);
-        setFavorites(prev => {
-          const newFavs = [...prev, track];
-          localStorage.setItem('sonic_favorites', JSON.stringify(newFavs));
-          return newFavs;
-        });
-      }
+      await toggleFavorite(track);
       setOpenMenuIndex(null);
     } catch (err) {
       console.error(err);
@@ -260,7 +225,7 @@ export function QueuePage() {
                           <ChevronsDown size={14} /> Move to Bottom
                         </button>
                         <button
-                          onClick={(e) => toggleFavorite(track, e)}
+                          onClick={(e) => handleToggleFavorite(track, e)}
                           className="w-full flex items-center gap-3 px-4 py-2 text-sm text-left text-white/80 hover:bg-white/10"
                         >
                           <Heart size={14} fill={favorites.some(f => f.id === track.id) ? "currentColor" : "none"} className={favorites.some(f => f.id === track.id) ? "text-primary" : ""} /> 

@@ -19,6 +19,7 @@ import { QueuePage } from './pages/QueuePage';
 import { OAuthCallback } from './pages/OAuthCallback';
 import { useGlobalAudio } from './context/AudioContext';
 import { UploadProvider } from './context/UploadContext';
+import { LibraryProvider } from './context/LibraryContext';
 import { Navigate } from 'react-router-dom';
 
 function ProtectedRoute({ children }: { children: React.ReactNode }) {
@@ -65,9 +66,11 @@ function App() {
 export default function AppWrapper() {
   return (
     <AudioProvider>
-      <UploadProvider>
-        <App />
-      </UploadProvider>
+      <LibraryProvider>
+        <UploadProvider>
+          <App />
+        </UploadProvider>
+      </LibraryProvider>
     </AudioProvider>
   );
 }

@@ -7,6 +7,8 @@ import { CreatePlaylistModal } from './CreatePlaylistModal';
 import { AddTracksModal } from './AddTracksModal';
 import { axiosClient } from '../api/axiosClient';
 import { useGlobalAudio } from '../context/AudioContext';
+import { db } from '../lib/db';
+import { useLibrary } from '../context/LibraryContext';
 
 interface PlaylistProps {
   jwtToken: string;
@@ -31,6 +33,7 @@ export function Playlist({ jwtToken, onPlay, currentTrackId }: PlaylistProps) {
   // eslint-disable-next-line @typescript-eslint/no-explicit-any
   const [selectedPlaylistDetails, setSelectedPlaylistDetails] = useState<any | null>(null);
   const { playerState } = useGlobalAudio();
+  const { favorites, toggleFavorite } = useLibrary();
   const [loading, setLoading] = useState(false);
   const [isCreateModalOpen, setIsCreateModalOpen] = useState(false);
   const [isAddTracksModalOpen, setIsAddTracksModalOpen] = useState(false);
@@ -39,46 +42,12 @@ export function Playlist({ jwtToken, onPlay, currentTrackId }: PlaylistProps) {
   const [editingListPlaylistId, setEditingListPlaylistId] = useState<number | null>(null);
   const [editListName, setEditListName] = useState('');
   const [openMenuId, setOpenMenuId] = useState<string | number | null>(null);
-  const [favorites, setFavorites] = useState<Track[]>([]);
   const [infoTrack, setInfoTrack] = useState<Track | null>(null);
 
-  useEffect(() => {
-    if (!jwtToken) return;
-    const cachedFavs = localStorage.getItem('sonic_favorites');
-    if (cachedFavs) {
-      // eslint-disable-next-line react-hooks/set-state-in-effect, @typescript-eslint/no-unused-vars, no-empty
-      try { setFavorites(JSON.parse(cachedFavs)); } catch (e) { }
-    }
-    axiosClient.get('/api/favorites')
-      // eslint-disable-next-line @typescript-eslint/no-explicit-any
-      .then((data: any) => {
-        // eslint-disable-next-line @typescript-eslint/no-explicit-any
-        const parsed = data.length > 0 ? data.map((d: any) => ({ id: d.id, fileName: d.name, sourceType: d.sourceType, imageUrl: d.imageUrl, artist: d.artist, title: d.title, album: d.album, genre: d.genre, durationSeconds: d.durationSeconds })) : [];
-        setFavorites(parsed);
-        localStorage.setItem('sonic_favorites', JSON.stringify(parsed));
-      })
-      .catch(() => setFavorites([]));
-  }, [jwtToken]);
-
-  const toggleFavorite = async (track: Track, e: React.MouseEvent) => {
+  const handleToggleFavorite = async (track: Track, e: React.MouseEvent) => {
     e.stopPropagation();
-    const isFav = favorites.some(f => f.id === track.id);
     try {
-      if (isFav) {
-        await axiosClient.delete(`/api/favorites/${track.id}`);
-        setFavorites(prev => {
-          const newFavs = prev.filter(f => f.id !== track.id);
-          localStorage.setItem('sonic_favorites', JSON.stringify(newFavs));
-          return newFavs;
-        });
-      } else {
-        await axiosClient.post(`/api/favorites/${track.id}`);
-        setFavorites(prev => {
-          const newFavs = [...prev, track];
-          localStorage.setItem('sonic_favorites', JSON.stringify(newFavs));
-          return newFavs;
-        });
-      }
+      await toggleFavorite(track);
       setOpenMenuId(null);
     } catch (err) {
       console.error(err);
@@ -119,7 +88,7 @@ export function Playlist({ jwtToken, onPlay, currentTrackId }: PlaylistProps) {
       const data = await axiosClient.get('/api/playlists');
       // eslint-disable-next-line @typescript-eslint/no-explicit-any
       setPlaylists(data as unknown as any[]);
-      localStorage.setItem('sonic_playlists', JSON.stringify(data));
+      db.set('sonic_playlists', data);
     } catch (e) {
       console.error(e);
     } finally {
@@ -147,7 +116,7 @@ export function Playlist({ jwtToken, onPlay, currentTrackId }: PlaylistProps) {
       }));
       const details = { ...data, tracks: mappedTracks };
       setSelectedPlaylistDetails(details);
-      localStorage.setItem(`sonic_playlist_${id}`, JSON.stringify(details));
+      db.set(`sonic_playlist_${id}`, details);
     } catch (e) {
       console.error(e);
     } finally {
@@ -157,22 +126,18 @@ export function Playlist({ jwtToken, onPlay, currentTrackId }: PlaylistProps) {
 
   useEffect(() => {
     if (jwtToken) {
-      const cached = localStorage.getItem('sonic_playlists');
-      if (cached) {
-        // eslint-disable-next-line react-hooks/set-state-in-effect, @typescript-eslint/no-unused-vars, no-empty
-        try { setPlaylists(JSON.parse(cached)); } catch (e) {}
-      }
+      db.get<any[]>('sonic_playlists').then(cached => {
+        if (cached) setPlaylists(cached);
+      });
       fetchPlaylists();
     }
   }, [jwtToken]);
 
   useEffect(() => {
     if (selectedPlaylistId) {
-      const cached = localStorage.getItem(`sonic_playlist_${selectedPlaylistId}`);
-      if (cached) {
-        // eslint-disable-next-line react-hooks/set-state-in-effect, @typescript-eslint/no-unused-vars, no-empty
-        try { setSelectedPlaylistDetails(JSON.parse(cached)); } catch (e) {}
-      }
+      db.get<any>(`sonic_playlist_${selectedPlaylistId}`).then(cached => {
+        if (cached) setSelectedPlaylistDetails(cached);
+      });
       fetchPlaylistDetails(selectedPlaylistId);
       setIsEditingName(false);
     } else {
@@ -581,7 +546,7 @@ export function Playlist({ jwtToken, onPlay, currentTrackId }: PlaylistProps) {
                           <ListEnd size={14} /> Add to Queue
                         </button>
                         <button
-                          onClick={(e) => toggleFavorite(track, e)}
+                          onClick={(e) => handleToggleFavorite(track, e)}
                           className="w-full flex items-center gap-3 px-4 py-2 text-sm text-left text-white/80 hover:bg-white/10"
                         >
                           <Heart size={14} fill={favorites.some(f => f.id === track.id) ? "currentColor" : "none"} className={favorites.some(f => f.id === track.id) ? "text-primary" : ""} /> 

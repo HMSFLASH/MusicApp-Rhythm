@@ -1,15 +1,45 @@
 import { useState, useCallback, useEffect } from 'react';
 import type { Track, SongEndMode, QueueEndMode } from './audioTypes';
 import { PLAYBACK_STORAGE_KEY } from './audioStorage';
+import { db } from '../lib/db';
 
 // eslint-disable-next-line @typescript-eslint/no-explicit-any
-export function useAudioQueue(initialPlayback: { currentTrack: Track | null; queue: Track[] }, savedState: any) {
-  const [currentTrack, setCurrentTrack] = useState<Track | null>(initialPlayback.currentTrack);
-  const [queue, setQueue] = useState<Track[]>(initialPlayback.queue);
+export function useAudioQueue(savedState: any) {
+  const [currentTrack, setCurrentTrack] = useState<Track | null>(null);
+  const [queue, setQueue] = useState<Track[]>([]);
+  const [loaded, setLoaded] = useState(false);
 
   useEffect(() => {
-    localStorage.setItem(PLAYBACK_STORAGE_KEY, JSON.stringify({ currentTrack, queue }));
-  }, [currentTrack, queue]);
+    db.get<{currentTrack: Track | null, queue: Track[]}>(PLAYBACK_STORAGE_KEY).then(saved => {
+      if (saved) {
+        let parsedQueue = saved.queue || [];
+        let parsedTrack = saved.currentTrack || null;
+        
+        parsedQueue = parsedQueue.filter((t: any) => t.sourceType !== 'LOCAL');
+        parsedQueue.forEach((t: any) => {
+          if (t.imageUrl?.startsWith('blob:')) t.imageUrl = '';
+        });
+
+        if (parsedTrack) {
+          if (parsedTrack.sourceType === 'LOCAL') {
+            parsedTrack = parsedQueue.length > 0 ? parsedQueue[0] : null;
+          } else if (parsedTrack.imageUrl?.startsWith('blob:')) {
+            parsedTrack.imageUrl = '';
+          }
+        }
+        
+        setQueue(parsedQueue);
+        setCurrentTrack(parsedTrack);
+      }
+      setLoaded(true);
+    });
+  }, []);
+
+  useEffect(() => {
+    if (loaded) {
+      db.set(PLAYBACK_STORAGE_KEY, { currentTrack, queue });
+    }
+  }, [currentTrack, queue, loaded]);
 
   const [isShuffleState, setIsShuffleState] = useState<boolean>(savedState.isShuffleState ?? false);
   const [originalQueue, setOriginalQueue] = useState<Track[]>([]);

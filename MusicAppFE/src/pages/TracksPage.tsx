@@ -5,14 +5,14 @@ import { AddToPlaylistModal } from '../components/AddToPlaylistModal';
 import { useGlobalAudio } from '../context/AudioContext';
 import type { Track } from '../hooks/useAudioPlayer';
 import { axiosClient } from '../api/axiosClient';
+import { useLibrary } from '../context/LibraryContext';
 
 export function TracksPage() {
   const navigate = useNavigate();
   const [searchParams] = useSearchParams();
   const { jwtToken, playerState } = useGlobalAudio();
   
-  const [tracks, setTracks] = useState<Track[]>([]);
-  const [favorites, setFavorites] = useState<Track[]>([]);
+  const { tracks, favorites, toggleFavorite: ctxToggleFavorite } = useLibrary();
   const activeTab = searchParams.get('tab') === 'favorites' ? 'favorites' : 'all';
   const [trackToPlaylist, setTrackToPlaylist] = useState<Track | null>(null);
   const [openMenuId, setOpenMenuId] = useState<string | number | null>(null);
@@ -21,102 +21,10 @@ export function TracksPage() {
   const [currentPage, setCurrentPage] = useState(1);
   const ITEMS_PER_PAGE = 20;
 
-  useEffect(() => {
-    const cached = localStorage.getItem('sonic_library_tracks');
-    if (cached) {
-      // eslint-disable-next-line react-hooks/set-state-in-effect, @typescript-eslint/no-unused-vars, no-empty
-      try { setTracks(JSON.parse(cached)); } catch (e) { }
-    }
-
-    axiosClient.get('/api/music/list')
-      // eslint-disable-next-line @typescript-eslint/no-explicit-any
-      .then((data: any) => {
-        const parsed = data.length > 0
-          // eslint-disable-next-line @typescript-eslint/no-explicit-any
-          ? data.map((d: any) => ({ id: d.id, fileName: d.name, sourceType: d.sourceType, imageUrl: d.imageUrl, artist: d.artist, title: d.title, album: d.album, genre: d.genre, durationSeconds: d.durationSeconds }))
-          : [];
-        setTracks(parsed);
-        localStorage.setItem('sonic_library_tracks', JSON.stringify(parsed));
-      })
-      .catch(() => setTracks([]));
-  }, [jwtToken]);
-
-  useEffect(() => {
-    if (!jwtToken) return;
-    
-    const cachedFavs = localStorage.getItem('sonic_favorites');
-    if (cachedFavs) {
-      // eslint-disable-next-line react-hooks/set-state-in-effect, @typescript-eslint/no-unused-vars, no-empty
-      try { setFavorites(JSON.parse(cachedFavs)); } catch (e) { }
-    }
-
-    axiosClient.get('/api/favorites')
-      // eslint-disable-next-line @typescript-eslint/no-explicit-any
-      .then((data: any) => {
-        const parsed = data.length > 0
-          // eslint-disable-next-line @typescript-eslint/no-explicit-any
-          ? data.map((d: any) => ({ id: d.id, fileName: d.name, sourceType: d.sourceType, imageUrl: d.imageUrl, artist: d.artist, title: d.title, album: d.album, genre: d.genre, durationSeconds: d.durationSeconds }))
-          : [];
-        setFavorites(parsed);
-        localStorage.setItem('sonic_favorites', JSON.stringify(parsed));
-      })
-      .catch(() => setFavorites([]));
-  }, [jwtToken]);
-
-  useEffect(() => {
-    const handleRestore = () => {
-      if (jwtToken) {
-        // eslint-disable-next-line @typescript-eslint/no-explicit-any
-        axiosClient.get('/api/music/list').then((data: any) => {
-          // eslint-disable-next-line @typescript-eslint/no-explicit-any
-          const parsed = data.length > 0 ? data.map((d: any) => ({ id: d.id, fileName: d.name, sourceType: d.sourceType, imageUrl: d.imageUrl, artist: d.artist, title: d.title, album: d.album, genre: d.genre, durationSeconds: d.durationSeconds })) : [];
-          setTracks(parsed);
-          localStorage.setItem('sonic_library_tracks', JSON.stringify(parsed));
-        }).catch(() => setTracks([]));
-
-        // eslint-disable-next-line @typescript-eslint/no-explicit-any
-        axiosClient.get('/api/favorites').then((data: any) => {
-          // eslint-disable-next-line @typescript-eslint/no-explicit-any
-          const parsed = data.length > 0 ? data.map((d: any) => ({ id: d.id, fileName: d.name, sourceType: d.sourceType, imageUrl: d.imageUrl, artist: d.artist, title: d.title, album: d.album, genre: d.genre, durationSeconds: d.durationSeconds })) : [];
-          setFavorites(parsed);
-          localStorage.setItem('sonic_favorites', JSON.stringify(parsed));
-        }).catch(() => setFavorites([]));
-      }
-    };
-    
-    // Force re-render when background metadata loads
-    const handleMetadataUpdated = () => {
-      setTracks(prev => [...prev]);
-      setFavorites(prev => [...prev]);
-    };
-
-    window.addEventListener('DriveConfigRestored', handleRestore);
-    window.addEventListener('sonic_metadata_updated', handleMetadataUpdated);
-    
-    return () => {
-      window.removeEventListener('DriveConfigRestored', handleRestore);
-      window.removeEventListener('sonic_metadata_updated', handleMetadataUpdated);
-    };
-  }, [jwtToken]);
   const toggleFavorite = async (track: Track, e: React.MouseEvent) => {
     e.stopPropagation();
-    const isFav = favorites.some(f => f.id === track.id);
     try {
-      if (isFav) {
-        await axiosClient.delete(`/api/favorites/${track.id}`);
-        setFavorites(prev => {
-          const newFavs = prev.filter(f => f.id !== track.id);
-          localStorage.setItem('sonic_favorites', JSON.stringify(newFavs));
-          return newFavs;
-        });
-      } else {
-        await axiosClient.post(`/api/favorites/${track.id}`);
-        setFavorites(prev => {
-          const newFavs = [...prev, track];
-          localStorage.setItem('sonic_favorites', JSON.stringify(newFavs));
-          return newFavs;
-        });
-      }
+      await ctxToggleFavorite(track);
       setOpenMenuId(null);
     } catch (err) {
       console.error(err);

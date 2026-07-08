@@ -26,6 +26,7 @@ import { useGlobalAudio } from '../context/AudioContext';
 import { LocalFilePicker } from './LocalFilePicker';
 import { UploadQueuePanel } from './UploadQueuePanel';
 import { SetLocalPasswordModal } from './SetLocalPasswordModal';
+import { db } from '../lib/db';
 
 const parseJwt = (token: string) => {
   try {
@@ -75,8 +76,9 @@ export function Layout() {
     try {
       const configStr = localStorage.getItem('SONIC_DEPTH_AUDIO_CONFIG');
       const config = configStr ? JSON.parse(configStr) : {};
+      const idbData = await db.getAllData();
       
-      await axiosClient.post('/api/backup/drive', { config });
+      await axiosClient.post('/api/backup/drive', { config, idbData });
       
       setNotification({ type: 'success', message: t('layout.backupSuccess', 'Backup to Google Drive successful!') });
     // eslint-disable-next-line @typescript-eslint/no-explicit-any
@@ -94,7 +96,15 @@ export function Layout() {
     setSyncing(true);
     setNotification(null);
     try {
-      const config = await axiosClient.get('/api/backup/drive');
+      const response = await axiosClient.get('/api/backup/drive');
+      let config = response;
+      
+      if (response && response.config) {
+        config = response.config;
+        if (response.idbData) {
+          await db.importData(response.idbData);
+        }
+      }
       
       if (config && Object.keys(config).length > 0) {
         localStorage.setItem('SONIC_DEPTH_AUDIO_CONFIG', JSON.stringify(config));
@@ -121,7 +131,8 @@ export function Layout() {
         try {
           const configStr = localStorage.getItem('SONIC_DEPTH_AUDIO_CONFIG');
           const config = configStr ? JSON.parse(configStr) : {};
-          await axiosClient.post('/api/backup/drive', { config });
+          const idbData = await db.getAllData();
+          await axiosClient.post('/api/backup/drive', { config, idbData });
         } catch (e) {
           console.error('Auto-backup failed on logout', e);
         }

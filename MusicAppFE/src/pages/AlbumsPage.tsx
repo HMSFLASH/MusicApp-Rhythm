@@ -3,36 +3,12 @@ import { useNavigate } from 'react-router-dom';
 import { ArrowLeft, Album, Play, ListPlus, ListMusic } from 'lucide-react';
 import { useGlobalAudio } from '../context/AudioContext';
 import type { Track } from '../hooks/useAudioPlayer';
-import { axiosClient } from '../api/axiosClient';
+import { useLibrary } from '../context/LibraryContext';
 
 export function AlbumsPage() {
   const navigate = useNavigate();
   const { playerState } = useGlobalAudio();
-  const [tracks, setTracks] = useState<Track[]>([]);
-
-  useEffect(() => {
-    const cached = localStorage.getItem('sonic_library_tracks');
-    if (cached) {
-      // eslint-disable-next-line react-hooks/set-state-in-effect, @typescript-eslint/no-unused-vars, no-empty
-      try { setTracks(JSON.parse(cached)); } catch (e) { }
-    }
-    axiosClient.get('/api/music/list')
-      // eslint-disable-next-line @typescript-eslint/no-explicit-any
-      .then((data: any) => {
-        const parsed = data.length > 0 ? (typeof data[0] === 'string' ? JSON.parse(data[0]) : data) : [];
-        setTracks(parsed);
-      })
-      .catch(console.error);
-
-    const handleMetadataUpdated = () => {
-      setTracks(prev => [...prev]);
-    };
-    window.addEventListener('sonic_metadata_updated', handleMetadataUpdated);
-    
-    return () => {
-      window.removeEventListener('sonic_metadata_updated', handleMetadataUpdated);
-    };
-  }, []);
+  const { tracks } = useLibrary();
 
   const albums = Array.from(new Set(tracks.map(t => t.album || playerState.getTrackMetadata(t.id)?.album).filter(Boolean))) as string[];
 

@@ -5,51 +5,13 @@ import { useGlobalAudio } from '../context/AudioContext';
 import { useUploadQueue } from '../context/UploadContext';
 import type { Track } from '../hooks/useAudioPlayer';
 
-import { axiosClient } from '../api/axiosClient';
+import { useLibrary } from '../context/LibraryContext';
 
 export function LibraryPage() {
   const navigate = useNavigate();
   const { jwtToken, playerState } = useGlobalAudio();
   const { queueFiles } = useUploadQueue();
-  const [tracks, setTracks] = useState<Track[]>([]);
-  const [favorites, setFavorites] = useState<Track[]>([]);
-
-
-  const tracksRef = useRef<Track[]>([]);
-
-  // Fetch all tracks (Stale-While-Revalidate)
-  useEffect(() => {
-    const cached = localStorage.getItem('sonic_library_tracks');
-    if (cached) {
-      // eslint-disable-next-line react-hooks/set-state-in-effect, @typescript-eslint/no-unused-vars, no-empty
-      try { setTracks(JSON.parse(cached)); } catch (e) { }
-    }
-
-    axiosClient.get('/api/music/list')
-      // eslint-disable-next-line @typescript-eslint/no-explicit-any
-      .then((data: any) => {
-        const parsed = data.length > 0
-          // eslint-disable-next-line @typescript-eslint/no-explicit-any
-          ? data.map((d: any) => ({ id: d.id, fileName: d.name, sourceType: d.sourceType, imageUrl: d.imageUrl, artist: d.artist, title: d.title, album: d.album, genre: d.genre, durationSeconds: d.durationSeconds }))
-          : [];
-        setTracks(parsed);
-        tracksRef.current = parsed;
-        localStorage.setItem('sonic_library_tracks', JSON.stringify(parsed));
-      })
-      .catch(() => { setTracks([]); tracksRef.current = []; });
-  }, [jwtToken]);
-
-  // Fetch favorites
-  useEffect(() => {
-    if (!jwtToken) return;
-    axiosClient.get('/api/favorites')
-      // eslint-disable-next-line @typescript-eslint/no-explicit-any
-      .then((data: any) => setFavorites(data.length > 0
-        // eslint-disable-next-line @typescript-eslint/no-explicit-any
-        ? data.map((d: any) => ({ id: d.id, fileName: d.name, sourceType: d.sourceType, imageUrl: d.imageUrl, artist: d.artist, title: d.title, album: d.album, genre: d.genre, durationSeconds: d.durationSeconds }))
-        : []))
-      .catch(() => setFavorites([]));
-  }, [jwtToken]);
+  const { tracks, favorites, refreshLibrary } = useLibrary();
 
   const handleUpload = (e: React.ChangeEvent<HTMLInputElement>) => {
     if (!e.target.files || e.target.files.length === 0) return;
@@ -59,7 +21,7 @@ export function LibraryPage() {
     const skippedFiles: File[] = [];
 
     for (const f of files) {
-      if (tracksRef.current.some(t => t.fileName === f.name)) {
+      if (tracks.some(t => t.fileName === f.name)) {
         skippedFiles.push(f);
       } else {
         pendingFiles.push(f);
@@ -72,22 +34,11 @@ export function LibraryPage() {
 
   useEffect(() => {
     const handleUploadSuccess = () => {
-      axiosClient.get('/api/music/list')
-        // eslint-disable-next-line @typescript-eslint/no-explicit-any
-        .then((data: any) => {
-          const parsed = data.length > 0
-            // eslint-disable-next-line @typescript-eslint/no-explicit-any
-            ? data.map((d: any) => ({ id: d.id, fileName: d.name, sourceType: d.sourceType, imageUrl: d.imageUrl, artist: d.artist, title: d.title, album: d.album, genre: d.genre, durationSeconds: d.durationSeconds }))
-            : [];
-          setTracks(parsed);
-          tracksRef.current = parsed;
-          localStorage.setItem('sonic_library_tracks', JSON.stringify(parsed));
-        })
-        .catch(() => { });
+      refreshLibrary();
     };
     window.addEventListener('music-uploaded', handleUploadSuccess);
     return () => window.removeEventListener('music-uploaded', handleUploadSuccess);
-  }, []);
+  }, [refreshLibrary]);
 
   const albumsCount = useMemo(() => new Set(tracks.map(t => t.album).filter(Boolean)).size, [tracks]);
   const genresCount = useMemo(() => new Set(tracks.map(t => t.genre).filter(Boolean)).size, [tracks]);

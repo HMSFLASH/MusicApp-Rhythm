@@ -13,38 +13,13 @@ interface AddTracksModalProps {
 }
 
 import { useGlobalAudio } from '../context/AudioContext';
+import { useLibrary } from '../context/LibraryContext';
 
 export function AddTracksModal({ isOpen, onClose, playlistId, playlistTracks, onSuccess }: AddTracksModalProps) {
-  const { jwtToken, playerState } = useGlobalAudio();
-  const [allTracks, setAllTracks] = useState<Track[]>([]);
-  const [loading, setLoading] = useState(false);
+  const { playerState } = useGlobalAudio();
+  const { tracks: allTracks, isLoading: loading } = useLibrary();
   const [addingIds, setAddingIds] = useState<Set<string | number>>(new Set());
   const [searchQuery, setSearchQuery] = useState('');
-
-  useEffect(() => {
-    if (isOpen && jwtToken) {
-      // eslint-disable-next-line react-hooks/set-state-in-effect
-      setLoading(true);
-      axiosClient.get('/api/music/list')
-      // eslint-disable-next-line @typescript-eslint/no-explicit-any
-      .then((data: any) => {
-        // eslint-disable-next-line @typescript-eslint/no-explicit-any
-        const mapped = data.map((d: any) => ({
-          id: d.id,
-          fileName: d.name,
-          sourceType: d.sourceType,
-          imageUrl: d.imageUrl,
-          artist: d.artist,
-          title: d.title,
-          album: d.album,
-          genre: d.genre,
-          durationSeconds: d.durationSeconds
-        }));
-        setAllTracks(mapped);
-      })
-      .finally(() => setLoading(false));
-    }
-  }, [isOpen, jwtToken]);
 
   if (!isOpen) return null;
 

@@ -2,15 +2,14 @@ import { useMemo, useEffect } from 'react';
 import { useAudioQueue } from './useAudioQueue';
 import { useAudioEffectsState } from './useAudioEffectsState';
 import { useAudioEngine } from './useAudioEngine';
-import { getInitialState, getInitialPlaybackState, LOCAL_STORAGE_KEY } from './audioStorage';
+import { getInitialState, LOCAL_STORAGE_KEY } from './audioStorage';
 export type { Track } from './audioTypes';
 export { EQ_PRESETS, STYLISTIC_PRESETS } from './audioTypes';
 
 export function useAudioPlayer(jwtToken: string) {
   const savedState = useMemo(() => getInitialState(), []);
-  const initialPlayback = useMemo(() => getInitialPlaybackState(), []);
 
-  const queueState = useAudioQueue(initialPlayback, savedState);
+  const queueState = useAudioQueue(savedState);
   const effectsState = useAudioEffectsState(savedState);
   // eslint-disable-next-line @typescript-eslint/no-explicit-any
   const engineState = useAudioEngine(jwtToken, queueState as any, effectsState as any, savedState);

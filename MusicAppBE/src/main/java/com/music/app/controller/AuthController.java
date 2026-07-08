@@ -93,23 +93,4 @@ public class AuthController {
         }
     }
 
-    @GetMapping("/me")
-    public ResponseEntity<?> getMe() {
-        try {
-            org.springframework.security.core.Authentication auth = SecurityContextHolder.getContext().getAuthentication();
-            if (auth == null || auth.getName().equals("anonymousUser")) {
-                return ResponseEntity.status(401).body(Map.of("message", "Not authenticated"));
-            }
-            String subject = auth.getName();
-            com.music.app.model.User user = authService.getUserBySubject(subject);
-            return ResponseEntity.ok(Map.of(
-                "isGoogleLinked", user.getGoogleId() != null && !user.getGoogleId().isEmpty(),
-                "hasPassword", user.getPassword() != null && !user.getPassword().isEmpty(),
-                "email", user.getEmail() != null ? user.getEmail() : "",
-                "fullName", user.getFullName() != null ? user.getFullName() : ""
-            ));
-        } catch (Exception e) {
-            return ResponseEntity.status(500).body(Map.of("message", e.getMessage()));
-        }
-    }
 }

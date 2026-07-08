@@ -69,7 +69,7 @@ public class MusicStreamController {
 
             StreamingResponseBody responseBody = outputStream -> {
                 try (InputStream is = driveResponse.getInputStream()) {
-                    byte[] buffer = new byte[8192];
+                    byte[] buffer = new byte[65536];
                     int bytesRead;
                     while ((bytesRead = is.read(buffer)) != -1) {
                         outputStream.write(buffer, 0, bytesRead);

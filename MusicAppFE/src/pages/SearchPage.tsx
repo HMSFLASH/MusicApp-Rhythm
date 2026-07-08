@@ -3,52 +3,15 @@ import { Search, Plus, Users, Music, Disc, X, Check, Play, Cloud, ListPlus } fro
 import { useGlobalAudio } from '../context/AudioContext';
 import { AddToPlaylistModal } from '../components/AddToPlaylistModal';
 import type { Track } from '../hooks/useAudioPlayer';
-import { axiosClient } from '../api/axiosClient';
+import { useLibrary } from '../context/LibraryContext';
 
 export function SearchPage() {
   const { playerState, jwtToken } = useGlobalAudio();
+  const { tracks: allTracks } = useLibrary();
   const [searchQuery, setSearchQuery] = useState('');
   const [trackToPlaylist, setTrackToPlaylist] = useState<Track | null>(null);
   const [searchResults, setSearchResults] = useState<Track[]>([]);
-  const [allTracks, setAllTracks] = useState<Track[]>([]);
   const [isSearching, setIsSearching] = useState(false);
-
-  // Fetch all tracks once on mount (Stale-While-Revalidate)
-  useEffect(() => {
-    const cached = localStorage.getItem('sonic_library_tracks');
-    if (cached) {
-      // eslint-disable-next-line react-hooks/set-state-in-effect, @typescript-eslint/no-unused-vars, no-empty
-      try { setAllTracks(JSON.parse(cached)); } catch (e) { }
-    }
-
-    axiosClient.get('/api/music/list')
-      // eslint-disable-next-line @typescript-eslint/no-explicit-any
-      .then((data: any) => {
-        if (data.length > 0) {
-          // eslint-disable-next-line @typescript-eslint/no-explicit-any
-          const parsed = data.map((d: any) => ({
-            id: d.id, fileName: d.name, sourceType: d.sourceType,
-            imageUrl: d.imageUrl, artist: d.artist, title: d.title,
-            album: d.album, genre: d.genre, durationSeconds: d.durationSeconds
-          }));
-          setAllTracks(parsed);
-          localStorage.setItem('sonic_library_tracks', JSON.stringify(parsed));
-        } else {
-          setAllTracks([]);
-        }
-      })
-      .catch(() => setAllTracks([]));
-
-    const handleMetadataUpdated = () => {
-      setAllTracks(prev => [...prev]);
-      setSearchResults(prev => [...prev]);
-    };
-    window.addEventListener('sonic_metadata_updated', handleMetadataUpdated);
-    
-    return () => {
-      window.removeEventListener('sonic_metadata_updated', handleMetadataUpdated);
-    };
-  }, [jwtToken]);
 
   // Debounced local search
   useEffect(() => {
