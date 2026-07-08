@@ -1,25 +1,17 @@
 import { useState, useRef, useEffect, useCallback } from 'react';
-import type { EqBand, Track } from './audioTypes';
+import type { Track } from './audioTypes';
 import { LOCAL_STORAGE_KEY } from './audioStorage';
 import { axiosClient } from '../api/axiosClient';
-import { configureLoudnessNormalization, configureMasterLimiter, createSoftClipCurve } from './useAudioContext';
+import { clamp } from './audioMath';
+import { getBufferProgressIntervalMs, getFullCoreCount, isLikelyConstrainedDevice } from './audioDevice';
+import { createSilentWavUrl } from './audioGraph';
+import { getTrackMimeType } from './audioMime';
+import { createRenderSignature as createAudioRenderSignature } from './audioRenderSignature';
+import { renderOfflineAudio } from './offlineAudioRenderer';
 
-const clamp = (value: number, min: number, max: number) => Math.min(max, Math.max(min, value));
-const msToAudioSeconds = (value: number) => clamp(value / 1000, 0, 1);
-const compressorAttackSeconds = (attackMs: number, rmsSizeMs: number) => msToAudioSeconds(Math.max(attackMs, rmsSizeMs * 0.5));
-const percentToPan = (value: number) => clamp(value / 100, -1, 1);
-const percentToStereoWidth = (value: number) => clamp(value / 100, 0, 2);
-const percentToStereoBaseWidth = (value: number) => {
-  const width = percentToStereoWidth(value);
-  return width <= 1 ? width : clamp(1 + (width - 1) * 0.5, 1, 1.5);
-};
-const percentToPseudoStereoAmount = (value: number) => clamp((value - 100) / 100, 0, 1);
-const REVERB_WET_GAIN = 0.75;
 const DRIVE_MEDIA_URL = 'https://www.googleapis.com/drive/v3/files';
-const NEUTRAL_EPSILON = 0.0001;
 const MAX_PRECALCULATED_BUFFER_CACHE_SIZE = 3;
 const MAX_RENDER_SIGNATURE_CACHE_ENTRIES = 24;
-const GAIN_BASED_EQ_TYPES = new Set<BiquadFilterType>(['peaking', 'lowshelf', 'highshelf']);
 type LoadingTrackPhase = 'downloading' | 'processing';
 type QueuePrecalculateStatus = {
   isRunning: boolean;
@@ -29,72 +21,6 @@ type QueuePrecalculateStatus = {
   cores: number;
 };
 
-const createSilentWavUrl = () => {
-  const sampleRate = 8000;
-  const durationSeconds = 1;
-  const bytesPerSample = 2;
-  const channelCount = 1;
-  const sampleCount = sampleRate * durationSeconds;
-  const dataSize = sampleCount * channelCount * bytesPerSample;
-  const buffer = new ArrayBuffer(44 + dataSize);
-  const view = new DataView(buffer);
-
-  const writeAscii = (offset: number, value: string) => {
-    for (let i = 0; i < value.length; i += 1) {
-      view.setUint8(offset + i, value.charCodeAt(i));
-    }
-  };
-
-  writeAscii(0, 'RIFF');
-  view.setUint32(4, 36 + dataSize, true);
-  writeAscii(8, 'WAVE');
-  writeAscii(12, 'fmt ');
-  view.setUint32(16, 16, true);
-  view.setUint16(20, 1, true);
-  view.setUint16(22, channelCount, true);
-  view.setUint32(24, sampleRate, true);
-  view.setUint32(28, sampleRate * channelCount * bytesPerSample, true);
-  view.setUint16(32, channelCount * bytesPerSample, true);
-  view.setUint16(34, bytesPerSample * 8, true);
-  writeAscii(36, 'data');
-  view.setUint32(40, dataSize, true);
-
-  return URL.createObjectURL(new Blob([buffer], { type: 'audio/wav' }));
-};
-
-const getTrackMimeType = (track: Track, fallback?: string | null) => {
-  const ext = track.fileName?.split('.').pop()?.toLowerCase();
-  if (ext === 'm4a') return 'audio/mp4';
-  if (ext === 'opus') return 'audio/ogg';
-  if (ext === 'flac') return 'audio/flac';
-  if (ext === 'wav') return 'audio/wav';
-  if (ext === 'ogg') return 'audio/ogg';
-  if (ext === 'aac') return 'audio/aac';
-  if (ext === 'wma') return 'audio/x-ms-wma';
-  return fallback && fallback !== 'application/octet-stream' ? fallback : 'audio/mpeg';
-};
-
-type NavigatorWithDeviceMemory = Navigator & { deviceMemory?: number };
-
-const isLikelyConstrainedDevice = () => {
-  const nav = navigator as NavigatorWithDeviceMemory;
-  const cores = nav.hardwareConcurrency ?? 8;
-  const memory = nav.deviceMemory ?? 8;
-  const isCoarseSmallScreen = window.matchMedia?.('(pointer: coarse)').matches && window.innerWidth <= 1024;
-  const isMobileUserAgent = /Android|iPhone|iPad|iPod|Mobile/i.test(nav.userAgent);
-
-  return isMobileUserAgent || isCoarseSmallScreen || cores <= 4 || memory <= 4;
-};
-
-const getFullCoreCount = () => Math.max(1, navigator.hardwareConcurrency ?? 4);
-const getBufferProgressIntervalMs = () => isLikelyConstrainedDevice() ? 1000 : 250;
-const isNeutralDbGain = (value: number) => Math.abs(value || 0) < NEUTRAL_EPSILON;
-const isNeutralPercentValue = (value: number, neutralValue: number) => Math.abs((value || 0) - neutralValue) < NEUTRAL_EPSILON;
-// eslint-disable-next-line @typescript-eslint/no-explicit-any
-const isActiveEqBand = (band: any) => {
-  const type = (band.type || 'peaking') as BiquadFilterType;
-  return !GAIN_BASED_EQ_TYPES.has(type) || !isNeutralDbGain(band.gain);
-};
 const getAdjacentTrackWindow = (currentId: string | number, currentQueue: Track[]) => {
   const allowedIds = new Set<string>();
   const currentTrackId = String(currentId);
@@ -116,72 +42,6 @@ const getAdjacentTrackWindow = (currentId: string | number, currentQueue: Track[
   }
 
   return { allowedIds, prev1, next1 };
-};
-
-const connectStereoWidthMatrix = (ctx: BaseAudioContext, input: AudioNode, widthPercent: number) => {
-  const width = percentToStereoBaseWidth(widthPercent);
-  const pseudoAmount = percentToPseudoStereoAmount(widthPercent);
-  const out = ctx.createGain();
-  const stereoInput = ctx.createGain();
-  const splitter = ctx.createChannelSplitter(2);
-  const merger = ctx.createChannelMerger(2);
-
-  stereoInput.channelCount = 2;
-  stereoInput.channelCountMode = 'explicit';
-  stereoInput.channelInterpretation = 'speakers';
-
-  const lToL = ctx.createGain();
-  const rToL = ctx.createGain();
-  const lToR = ctx.createGain();
-  const rToR = ctx.createGain();
-
-  lToL.gain.value = (1 + width) / 2;
-  rToL.gain.value = (1 - width) / 2;
-  lToR.gain.value = (1 - width) / 2;
-  rToR.gain.value = (1 + width) / 2;
-
-  input.connect(stereoInput);
-  stereoInput.connect(splitter);
-  splitter.connect(lToL, 0);
-  splitter.connect(lToR, 0);
-  splitter.connect(rToL, 1);
-  splitter.connect(rToR, 1);
-
-  lToL.connect(merger, 0, 0);
-  rToL.connect(merger, 0, 0);
-  lToR.connect(merger, 0, 1);
-  rToR.connect(merger, 0, 1);
-  merger.connect(out);
-
-  if (pseudoAmount > 0) {
-    const pseudoMono = ctx.createGain();
-    const pseudoDelay = ctx.createDelay(0.05);
-    const pseudoHighpass = ctx.createBiquadFilter();
-    const pseudoLeft = ctx.createGain();
-    const pseudoRight = ctx.createGain();
-    const pseudoMerger = ctx.createChannelMerger(2);
-    const pseudoWet = ctx.createGain();
-
-    pseudoMono.channelCount = 1;
-    pseudoMono.channelCountMode = 'explicit';
-    pseudoMono.channelInterpretation = 'speakers';
-    pseudoDelay.delayTime.value = 0.012 + 0.008 * pseudoAmount;
-    pseudoHighpass.type = 'highpass';
-    pseudoHighpass.frequency.value = 180;
-    pseudoWet.gain.value = 0.16 * pseudoAmount;
-
-    input.connect(pseudoMono);
-    pseudoMono.connect(pseudoLeft);
-    pseudoMono.connect(pseudoDelay);
-    pseudoDelay.connect(pseudoHighpass);
-    pseudoHighpass.connect(pseudoRight);
-    pseudoLeft.connect(pseudoMerger, 0, 0);
-    pseudoRight.connect(pseudoMerger, 0, 1);
-    pseudoMerger.connect(pseudoWet);
-    pseudoWet.connect(out);
-  }
-
-  return out;
 };
 
 export function useAudioPlayback(
@@ -821,46 +681,7 @@ export function useAudioPlayback(
   // Define functions in correct dependency order
 
   const createRenderSignature = () => {
-    const params = audioParamsRef.current;
-    const enabled = fxEnabledRef.current || {};
-
-    return JSON.stringify({
-      fxEnabled: {
-        preamp: Boolean(enabled.preamp),
-        eq: Boolean(enabled.eq),
-        tone: Boolean(enabled.tone),
-        comp: Boolean(enabled.comp),
-        reverb: Boolean(enabled.reverb),
-        stereo: Boolean(enabled.stereo),
-        master: Boolean(enabled.master),
-        limiter: Boolean(enabled.limiter),
-      },
-      preampGain: params.preampGain,
-      eqBands: Array.isArray(params.eqBands)
-        ? params.eqBands.map((band: EqBand) => ({
-          frequency: band.frequency,
-          gain: band.gain,
-          q: band.q,
-          channel: band.channel,
-          type: band.type || 'peaking',
-        }))
-        : [],
-      bassGain: params.bassGain,
-      trebleGain: params.trebleGain,
-      compThreshold: params.compThreshold,
-      compRatio: params.compRatio,
-      compKnee: params.compKnee,
-      compAttack: params.compAttack,
-      compRelease: params.compRelease,
-      compRmsSize: params.compRmsSize,
-      compMakeupGain: params.compMakeupGain,
-      reverbMix: params.reverbMix,
-      reverbTime: params.reverbTime,
-      stereoWidth: params.stereoWidth,
-      panValue: params.panValue,
-      useOversample: Boolean(params.useOversample),
-      loudnessNormalization: Boolean(params.loudnessNormalization),
-    });
+    return createAudioRenderSignature(audioParamsRef.current, fxEnabledRef.current || {});
   };
 
   const getRenderSignatureCacheKey = (trackId: string, signature = createRenderSignature()) => (
@@ -947,222 +768,13 @@ export function useAudioPlayback(
     prunePrecalculatedQueueBuffers(preferredAllowedIds);
   };
 
-  const performOfflineRender = async (audioBuffer: AudioBuffer) => {
-console.log("[Audio] performOfflineRender called with EQ bands:", audioParamsRef.current.eqBands.length);
-    if (!audioBuffer) return audioBuffer;
-    const sampleRate = audioBuffer.sampleRate;
-    const length = audioBuffer.length;
-    const offlineCtx = new OfflineAudioContext(2, length, sampleRate);
-
-    const offlineSource = offlineCtx.createBufferSource();
-    offlineSource.buffer = audioBuffer;
-    offlineSource.playbackRate.value = 1.0;
-
-    let currentNode: AudioNode = offlineSource;
-    const enabled = fxEnabledRef.current;
-    const { preampGain, eqBands, bassGain, trebleGain, compThreshold, compRatio, compKnee, compAttack, compRelease, compRmsSize, compMakeupGain, reverbMix, stereoWidth, panValue, loudnessNormalization } = audioParamsRef.current;
-
-    // 1. Gain Staging (-6dB)
-    const headroomDrop = offlineCtx.createGain();
-    headroomDrop.gain.value = 0.5;
-    currentNode.connect(headroomDrop);
-    currentNode = headroomDrop;
-
-    // 1.5 Preamp
-    if (enabled.preamp && !isNeutralDbGain(preampGain)) {
-      const preamp = offlineCtx.createGain();
-      preamp.gain.value = Math.pow(10, preampGain / 20);
-      currentNode.connect(preamp);
-      currentNode = preamp;
-    }
-
-    // 2. EQ
-    const activeEqBands = enabled.eq && eqBands ? eqBands.filter(isActiveEqBand) : [];
-    if (activeEqBands.length > 0) {
-      // eslint-disable-next-line @typescript-eslint/no-explicit-any
-      const filters = activeEqBands.map((band: any) => {
-        const filter = offlineCtx.createBiquadFilter();
-        filter.type = band.type || 'peaking';
-        filter.frequency.value = band.frequency;
-        filter.Q.value = band.q;
-        filter.gain.value = band.gain;
-        return filter;
-      });
-
-      const splitter = offlineCtx.createChannelSplitter(2);
-      const merger = offlineCtx.createChannelMerger(2);
-
-      // eslint-disable-next-line @typescript-eslint/no-explicit-any
-      const stereoFilters = filters.filter((_: any, i: number) => activeEqBands[i].channel === 'L+R');
-      // eslint-disable-next-line @typescript-eslint/no-explicit-any
-      const leftFilters = filters.filter((_: any, i: number) => activeEqBands[i].channel === 'L');
-      // eslint-disable-next-line @typescript-eslint/no-explicit-any
-      const rightFilters = filters.filter((_: any, i: number) => activeEqBands[i].channel === 'R');
-
-      // Stereo Chain
-      let prevNode = null;
-      for (const filter of stereoFilters) {
-        if (prevNode) prevNode.connect(filter);
-        else currentNode.connect(filter);
-        prevNode = filter;
-      }
-      if (prevNode) prevNode.connect(splitter);
-      else currentNode.connect(splitter);
-
-      // Left Chain
-      let leftNode = splitter;
-      let prevLeft = null;
-      for (const filter of leftFilters) {
-        if (prevLeft) prevLeft.connect(filter);
-        else splitter.connect(filter, 0, 0);
-        prevLeft = filter;
-      }
-      if (prevLeft) leftNode = prevLeft;
-
-      // Right Chain
-      let rightNode = splitter;
-      let prevRight = null;
-      for (const filter of rightFilters) {
-        if (prevRight) prevRight.connect(filter);
-        else splitter.connect(filter, 1, 0);
-        prevRight = filter;
-      }
-      if (prevRight) rightNode = prevRight;
-
-      leftNode.connect(merger, leftNode === splitter ? 0 : 0, 0);
-      rightNode.connect(merger, rightNode === splitter ? 1 : 0, 1);
-
-      currentNode = merger;
-    }
-
-    // 3. Tone
-    if (enabled.tone && (!isNeutralDbGain(bassGain) || !isNeutralDbGain(trebleGain))) {
-      if (!isNeutralDbGain(bassGain)) {
-        const bass = offlineCtx.createBiquadFilter();
-        bass.type = 'lowshelf';
-        bass.frequency.value = 150;
-        bass.gain.value = bassGain;
-
-        currentNode.connect(bass);
-        currentNode = bass;
-      }
-
-      if (!isNeutralDbGain(trebleGain)) {
-        const treble = offlineCtx.createBiquadFilter();
-        treble.type = 'highshelf';
-        treble.frequency.value = 4000;
-        treble.gain.value = trebleGain;
-
-        currentNode.connect(treble);
-        currentNode = treble;
-      }
-    }
-
-    // 4. Compressor
-    if (enabled.comp) {
-      const comp = offlineCtx.createDynamicsCompressor();
-      comp.threshold.value = compThreshold;
-      comp.ratio.value = compRatio;
-      comp.knee.value = compKnee;
-      comp.attack.value = compressorAttackSeconds(compAttack, compRmsSize);
-      comp.release.value = msToAudioSeconds(compRelease);
-
-      const makeup = offlineCtx.createGain();
-      makeup.gain.value = Math.pow(10, compMakeupGain / 20);
-
-      currentNode.connect(comp);
-      comp.connect(makeup);
-      currentNode = makeup;
-    }
-
-    // 5. Reverb
-    // eslint-disable-next-line @typescript-eslint/no-explicit-any
-    let dryGain: any, wetGain: any;
-    let isReverbParallel = false;
-    if (enabled.reverb && !isNeutralPercentValue(reverbMix, 0)) {
-      const preDelay = offlineCtx.createDelay(1.0);
-      preDelay.delayTime.value = 0.02;
-
-      const convolver = offlineCtx.createConvolver();
-      if (irBufferRef.current) {
-        convolver.buffer = irBufferRef.current;
-      }
-      
-      dryGain = offlineCtx.createGain();
-      const x = reverbMix / 100;
-      dryGain.gain.value = Math.cos(x * Math.PI / 2);
-
-      wetGain = offlineCtx.createGain();
-      wetGain.gain.value = Math.sin(x * Math.PI / 2) * REVERB_WET_GAIN;
-
-      currentNode.connect(dryGain);
-      currentNode.connect(preDelay);
-      preDelay.connect(convolver);
-      convolver.connect(wetGain);
-
-      isReverbParallel = true;
-    }
-
-    const connectToNext = (nextNode: AudioNode) => {
-      if (isReverbParallel && dryGain && wetGain) {
-        dryGain.connect(nextNode);
-        wetGain.connect(nextNode);
-        isReverbParallel = false;
-      } else {
-        currentNode.connect(nextNode);
-      }
-      currentNode = nextNode;
-    };
-
-    // 5.5 Stereo Width Matrix
-    if (enabled.stereo && !isNeutralPercentValue(stereoWidth, 100)) {
-      const stereoInput = offlineCtx.createGain();
-      connectToNext(stereoInput);
-      currentNode = connectStereoWidthMatrix(offlineCtx, stereoInput, stereoWidth);
-    }
-
-    // 6. Pan
-    if (enabled.master && !isNeutralPercentValue(panValue, 0)) {
-      const panNode = offlineCtx.createStereoPanner();
-      panNode.pan.value = percentToPan(panValue);
-      connectToNext(panNode);
-    }
-
-    // 6.5 Loudness Normalization
-    if (loudnessNormalization) {
-      const agcPreGain = offlineCtx.createGain();
-      const agcComp = offlineCtx.createDynamicsCompressor();
-      const agcMakeup = offlineCtx.createGain();
-      configureLoudnessNormalization(agcPreGain, agcComp, agcMakeup, true);
-      connectToNext(agcPreGain);
-      agcPreGain.connect(agcComp);
-      agcComp.connect(agcMakeup);
-      currentNode = agcMakeup;
-    }
-
-    // 7. Headroom Recover
-    const headroomRecover = offlineCtx.createGain();
-    headroomRecover.gain.value = 1.414;
-    connectToNext(headroomRecover);
-
-    // 8. Limiter & Soft Clip
-    if (enabled.limiter) {
-      const limiter = offlineCtx.createDynamicsCompressor();
-      configureMasterLimiter(limiter);
-      connectToNext(limiter);
-
-      const softClip = offlineCtx.createWaveShaper();
-      softClip.curve = createSoftClipCurve(44100);
-      softClip.oversample = audioParamsRef.current.useOversample ? '4x' : 'none';
-      connectToNext(softClip);
-    }
-
-    connectToNext(offlineCtx.destination);
-
-    offlineSource.start(0);
-    const renderedBuffer = await offlineCtx.startRendering();
-    return renderedBuffer;
-  };
+  const performOfflineRender = async (audioBuffer: AudioBuffer) =>
+    renderOfflineAudio({
+      audioBuffer,
+      params: audioParamsRef.current,
+      fxEnabled: fxEnabledRef.current || {},
+      irBuffer: irBufferRef.current,
+    });
 
   const precalculateTrackBuffer = async (track: Track, keepInQueueCache = false) => {
     const trackId = String(track.id);

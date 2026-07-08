@@ -1,23 +1,9 @@
 import { useRef } from 'react';
 import { FolderOpen } from 'lucide-react';
 import { useGlobalAudio } from '../context/AudioContext';
-import type { Track } from '../hooks/useAudioPlayer';
 import { useTranslation } from 'react-i18next';
-
-const AUDIO_EXTENSIONS = [
-  '.mp3', '.m4a', '.flac', '.wav', '.ogg', '.opus', '.aac', '.wma',
-];
-
-function buildStubTrack(file: File): Track {
-  const id = `local_${file.name}_${file.size}`;
-  return {
-    id,
-    fileName: file.name,
-    sourceType: 'LOCAL',
-    localFile: file,
-    title: file.name.replace(/\.[^/.]+$/, ''),
-  };
-}
+import { AUDIO_EXTENSIONS } from '../hooks/audioMime';
+import { buildLocalTrackStub, filterAudioFiles, readLocalTrackMetadata } from '../utils/localAudioFiles';
 
 export function LocalFilePicker() {
   const { t } = useTranslation();
@@ -42,49 +28,17 @@ export function LocalFilePicker() {
   const handleFiles = (files: FileList | null) => {
     if (!files || files.length === 0) return;
 
-    const audioFiles = Array.from(files).filter(f =>
-      AUDIO_EXTENSIONS.some(ext => f.name.toLowerCase().endsWith(ext))
-    );
+    const audioFiles = filterAudioFiles(files);
     if (audioFiles.length === 0) return;
 
-    const tracks = audioFiles.map(buildStubTrack);
+    const tracks = audioFiles.map(buildLocalTrackStub);
     // Play immediately — no blocking
     playTrack(tracks[0], tracks, true);
 
     // Enrich remaining queue tracks (skip tracks[0] — playTrack handles the currently playing track)
-    const MIME_MAP: Record<string, string> = { mp3: 'audio/mpeg', m4a: 'audio/mp4', flac: 'audio/flac', wav: 'audio/wav', ogg: 'audio/ogg', opus: 'audio/ogg', aac: 'audio/aac', wma: 'audio/x-ms-wma' };
     tracks.slice(1).forEach(async (stub) => {
       try {
-        const mm = await import('music-metadata-browser');
-        const parseBufferFn = mm.parseBuffer || mm.default?.parseBuffer;
-        if (!parseBufferFn) return;
-
-        const arrayBuffer = await stub.localFile!.arrayBuffer();
-        const buffer = new Uint8Array(arrayBuffer);
-        const ext = stub.fileName?.split('.').pop()?.toLowerCase();
-        const mimeType = MIME_MAP[ext || ''] || stub.localFile!.type || 'audio/mpeg';
-
-        let timeoutId: ReturnType<typeof setTimeout>;
-        const parsePromise = parseBufferFn(buffer, mimeType, { duration: false });
-        const timeoutPromise = new Promise<never>((_, reject) => {
-          timeoutId = setTimeout(() => reject(new Error('timeout')), 10000);
-        });
-        const metadata = await Promise.race([parsePromise, timeoutPromise]).finally(() => clearTimeout(timeoutId!));
-
-        const update: Partial<Track> = {};
-        if (metadata.common.title) update.title = metadata.common.title;
-        if (metadata.common.artist) update.artist = metadata.common.artist;
-        if (metadata.common.album) update.album = metadata.common.album;
-        if (metadata.common.genre?.length) update.genre = metadata.common.genre[0];
-        if (metadata.format.duration) update.durationSeconds = metadata.format.duration;
-
-        if (metadata.common.picture?.length) {
-          const pic = metadata.common.picture[0];
-          const fmt = pic.format || 'jpeg';
-          const imgMime = fmt.startsWith('image/') ? fmt : `image/${fmt}`;
-          update.imageUrl = URL.createObjectURL(new Blob([new Uint8Array(pic.data)], { type: imgMime }));
-        }
-
+        const update = await readLocalTrackMetadata(stub);
         if (Object.keys(update).length === 0) return;
 
         // Update queue entry

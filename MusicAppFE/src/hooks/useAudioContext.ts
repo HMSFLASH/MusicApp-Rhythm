@@ -1,134 +1,24 @@
 import { useRef, useEffect, useCallback } from 'react';
+import {
+  applyMasterLimiterState,
+  configureLoudnessNormalization,
+  generateImpulseResponse,
+  REVERB_WET_GAIN,
+} from './audioGraph';
+import {
+  clamp,
+  compressorAttackSeconds,
+  msToAudioSeconds,
+  percentToPan,
+  percentToPseudoStereoAmount,
+  percentToStereoBaseWidth,
+} from './audioMath';
 
-export const createSoftClipCurve = (amount = 44100) => {
-  const curve = new Float32Array(amount);
-  const threshold = 0.92;
-  const knee = 1 - threshold;
-
-  for (let i = 0; i < amount; ++i) {
-    const x = amount > 1 ? (i * 2) / (amount - 1) - 1 : 0;
-    const absX = Math.abs(x);
-
-    if (absX <= threshold) {
-      curve[i] = x;
-    } else {
-      const sign = Math.sign(x);
-      const normalized = (absX - threshold) / knee;
-      const softened = threshold + knee * Math.tanh(normalized);
-      curve[i] = Math.max(-1, Math.min(1, sign * softened));
-    }
-  }
-  return curve;
-};
-
-const createIdentityCurve = (amount = 44100) => {
-  const curve = new Float32Array(amount);
-
-  for (let i = 0; i < amount; ++i) {
-    curve[i] = amount > 1 ? (i * 2) / (amount - 1) - 1 : 0;
-  }
-
-  return curve;
-};
-
-export const configureMasterLimiter = (limiter: DynamicsCompressorNode) => {
-  limiter.threshold.value = -0.8;
-  limiter.knee.value = 0;
-  limiter.ratio.value = 20;
-  limiter.attack.value = 0.002;
-  limiter.release.value = 0.08;
-};
-
-const MASTER_LIMITER_RAMP_SECONDS = 0.08;
-
-const setAudioParam = (
-  ctx: BaseAudioContext,
-  param: AudioParam,
-  value: number,
-  smooth: boolean
-) => {
-  const now = ctx.currentTime;
-  param.cancelScheduledValues(now);
-
-  if (smooth) {
-    param.setValueAtTime(param.value, now);
-    param.linearRampToValueAtTime(value, now + MASTER_LIMITER_RAMP_SECONDS);
-    return;
-  }
-
-  param.value = value;
-};
-
-const applyMasterLimiterState = (
-  ctx: BaseAudioContext,
-  limiter: DynamicsCompressorNode,
-  softClip: WaveShaperNode,
-  enabled: boolean,
-  useOversample: boolean,
-  smooth = false
-) => {
-  setAudioParam(ctx, limiter.threshold, enabled ? -0.8 : 0, smooth);
-  setAudioParam(ctx, limiter.knee, 0, smooth);
-  setAudioParam(ctx, limiter.ratio, enabled ? 20 : 1, smooth);
-  setAudioParam(ctx, limiter.attack, enabled ? 0.002 : 0, smooth);
-  setAudioParam(ctx, limiter.release, enabled ? 0.08 : 0.25, smooth);
-  softClip.curve = enabled ? createSoftClipCurve(44100) : createIdentityCurve(44100);
-  softClip.oversample = useOversample ? '4x' : 'none';
-};
-
-export const configureLoudnessNormalization = (
-  preGain: GainNode,
-  compressor: DynamicsCompressorNode,
-  makeup: GainNode,
-  enabled: boolean
-) => {
-  preGain.gain.value = 1;
-
-  if (enabled) {
-    compressor.threshold.value = -18;
-    compressor.knee.value = 12;
-    compressor.ratio.value = 3;
-    compressor.attack.value = 0.003;
-    compressor.release.value = 0.25;
-    makeup.gain.value = 1.25;
-    return;
-  }
-
-  compressor.threshold.value = 0;
-  compressor.knee.value = 0;
-  compressor.ratio.value = 1;
-  compressor.attack.value = 0;
-  compressor.release.value = 0.25;
-  makeup.gain.value = 1;
-};
-
-const clamp = (value: number, min: number, max: number) => Math.min(max, Math.max(min, value));
-const msToAudioSeconds = (value: number) => clamp(value / 1000, 0, 1);
-const compressorAttackSeconds = (attackMs: number, rmsSizeMs: number) => msToAudioSeconds(Math.max(attackMs, rmsSizeMs * 0.5));
-const percentToPan = (value: number) => clamp(value / 100, -1, 1);
-const percentToStereoWidth = (value: number) => clamp(value / 100, 0, 2);
-const percentToStereoBaseWidth = (value: number) => {
-  const width = percentToStereoWidth(value);
-  return width <= 1 ? width : clamp(1 + (width - 1) * 0.5, 1, 1.5);
-};
-const percentToPseudoStereoAmount = (value: number) => clamp((value - 100) / 100, 0, 1);
-const REVERB_WET_GAIN = 0.75;
-
-const generateImpulseResponse = (ctx: BaseAudioContext, duration: number, decay: number) => {
-  const sampleRate = ctx.sampleRate;
-  const length = Math.max(1, Math.floor(sampleRate * duration));
-  const impulse = ctx.createBuffer(2, length, sampleRate);
-  const left = impulse.getChannelData(0);
-  const right = impulse.getChannelData(1);
-
-  for (let i = 0; i < length; i += 1) {
-    const factor = Math.pow(1 - i / length, decay);
-    left[i] = (Math.random() * 2 - 1) * factor;
-    right[i] = (Math.random() * 2 - 1) * factor;
-  }
-
-  return impulse;
-};
+export {
+  configureLoudnessNormalization,
+  configureMasterLimiter,
+  createSoftClipCurve,
+} from './audioGraph';
 
 // eslint-disable-next-line @typescript-eslint/no-explicit-any
 export function useAudioContext(effectsState: any) {
