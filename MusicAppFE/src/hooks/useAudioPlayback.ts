@@ -614,6 +614,7 @@ export function useAudioPlayback(
 
     if (!audioRef.current || !trackToResume) {
       setIsPlaying(false);
+      clearTrackLoading();
       return;
     }
 
@@ -623,6 +624,7 @@ export function useAudioPlayback(
         if (decodeSessionRef.current !== transitionSessionId || precalculateOnIdleRef.current) return;
         if (!audioUrl) {
           setIsPlaying(false);
+          clearTrackLoading();
           return;
         }
 
@@ -644,9 +646,13 @@ export function useAudioPlayback(
 
           if (shouldResume) {
             // eslint-disable-next-line @typescript-eslint/no-explicit-any
-            audioRef.current.play().catch((e: any) => console.error("Playback failed", e));
+            audioRef.current.play().catch((e: any) => {
+              console.error("Playback failed", e);
+              clearTrackLoading();
+            });
           } else {
             setIsPlaying(false);
+            clearTrackLoading();
           }
         };
 
@@ -659,11 +665,13 @@ export function useAudioPlayback(
         if (decodeSessionRef.current === transitionSessionId) {
           console.error("Failed to restore blob playback", e);
           setIsPlaying(false);
+          clearTrackLoading();
         }
       }
     })();
   }, [
     audioRef,
+    clearTrackLoading,
     configureAudioElementSource,
     getTrackAudioUrl,
     initializeAudioContext,
