@@ -1,7 +1,7 @@
 import { Heart, ListMusic, Album, Mic2, Music, Disc, CloudUpload, RefreshCw } from 'lucide-react';
 import { useNavigate } from 'react-router-dom';
 import { useEffect, useMemo } from 'react';
-import { useGlobalAudio } from '../context/AudioContext'
+import { useGlobalAudio } from '../context/AudioContext';
 import { useUploadQueue } from '../context/UploadContext';
 
 import { useLibrary } from '../context/LibraryContext';

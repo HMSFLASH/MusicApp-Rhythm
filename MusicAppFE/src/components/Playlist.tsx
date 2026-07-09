@@ -6,7 +6,7 @@ import { Cloud, Play, Plus, ListMusic, ChevronLeft, Trash2, ListPlus, X, Shuffle
 import { CreatePlaylistModal } from './CreatePlaylistModal';
 import { AddTracksModal } from './AddTracksModal';
 import { axiosClient } from '../api/axiosClient';
-import { useGlobalAudio } from '../context/AudioContext'
+import { useGlobalAudio } from '../context/AudioContext';
 import { db } from '../lib/db';
 import { useLibrary } from '../context/LibraryContext';
 import { useConfirm } from '../context/ConfirmContext';

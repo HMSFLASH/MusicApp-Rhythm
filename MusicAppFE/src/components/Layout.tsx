@@ -129,7 +129,7 @@ export function Layout() {
       }
       try {
         await axiosClient.post('/api/auth/logout');
-      } catch (e) {
+      } catch {
         // ignore logout error
       }
     } finally {

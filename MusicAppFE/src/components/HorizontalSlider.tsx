@@ -32,16 +32,11 @@ export function HorizontalSlider({
   const range = max - min;
   const isBidirectional = min < 0 && max > 0;
   
-  let percentage = 0;
-  if (isBidirectional) {
-    if (value <= 0) {
-      percentage = ((value - min) / Math.abs(min)) * 50;
-    } else {
-      percentage = 50 + (value / max) * 50;
-    }
-  } else {
-    percentage = ((value - min) / range) * 100;
-  }
+  const percentage = isBidirectional
+    ? value <= 0
+      ? ((value - min) / Math.abs(min)) * 50
+      : 50 + (value / max) * 50
+    : ((value - min) / range) * 100;
 
   const handlePointerMove = useCallback((e: PointerEvent) => {
     if (!isDragging || !trackRef.current) return;
@@ -51,17 +46,11 @@ export function HorizontalSlider({
     newX = Math.max(0, Math.min(newX, rect.width));
     
     const pct = newX / rect.width;
-    let newValue = 0;
-    
-    if (min < 0 && max > 0) {
-      if (pct <= 0.5) {
-        newValue = min + (pct / 0.5) * Math.abs(min);
-      } else {
-        newValue = ((pct - 0.5) / 0.5) * max;
-      }
-    } else {
-      newValue = min + (pct * range);
-    }
+    let newValue = min < 0 && max > 0
+      ? pct <= 0.5
+        ? min + (pct / 0.5) * Math.abs(min)
+        : ((pct - 0.5) / 0.5) * max
+      : min + (pct * range);
     
     if (step > 0) {
       newValue = Math.round(newValue / step) * step;

@@ -62,7 +62,6 @@ export const loadTrackAudioUrl = async ({
       }
 
       const url = `${DRIVE_MEDIA_URL}/${encodeURIComponent(driveFileId)}?alt=media`;
-      console.log("[Audio] Downloading track into RAM", track.title || track.fileName || track.id);
       const response = await fetch(url, {
         mode: 'cors',
         headers: {
@@ -79,7 +78,6 @@ export const loadTrackAudioUrl = async ({
       const objectUrl = URL.createObjectURL(audioBlob);
 
       blobCache.set(trackId, objectUrl);
-      console.log("[Audio] Track loaded into RAM", track.title || track.fileName || track.id, `${(audioBlob.size / 1024 / 1024).toFixed(2)} MB`);
       return objectUrl;
     })();
 

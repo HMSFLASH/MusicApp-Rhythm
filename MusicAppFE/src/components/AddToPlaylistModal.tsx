@@ -10,8 +10,8 @@ interface AddToPlaylistModalProps {
   track: Track | null;
 }
 
-import { useGlobalAudio } from '../context/AudioContext'
-import { useAuth } from '../context/AuthContext';;
+import { useGlobalAudio } from '../context/AudioContext';
+import { useAuth } from '../context/AuthContext';
 
 export function AddToPlaylistModal({ isOpen, onClose, track }: AddToPlaylistModalProps) {
   const { isAuthenticated } = useAuth();

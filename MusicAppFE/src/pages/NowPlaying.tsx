@@ -1,6 +1,6 @@
 import { useState, useRef, useEffect } from 'react';
-import { useGlobalAudio } from '../context/AudioContext'
-import { useAuth } from '../context/AuthContext';;
+import { useGlobalAudio } from '../context/AudioContext';
+import { useAuth } from '../context/AuthContext';
 import { Disc, Play, Pause, SkipBack, SkipForward, Shuffle, Repeat, Heart, Info, ListPlus, MoreHorizontal, Repeat1, User, Volume2, VolumeX, BarChart2, Gauge, Music, Check, X, ArrowRight, Square, PauseCircle, ListX, Loader2, Trash2 } from 'lucide-react';
 import { HorizontalSlider } from '../components/HorizontalSlider';
 import { useLibrary } from '../context/LibraryContext';

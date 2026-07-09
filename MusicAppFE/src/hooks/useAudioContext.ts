@@ -696,9 +696,8 @@ export function useAudioContext(effectsState: any) {
   }, [bassGain, eqBands, fxEnabled, preampGain, reverbMix, stereoWidth, trebleGain]);
 
   useEffect(() => {
-    console.log("[Audio] Preamp useEffect triggered: ", preampGain);
-if (preampNodeRef.current) {
-        preampNodeRef.current.gain.value = fxEnabled.preamp ? Math.pow(10, preampGain / 20) : 1;
+    if (preampNodeRef.current) {
+      preampNodeRef.current.gain.value = fxEnabled.preamp ? Math.pow(10, preampGain / 20) : 1;
     }
   }, [preampGain, fxEnabled.preamp]);
 

@@ -883,7 +883,6 @@ export function useAudioPlayback(
   const preloadNextTrack = async (currentTrack: Track, currentQueue: Track[], sessionId: symbol) => {
     if (!precalculateOnIdleRef.current || isPrecalculatingNextRef.current) return;
     if (isLikelyConstrainedDevice() || getFullCoreCount() <= 8) {
-      console.log("[Lookahead] Skipping next-track precalculate on constrained device (or cores <= 8)");
       return;
     }
 
@@ -908,19 +907,16 @@ export function useAudioPlayback(
 
     try {
       isPrecalculatingNextRef.current = true;
-      console.log("[Lookahead] Precalculating next track:", nextTrack.title || nextTrack.fileName);
 
       const finalRenderedBuffer = await precalculateTrackBuffer(nextTrack);
 
       // Discard if session was invalidated while precalculating (user switched track)
       if (!precalculateOnIdleRef.current || precalculateNextSessionRef.current !== sessionId) {
-        console.log("[Lookahead] Discarding stale precalculated buffer (session changed)");
         return;
       }
       const nextTrackId = String(nextTrack.id);
       cachePrecalculatedQueueBuffer(nextTrackId, finalRenderedBuffer);
       precalculatedNextBufferRef.current = { trackId: nextTrackId, buffer: finalRenderedBuffer };
-      console.log("[Lookahead] Finished precalculating next track:", nextTrack.title || nextTrack.fileName);
     } catch (e) {
       console.error("[Lookahead] Failed to precalculate:", e);
     } finally {
@@ -941,7 +937,6 @@ export function useAudioPlayback(
       if (!allowedIds.has(String(key))) {
         URL.revokeObjectURL(objectUrl);
         blobCacheRef.current.delete(key);
-        console.log(`[Cache Cleanup] Removed blob ${key} from RAM`);
       }
     }
 

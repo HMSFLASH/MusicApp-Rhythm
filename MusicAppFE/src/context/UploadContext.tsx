@@ -63,7 +63,6 @@ export function UploadProvider({ children }: { children: ReactNode }) {
           });
           const metadata = await Promise.race([parsePromise, timeoutPromise]).finally(() => clearTimeout(timeoutId!));
           
-          console.log(`[Upload] Metadata parsed for ${file.name}:`, metadata.common.title, metadata.common.artist);
           if (metadata.common.title) formData.append('title', metadata.common.title);
           if (metadata.common.artist) formData.append('artist', metadata.common.artist);
           if (metadata.common.album) formData.append('album', metadata.common.album);

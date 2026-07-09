@@ -1,5 +1,5 @@
-import { useGlobalAudio } from '../context/AudioContext'
-import { useAuth } from '../context/AuthContext';;
+import { useGlobalAudio } from '../context/AudioContext';
+import { useAuth } from '../context/AuthContext';
 import { Playlist } from '../components/Playlist';
 import { useNavigate } from 'react-router-dom';
 import { ArrowLeft } from 'lucide-react';

@@ -12,7 +12,7 @@ interface AddTracksModalProps {
   onSuccess: () => void;
 }
 
-import { useGlobalAudio } from '../context/AudioContext'
+import { useGlobalAudio } from '../context/AudioContext';
 import { useLibrary } from '../context/LibraryContext';
 
 export function AddTracksModal({ isOpen, onClose, playlistId, playlistTracks, onSuccess }: AddTracksModalProps) {

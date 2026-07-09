@@ -1,8 +1,8 @@
 import { useState, useRef, useEffect } from 'react';
 import { useNavigate } from 'react-router-dom';
 import { Search, Plus, Users, Music, Disc, X, Check, Play, Cloud, ListPlus } from 'lucide-react';
-import { useGlobalAudio } from '../context/AudioContext'
-import { useAuth } from '../context/AuthContext';;
+import { useGlobalAudio } from '../context/AudioContext';
+import { useAuth } from '../context/AuthContext';
 import { AddToPlaylistModal } from '../components/AddToPlaylistModal';
 import type { Track } from '../hooks/useAudioPlayer';
 import { useLibrary } from '../context/LibraryContext';

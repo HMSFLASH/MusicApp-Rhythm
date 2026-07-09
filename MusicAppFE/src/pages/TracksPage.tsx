@@ -2,8 +2,8 @@ import { useState } from 'react';
 import { useNavigate, useSearchParams } from 'react-router-dom';
 import { Heart, ListMusic, Cloud, Star, Clock, ListPlus, Play, ArrowLeft, Shuffle, MoreHorizontal, Info, X, ListEnd, ListStart, RefreshCw, Trash2 } from 'lucide-react';
 import { AddToPlaylistModal } from '../components/AddToPlaylistModal';
-import { useGlobalAudio } from '../context/AudioContext'
-import { useAuth } from '../context/AuthContext';;
+import { useGlobalAudio } from '../context/AudioContext';
+import { useAuth } from '../context/AuthContext';
 import type { Track } from '../hooks/useAudioPlayer';
 import { useLibrary } from '../context/LibraryContext';
 import { useConfirm } from '../context/ConfirmContext';

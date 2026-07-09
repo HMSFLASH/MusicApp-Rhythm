@@ -1,7 +1,7 @@
 import { useRef, useEffect, useState } from 'react';
 import { useNavigate, useLocation } from 'react-router-dom';
-import { useGlobalAudio } from '../context/AudioContext'
-import { useAuth } from '../context/AuthContext';;
+import { useGlobalAudio } from '../context/AudioContext';
+import { useAuth } from '../context/AuthContext';
 import { Play, Pause, SkipForward, SkipBack, Cloud, Disc, Heart, Shuffle, Repeat, Repeat1, Square, PauseCircle, ListX, ListPlus, Maximize2, Info, ListMusic, Volume2, VolumeX, X, ArrowRight, Loader2 } from 'lucide-react';
 import { HorizontalSlider } from './HorizontalSlider';
 import { axiosClient } from '../api/axiosClient';
