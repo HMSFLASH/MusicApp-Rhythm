@@ -141,3 +141,34 @@ export const cachePrecalculatedQueueBuffer = ({
     fullQueuePrecalculateCache,
   });
 };
+
+// ---------------------------------------------------------------------------
+// In-flight render tracking – prevents duplicate concurrent renders of the
+// same track across preloadNextTrack / precalculateEntireQueue workers.
+// ---------------------------------------------------------------------------
+
+export type InFlightTracker = Map<string, Promise<AudioBuffer>>;
+
+/** Return the in-flight promise for `trackId`, or `null` if none. */
+export const acquireInflight = (
+  tracker: InFlightTracker,
+  trackId: string,
+): Promise<AudioBuffer> | null => tracker.get(trackId) ?? null;
+
+/** Register a render promise so other callers can join it. */
+export const registerInflight = (
+  tracker: InFlightTracker,
+  trackId: string,
+  promise: Promise<AudioBuffer>,
+) => {
+  tracker.set(trackId, promise);
+};
+
+/** Remove a completed (or failed) render from the tracker. */
+export const releaseInflight = (
+  tracker: InFlightTracker,
+  trackId: string,
+) => {
+  tracker.delete(trackId);
+};
+

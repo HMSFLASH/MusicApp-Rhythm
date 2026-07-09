@@ -1,5 +1,7 @@
-import { Cpu, Zap } from 'lucide-react';
+import { useState } from 'react';
+import { Cpu, Zap, XCircle } from 'lucide-react';
 import { useTranslation } from 'react-i18next';
+import { getFullCoreCount, getConstrainedWorkerCount } from '../../hooks/audioDevice';
 
 type QueuePrecalculatePanelProps = {
   // eslint-disable-next-line @typescript-eslint/no-explicit-any
@@ -10,23 +12,33 @@ export function QueuePrecalculatePanel({ playerState }: QueuePrecalculatePanelPr
   const { t } = useTranslation();
   const queuePrecalculateStatus = playerState.queuePrecalculateStatus;
   const queueCount = playerState.queue?.length ?? 0;
-  const cpuCores = queuePrecalculateStatus?.cores ?? (navigator.hardwareConcurrency ?? 4);
+  const totalCores = getFullCoreCount();
+  const defaultWorkers = getConstrainedWorkerCount(queueCount || totalCores);
+  const [workerInput, setWorkerInput] = useState<string>(String(defaultWorkers));
   const completedCount = queuePrecalculateStatus?.completed ?? 0;
   const failedCount = queuePrecalculateStatus?.failed ?? 0;
   const totalCount = queuePrecalculateStatus?.total ?? 0;
+  const activeCores = queuePrecalculateStatus?.cores ?? defaultWorkers;
   const progressPercent = totalCount > 0 ? Math.min(100, Math.round(((completedCount + failedCount) / totalCount) * 100)) : 0;
+  const isRunning = queuePrecalculateStatus?.isRunning ?? false;
 
   const handlePrecalculateQueue = () => {
-    if (queueCount === 0 || queuePrecalculateStatus?.isRunning) return;
+    if (queueCount === 0 || isRunning) return;
 
-    const shouldContinue = window.confirm(t('studio.masterOutput.queuePrecalcWarning', {
-      count: queueCount,
-      cores: cpuCores,
-      defaultValue: 'You are about to make the browser pre-render the entire {{count}}-track queue using every CPU core it reports ({{cores}} cores). If your machine is strong, hit OK and prove it. If not, expect heat, lag, RAM pressure, or a crashed tab. Continue?'
-    }));
+    const parsedWorkers = parseInt(workerInput, 10);
+    const effectiveWorkers = Number.isFinite(parsedWorkers) && parsedWorkers > 0
+      ? Math.min(parsedWorkers, queueCount)
+      : undefined;
 
-    if (!shouldContinue) return;
-    playerState.precalculateEntireQueue();
+    playerState.precalculateEntireQueue(effectiveWorkers);
+  };
+
+  const handleCancel = () => {
+    playerState.cancelQueuePrecalculate?.();
+  };
+
+  const handleAllCores = () => {
+    setWorkerInput(String(totalCores));
   };
 
   return (
@@ -39,29 +51,70 @@ export function QueuePrecalculatePanel({ playerState }: QueuePrecalculatePanelPr
           </span>
           <span className="text-xs text-red-300/65 font-mono mt-1 block">
             {t('studio.masterOutput.queuePrecalcDesc', {
-              cores: cpuCores,
-              defaultValue: 'Uses all {{cores}} CPU cores the browser exposes and keeps rendered buffers in RAM until audio settings change.'
+              cores: totalCores,
+              defaultValue: 'Total CPU cores detected: {{cores}}. Choose how many to use below.'
             })}
           </span>
         </div>
       </div>
 
-      <button
-        aria-label={t('studio.masterOutput.queuePrecalcButton', 'Pre-calculate Entire Queue')}
-        title={t('studio.masterOutput.queuePrecalcButton', 'Pre-calculate Entire Queue')}
-        onClick={handlePrecalculateQueue}
-        disabled={queueCount === 0 || queuePrecalculateStatus?.isRunning}
-        className="w-full h-10 rounded-lg bg-red-500/20 hover:bg-red-500/30 disabled:bg-white/5 disabled:text-white/30 disabled:cursor-not-allowed text-red-100 border border-red-400/30 flex items-center justify-center gap-2 text-xs font-bold uppercase transition-colors"
-      >
-        <Zap size={15} />
-        <span>
-          {queuePrecalculateStatus?.isRunning
-            ? t('studio.masterOutput.queuePrecalcRunningButton', 'Calculating...')
-            : t('studio.masterOutput.queuePrecalcButton', 'Pre-calculate Entire Queue')}
-        </span>
-      </button>
+      {/* Worker count controls */}
+      {!isRunning && (
+        <div className="flex items-center gap-2">
+          <label className="text-xs text-red-300/70 font-mono whitespace-nowrap shrink-0">
+            {t('studio.masterOutput.queuePrecalcWorkers', 'Workers:')}
+          </label>
+          <input
+            type="number"
+            min={1}
+            max={Math.max(totalCores, queueCount)}
+            value={workerInput}
+            onChange={(e) => setWorkerInput(e.target.value)}
+            disabled={isRunning}
+            className="w-16 h-8 rounded-md bg-white/5 border border-red-400/20 text-center text-sm text-red-100 font-mono
+              focus:outline-none focus:border-red-400/50 disabled:opacity-40 [appearance:textfield]
+              [&::-webkit-outer-spin-button]:appearance-none [&::-webkit-inner-spin-button]:appearance-none"
+          />
+          <button
+            onClick={handleAllCores}
+            disabled={isRunning}
+            className="h-8 px-3 rounded-md bg-red-500/15 hover:bg-red-500/25 border border-red-400/20
+              text-xs text-red-200 font-bold uppercase transition-colors disabled:opacity-40 disabled:cursor-not-allowed whitespace-nowrap"
+          >
+            {t('studio.masterOutput.queuePrecalcAllCores', { cores: totalCores, defaultValue: 'All {{cores}} Cores' })}
+          </button>
+        </div>
+      )}
 
-      {(queuePrecalculateStatus?.isRunning || totalCount > 0) && (
+      {/* Start / Cancel buttons */}
+      {isRunning ? (
+        <button
+          aria-label={t('studio.masterOutput.queuePrecalcCancelButton', 'Cancel')}
+          title={t('studio.masterOutput.queuePrecalcCancelButton', 'Cancel')}
+          onClick={handleCancel}
+          className="w-full h-10 rounded-lg bg-red-600/30 hover:bg-red-600/45 text-red-100 border border-red-400/40
+            flex items-center justify-center gap-2 text-xs font-bold uppercase transition-colors"
+        >
+          <XCircle size={15} />
+          <span>{t('studio.masterOutput.queuePrecalcCancelButton', 'Cancel')}</span>
+        </button>
+      ) : (
+        <button
+          aria-label={t('studio.masterOutput.queuePrecalcButton', 'Pre-calculate Entire Queue')}
+          title={t('studio.masterOutput.queuePrecalcButton', 'Pre-calculate Entire Queue')}
+          onClick={handlePrecalculateQueue}
+          disabled={queueCount === 0}
+          className="w-full h-10 rounded-lg bg-red-500/20 hover:bg-red-500/30 disabled:bg-white/5
+            disabled:text-white/30 disabled:cursor-not-allowed text-red-100 border border-red-400/30
+            flex items-center justify-center gap-2 text-xs font-bold uppercase transition-colors"
+        >
+          <Zap size={15} />
+          <span>{t('studio.masterOutput.queuePrecalcButton', 'Pre-calculate Entire Queue')}</span>
+        </button>
+      )}
+
+      {/* Progress bar */}
+      {(isRunning || totalCount > 0) && (
         <div className="flex flex-col gap-2">
           <div className="h-1.5 rounded-full bg-white/10 overflow-hidden">
             <div
@@ -70,13 +123,13 @@ export function QueuePrecalculatePanel({ playerState }: QueuePrecalculatePanelPr
             />
           </div>
           <span className="text-[11px] text-red-200/70 font-mono">
-            {queuePrecalculateStatus?.isRunning
+            {isRunning
               ? t('studio.masterOutput.queuePrecalcRunning', {
                 completed: completedCount,
                 failed: failedCount,
                 total: totalCount,
-                cores: cpuCores,
-                defaultValue: 'Rendering {{completed}}/{{total}} on {{cores}} cores. Failed: {{failed}}.'
+                cores: activeCores,
+                defaultValue: 'Rendering {{completed}}/{{total}} on {{cores}} workers. Failed: {{failed}}.'
               })
               : t('studio.masterOutput.queuePrecalcDone', {
                 completed: completedCount,

@@ -62,8 +62,7 @@
       "queuePrecalcButton": "Tính toán trước toàn bộ hàng chờ",
       "queuePrecalcRunningButton": "Đang tính...",
       "queuePrecalcRunning": "Đang render {{completed}}/{{total}} bằng {{cores}} nhân. Lỗi: {{failed}}.",
-      "queuePrecalcDone": "Sẵn sàng: đã render {{completed}}/{{total}}. Lỗi: {{failed}}.",
-      "queuePrecalcWarning": "Bạn sắp bắt trình duyệt render toàn bộ {{count}} bài trong hàng chờ bằng tất cả nhân CPU mà nó dám khai báo ({{cores}} nhân). Máy mạnh thì bấm OK và chứng minh; máy yếu có thể nóng, giật, ngốn RAM hoặc văng tab. Tiếp tục?"
+      "queuePrecalcDone": "Sẵn sàng: đã render {{completed}}/{{total}}. Lỗi: {{failed}}."
     },
     "eq": {
       "init": "Khởi tạo EQ...",

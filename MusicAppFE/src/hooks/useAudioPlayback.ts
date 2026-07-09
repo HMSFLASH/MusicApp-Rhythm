@@ -9,7 +9,7 @@ import {
   INPUT_HEADROOM_DB,
 } from './audioLoudness';
 import { getAudioFxActivity } from './audioFxActivity';
-import { getBufferProgressIntervalMs, getFullCoreCount, isLikelyConstrainedDevice } from './audioDevice';
+import { getBufferProgressIntervalMs, getConstrainedWorkerCount, getFullCoreCount, getPrecalculateDelayMs, isLikelyConstrainedDevice, isMobileDevice } from './audioDevice';
 import { audioBufferToWavBlob } from './audioBufferWav';
 import {
   createRenderSignature as createAudioRenderSignature,
@@ -24,6 +24,10 @@ import {
   getCachedPrecalculatedQueueBuffer as getCachedPrecalculatedQueueBufferEntry,
   getCachedRenderSignatureBuffer as getCachedRenderSignatureBufferEntry,
   prunePrecalculatedQueueBuffers as prunePrecalculatedQueueBufferEntries,
+  acquireInflight,
+  registerInflight,
+  releaseInflight,
+  type InFlightTracker,
   type LoadingTrackPhase,
   type PrecalculatedNextBuffer,
   type QueuePrecalculateStatus,
@@ -109,6 +113,7 @@ export function useAudioPlayback(
   const precalculatedQueueBuffersRef = useRef<Map<string, AudioBuffer>>(new Map());
   const renderSignatureBuffersRef = useRef<Map<string, AudioBuffer>>(new Map());
   const loudnessGainCacheRef = useRef<Map<string, number>>(new Map());
+  const inFlightRef = useRef<InFlightTracker>(new Map());
   const fullQueuePrecalculateCacheRef = useRef<boolean>(false);
   const renderSignatureCacheEnabledRef = useRef<boolean>(renderSignatureCacheEnabled);
   const isPrecalculatingNextRef = useRef<boolean>(false);
@@ -452,6 +457,7 @@ export function useAudioPlayback(
     fullQueuePrecalculateCacheRef.current = false;
     queuePrecalculateSessionRef.current = null;
     loudnessGainCacheRef.current.clear();
+    inFlightRef.current.clear();
     stopQueuePrecalculateStatusSoon();
   }, [
     bassGain,
@@ -833,43 +839,72 @@ export function useAudioPlayback(
       return signatureCachedBuffer;
     }
 
-    const renderVersion = renderSettingsVersionRef.current;
-    const audioUrl = await getTrackAudioUrl(track);
-    if (!audioUrl) {
-      throw new Error(`No audio URL for track ${trackId}`);
+    // Check if another caller is already rendering this track.
+    const existingInflight = acquireInflight(inFlightRef.current, trackId);
+    if (existingInflight) {
+      try {
+        const buffer = await existingInflight;
+        if (keepInQueueCache) {
+          cachePrecalculatedQueueBuffer(trackId, buffer);
+        }
+        return buffer;
+      } catch {
+        // First render failed – fall through to retry independently.
+        releaseInflight(inFlightRef.current, trackId);
+      }
     }
 
-    const response = await fetch(audioUrl);
-    const arrayBuffer = await response.arrayBuffer();
-    const audioBuffer = shouldUseFlacWasmPlayback(track)
-      ? await decodeFlacToAudioBuffer(
-        audioContextRef.current || createDecodeContext(),
-        new Uint8Array(arrayBuffer),
-        track.durationSeconds,
-      )
-      : await decodeAudioDataForPreRender(arrayBuffer);
-    const finalRenderedBuffer = await performOfflineRender(audioBuffer);
+    // No cache hit and no in-flight render – do the work ourselves.
+    const renderPromise = (async () => {
+      try {
+        const renderVersion = renderSettingsVersionRef.current;
+        const audioUrl = await getTrackAudioUrl(track);
+        if (!audioUrl) {
+          throw new Error(`No audio URL for track ${trackId}`);
+        }
 
-    if (renderSettingsVersionRef.current !== renderVersion) {
-      throw new Error('Audio settings changed while pre-calculating');
-    }
+        const response = await fetch(audioUrl);
+        const arrayBuffer = await response.arrayBuffer();
+        const audioBuffer = shouldUseFlacWasmPlayback(track)
+          ? await decodeFlacToAudioBuffer(
+            audioContextRef.current || createDecodeContext(),
+            new Uint8Array(arrayBuffer),
+            track.durationSeconds,
+          )
+          : await decodeAudioDataForPreRender(arrayBuffer);
+        const finalRenderedBuffer = await performOfflineRender(audioBuffer);
+
+        if (renderSettingsVersionRef.current !== renderVersion) {
+          throw new Error('Audio settings changed while pre-calculating');
+        }
+
+        cacheRenderSignatureBuffer(trackId, renderSignature, finalRenderedBuffer);
+        return finalRenderedBuffer;
+      } finally {
+        releaseInflight(inFlightRef.current, trackId);
+      }
+    })();
+
+    registerInflight(inFlightRef.current, trackId, renderPromise);
+    const finalRenderedBuffer = await renderPromise;
 
     if (keepInQueueCache) {
       cachePrecalculatedQueueBuffer(trackId, finalRenderedBuffer);
     }
-    cacheRenderSignatureBuffer(trackId, renderSignature, finalRenderedBuffer);
 
     return finalRenderedBuffer;
   };
 
-  const precalculateEntireQueue = async () => {
+  const precalculateEntireQueue = async (customWorkerCount?: number) => {
     if (!precalculateOnIdleRef.current || !Array.isArray(queue) || queue.length === 0) return;
     if (queuePrecalculateSessionRef.current) return;
 
     const tracks = [...queue];
     const total = tracks.length;
     const cores = getFullCoreCount();
-    const workerCount = Math.min(cores, total);
+    const workerCount = customWorkerCount != null
+      ? Math.max(1, Math.min(customWorkerCount, total))
+      : getConstrainedWorkerCount(total);
     const sessionId = Symbol();
     let cursor = 0;
     let completed = 0;
@@ -877,7 +912,7 @@ export function useAudioPlayback(
 
     queuePrecalculateSessionRef.current = sessionId;
     fullQueuePrecalculateCacheRef.current = true;
-    setQueuePrecalculateStatus({ isRunning: true, total, completed, failed, cores });
+    setQueuePrecalculateStatus({ isRunning: true, total, completed, failed, cores: workerCount });
 
     const runWorker = async () => {
       while (queuePrecalculateSessionRef.current === sessionId) {
@@ -895,7 +930,7 @@ export function useAudioPlayback(
         }
 
         if (queuePrecalculateSessionRef.current !== sessionId) return;
-        setQueuePrecalculateStatus({ isRunning: true, total, completed, failed, cores });
+        setQueuePrecalculateStatus({ isRunning: true, total, completed, failed, cores: workerCount });
       }
     };
 
@@ -903,9 +938,19 @@ export function useAudioPlayback(
 
     if (queuePrecalculateSessionRef.current === sessionId) {
       queuePrecalculateSessionRef.current = null;
-      setQueuePrecalculateStatus({ isRunning: false, total, completed, failed, cores });
+      setQueuePrecalculateStatus({ isRunning: false, total, completed, failed, cores: workerCount });
     }
   };
+
+  const cancelQueuePrecalculate = useCallback(() => {
+    if (!queuePrecalculateSessionRef.current) return;
+    queuePrecalculateSessionRef.current = null;
+    inFlightRef.current.clear();
+    setQueuePrecalculateStatus((prev) => ({
+      ...prev,
+      isRunning: false,
+    }));
+  }, []);
 
   // Download tracks into RAM-backed blob URLs. The backend only provides the
   // Drive access token; playback happens from the browser's blob cache.
@@ -922,7 +967,9 @@ export function useAudioPlayback(
 
   const preloadNextTrack = async (currentTrack: Track, currentQueue: Track[], sessionId: symbol) => {
     if (!precalculateOnIdleRef.current || isPrecalculatingNextRef.current) return;
-    if (isLikelyConstrainedDevice() || getFullCoreCount() <= 8) {
+    // Keep blocking mobile devices; allow constrained desktop devices with
+    // adaptive delay (handled by getPrecalculateDelayMs at the call-site).
+    if (isMobileDevice()) {
       return;
     }
 
@@ -1036,7 +1083,6 @@ export function useAudioPlayback(
     setIsPlaying(true);
   };
 
-
   // eslint-disable-next-line @typescript-eslint/no-unused-vars, @typescript-eslint/no-explicit-any
   const playTrack = async (startingTrack: Track | null, currentQueue?: Track[], autoPlay = true, ..._args: any[]) => {
     if (!precalculateOnIdleRef.current) {
@@ -1063,7 +1109,7 @@ export function useAudioPlayback(
     prunePrecalculatedQueueBuffers(trackWindow.allowedIds);
     setLoadingTrackId(String(startingTrack.id));
     setIsLoadingTrack(autoPlay);
-    setLoadingTrackPhase(autoPlay ? 'downloading' : null);
+    setLoadingTrackPhase(null);
 
     const playSessionId = Symbol();
     decodeSessionRef.current = playSessionId;
@@ -1071,21 +1117,6 @@ export function useAudioPlayback(
     precalculateNextSessionRef.current = null;
     isDecodingRef.current = false;
     stopBufferPlayback();
-
-    let audioUrl = '';
-    try {
-      audioUrl = await getTrackAudioUrl(startingTrack);
-      if (!audioUrl) {
-        setIsPlaying(false);
-        clearTrackLoading();
-        return;
-      }
-    } catch (e) {
-      console.error("[Audio] Failed to prepare track for playback", e);
-      setIsPlaying(false);
-      clearTrackLoading();
-      return;
-    }
 
     const useRenderedBufferPlayback = precalculateOnIdle || shouldUseFlacWasmPlayback(startingTrack);
 
@@ -1096,7 +1127,6 @@ export function useAudioPlayback(
       updateMediaSessionMetadata(startingTrack);
       setIsPlaying(false);
       pauseMediaSessionAnchor();
-      setLoadingTrackPhase(autoPlay ? 'processing' : null);
 
       (async () => {
         try {
@@ -1104,6 +1134,8 @@ export function useAudioPlayback(
 
           let finalRenderedBuffer: AudioBuffer | null = null;
           const startingTrackId = String(startingTrack.id);
+
+          // Fast path: check in-memory cache BEFORE fetching the audio URL.
           const cachedRenderedBuffer = getCachedPrecalculatedQueueBuffer(startingTrackId);
           if (cachedRenderedBuffer) {
             finalRenderedBuffer = cachedRenderedBuffer;
@@ -1112,7 +1144,30 @@ export function useAudioPlayback(
             precalculatedNextBufferRef.current?.buffer
           ) {
             finalRenderedBuffer = precalculatedNextBufferRef.current.buffer;
-          } else {
+          }
+
+          // Track the audio URL for the fallback path (stream on decode failure).
+          let slowPathAudioUrl = '';
+
+          // Slow path: no cached buffer – need to download, decode, and render.
+          if (!finalRenderedBuffer) {
+            setLoadingTrackPhase(autoPlay ? 'downloading' : null);
+
+            try {
+              slowPathAudioUrl = await getTrackAudioUrl(startingTrack);
+              if (!slowPathAudioUrl) {
+                setIsPlaying(false);
+                clearTrackLoading();
+                return;
+              }
+            } catch (e) {
+              console.error("[Audio] Failed to prepare track for playback", e);
+              setIsPlaying(false);
+              clearTrackLoading();
+              return;
+            }
+
+            setLoadingTrackPhase(autoPlay ? 'processing' : null);
             finalRenderedBuffer = await precalculateTrackBuffer(startingTrack);
           }
 
@@ -1147,7 +1202,7 @@ export function useAudioPlayback(
           if (precalculateOnIdleRef.current) {
             const nextSession = Symbol();
             precalculateNextSessionRef.current = nextSession;
-            setTimeout(() => preloadNextTrack(startingTrack, currentQueue, nextSession), 500);
+            setTimeout(() => preloadNextTrack(startingTrack, currentQueue, nextSession), getPrecalculateDelayMs());
           }
 
           if (autoPlay) {
@@ -1167,18 +1222,42 @@ export function useAudioPlayback(
           }
         } catch (e) {
           if (decodeSessionRef.current !== playSessionId) return;
-          console.error("Decode failed, falling back to stream", e);
-          audioBufferRef.current = null;
-          usingBufferPlaybackRef.current = false;
-          pauseMediaSessionAnchor();
-          releaseRenderedAudioSource();
-          configureAudioElementSource(audioUrl);
-          if (autoPlay) {
-            // eslint-disable-next-line @typescript-eslint/no-explicit-any
-            audioRef.current!.play().catch((playError: any) => {
+          console.warn("[Audio] Render failed, retrying once…", e);
+
+          // Retry: attempt to render again from scratch.
+          try {
+            const retryBuffer = await precalculateTrackBuffer(startingTrack);
+            if (decodeSessionRef.current !== playSessionId) return;
+
+            audioBufferRef.current = retryBuffer;
+            setDuration(retryBuffer.duration);
+            const retryUrl = configureRenderedAudioBufferSource(retryBuffer);
+            if (!retryUrl) throw new Error('Failed to create rendered audio source on retry');
+
+            if (autoPlay) {
+              bufferPausedTimeRef.current = 0;
               clearTrackLoading();
-              console.error("Playback failed", playError);
-            });
+              renderedAudioRef.current!.currentTime = 0;
+              renderedAudioRef.current!.play().catch((pe) => {
+                clearTrackLoading();
+                console.error("Playback failed on retry", pe);
+              });
+              setIsPlaying(true);
+            } else {
+              bufferPausedTimeRef.current = 0;
+              renderedAudioRef.current!.pause();
+              clearTrackLoading();
+              setIsPlaying(false);
+            }
+          } catch (retryError) {
+            if (decodeSessionRef.current !== playSessionId) return;
+            console.error("[Audio] Retry also failed, giving up", retryError);
+            audioBufferRef.current = null;
+            usingBufferPlaybackRef.current = false;
+            pauseMediaSessionAnchor();
+            releaseRenderedAudioSource();
+            clearTrackLoading();
+            setIsPlaying(false);
           }
         } finally {
           if (decodeSessionRef.current === playSessionId) {
@@ -1190,6 +1269,24 @@ export function useAudioPlayback(
         }
       })();
     } else {
+      // Non-buffer playback path (streaming)
+      setLoadingTrackPhase(autoPlay ? 'downloading' : null);
+
+      let audioUrl = '';
+      try {
+        audioUrl = await getTrackAudioUrl(startingTrack);
+        if (!audioUrl) {
+          setIsPlaying(false);
+          clearTrackLoading();
+          return;
+        }
+      } catch (e) {
+        console.error("[Audio] Failed to prepare track for playback", e);
+        setIsPlaying(false);
+        clearTrackLoading();
+        return;
+      }
+
       // eslint-disable-next-line @typescript-eslint/no-explicit-any
       if ((window as any).dummyAudio) (window as any).dummyAudio.pause();
       pauseMediaSessionAnchor();
@@ -1227,326 +1324,327 @@ export function useAudioPlayback(
   };
 
 
-  const playNext = useCallback(() => {
-    if (!currentTrack || queue.length === 0) return;
+    const playNext = useCallback(() => {
+      if (!currentTrack || queue.length === 0) return;
 
-    // Read current precalculate state from ref to avoid stale closure
-    const isPrecalc = precalculateOnIdleRef.current;
-    const isRenderedBufferPlayback = isPrecalc || (usingBufferPlaybackRef.current && Boolean(renderedAudioUrlRef.current));
+      // Read current precalculate state from ref to avoid stale closure
+      const isPrecalc = precalculateOnIdleRef.current;
+      const isRenderedBufferPlayback = isPrecalc || (usingBufferPlaybackRef.current && Boolean(renderedAudioUrlRef.current));
 
-    if (songEndMode === 'repeat_one') {
-      if (isRenderedBufferPlayback && (renderedAudioUrlRef.current || audioBufferRef.current)) {
-        playCurrentBuffer(0);
-      } else if (audioRef.current) {
-        audioRef.current.currentTime = 0;
-        // eslint-disable-next-line @typescript-eslint/no-explicit-any
-        audioRef.current.play().catch((e: any) => console.error(e));
-      }
-      return;
-    }
-
-    if (songEndMode === 'stop') {
-      if (isRenderedBufferPlayback) {
-        stopBufferPlayback();
-        if (renderedAudioRef.current) {
-          renderedAudioRef.current.currentTime = 0;
+      if (songEndMode === 'repeat_one') {
+        if (isRenderedBufferPlayback && (renderedAudioUrlRef.current || audioBufferRef.current)) {
+          playCurrentBuffer(0);
+        } else if (audioRef.current) {
+          audioRef.current.currentTime = 0;
+          // eslint-disable-next-line @typescript-eslint/no-explicit-any
+          audioRef.current.play().catch((e: any) => console.error(e));
         }
-        setCurrentTime(0);
-        bufferPausedTimeRef.current = 0;
-        setIsPlaying(false);
-      } else if (audioRef.current) {
-        audioRef.current.pause();
-        audioRef.current.currentTime = 0;
-        setIsPlaying(false);
-      }
-      return;
-    }
-
-    const isPreload = songEndMode === 'preload';
-
-    // Use playTrackRef to always call the latest playTrack (avoids stale closure)
-    const latestPlayTrack = playTrackRef.current;
-    if (!latestPlayTrack) return;
-
-    const idx = getCurrentTrackIndex(currentTrack, queue);
-    if (idx !== -1 && idx < queue.length - 1) {
-      latestPlayTrack(queue[idx + 1], queue, !isPreload);
-    } else if (queueEndMode === 'repeat' && idx === queue.length - 1) {
-      if (isShuffleState) {
-        // eslint-disable-next-line prefer-const
-        let newQueue = [...queue];
-        for (let i = newQueue.length - 1; i > 0; i--) {
-          const j = Math.floor(Math.random() * (i + 1));
-          [newQueue[i], newQueue[j]] = [newQueue[j], newQueue[i]];
-        }
-        latestPlayTrack(newQueue[0], newQueue, !isPreload);
-      } else {
-        latestPlayTrack(queue[0], queue, !isPreload);
-      }
-    } else if (queueEndMode === 'next' && idx === queue.length - 1) {
-      if (upcomingQueues.length > 0) {
-        const nextQ = upcomingQueues[0];
-        // eslint-disable-next-line @typescript-eslint/no-explicit-any
-        setUpcomingQueues((prev: any) => {
-          const rest = prev.slice(1);
-          if (cycleQueues) return [...rest, queue];
-          return rest;
-        });
-        latestPlayTrack(nextQ[0], nextQ, !isPreload);
-      } else if (cycleQueues) {
-        latestPlayTrack(queue[0], queue, !isPreload);
-      } else {
-        setIsPlaying(false);
-      }
-    } else {
-      setIsPlaying(false);
-    }
-  }, [currentTrack, queue, songEndMode, queueEndMode, isShuffleState, upcomingQueues, cycleQueues]);
-
-
-  const playPrevious = useCallback(() => {
-    if (!currentTrack || queue.length === 0) return;
-    // Use playTrackRef to always call the latest playTrack (avoids stale closure)
-    const latestPlayTrack = playTrackRef.current;
-    if (!latestPlayTrack) return;
-    const idx = getCurrentTrackIndex(currentTrack, queue);
-    if (idx > 0) {
-      latestPlayTrack(queue[idx - 1], queue);
-    } else if (idx === 0 && queueEndMode === 'repeat' && queue.length > 1) {
-      latestPlayTrack(queue[queue.length - 1], queue);
-    }
-  }, [currentTrack, queue, queueEndMode]);
-
-
-  const togglePlay = () => {
-    if (!audioRef.current && !renderedAudioRef.current) return;
-    if (!precalculateOnIdle) {
-      initializeAudioContext();
-    }
-    if (isPlaying) {
-      if ((precalculateOnIdle || usingBufferPlaybackRef.current) && renderedAudioRef.current && renderedAudioUrlRef.current) {
-        bufferPausedTimeRef.current = renderedAudioRef.current.currentTime || currentTime;
-        renderedAudioRef.current.pause();
-        setIsPlaying(false);
-      } else if (precalculateOnIdle && bufferSourceRef.current) {
-        stopBufferPlayback();
-        bufferPausedTimeRef.current = currentTime;
-        setIsPlaying(false);
-      } else {
-        audioRef.current.pause();
-      }
-    } else {
-      if ((precalculateOnIdle || usingBufferPlaybackRef.current) && (renderedAudioUrlRef.current || audioBufferRef.current)) {
-        playCurrentBuffer(bufferPausedTimeRef.current);
-      } else if (!precalculateOnIdle && (!audioRef.current.src || audioRef.current.src === window.location.href || audioRef.current.src.endsWith('/'))) {
-        if (currentTrack) {
-          playTrack(currentTrack, queue, true);
-        }
-      } else if (!precalculateOnIdle) {
-        // eslint-disable-next-line @typescript-eslint/no-explicit-any
-        audioRef.current.play().catch((e: any) => console.error(e));
-      } else if (currentTrack && isDecodingRef.current === false) {
-        playTrack(currentTrack, queue, true);
-      }
-    }
-  };
-
-
-  const seek = (time: number) => {
-    if ((precalculateOnIdle || usingBufferPlaybackRef.current) && renderedAudioRef.current && renderedAudioUrlRef.current) {
-      const safeTime = audioBufferRef.current
-        ? clamp(time, 0, Math.max(0, audioBufferRef.current.duration - 0.05))
-        : Math.max(0, time);
-      bufferPausedTimeRef.current = safeTime;
-      setCurrentTime(safeTime);
-      try {
-        renderedAudioRef.current.currentTime = safeTime;
-      } catch {
-        // Some browsers reject seeking until metadata is ready.
-      }
-      if (isPlaying && renderedAudioRef.current.paused) {
-        renderedAudioRef.current.play().catch((e) => console.error(e));
-      }
-    } else if (precalculateOnIdle && audioBufferRef.current) {
-      bufferPausedTimeRef.current = time;
-      setCurrentTime(time);
-      if (isPlaying) playCurrentBuffer(time);
-    } else if (audioRef.current) {
-      audioRef.current.currentTime = time;
-    }
-
-    if ('mediaSession' in navigator && duration > 0) {
-      try {
-        navigator.mediaSession.setPositionState({
-          duration: duration,
-          playbackRate: playbackRate,
-          position: time
-        });
-      } catch {
-        // Some browsers reject position updates while metadata is incomplete.
-      }
-    }
-  };
-
-  useEffect(() => {
-    playNextRef.current = playNext;
-    playPreviousRef.current = playPrevious;
-    playTrackRef.current = playTrack;
-    seekRef.current = seek;
-    togglePlayRef.current = togglePlay;
-  });
-
-  useEffect(() => {
-    const stopDeletedCurrentTrack = () => {
-      decodeSessionRef.current = Symbol();
-      isDecodingRef.current = false;
-      stopBufferPlayback();
-      audioBufferRef.current = null;
-      bufferPausedTimeRef.current = 0;
-      usingBufferPlaybackRef.current = false;
-      setCurrentTime(0);
-      setDuration(0);
-      setIsPlaying(false);
-      clearTrackLoading();
-      releaseAudioElementSource();
-      releaseRenderedAudioSource();
-      if (setCurrentTrack) setCurrentTrack(null);
-    };
-
-    const isTrackAllowed = (track: Track, validIds?: Set<string>) => (
-      track.sourceType === 'LOCAL' || !validIds || validIds.has(String(track.id))
-    );
-
-    const continueAfterDeletedCurrentTrack = (deletedId: string | number, validIds?: Set<string>) => {
-      const activeTrack = currentTrackSnapshotRef.current;
-      if (!activeTrack || String(activeTrack.id) !== String(deletedId)) return;
-
-      const deletedTrackId = String(deletedId);
-      const deletedBlobUrl = blobCacheRef.current.get(deletedTrackId);
-      if (deletedBlobUrl) {
-        URL.revokeObjectURL(deletedBlobUrl);
-        blobCacheRef.current.delete(deletedTrackId);
-      }
-      blobLoadingPromisesRef.current.delete(deletedTrackId);
-      precalculatedQueueBuffersRef.current.delete(deletedTrackId);
-      if (precalculatedNextBufferRef.current?.trackId === deletedTrackId) {
-        precalculatedNextBufferRef.current = null;
-      }
-      for (const key of renderSignatureBuffersRef.current.keys()) {
-        if (key.startsWith(`${deletedTrackId}::`)) {
-          renderSignatureBuffersRef.current.delete(key);
-        }
-      }
-
-      const currentQueue = queueSnapshotRef.current ?? [];
-      const sanitizedQueue = currentQueue.filter((track) => (
-        String(track.id) !== deletedTrackId && isTrackAllowed(track, validIds)
-      ));
-      const currentIndex = currentQueue.findIndex((track) => String(track.id) === deletedTrackId);
-      const replacementTrack = currentIndex === -1
-        ? sanitizedQueue[0]
-        : currentQueue
-          .slice(currentIndex + 1)
-          .find((track) => String(track.id) !== deletedTrackId && isTrackAllowed(track, validIds))
-        ?? (queueEndMode === 'repeat' ? sanitizedQueue[0] : undefined);
-
-      if (replacementTrack && playTrackRef.current) {
-        playTrackRef.current(replacementTrack, sanitizedQueue, isPlayingSnapshotRef.current);
         return;
       }
 
-      if (queueEndMode === 'next') {
-        const upcomingQueuesToKeep = (upcomingQueuesSnapshotRef.current ?? [])
-          .map((nextQueue) => nextQueue.filter((track) => (
-            String(track.id) !== deletedTrackId && isTrackAllowed(track, validIds)
-          )))
-          .filter((nextQueue) => nextQueue.length > 0);
-        const nextQueue = upcomingQueuesToKeep[0];
+      if (songEndMode === 'stop') {
+        if (isRenderedBufferPlayback) {
+          stopBufferPlayback();
+          if (renderedAudioRef.current) {
+            renderedAudioRef.current.currentTime = 0;
+          }
+          setCurrentTime(0);
+          bufferPausedTimeRef.current = 0;
+          setIsPlaying(false);
+        } else if (audioRef.current) {
+          audioRef.current.pause();
+          audioRef.current.currentTime = 0;
+          setIsPlaying(false);
+        }
+        return;
+      }
 
-        if (nextQueue?.[0] && playTrackRef.current) {
-          setUpcomingQueues?.((previous: Track[][]) => {
-            const rest = previous
-              .map((candidateQueue) => candidateQueue.filter((track) => (
-                String(track.id) !== deletedTrackId && isTrackAllowed(track, validIds)
-              )))
-              .filter((candidateQueue) => candidateQueue.length > 0)
-              .slice(1);
-            if (cycleQueues && sanitizedQueue.length > 0) return [...rest, sanitizedQueue];
+      const isPreload = songEndMode === 'preload';
+
+      // Use playTrackRef to always call the latest playTrack (avoids stale closure)
+      const latestPlayTrack = playTrackRef.current;
+      if (!latestPlayTrack) return;
+
+      const idx = getCurrentTrackIndex(currentTrack, queue);
+      if (idx !== -1 && idx < queue.length - 1) {
+        latestPlayTrack(queue[idx + 1], queue, !isPreload);
+      } else if (queueEndMode === 'repeat' && idx === queue.length - 1) {
+        if (isShuffleState) {
+          // eslint-disable-next-line prefer-const
+          let newQueue = [...queue];
+          for (let i = newQueue.length - 1; i > 0; i--) {
+            const j = Math.floor(Math.random() * (i + 1));
+            [newQueue[i], newQueue[j]] = [newQueue[j], newQueue[i]];
+          }
+          latestPlayTrack(newQueue[0], newQueue, !isPreload);
+        } else {
+          latestPlayTrack(queue[0], queue, !isPreload);
+        }
+      } else if (queueEndMode === 'next' && idx === queue.length - 1) {
+        if (upcomingQueues.length > 0) {
+          const nextQ = upcomingQueues[0];
+          // eslint-disable-next-line @typescript-eslint/no-explicit-any
+          setUpcomingQueues((prev: any) => {
+            const rest = prev.slice(1);
+            if (cycleQueues) return [...rest, queue];
             return rest;
           });
-          playTrackRef.current(nextQueue[0], nextQueue, isPlayingSnapshotRef.current);
-          return;
+          latestPlayTrack(nextQ[0], nextQ, !isPreload);
+        } else if (cycleQueues) {
+          latestPlayTrack(queue[0], queue, !isPreload);
+        } else {
+          setIsPlaying(false);
+        }
+      } else {
+        setIsPlaying(false);
+      }
+    }, [currentTrack, queue, songEndMode, queueEndMode, isShuffleState, upcomingQueues, cycleQueues]);
+
+
+    const playPrevious = useCallback(() => {
+      if (!currentTrack || queue.length === 0) return;
+      // Use playTrackRef to always call the latest playTrack (avoids stale closure)
+      const latestPlayTrack = playTrackRef.current;
+      if (!latestPlayTrack) return;
+      const idx = getCurrentTrackIndex(currentTrack, queue);
+      if (idx > 0) {
+        latestPlayTrack(queue[idx - 1], queue);
+      } else if (idx === 0 && queueEndMode === 'repeat' && queue.length > 1) {
+        latestPlayTrack(queue[queue.length - 1], queue);
+      }
+    }, [currentTrack, queue, queueEndMode]);
+
+
+    const togglePlay = () => {
+      if (!audioRef.current && !renderedAudioRef.current) return;
+      if (!precalculateOnIdle) {
+        initializeAudioContext();
+      }
+      if (isPlaying) {
+        if ((precalculateOnIdle || usingBufferPlaybackRef.current) && renderedAudioRef.current && renderedAudioUrlRef.current) {
+          bufferPausedTimeRef.current = renderedAudioRef.current.currentTime || currentTime;
+          renderedAudioRef.current.pause();
+          setIsPlaying(false);
+        } else if (precalculateOnIdle && bufferSourceRef.current) {
+          stopBufferPlayback();
+          bufferPausedTimeRef.current = currentTime;
+          setIsPlaying(false);
+        } else {
+          audioRef.current.pause();
+        }
+      } else {
+        if ((precalculateOnIdle || usingBufferPlaybackRef.current) && (renderedAudioUrlRef.current || audioBufferRef.current)) {
+          playCurrentBuffer(bufferPausedTimeRef.current);
+        } else if (!precalculateOnIdle && (!audioRef.current.src || audioRef.current.src === window.location.href || audioRef.current.src.endsWith('/'))) {
+          if (currentTrack) {
+            playTrack(currentTrack, queue, true);
+          }
+        } else if (!precalculateOnIdle) {
+          // eslint-disable-next-line @typescript-eslint/no-explicit-any
+          audioRef.current.play().catch((e: any) => console.error(e));
+        } else if (currentTrack && isDecodingRef.current === false) {
+          playTrack(currentTrack, queue, true);
         }
       }
-
-      stopDeletedCurrentTrack();
     };
 
-    const handleMusicDeleted = (e: Event) => {
-      const deletedId = (e as CustomEvent).detail;
-      if (!deletedId) return;
-      continueAfterDeletedCurrentTrack(deletedId);
-    };
 
-    const handleLibraryRefreshed = (e: Event) => {
-      const trackIds = (e as CustomEvent<{ trackIds?: Array<string | number> }>).detail?.trackIds;
-      if (!Array.isArray(trackIds)) return;
+    const seek = (time: number) => {
+      if ((precalculateOnIdle || usingBufferPlaybackRef.current) && renderedAudioRef.current && renderedAudioUrlRef.current) {
+        const safeTime = audioBufferRef.current
+          ? clamp(time, 0, Math.max(0, audioBufferRef.current.duration - 0.05))
+          : Math.max(0, time);
+        bufferPausedTimeRef.current = safeTime;
+        setCurrentTime(safeTime);
+        try {
+          renderedAudioRef.current.currentTime = safeTime;
+        } catch {
+          // Some browsers reject seeking until metadata is ready.
+        }
+        if (isPlaying && renderedAudioRef.current.paused) {
+          renderedAudioRef.current.play().catch((e) => console.error(e));
+        }
+      } else if (precalculateOnIdle && audioBufferRef.current) {
+        bufferPausedTimeRef.current = time;
+        setCurrentTime(time);
+        if (isPlaying) playCurrentBuffer(time);
+      } else if (audioRef.current) {
+        audioRef.current.currentTime = time;
+      }
 
-      const validIds = new Set(trackIds.map(String));
-      const activeTrack = currentTrackSnapshotRef.current;
-      if (activeTrack?.sourceType !== 'LOCAL' && activeTrack && !validIds.has(String(activeTrack.id))) {
-        continueAfterDeletedCurrentTrack(activeTrack.id, validIds);
+      if ('mediaSession' in navigator && duration > 0) {
+        try {
+          navigator.mediaSession.setPositionState({
+            duration: duration,
+            playbackRate: playbackRate,
+            position: time
+          });
+        } catch {
+          // Some browsers reject position updates while metadata is incomplete.
+        }
       }
     };
 
-    window.addEventListener('music-deleted', handleMusicDeleted);
-    window.addEventListener('music-library-refreshed', handleLibraryRefreshed);
-    return () => {
-      window.removeEventListener('music-deleted', handleMusicDeleted);
-      window.removeEventListener('music-library-refreshed', handleLibraryRefreshed);
+    useEffect(() => {
+      playNextRef.current = playNext;
+      playPreviousRef.current = playPrevious;
+      playTrackRef.current = playTrack;
+      seekRef.current = seek;
+      togglePlayRef.current = togglePlay;
+    });
+
+    useEffect(() => {
+      const stopDeletedCurrentTrack = () => {
+        decodeSessionRef.current = Symbol();
+        isDecodingRef.current = false;
+        stopBufferPlayback();
+        audioBufferRef.current = null;
+        bufferPausedTimeRef.current = 0;
+        usingBufferPlaybackRef.current = false;
+        setCurrentTime(0);
+        setDuration(0);
+        setIsPlaying(false);
+        clearTrackLoading();
+        releaseAudioElementSource();
+        releaseRenderedAudioSource();
+        if (setCurrentTrack) setCurrentTrack(null);
+      };
+
+      const isTrackAllowed = (track: Track, validIds?: Set<string>) => (
+        track.sourceType === 'LOCAL' || !validIds || validIds.has(String(track.id))
+      );
+
+      const continueAfterDeletedCurrentTrack = (deletedId: string | number, validIds?: Set<string>) => {
+        const activeTrack = currentTrackSnapshotRef.current;
+        if (!activeTrack || String(activeTrack.id) !== String(deletedId)) return;
+
+        const deletedTrackId = String(deletedId);
+        const deletedBlobUrl = blobCacheRef.current.get(deletedTrackId);
+        if (deletedBlobUrl) {
+          URL.revokeObjectURL(deletedBlobUrl);
+          blobCacheRef.current.delete(deletedTrackId);
+        }
+        blobLoadingPromisesRef.current.delete(deletedTrackId);
+        precalculatedQueueBuffersRef.current.delete(deletedTrackId);
+        if (precalculatedNextBufferRef.current?.trackId === deletedTrackId) {
+          precalculatedNextBufferRef.current = null;
+        }
+        for (const key of renderSignatureBuffersRef.current.keys()) {
+          if (key.startsWith(`${deletedTrackId}::`)) {
+            renderSignatureBuffersRef.current.delete(key);
+          }
+        }
+
+        const currentQueue = queueSnapshotRef.current ?? [];
+        const sanitizedQueue = currentQueue.filter((track) => (
+          String(track.id) !== deletedTrackId && isTrackAllowed(track, validIds)
+        ));
+        const currentIndex = currentQueue.findIndex((track) => String(track.id) === deletedTrackId);
+        const replacementTrack = currentIndex === -1
+          ? sanitizedQueue[0]
+          : currentQueue
+            .slice(currentIndex + 1)
+            .find((track) => String(track.id) !== deletedTrackId && isTrackAllowed(track, validIds))
+          ?? (queueEndMode === 'repeat' ? sanitizedQueue[0] : undefined);
+
+        if (replacementTrack && playTrackRef.current) {
+          playTrackRef.current(replacementTrack, sanitizedQueue, isPlayingSnapshotRef.current);
+          return;
+        }
+
+        if (queueEndMode === 'next') {
+          const upcomingQueuesToKeep = (upcomingQueuesSnapshotRef.current ?? [])
+            .map((nextQueue) => nextQueue.filter((track) => (
+              String(track.id) !== deletedTrackId && isTrackAllowed(track, validIds)
+            )))
+            .filter((nextQueue) => nextQueue.length > 0);
+          const nextQueue = upcomingQueuesToKeep[0];
+
+          if (nextQueue?.[0] && playTrackRef.current) {
+            setUpcomingQueues?.((previous: Track[][]) => {
+              const rest = previous
+                .map((candidateQueue) => candidateQueue.filter((track) => (
+                  String(track.id) !== deletedTrackId && isTrackAllowed(track, validIds)
+                )))
+                .filter((candidateQueue) => candidateQueue.length > 0)
+                .slice(1);
+              if (cycleQueues && sanitizedQueue.length > 0) return [...rest, sanitizedQueue];
+              return rest;
+            });
+            playTrackRef.current(nextQueue[0], nextQueue, isPlayingSnapshotRef.current);
+            return;
+          }
+        }
+
+        stopDeletedCurrentTrack();
+      };
+
+      const handleMusicDeleted = (e: Event) => {
+        const deletedId = (e as CustomEvent).detail;
+        if (!deletedId) return;
+        continueAfterDeletedCurrentTrack(deletedId);
+      };
+
+      const handleLibraryRefreshed = (e: Event) => {
+        const trackIds = (e as CustomEvent<{ trackIds?: Array<string | number> }>).detail?.trackIds;
+        if (!Array.isArray(trackIds)) return;
+
+        const validIds = new Set(trackIds.map(String));
+        const activeTrack = currentTrackSnapshotRef.current;
+        if (activeTrack?.sourceType !== 'LOCAL' && activeTrack && !validIds.has(String(activeTrack.id))) {
+          continueAfterDeletedCurrentTrack(activeTrack.id, validIds);
+        }
+      };
+
+      window.addEventListener('music-deleted', handleMusicDeleted);
+      window.addEventListener('music-library-refreshed', handleLibraryRefreshed);
+      return () => {
+        window.removeEventListener('music-deleted', handleMusicDeleted);
+        window.removeEventListener('music-library-refreshed', handleLibraryRefreshed);
+      };
+    }, [
+      blobCacheRef,
+      clearTrackLoading,
+      cycleQueues,
+      queueEndMode,
+      releaseAudioElementSource,
+      releaseRenderedAudioSource,
+      setCurrentTrack,
+      setUpcomingQueues,
+      stopBufferPlayback,
+    ]);
+
+    const { hasPrevious, hasNext } = getPlaybackAvailability({
+      currentTrack: currentTrack ?? null,
+      queue,
+      queueEndMode,
+      upcomingQueues,
+      cycleQueues,
+    });
+
+    return {
+      isPlaying,
+      isLoadingTrack,
+      loadingTrackId,
+      loadingTrackPhase,
+      currentTime,
+      duration,
+      volume,
+      setVolume,
+      playbackRate,
+      updatePlaybackRate,
+      preservesPitch,
+      togglePreservesPitch,
+      queuePrecalculateStatus,
+      precalculateEntireQueue,
+      cancelQueuePrecalculate,
+      playTrack,
+      playNext,
+      playPrevious,
+      togglePlay,
+      seek,
+      preloadTrack,
+      hasNext,
+      hasPrevious
     };
-  }, [
-    blobCacheRef,
-    clearTrackLoading,
-    cycleQueues,
-    queueEndMode,
-    releaseAudioElementSource,
-    releaseRenderedAudioSource,
-    setCurrentTrack,
-    setUpcomingQueues,
-    stopBufferPlayback,
-  ]);
-
-  const { hasPrevious, hasNext } = getPlaybackAvailability({
-    currentTrack: currentTrack ?? null,
-    queue,
-    queueEndMode,
-    upcomingQueues,
-    cycleQueues,
-  });
-
-  return {
-    isPlaying,
-    isLoadingTrack,
-    loadingTrackId,
-    loadingTrackPhase,
-    currentTime,
-    duration,
-    volume,
-    setVolume,
-    playbackRate,
-    updatePlaybackRate,
-    preservesPitch,
-    togglePreservesPitch,
-    queuePrecalculateStatus,
-    precalculateEntireQueue,
-    playTrack,
-    playNext,
-    playPrevious,
-    togglePlay,
-    seek,
-    preloadTrack,
-    hasNext,
-    hasPrevious
-  };
-}
+  }

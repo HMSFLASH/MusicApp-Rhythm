@@ -62,8 +62,7 @@
       "queuePrecalcButton": "Pre-calculate Entire Queue",
       "queuePrecalcRunningButton": "Calculating...",
       "queuePrecalcRunning": "Rendering {{completed}}/{{total}} on {{cores}} cores. Failed: {{failed}}.",
-      "queuePrecalcDone": "Ready: {{completed}}/{{total}} rendered. Failed: {{failed}}.",
-      "queuePrecalcWarning": "You are about to make the browser pre-render the entire {{count}}-track queue using every CPU core it reports ({{cores}} cores). If your machine is strong, hit OK and prove it. If not, expect heat, lag, RAM pressure, or a crashed tab. Continue?"
+      "queuePrecalcDone": "Ready: {{completed}}/{{total}} rendered. Failed: {{failed}}."
     },
     "eq": {
       "init": "Initializing EQ...",

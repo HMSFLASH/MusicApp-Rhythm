@@ -20,6 +20,27 @@ export const isLikelyConstrainedDevice = () => {
   return isMobileUserAgent || isCoarseSmallScreen || cores <= 4 || memory <= 4 || !!isSlowNetwork;
 };
 
+export const isMobileDevice = () => {
+  const nav = navigator as NavigatorExtended;
+  const isCoarseSmallScreen = window.matchMedia?.('(pointer: coarse)').matches && window.innerWidth <= 1024;
+  const isMobileUserAgent = /Android|iPhone|iPad|iPod|Mobile/i.test(nav.userAgent);
+  return isMobileUserAgent || isCoarseSmallScreen;
+};
+
 export const getFullCoreCount = () => Math.max(1, navigator.hardwareConcurrency ?? 4);
+
+export const getConstrainedWorkerCount = (total: number) => {
+  const cores = getFullCoreCount();
+  if (isLikelyConstrainedDevice() || cores <= 4) return Math.min(1, total);
+  if (cores <= 8) return Math.min(2, total);
+  return Math.min(cores, total);
+};
+
+export const getPrecalculateDelayMs = () => {
+  const cores = getFullCoreCount();
+  if (isLikelyConstrainedDevice() || cores <= 4) return 2000;
+  if (cores <= 8) return 1000;
+  return 500;
+};
 
 export const getBufferProgressIntervalMs = () => isLikelyConstrainedDevice() ? 1000 : 250;

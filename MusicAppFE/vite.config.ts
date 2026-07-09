@@ -6,7 +6,7 @@ import { nodePolyfills } from 'vite-plugin-node-polyfills'
 // https://vite.dev/config/
 export default defineConfig({
   server: {
-    host: true, // Listen on all local IPs
+    host: '::', // Listen on all IPv4 and IPv6 addresses (allows localhost and LAN IP access)
   },
   plugins: [
     react(),
