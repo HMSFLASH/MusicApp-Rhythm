@@ -17,14 +17,6 @@ export const isLikelyConstrainedDevice = () => {
     nav.connection.effectiveType === '3g'
   );
 
-  console.log("[AudioDevice] Device Check:", {
-    cores, 
-    memory, 
-    isSlowNetwork: !!isSlowNetwork,
-    effectiveType: nav.connection?.effectiveType,
-    saveData: nav.connection?.saveData
-  });
-
   return isMobileUserAgent || isCoarseSmallScreen || cores <= 4 || memory <= 4 || !!isSlowNetwork;
 };
 

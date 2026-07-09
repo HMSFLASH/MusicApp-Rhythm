@@ -264,7 +264,6 @@ export function useAudioContext(effectsState: any) {
 
 
   const initializeAudioContext = useCallback(() => {
-console.log("[Audio] initializeAudioContext called");
     if (!audioContextRef.current) {
       // eslint-disable-next-line @typescript-eslint/no-explicit-any
       const AudioContextCtor = window.AudioContext || (window as any).webkitAudioContext;
