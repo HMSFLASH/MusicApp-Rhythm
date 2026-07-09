@@ -75,7 +75,7 @@ export function useAudioPlayback(
     panValue,
     loudnessNormalization,
     renderSignatureCacheEnabled,
-    flacWasmTrackIds,
+    flacWasmOverrides,
   } = effectsState || {};
   const { audioContextRef, audioRef, bufferSourceRef, bufferVolumeNodeRef, initializeAudioContext, irBufferRef, setTrackLoudnessGain } = contextState;
   const { blobCacheRef } = metadataState;
@@ -208,10 +208,19 @@ export function useAudioPlayback(
   }, [createDecodeContext]);
 
   const shouldUseFlacWasmPlayback = useCallback((track: Track | null | undefined) => (
-    getAudioExtension(track?.fileName) === 'flac' &&
-    flacWasmTrackIds instanceof Set &&
-    flacWasmTrackIds.has(String(track?.id))
-  ), [flacWasmTrackIds]);
+    Boolean(
+      track &&
+      getAudioExtension(track.fileName) === 'flac' &&
+      (
+        (
+          flacWasmOverrides &&
+          Object.prototype.hasOwnProperty.call(flacWasmOverrides, String(track.id))
+        )
+          ? flacWasmOverrides[String(track.id)]
+          : false
+      )
+    )
+  ), [flacWasmOverrides]);
 
   const revokeRenderedAudioUrl = useCallback(() => {
     if (!renderedAudioUrlRef.current) return;

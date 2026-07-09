@@ -5,50 +5,58 @@ import { useAudioEngine } from './useAudioEngine';
 import { getAudioConfigStorageKey, getInitialState } from './audioStorage';
 import { getAudioExtension } from './audioMime';
 import type { Track as AudioTrack } from './audioTypes';
+import { db } from '../lib/db';
 export type { Track } from './audioTypes';
 export { EQ_PRESETS, STYLISTIC_PRESETS } from './audioTypes';
 
 const FLAC_WASM_TRACKS_STORAGE_KEY = 'SONIC_FLAC_WASM_TRACKS_V1';
 
-const loadFlacWasmTrackIds = () => {
-  try {
-    const saved = localStorage.getItem(FLAC_WASM_TRACKS_STORAGE_KEY);
-    const ids = saved ? JSON.parse(saved) : [];
-    return new Set<string>(Array.isArray(ids) ? ids.map(String) : []);
-  } catch {
-    return new Set<string>();
-  }
-};
-
 export function useAudioPlayer(isAuthenticated: boolean, driveToken?: string, fetchDriveToken?: () => Promise<string>) {
   const savedState = useMemo(() => getInitialState(isAuthenticated), [isAuthenticated]);
-  const [flacWasmTrackIds, setFlacWasmTrackIds] = useState<Set<string>>(loadFlacWasmTrackIds);
+  const [flacWasmOverrides, setFlacWasmOverrides] = useState<Record<string, boolean>>({});
 
   const queueState = useAudioQueue(savedState, isAuthenticated);
   const effectsState = useAudioEffectsState(savedState);
-  const isFlacWasmEnabled = useCallback((track?: AudioTrack | null) => (
-    Boolean(track && getAudioExtension(track.fileName) === 'flac' && flacWasmTrackIds.has(String(track.id)))
-  ), [flacWasmTrackIds]);
+  useEffect(() => {
+    let cancelled = false;
+    void db.get<Record<string, boolean> | string[]>(FLAC_WASM_TRACKS_STORAGE_KEY)
+      .then((saved) => {
+        if (cancelled || !saved) return;
+        const normalized = Array.isArray(saved)
+          ? Object.fromEntries(saved.map((id) => [String(id), true]))
+          : saved;
+        setFlacWasmOverrides(normalized);
+      })
+      .catch((error) => console.warn('[Audio] Failed to load FLAC WASM settings', error));
+
+    return () => {
+      cancelled = true;
+    };
+  }, []);
+
+  const isFlacWasmEnabled = useCallback((track?: AudioTrack | null) => {
+    if (!track || getAudioExtension(track.fileName) !== 'flac') return false;
+    const trackId = String(track.id);
+    return Boolean(flacWasmOverrides[trackId]);
+  }, [flacWasmOverrides]);
   const toggleFlacWasmForTrack = useCallback((track: AudioTrack) => {
     if (getAudioExtension(track.fileName) !== 'flac') return;
 
-    setFlacWasmTrackIds((previous) => {
-      const next = new Set(previous);
-      const trackId = String(track.id);
-      if (next.has(trackId)) {
-        next.delete(trackId);
-      } else {
-        next.add(trackId);
-      }
-      localStorage.setItem(FLAC_WASM_TRACKS_STORAGE_KEY, JSON.stringify([...next]));
+    const trackId = String(track.id);
+    const nextEnabled = !isFlacWasmEnabled(track);
+
+    setFlacWasmOverrides((previous) => {
+      const next = { ...previous, [trackId]: nextEnabled };
+      void db.set(FLAC_WASM_TRACKS_STORAGE_KEY, next)
+        .catch((error) => console.warn('[Audio] Failed to save FLAC WASM settings', error));
       return next;
     });
-  }, []);
+  }, [isFlacWasmEnabled]);
   // eslint-disable-next-line @typescript-eslint/no-explicit-any
   const engineState = useAudioEngine(
     isAuthenticated,
     queueState as any,
-    { ...effectsState, flacWasmTrackIds } as any,
+    { ...effectsState, flacWasmOverrides } as any,
     savedState,
     driveToken,
     fetchDriveToken

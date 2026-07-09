@@ -22,7 +22,7 @@ public class BackupController {
     @PostMapping("/drive")
     public ApiResponse<String> backupToDrive(@RequestBody BackupRequest request, Principal principal) {
         Long userId = SecurityUtils.extractUserId(principal);
-        backupService.backupToDrive(request.getConfig(), userId);
+        backupService.backupToDrive(request.getConfig(), request.getIdbData(), userId);
         return ApiResponse.<String>builder()
                 .result("Backup successful")
                 .build();

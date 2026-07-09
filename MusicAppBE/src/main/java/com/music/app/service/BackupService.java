@@ -45,7 +45,7 @@ public class BackupService {
             .registerModule(new com.fasterxml.jackson.datatype.jsr310.JavaTimeModule())
             .disable(com.fasterxml.jackson.databind.SerializationFeature.WRITE_DATES_AS_TIMESTAMPS);
 
-    public void backupToDrive(Map<String, Object> config, Long userId) throws org.hibernate.FetchNotFoundException {
+    public void backupToDrive(Map<String, Object> config, Map<String, Object> idbData, Long userId) throws org.hibernate.FetchNotFoundException {
         User user = userRepository.findById(userId).orElseThrow(() -> new AppException(ErrorCode.UNAUTHENTICATED));
         if (user.getRefreshToken() == null) {
             throw new AppException(ErrorCode.DRIVE_NOT_LINKED);
@@ -75,6 +75,7 @@ public class BackupService {
 
             BackupDataDto backupData = new BackupDataDto();
             backupData.setConfig(config);
+            backupData.setIdbData(idbData);
             backupData.setPlaylists(playlistDtos);
             backupData.setFavorites(favoriteDtos);
             backupData.setLibrary(libraryDtos);
@@ -230,7 +231,10 @@ public class BackupService {
                 }
             }
 
-            return backupData.getConfig();
+            Map<String, Object> restoredPayload = new java.util.HashMap<>();
+            restoredPayload.put("config", backupData.getConfig());
+            restoredPayload.put("idbData", backupData.getIdbData());
+            return restoredPayload;
         } catch (AppException e) {
             throw e;
         } catch (Exception e) {
