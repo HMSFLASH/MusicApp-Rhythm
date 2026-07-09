@@ -33,6 +33,10 @@ export function LoginPage() {
         password
       });
       if (response && response.accessToken) {
+        localStorage.setItem('music_app_access_token', response.accessToken);
+        if (response.refreshToken) {
+          localStorage.setItem('music_app_refresh_token', response.refreshToken);
+        }
         setIsAuthenticated(true);
         navigate('/');
       }

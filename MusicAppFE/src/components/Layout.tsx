@@ -1,4 +1,4 @@
-import { NavLink, Outlet, useLocation } from 'react-router-dom';
+import { NavLink, Outlet, useLocation, useNavigate } from 'react-router-dom';
 import {
   Library,
   SlidersHorizontal,
@@ -34,6 +34,7 @@ import { useGlobalAudio } from '../context/AudioContext';
 export function Layout() {
   const { t, i18n } = useTranslation();
   const location = useLocation();
+  const navigate = useNavigate();
   const { isAuthenticated, setIsAuthenticated, user } = useAuth();
   const { playerState } = useGlobalAudio();
   const [syncing, setSyncing] = useState(false);
@@ -112,9 +113,8 @@ export function Layout() {
   };
 
   const handleLogout = async () => {
-    if (isAuthenticated) {
-      setIsLoggingOut(true);
-      
+    setIsLoggingOut(true);
+    try {
       // Auto-backup before logout if Google Drive is linked
       if (user?.isGoogleLinked) {
         try {
@@ -126,16 +126,18 @@ export function Layout() {
           console.error('Auto-backup failed on logout', e);
         }
       }
-
-      // Add token to blacklist
       try {
         await axiosClient.post('/api/auth/logout');
       } catch (e) {
-        console.error('Failed to blacklist token', e);
+        // ignore logout error
       }
+    } finally {
+      localStorage.removeItem('music_app_access_token');
+      localStorage.removeItem('music_app_refresh_token');
+      setIsAuthenticated(false);
       setIsLoggingOut(false);
+      navigate('/login');
     }
-    setIsAuthenticated(false);
   };
 
   const navItems = [

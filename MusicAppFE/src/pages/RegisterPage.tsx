@@ -40,11 +40,15 @@ export function RegisterPage() {
     try {
       // eslint-disable-next-line @typescript-eslint/no-explicit-any
       const response: any = await axiosClient.post('/api/auth/register', {
-        email,
         username: displayName,
+        email,
         password
       });
       if (response && response.accessToken) {
+        localStorage.setItem('music_app_access_token', response.accessToken);
+        if (response.refreshToken) {
+          localStorage.setItem('music_app_refresh_token', response.refreshToken);
+        }
         setIsAuthenticated(true);
         navigate('/');
       }

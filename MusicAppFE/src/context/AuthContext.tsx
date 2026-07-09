@@ -43,6 +43,8 @@ export function AuthProvider({ children }: { children: ReactNode }) {
       localStorage.setItem('music_app_logged_in', 'true');
     } else {
       localStorage.removeItem('music_app_logged_in');
+      localStorage.removeItem('music_app_access_token');
+      localStorage.removeItem('music_app_refresh_token');
       setUser(null);
     }
     setIsAuthenticatedState(auth);
