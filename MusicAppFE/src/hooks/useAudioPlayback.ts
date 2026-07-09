@@ -102,6 +102,7 @@ export function useAudioPlayback(
   const renderSignatureCacheEnabledRef = useRef<boolean>(renderSignatureCacheEnabled);
   const isPrecalculatingNextRef = useRef<boolean>(false);
   const queuePrecalculateSessionRef = useRef<symbol | null>(null);
+  const precalculateNextSessionRef = useRef<symbol | null>(null);
   const precalculateOnIdleRef = useRef<boolean>(precalculateOnIdle);
   const previousPrecalculateOnIdleRef = useRef<boolean>(precalculateOnIdle);
   const renderSettingsVersionRef = useRef<number>(0);
@@ -755,7 +756,7 @@ export function useAudioPlayback(
 
 
 
-  const preloadNextTrack = async (currentTrack: Track, currentQueue: Track[]) => {
+  const preloadNextTrack = async (currentTrack: Track, currentQueue: Track[], sessionId: symbol) => {
     if (!precalculateOnIdleRef.current || isPrecalculatingNextRef.current) return;
     if (isLikelyConstrainedDevice() || getFullCoreCount() <= 8) {
       console.log("[Lookahead] Skipping next-track precalculate on constrained device (or cores <= 8)");
@@ -778,13 +779,20 @@ export function useAudioPlayback(
     // Check if we already have it
     if (precalculatedNextBufferRef.current?.trackId === String(nextTrack.id)) return;
 
+    // Bail if the session was invalidated (user changed track before we started)
+    if (precalculateNextSessionRef.current !== sessionId) return;
+
     try {
       isPrecalculatingNextRef.current = true;
       console.log("[Lookahead] Precalculating next track:", nextTrack.title || nextTrack.fileName);
 
       const finalRenderedBuffer = await precalculateTrackBuffer(nextTrack);
 
-      if (!precalculateOnIdleRef.current) return;
+      // Discard if session was invalidated while precalculating (user switched track)
+      if (!precalculateOnIdleRef.current || precalculateNextSessionRef.current !== sessionId) {
+        console.log("[Lookahead] Discarding stale precalculated buffer (session changed)");
+        return;
+      }
       const nextTrackId = String(nextTrack.id);
       cachePrecalculatedQueueBuffer(nextTrackId, finalRenderedBuffer);
       precalculatedNextBufferRef.current = { trackId: nextTrackId, buffer: finalRenderedBuffer };
@@ -870,6 +878,8 @@ export function useAudioPlayback(
 
     const playSessionId = Symbol();
     decodeSessionRef.current = playSessionId;
+    // Invalidate any in-flight preloadNextTrack from a previous playTrack call
+    precalculateNextSessionRef.current = null;
     isDecodingRef.current = false;
     stopBufferPlayback();
 
@@ -906,7 +916,10 @@ export function useAudioPlayback(
           const cachedRenderedBuffer = getCachedPrecalculatedQueueBuffer(startingTrackId);
           if (cachedRenderedBuffer) {
             finalRenderedBuffer = cachedRenderedBuffer;
-          } else if (precalculatedNextBufferRef.current?.trackId === startingTrackId) {
+          } else if (
+            precalculatedNextBufferRef.current?.trackId === startingTrackId &&
+            precalculatedNextBufferRef.current?.buffer
+          ) {
             finalRenderedBuffer = precalculatedNextBufferRef.current.buffer;
           } else {
             finalRenderedBuffer = await precalculateTrackBuffer(startingTrack);
@@ -914,6 +927,15 @@ export function useAudioPlayback(
 
           // Check if session changed while decoding
           if (decodeSessionRef.current !== playSessionId || !precalculateOnIdleRef.current) return;
+
+          // SAFETY: Verify the current track is still the one we decoded for.
+          // This guards against a rapid track-switch race where setCurrentTrack
+          // ran for a newer track while we were still awaiting the buffer.
+          if (String(currentTrackSnapshotRef.current?.id) !== startingTrackId) {
+            console.warn('[Audio] Discarding stale buffer – currentTrack changed during decode',
+              { expected: startingTrackId, actual: String(currentTrackSnapshotRef.current?.id) });
+            return;
+          }
 
           audioBufferRef.current = finalRenderedBuffer;
           cachePrecalculatedQueueBuffer(startingTrackId, finalRenderedBuffer, trackWindow.allowedIds);
@@ -940,7 +962,9 @@ export function useAudioPlayback(
 
           // Trigger background preload for the next track
           if (precalculateOnIdleRef.current) {
-            setTimeout(() => preloadNextTrack(startingTrack, currentQueue), 500);
+            const nextSession = Symbol();
+            precalculateNextSessionRef.current = nextSession;
+            setTimeout(() => preloadNextTrack(startingTrack, currentQueue, nextSession), 500);
           }
 
           if (autoPlay) {
