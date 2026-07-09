@@ -13,6 +13,13 @@ export const REVERB_WET_LOWPASS_HZ = 7500;
 export const HAAS_WET_GAIN_MAX = 0.14;
 export const NEAR_MONO_CORRELATION_THRESHOLD = 0.985;
 export const NEAR_MONO_SIDE_RATIO_THRESHOLD = 0.12;
+export const OVERSAMPLED_SOFT_CLIPPER_WORKLET_URL = '/audio/oversampled-soft-clipper-worklet.js';
+export const SOFT_CLIP_CURVE_POINTS = 65536;
+export const SOFT_CLIP_THRESHOLD = 0.86;
+export const SOFT_CLIP_SHAPE = 1.2;
+export const SOFT_CLIP_CEILING = 0.985;
+
+const loadedSoftClipperWorkletContexts = new WeakSet<BaseAudioContext>();
 
 export const normalizedReverbMix = (reverbMix: number) => clamp((Number(reverbMix) || 0) / 100, 0, 1);
 
@@ -81,29 +88,31 @@ export const isAudioBufferNearMono = (audioBuffer: AudioBuffer) => {
   return getStereoSimilarity(left, right, stride).nearMono;
 };
 
-export const createSoftClipCurve = (amount = 44100) => {
+export const softClipSample = (sample: number) => {
+  const absX = Math.abs(sample);
+  if (absX <= SOFT_CLIP_THRESHOLD) return sample;
+
+  const sign = sample < 0 ? -1 : 1;
+  const knee = 1 - SOFT_CLIP_THRESHOLD;
+  const normalized = (absX - SOFT_CLIP_THRESHOLD) / knee;
+  const softened =
+    SOFT_CLIP_THRESHOLD +
+    knee * (Math.atan(normalized * SOFT_CLIP_SHAPE) / SOFT_CLIP_SHAPE);
+
+  return sign * Math.min(SOFT_CLIP_CEILING, softened);
+};
+
+export const createSoftClipCurve = (amount = SOFT_CLIP_CURVE_POINTS) => {
   const curve = new Float32Array(amount);
-  const threshold = 0.92;
-  const knee = 1 - threshold;
-  const ceiling = 0.98;
 
   for (let i = 0; i < amount; ++i) {
     const x = amount > 1 ? (i * 2) / (amount - 1) - 1 : 0;
-    const absX = Math.abs(x);
-
-    if (absX <= threshold) {
-      curve[i] = x;
-    } else {
-      const sign = Math.sign(x);
-      const normalized = (absX - threshold) / knee;
-      const softened = threshold + knee * Math.tanh(normalized);
-      curve[i] = Math.max(-ceiling, Math.min(ceiling, sign * softened));
-    }
+    curve[i] = softClipSample(x);
   }
   return curve;
 };
 
-export const createIdentityCurve = (amount = 44100) => {
+export const createIdentityCurve = (amount = SOFT_CLIP_CURVE_POINTS) => {
   const curve = new Float32Array(amount);
 
   for (let i = 0; i < amount; ++i) {
@@ -120,6 +129,30 @@ export const configureMasterLimiter = (limiter: DynamicsCompressorNode) => {
   limiter.attack.value = 0.001;
   limiter.release.value = 0.1;
 };
+
+export const loadOversampledSoftClipperWorklet = async (ctx: BaseAudioContext) => {
+  if (!('audioWorklet' in ctx) || !ctx.audioWorklet) return false;
+  if (loadedSoftClipperWorkletContexts.has(ctx)) return true;
+
+  try {
+    await ctx.audioWorklet.addModule(OVERSAMPLED_SOFT_CLIPPER_WORKLET_URL);
+    loadedSoftClipperWorkletContexts.add(ctx);
+    return true;
+  } catch (error) {
+    console.warn('[Audio] Falling back to WaveShaper soft clipper.', error);
+    return false;
+  }
+};
+
+export const createOversampledSoftClipperNode = (ctx: BaseAudioContext) =>
+  new AudioWorkletNode(ctx, 'oversampled-soft-clipper', {
+    numberOfInputs: 1,
+    numberOfOutputs: 1,
+    outputChannelCount: [2],
+    channelCount: 2,
+    channelCountMode: 'max',
+    channelInterpretation: 'speakers',
+  });
 
 const MASTER_LIMITER_RAMP_SECONDS = 0.08;
 
@@ -141,6 +174,19 @@ const setAudioParam = (
   param.value = value;
 };
 
+export const applyMasterLimiterCompressorState = (
+  ctx: BaseAudioContext,
+  limiter: DynamicsCompressorNode,
+  enabled: boolean,
+  smooth = false
+) => {
+  setAudioParam(ctx, limiter.threshold, enabled ? TRUE_PEAK_CEILING_DB : 0, smooth);
+  setAudioParam(ctx, limiter.knee, 0, smooth);
+  setAudioParam(ctx, limiter.ratio, enabled ? 20 : 1, smooth);
+  setAudioParam(ctx, limiter.attack, enabled ? 0.001 : 0, smooth);
+  setAudioParam(ctx, limiter.release, enabled ? 0.1 : 0.25, smooth);
+};
+
 export const applyMasterLimiterState = (
   ctx: BaseAudioContext,
   limiter: DynamicsCompressorNode,
@@ -149,12 +195,8 @@ export const applyMasterLimiterState = (
   useOversample: boolean,
   smooth = false
 ) => {
-  setAudioParam(ctx, limiter.threshold, enabled ? TRUE_PEAK_CEILING_DB : 0, smooth);
-  setAudioParam(ctx, limiter.knee, 0, smooth);
-  setAudioParam(ctx, limiter.ratio, enabled ? 20 : 1, smooth);
-  setAudioParam(ctx, limiter.attack, enabled ? 0.001 : 0, smooth);
-  setAudioParam(ctx, limiter.release, enabled ? 0.1 : 0.25, smooth);
-  softClip.curve = enabled ? createSoftClipCurve(44100) : createIdentityCurve(44100);
+  applyMasterLimiterCompressorState(ctx, limiter, enabled, smooth);
+  softClip.curve = enabled ? createSoftClipCurve() : createIdentityCurve();
   softClip.oversample = useOversample ? '4x' : 'none';
 };
 

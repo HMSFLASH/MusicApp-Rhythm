@@ -52,7 +52,7 @@
       "loudnessNorm": "Loudness Normalization",
       "loudnessDesc": "Measures each track and applies fixed LUFS gain with peak-safe headroom. Best quality when pre-calculation is enabled.",
       "hqOversample": "High Quality Oversampling",
-      "hqOversampleDesc": "Reduces aliasing in the limiter's soft clip stage. Warning: May cause lag on mobile devices.",
+      "hqOversampleDesc": "Uses a 4x FIR oversampled soft clipper to reduce limiter aliasing. May be heavy on weak phones.",
       "precalcIdle": "Pre-calculate for Weak CPUs",
       "precalcIdleDesc": "For weak CPUs with enough RAM: renders each track before playback so heavy effects do not have to run in real time. This normal mode handles one track at a time, not the whole queue. EQ/Effects changes apply on the next track.",
       "renderSignatureCache": "Reusable Render Cache",

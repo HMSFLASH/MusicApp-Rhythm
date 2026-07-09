@@ -1,8 +1,11 @@
 import { useRef, useEffect, useCallback } from 'react';
 import {
+  applyMasterLimiterCompressorState,
   applyMasterLimiterState,
+  createOversampledSoftClipperNode,
   generateImpulseResponse,
   getStereoSimilarity,
+  loadOversampledSoftClipperWorklet,
   pseudoStereoWetGain,
   REVERB_WET_HIGHPASS_HZ,
   REVERB_WET_LOWPASS_HZ,
@@ -63,7 +66,10 @@ export function useAudioContext(effectsState: any) {
   // FX Nodes
   const eqNodesRef = useRef<BiquadFilterNode[]>([]);
   const limiterNodeRef = useRef<DynamicsCompressorNode | null>(null);
-  const softClipNodeRef = useRef<WaveShaperNode | null>(null);
+  const softClipNodeRef = useRef<AudioNode | null>(null);
+  const softClipWaveShaperRef = useRef<WaveShaperNode | null>(null);
+  const oversampledSoftClipperReadyRef = useRef(false);
+  const oversampledSoftClipperLoadingRef = useRef<Promise<boolean> | null>(null);
   const panNodeRef = useRef<StereoPannerNode | null>(null);
   const trackLoudnessGainRef = useRef<GainNode | null>(null);
   const trackLoudnessGainValueRef = useRef(1);
@@ -101,6 +107,22 @@ export function useAudioContext(effectsState: any) {
     stereoLeftAnalyserRef.current = null;
     stereoRightAnalyserRef.current = null;
   }, []);
+
+  const ensureOversampledSoftClipperWorklet = useCallback((ctx: BaseAudioContext) => {
+    if (oversampledSoftClipperReadyRef.current || oversampledSoftClipperLoadingRef.current) return;
+
+    oversampledSoftClipperLoadingRef.current = loadOversampledSoftClipperWorklet(ctx).then((ready) => {
+      oversampledSoftClipperReadyRef.current = ready;
+      oversampledSoftClipperLoadingRef.current = null;
+
+      if (ready && sourceNodeRef.current && fxEnabledRef.current?.limiter && effectsState?.useOversample) {
+        window.setTimeout(() => initializeAudioContext(), 0);
+      }
+
+      return ready;
+    });
+  // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [effectsState?.useOversample]);
 
   const startStereoNearMonoAnalysis = useCallback((sourceNode: AudioNode, basePseudoAmount: number) => {
     if (!audioContextRef.current || !pseudoDelayRef.current || !haasWetGainRef.current || basePseudoAmount <= 0) return;
@@ -304,6 +326,9 @@ console.log("[Audio] initializeAudioContext called");
     if (headroomRecoverRef.current) headroomRecoverRef.current.disconnect();
     if (limiterNodeRef.current) limiterNodeRef.current.disconnect();
     if (softClipNodeRef.current) softClipNodeRef.current.disconnect();
+    if (softClipWaveShaperRef.current && softClipWaveShaperRef.current !== softClipNodeRef.current) {
+      softClipWaveShaperRef.current.disconnect();
+    }
     if (panNodeRef.current) panNodeRef.current.disconnect();
 
     let currentNode: AudioNode = sourceNodeRef.current;
@@ -519,16 +544,35 @@ console.log("[Audio] initializeAudioContext called");
     if (!limiterNodeRef.current) {
       limiterNodeRef.current = ctx.createDynamicsCompressor();
     }
-    if (!softClipNodeRef.current) {
-      softClipNodeRef.current = ctx.createWaveShaper();
+    if (Boolean(enabled.limiter) && useOversample) {
+      ensureOversampledSoftClipperWorklet(ctx);
     }
-    applyMasterLimiterState(
-      ctx,
-      limiterNodeRef.current,
-      softClipNodeRef.current,
-      Boolean(enabled.limiter),
-      useOversample
-    );
+
+    const useWorkletSoftClipper =
+      Boolean(enabled.limiter) &&
+      useOversample &&
+      oversampledSoftClipperReadyRef.current;
+
+    softClipWaveShaperRef.current = null;
+    if (useWorkletSoftClipper) {
+      softClipNodeRef.current = createOversampledSoftClipperNode(ctx);
+      applyMasterLimiterCompressorState(
+        ctx,
+        limiterNodeRef.current,
+        Boolean(enabled.limiter)
+      );
+    } else {
+      const waveShaper = ctx.createWaveShaper();
+      applyMasterLimiterState(
+        ctx,
+        limiterNodeRef.current,
+        waveShaper,
+        Boolean(enabled.limiter),
+        useOversample
+      );
+      softClipWaveShaperRef.current = waveShaper;
+      softClipNodeRef.current = waveShaper;
+    }
 
     currentNode.connect(softClipNodeRef.current);
     softClipNodeRef.current.connect(limiterNodeRef.current);
@@ -656,12 +700,19 @@ if (preampNodeRef.current) {
   }, [panValue, fxEnabled.master]);
 
   useEffect(() => {
-    if (!audioContextRef.current || !limiterNodeRef.current || !softClipNodeRef.current) return;
+    if (!audioContextRef.current || !limiterNodeRef.current) return;
+
+    if (sourceNodeRef.current) {
+      initializeAudioContext();
+      return;
+    }
+
+    if (!softClipWaveShaperRef.current) return;
 
     applyMasterLimiterState(
       audioContextRef.current,
       limiterNodeRef.current,
-      softClipNodeRef.current,
+      softClipWaveShaperRef.current,
       Boolean(fxEnabled.limiter),
       useOversample,
       true

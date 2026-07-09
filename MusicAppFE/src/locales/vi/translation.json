@@ -52,7 +52,7 @@
       "loudnessNorm": "Cân Bằng Âm Lượng",
       "loudnessDesc": "Đo từng bài và áp gain LUFS cố định với headroom an toàn cho peak. Chất lượng tốt nhất khi bật tính toán trước.",
       "hqOversample": "Oversampling chất lượng cao",
-      "hqOversampleDesc": "Giảm răng cưa cho soft clip của limiter. Cảnh báo: Có thể gây lag và nóng máy trên điện thoại yếu.",
+      "hqOversampleDesc": "Dùng soft clipper oversampling FIR 4x để giảm aliasing của limiter. Có thể nặng trên điện thoại yếu.",
       "precalcIdle": "Tính toán trước cho máy yếu",
       "precalcIdleDesc": "Dành cho CPU yếu nhưng còn đủ RAM: render từng bài trước khi phát để hiệu ứng nặng không phải chạy realtime. Chế độ thường này chỉ xử lý từng bài, không xử lý cả hàng chờ. Thay đổi EQ/Hiệu ứng có tác dụng ở bài tiếp theo.",
       "renderSignatureCache": "Cache render tái sử dụng",
