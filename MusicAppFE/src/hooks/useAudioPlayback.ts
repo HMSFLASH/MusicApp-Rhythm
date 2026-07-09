@@ -216,9 +216,7 @@ export function useAudioPlayback(
     return () => {
       // Cleanup on unmount (critical for React Hot Reload / Fast Refresh)
       if (audioRef.current) {
-        // eslint-disable-next-line @typescript-eslint/no-explicit-any
         if ((audioRef as any).current._visibilityHandler) {
-          // eslint-disable-next-line @typescript-eslint/no-explicit-any
           document.removeEventListener('visibilitychange', (audioRef as any).current._visibilityHandler);
         }
         audioRef.current.pause();
@@ -231,7 +229,6 @@ export function useAudioPlayback(
       }
       cleanupMediaSessionAnchor();
     };
-  // eslint-disable-next-line react-hooks/exhaustive-deps
   }, []);
   const allowedIdsRef = useRef<Set<string>>(new Set());
   const blobLoadingPromisesRef = useRef<Map<string, Promise<string>>>(new Map());
@@ -255,7 +252,6 @@ export function useAudioPlayback(
     useOversample,
     loudnessNormalization,
   });
-  // eslint-disable-next-line @typescript-eslint/no-explicit-any
   const fxEnabledRef = useRef<any>(fxEnabled);
 
   useEffect(() => {
@@ -350,7 +346,6 @@ export function useAudioPlayback(
     try {
       const existing = JSON.parse(localStorage.getItem(LOCAL_STORAGE_KEY) || '{}');
       localStorage.setItem(LOCAL_STORAGE_KEY, JSON.stringify({ ...existing, volume: newVolume }));
-    // eslint-disable-next-line @typescript-eslint/no-unused-vars, no-empty
     } catch (e) { }
   }, [audioRef, bufferVolumeNodeRef]);
 
@@ -762,8 +757,8 @@ export function useAudioPlayback(
 
   const preloadNextTrack = async (currentTrack: Track, currentQueue: Track[]) => {
     if (!precalculateOnIdleRef.current || isPrecalculatingNextRef.current) return;
-    if (isLikelyConstrainedDevice()) {
-      console.log("[Lookahead] Skipping next-track precalculate on constrained device");
+    if (isLikelyConstrainedDevice() || getFullCoreCount() <= 8) {
+      console.log("[Lookahead] Skipping next-track precalculate on constrained device (or cores <= 8)");
       return;
     }
 
@@ -1015,10 +1010,10 @@ export function useAudioPlayback(
     preloadAdjacentTracks(
       startingTrack.id,
       currentQueue!,
-      !(precalculateOnIdleRef.current && isLikelyConstrainedDevice())
+      !(precalculateOnIdleRef.current && (isLikelyConstrainedDevice() || getFullCoreCount() <= 8))
     );
-    
-    
+
+
   };
 
 
@@ -1092,7 +1087,6 @@ export function useAudioPlayback(
     } else {
       setIsPlaying(false);
     }
-  // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [currentTrack, queue, songEndMode, queueEndMode, isShuffleState, upcomingQueues, cycleQueues]);
 
 
@@ -1221,7 +1215,7 @@ export function useAudioPlayback(
         : currentQueue
           .slice(currentIndex + 1)
           .find((track) => String(track.id) !== deletedTrackId && isTrackAllowed(track, validIds))
-          ?? (queueEndMode === 'repeat' ? sanitizedQueue[0] : undefined);
+        ?? (queueEndMode === 'repeat' ? sanitizedQueue[0] : undefined);
 
       if (replacementTrack && playTrackRef.current) {
         playTrackRef.current(replacementTrack, sanitizedQueue, isPlayingSnapshotRef.current);

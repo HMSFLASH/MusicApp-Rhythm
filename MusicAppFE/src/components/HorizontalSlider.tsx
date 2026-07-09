@@ -30,7 +30,18 @@ export function HorizontalSlider({
   const [inputValue, setInputValue] = useState('');
 
   const range = max - min;
-  const percentage = ((value - min) / range) * 100;
+  const isBidirectional = min < 0 && max > 0;
+  
+  let percentage = 0;
+  if (isBidirectional) {
+    if (value <= 0) {
+      percentage = ((value - min) / Math.abs(min)) * 50;
+    } else {
+      percentage = 50 + (value / max) * 50;
+    }
+  } else {
+    percentage = ((value - min) / range) * 100;
+  }
 
   const handlePointerMove = useCallback((e: PointerEvent) => {
     if (!isDragging || !trackRef.current) return;
@@ -40,7 +51,17 @@ export function HorizontalSlider({
     newX = Math.max(0, Math.min(newX, rect.width));
     
     const pct = newX / rect.width;
-    let newValue = min + (pct * range);
+    let newValue = 0;
+    
+    if (min < 0 && max > 0) {
+      if (pct <= 0.5) {
+        newValue = min + (pct / 0.5) * Math.abs(min);
+      } else {
+        newValue = ((pct - 0.5) / 0.5) * max;
+      }
+    } else {
+      newValue = min + (pct * range);
+    }
     
     if (step > 0) {
       newValue = Math.round(newValue / step) * step;
@@ -50,7 +71,7 @@ export function HorizontalSlider({
     newValue = Number(newValue.toFixed(5));
     
     onChange(newValue);
-  }, [isDragging, min, range, onChange, step]);
+  }, [isDragging, min, max, range, onChange, step]);
 
   const handlePointerUp = useCallback(() => {
     setIsDragging(false);
@@ -111,8 +132,7 @@ export function HorizontalSlider({
 
   // Center point logic for bi-directional active track
   // Only use bidirectional center tracking if min < 0 and max > 0 (e.g. dB gain)
-  const isBidirectional = min < 0 && max > 0;
-  const zeroPct = isBidirectional ? ((0 - min) / range) * 100 : 0;
+  const zeroPct = isBidirectional ? 50 : 0;
   
   // Calculate width and left for the filled portion
   const isPositive = value >= 0;
@@ -166,7 +186,10 @@ export function HorizontalSlider({
         
         {/* Center zero mark (only if bidirectional) */}
         {isBidirectional && (
-          <div className="absolute left-1/2 -translate-x-1/2 w-1 h-3 bg-white/30 rounded-full"></div>
+          <div 
+            className="absolute -translate-x-1/2 w-1 h-3 bg-white/30 rounded-full"
+            style={{ left: `${zeroPct}%` }}
+          ></div>
         )}
 
         {/* Active Track (Colored from 0 to value) */}
@@ -195,10 +218,17 @@ export function HorizontalSlider({
       
       
       {!hideLabels && (
-        <div className="flex justify-between font-mono text-[10px] text-white/40 mt-1">
-          <span>{min}</span>
-          {isBidirectional && <span>0</span>}
-          <span>{unit === 'dB' && max > 0 ? `+${max}` : max}</span>
+        <div className="relative h-4 font-mono text-[10px] text-white/40 mt-1">
+          <span className="absolute left-0">{min}</span>
+          {isBidirectional && (
+            <span 
+              className="absolute -translate-x-1/2" 
+              style={{ left: `${zeroPct}%` }}
+            >
+              0
+            </span>
+          )}
+          <span className="absolute right-0">{unit === 'dB' && max > 0 ? `+${max}` : max}</span>
         </div>
       )}
     </div>
