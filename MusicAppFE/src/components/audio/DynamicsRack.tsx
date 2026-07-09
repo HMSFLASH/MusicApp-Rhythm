@@ -12,7 +12,7 @@ export function DynamicsRack() {
     <div className="flex flex-col gap-8 w-full">
       
       {/* Dynamics Compressor */}
-      <div className="bg-[#0a0a0a] p-8 rounded-2xl border border-white/5 shadow-2xl flex flex-col gap-10">
+      <div className="bg-[#0a0a0a] p-4 md:p-8 rounded-2xl border border-white/5 shadow-2xl flex flex-col gap-6 md:gap-10">
         <div className="flex flex-col gap-4 border-b border-white/10 pb-4 md:flex-row md:items-center md:justify-between">
           <div>
             <h2 className="text-xl font-bold font-sans text-white/80 tracking-tight">{t('studio.dynamics.title', 'Compressor / Night Mode')}</h2>
@@ -44,8 +44,8 @@ export function DynamicsRack() {
           </div>
         </div>
 
-        <EffectControlsGate active={playerState.fxEnabled.comp} className="flex flex-col gap-10">
-          <div className="grid grid-cols-1 md:grid-cols-2 gap-12">
+        <EffectControlsGate active={playerState.fxEnabled.comp} className="flex flex-col gap-6 md:gap-10">
+          <div className="grid grid-cols-1 md:grid-cols-2 gap-6 md:gap-12">
             <HorizontalSlider
               value={playerState.compThreshold}
               min={-100}
@@ -66,7 +66,7 @@ export function DynamicsRack() {
             />
           </div>
 
-          <div className="grid grid-cols-1 md:grid-cols-2 gap-12">
+          <div className="grid grid-cols-1 md:grid-cols-2 gap-6 md:gap-12">
             <HorizontalSlider
               value={playerState.compKnee}
               min={0}
@@ -78,7 +78,7 @@ export function DynamicsRack() {
             />
           </div>
 
-          <div className="grid grid-cols-1 md:grid-cols-2 gap-12 pt-6 border-t border-white/10">
+          <div className="grid grid-cols-1 md:grid-cols-2 gap-6 md:gap-12 pt-6 border-t border-white/10">
             <HorizontalSlider
               value={playerState.compAttack}
               min={0}
@@ -99,7 +99,7 @@ export function DynamicsRack() {
             />
           </div>
 
-          <div className="grid grid-cols-1 md:grid-cols-2 gap-12 pt-6 border-t border-white/10">
+          <div className="grid grid-cols-1 md:grid-cols-2 gap-6 md:gap-12 pt-6 border-t border-white/10">
             <HorizontalSlider
               value={playerState.compRmsSize}
               min={1}
@@ -124,7 +124,7 @@ export function DynamicsRack() {
       </div>
 
       {/* Master Limiter */}
-      <div className={`bg-[#0a0a0a] p-8 rounded-2xl border border-white/5 shadow-2xl flex items-center justify-between transition-opacity duration-300 ${playerState.fxEnabled.limiter ? 'opacity-100' : 'opacity-50'}`}>
+      <div className={`bg-[#0a0a0a] p-4 md:p-8 rounded-2xl border border-white/5 shadow-2xl flex flex-col sm:flex-row sm:items-center justify-between gap-4 transition-opacity duration-300 ${playerState.fxEnabled.limiter ? 'opacity-100' : 'opacity-50'}`}>
         <div>
           <h2 className="text-xl font-bold font-sans text-white/80 tracking-tight">{t('studio.dynamics.limiterTitle', 'Anti-Clipping Master Limiter')}</h2>
           <p className="text-secondary/60 text-xs font-mono mt-2">{t('studio.dynamics.limiterDesc', 'Catches final output peaks after soft clipping, reducing crackling when EQ, preamp, or effects raise the level. Recommended to leave on.')}</p>

@@ -118,17 +118,6 @@ export function Layout() {
   const handleLogout = async () => {
     setIsLoggingOut(true);
     try {
-      // Auto-backup before logout if Google Drive is linked
-      if (user?.isGoogleLinked) {
-        try {
-          const configStr = localStorage.getItem('SONIC_DEPTH_AUDIO_CONFIG');
-          const config = configStr ? JSON.parse(configStr) : {};
-          const idbData = await db.getAllData();
-          await axiosClient.post('/api/backup/drive', { config, idbData });
-        } catch (e) {
-          console.error('Auto-backup failed on logout', e);
-        }
-      }
       try {
         await axiosClient.post('/api/auth/logout');
       } catch {

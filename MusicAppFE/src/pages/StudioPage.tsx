@@ -34,10 +34,10 @@ export function StudioPage() {
         </div>
 
         {/* Tabs */}
-        <div className="flex bg-[#111] p-1 rounded-xl border border-white/10 overflow-hidden">
+        <div className="flex w-full sm:w-auto bg-[#111] p-1 rounded-xl border border-white/10 overflow-hidden">
           <button aria-label="Action"
             onClick={() => setActiveTab('eq')}
-            className={`px-6 py-2 rounded-lg text-sm font-bold transition-all ${
+            className={`flex-1 sm:flex-none px-3 sm:px-6 py-2 rounded-lg text-xs sm:text-sm font-bold transition-all whitespace-nowrap ${
               activeTab === 'eq' ? 'bg-[#00E5FF]/20 text-[#00E5FF]' : 'text-white/80 hover:text-white hover:bg-white/10'
             }`}
           >
@@ -45,7 +45,7 @@ export function StudioPage() {
           </button>
           <button aria-label="Action"
             onClick={() => setActiveTab('dynamics')}
-            className={`px-6 py-2 rounded-lg text-sm font-bold transition-all ${
+            className={`flex-1 sm:flex-none px-3 sm:px-6 py-2 rounded-lg text-xs sm:text-sm font-bold transition-all whitespace-nowrap ${
               activeTab === 'dynamics' ? 'bg-[#ff0055]/20 text-[#ff0055]' : 'text-white/80 hover:text-white hover:bg-white/10'
             }`}
           >
@@ -53,7 +53,7 @@ export function StudioPage() {
           </button>
           <button aria-label="Action"
             onClick={() => setActiveTab('spatial')}
-            className={`px-6 py-2 rounded-lg text-sm font-bold transition-all ${
+            className={`flex-1 sm:flex-none px-3 sm:px-6 py-2 rounded-lg text-xs sm:text-sm font-bold transition-all whitespace-nowrap ${
               activeTab === 'spatial' ? 'bg-[#9d00ff]/20 text-[#9d00ff]' : 'text-white/80 hover:text-white hover:bg-white/10'
             }`}
           >

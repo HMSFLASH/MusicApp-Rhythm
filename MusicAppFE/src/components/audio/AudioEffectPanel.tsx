@@ -62,7 +62,7 @@ export function AudioEffectPanel({
   headerClassName = '',
 }: AudioEffectPanelProps) {
   return (
-    <div className={`bg-[#0a0a0a] rounded-2xl border border-white/5 shadow-2xl p-8 flex flex-col gap-8 w-full ${className}`}>
+    <div className={`bg-[#0a0a0a] rounded-2xl border border-white/5 shadow-2xl p-4 md:p-8 flex flex-col gap-6 md:gap-8 w-full ${className}`}>
       <div className={`flex items-center gap-3 border-b border-white/10 pb-4 ${trailing ? 'justify-between' : ''} ${headerClassName}`}>
         <div className="flex items-center gap-3 min-w-0">
           {leading}
