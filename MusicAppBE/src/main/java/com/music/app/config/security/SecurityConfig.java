@@ -50,6 +50,13 @@ public class SecurityConfig {
                                 .anyRequest().authenticated());
 
                 BearerTokenResolver bearerTokenResolver = request -> {
+                        String path = request.getRequestURI();
+                        if (path.equals("/api/auth/login") || path.equals("/api/auth/register") 
+                            || path.equals("/api/auth/refresh") || path.equals("/api/auth/google")
+                            || path.equals("/api/auth/forgot-password") || path.equals("/api/auth/reset-password")) {
+                                return null;
+                        }
+
                         Cookie[] cookies = request.getCookies();
                         if (cookies != null) {
                                 for (Cookie cookie : cookies) {
