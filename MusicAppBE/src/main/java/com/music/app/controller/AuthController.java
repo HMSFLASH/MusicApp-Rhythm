@@ -38,14 +38,25 @@ public class AuthController {
         response.addHeader("Set-Cookie", "music_app_token=" + token + "; Path=/; Max-Age=" + (7 * 24 * 60 * 60) + "; HttpOnly; SameSite=Lax");
     }
 
+    private void setRefreshTokenCookie(HttpServletResponse response, String refreshToken) {
+        if (refreshToken != null) {
+            response.addHeader("Set-Cookie", "music_app_refresh_token=" + refreshToken + "; Path=/api/auth/refresh; Max-Age=" + (30 * 24 * 60 * 60) + "; HttpOnly; SameSite=Lax");
+        }
+    }
+
     private void clearTokenCookie(HttpServletResponse response) {
         response.addHeader("Set-Cookie", "music_app_token=; Path=/; Max-Age=0; HttpOnly; SameSite=Lax");
+    }
+
+    private void clearRefreshTokenCookie(HttpServletResponse response) {
+        response.addHeader("Set-Cookie", "music_app_refresh_token=; Path=/api/auth/refresh; Max-Age=0; HttpOnly; SameSite=Lax");
     }
 
     @PostMapping("/register")
     public ApiResponse<AuthenticationResponse> register(@Valid @RequestBody RegisterRequest request, HttpServletResponse response) {
         AuthenticationResponse authResponse = authService.registerUser(request.getUsername(), request.getPassword(), request.getEmail());
         setTokenCookie(response, authResponse.getAccessToken());
+        setRefreshTokenCookie(response, authResponse.getRefreshToken());
         return ApiResponse.<AuthenticationResponse>builder()
                 .result(authResponse)
                 .build();
@@ -55,6 +66,7 @@ public class AuthController {
     public ApiResponse<AuthenticationResponse> login(@Valid @RequestBody LoginRequest request, HttpServletResponse response) {
         AuthenticationResponse authResponse = authService.login(request.getLoginId(), request.getPassword());
         setTokenCookie(response, authResponse.getAccessToken());
+        setRefreshTokenCookie(response, authResponse.getRefreshToken());
         return ApiResponse.<AuthenticationResponse>builder()
                 .result(authResponse)
                 .build();
@@ -68,6 +80,7 @@ public class AuthController {
         String picture = request.get("picture");
         AuthenticationResponse authResponse = authService.loginWithGoogle(googleId, email, name, picture);
         setTokenCookie(response, authResponse.getAccessToken());
+        setRefreshTokenCookie(response, authResponse.getRefreshToken());
         return ApiResponse.<AuthenticationResponse>builder()
                 .result(authResponse)
                 .build();
@@ -80,13 +93,20 @@ public class AuthController {
             authService.logout(token);
         }
         clearTokenCookie(response);
+        clearRefreshTokenCookie(response);
         return ApiResponse.<Void>builder().build();
     }
 
     @PostMapping("/refresh")
-    public ApiResponse<AuthenticationResponse> refresh(@RequestBody RefreshRequest request, HttpServletResponse response) {
-        AuthenticationResponse authResponse = authService.refreshToken(request);
+    public ApiResponse<AuthenticationResponse> refresh(@RequestBody(required = false) RefreshRequest request, @CookieValue(name = "music_app_refresh_token", required = false) String refreshTokenCookie, HttpServletResponse response) {
+        String token = (request != null && request.getRefreshToken() != null) ? request.getRefreshToken() : refreshTokenCookie;
+        if (token == null || token.isEmpty()) {
+            throw new RuntimeException("Refresh token is missing");
+        }
+        RefreshRequest req = new RefreshRequest(token);
+        AuthenticationResponse authResponse = authService.refreshToken(req);
         setTokenCookie(response, authResponse.getAccessToken());
+        setRefreshTokenCookie(response, authResponse.getRefreshToken());
         return ApiResponse.<AuthenticationResponse>builder()
                 .result(authResponse)
                 .build();
@@ -102,6 +122,7 @@ public class AuthController {
             String currentSubject = auth.getName();
             AuthenticationResponse authResponse = authService.setLocalCredentials(currentSubject, request.getLoginId(), request.getPassword());
             setTokenCookie(response, authResponse.getAccessToken());
+            setRefreshTokenCookie(response, authResponse.getRefreshToken());
             return ResponseEntity.ok(ApiResponse.builder().result(authResponse).build());
         } catch (Exception e) {
             return ResponseEntity.status(500).body(ApiResponse.builder().code(500).message(e.getMessage()).build());

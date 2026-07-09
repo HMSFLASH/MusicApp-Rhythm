@@ -79,6 +79,11 @@ public class OAuth2LoginSuccessHandler extends SimpleUrlAuthenticationSuccessHan
             String token = authResponse.getAccessToken();
             response.addHeader("Set-Cookie", "music_app_token=" + token + "; Path=/; Max-Age=" + (7 * 24 * 60 * 60) + "; HttpOnly; SameSite=Lax");
             
+            String backendRefreshToken = authResponse.getRefreshToken();
+            if (backendRefreshToken != null) {
+                response.addHeader("Set-Cookie", "music_app_refresh_token=" + backendRefreshToken + "; Path=/api/auth/refresh; Max-Age=" + (30 * 24 * 60 * 60) + "; HttpOnly; SameSite=Lax");
+            }
+            
             getRedirectStrategy().sendRedirect(request, response, targetUrl);
         } else {
             super.onAuthenticationSuccess(request, response, authentication);

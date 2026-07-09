@@ -10,26 +10,69 @@ export const axiosClient = axios.create({
   withCredentials: true,
 });
 
-// Removed request interceptor because cookies are sent automatically with `withCredentials: true`
+let isRefreshing = false;
+let failedQueue: Array<{ resolve: (value?: unknown) => void; reject: (reason?: any) => void }> = [];
 
-// Add a response interceptor
+const processQueue = (error: any, token: string | null = null) => {
+  failedQueue.forEach((prom) => {
+    if (error) {
+      prom.reject(error);
+    } else {
+      prom.resolve(token);
+    }
+  });
+  failedQueue = [];
+};
+
 axiosClient.interceptors.response.use(
   (response) => {
-    // If it's our ApiResponse format { code, message, result }, we can unwrap it directly
     if (response.data && response.data.code === 1000) {
        return response.data.result !== undefined ? response.data.result : response.data;
     }
-    return response.data; // default unwrap for endpoints not using ApiResponse yet
+    return response.data;
   },
-  (error) => {
-    if (error.response?.status === 401) {
-      // Clear token state and redirect to login if unauthorized
+  async (error) => {
+    const originalRequest = error.config;
+
+    // If refresh fails, log out
+    if (originalRequest.url === '/api/auth/refresh') {
       localStorage.removeItem('music_app_logged_in');
       if (window.location.pathname !== '/login') {
          window.location.href = '/login';
       }
+      return Promise.reject(error);
     }
-    // Return the ErrorCode message if backend provides it
+
+    if (error.response?.status === 401 && !originalRequest._retry) {
+      if (isRefreshing) {
+        return new Promise(function(resolve, reject) {
+          failedQueue.push({ resolve, reject });
+        }).then(() => {
+          return axiosClient(originalRequest);
+        }).catch((err) => {
+          return Promise.reject(err);
+        });
+      }
+
+      originalRequest._retry = true;
+      isRefreshing = true;
+
+      try {
+        await axiosClient.post('/api/auth/refresh');
+        processQueue(null, 'refreshed');
+        return axiosClient(originalRequest);
+      } catch (err) {
+        processQueue(err, null);
+        localStorage.removeItem('music_app_logged_in');
+        if (window.location.pathname !== '/login') {
+           window.location.href = '/login';
+        }
+        return Promise.reject(err);
+      } finally {
+        isRefreshing = false;
+      }
+    }
+
     const apiMessage = error.response?.data?.message;
     if (apiMessage) {
       return Promise.reject(new Error(apiMessage));
