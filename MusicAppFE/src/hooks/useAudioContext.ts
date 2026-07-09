@@ -3,7 +3,12 @@ import {
   applyMasterLimiterState,
   configureLoudnessNormalization,
   generateImpulseResponse,
-  REVERB_WET_GAIN,
+  getStereoSimilarity,
+  pseudoStereoWetGain,
+  REVERB_WET_HIGHPASS_HZ,
+  REVERB_WET_LOWPASS_HZ,
+  reverbPreDelaySeconds,
+  reverbWetGain,
 } from './audioGraph';
 import {
   clamp,
@@ -22,7 +27,7 @@ export {
 
 // eslint-disable-next-line @typescript-eslint/no-explicit-any
 export function useAudioContext(effectsState: any) {
-  const { eqBands, preampGain, bassGain, trebleGain, compThreshold, compRatio, compKnee, compAttack, compRelease, compRmsSize, compMakeupGain, panValue, stereoWidth, reverbMix, reverbTime, useOversample, loudnessNormalization, fxEnabled, } = effectsState;
+  const { eqBands, preampGain, bassGain, trebleGain, compThreshold, compRatio, compKnee, compAttack, compRelease, compRmsSize, compMakeupGain, panValue, stereoWidth, reverbMix, reverbTime, useOversample, loudnessNormalization, fxEnabled, audioIsStereo = true, } = effectsState;
 
   // Audio Context and Core Nodes
 
@@ -73,6 +78,66 @@ export function useAudioContext(effectsState: any) {
   const reverbPreDelayRef = useRef<DelayNode | null>(null);
   const reverbHighpassRef = useRef<BiquadFilterNode | null>(null);
   const reverbLowpassRef = useRef<BiquadFilterNode | null>(null);
+  const stereoAnalysisSplitterRef = useRef<ChannelSplitterNode | null>(null);
+  const stereoLeftAnalyserRef = useRef<AnalyserNode | null>(null);
+  const stereoRightAnalyserRef = useRef<AnalyserNode | null>(null);
+  const stereoAnalysisIntervalRef = useRef<number | null>(null);
+  const stereoPseudoBaseAmountRef = useRef(0);
+
+  const stopStereoNearMonoAnalysis = useCallback(() => {
+    if (stereoAnalysisIntervalRef.current != null) {
+      window.clearInterval(stereoAnalysisIntervalRef.current);
+      stereoAnalysisIntervalRef.current = null;
+    }
+
+    if (stereoAnalysisSplitterRef.current) stereoAnalysisSplitterRef.current.disconnect();
+    if (stereoLeftAnalyserRef.current) stereoLeftAnalyserRef.current.disconnect();
+    if (stereoRightAnalyserRef.current) stereoRightAnalyserRef.current.disconnect();
+
+    stereoAnalysisSplitterRef.current = null;
+    stereoLeftAnalyserRef.current = null;
+    stereoRightAnalyserRef.current = null;
+  }, []);
+
+  const startStereoNearMonoAnalysis = useCallback((sourceNode: AudioNode, basePseudoAmount: number) => {
+    if (!audioContextRef.current || !pseudoDelayRef.current || !haasWetGainRef.current || basePseudoAmount <= 0) return;
+
+    stopStereoNearMonoAnalysis();
+
+    const ctx = audioContextRef.current;
+    const splitter = ctx.createChannelSplitter(2);
+    const leftAnalyser = ctx.createAnalyser();
+    const rightAnalyser = ctx.createAnalyser();
+    leftAnalyser.fftSize = 2048;
+    rightAnalyser.fftSize = 2048;
+
+    const leftData = new Float32Array(leftAnalyser.fftSize);
+    const rightData = new Float32Array(rightAnalyser.fftSize);
+
+    sourceNode.connect(splitter);
+    splitter.connect(leftAnalyser, 0);
+    splitter.connect(rightAnalyser, 1);
+
+    stereoAnalysisSplitterRef.current = splitter;
+    stereoLeftAnalyserRef.current = leftAnalyser;
+    stereoRightAnalyserRef.current = rightAnalyser;
+
+    const updatePseudoStereo = () => {
+      if (!audioContextRef.current || !pseudoDelayRef.current || !haasWetGainRef.current) return;
+      leftAnalyser.getFloatTimeDomainData(leftData);
+      rightAnalyser.getFloatTimeDomainData(rightData);
+
+      const baseAmount = stereoPseudoBaseAmountRef.current;
+      const pseudoAmount = getStereoSimilarity(leftData, rightData).nearMono ? baseAmount : 0;
+      const now = audioContextRef.current.currentTime;
+      pseudoDelayRef.current.delayTime.setTargetAtTime(0.006 + 0.007 * baseAmount, now, 0.05);
+      haasWetGainRef.current.gain.setTargetAtTime(pseudoStereoWetGain(pseudoAmount), now, 0.05);
+    };
+
+    updatePseudoStereo();
+    stereoAnalysisIntervalRef.current = window.setInterval(updatePseudoStereo, 500);
+  }, [stopStereoNearMonoAnalysis]);
+
   const applyCompressorParams = useCallback((compressor: DynamicsCompressorNode, makeup: GainNode) => {
     if (fxEnabled.comp) {
       compressor.threshold.value = compThreshold;
@@ -101,6 +166,10 @@ export function useAudioContext(effectsState: any) {
       loudnessNormalization
     );
   }, [loudnessNormalization]);
+
+  useEffect(() => () => {
+    stopStereoNearMonoAnalysis();
+  }, [stopStereoNearMonoAnalysis]);
 
   useEffect(() => {
     if (!audioContextRef.current) return;
@@ -193,6 +262,7 @@ console.log("[Audio] initializeAudioContext called");
     if (!sourceNodeRef.current) return;
     
         // Disconnect everything first to rebuild graph
+    stopStereoNearMonoAnalysis();
     if (sourceNodeRef.current) sourceNodeRef.current.disconnect();
     if (headroomDropRef.current) headroomDropRef.current.disconnect();
     if (preampNodeRef.current) preampNodeRef.current.disconnect();
@@ -303,6 +373,7 @@ console.log("[Audio] initializeAudioContext called");
     compressorNodeRef.current.connect(compMakeupNodeRef.current);
     currentNode = compMakeupNodeRef.current;
 
+    const stereoDetectionNode = currentNode;
     
     // 5. Reverb
     if (!convolverNodeRef.current) convolverNodeRef.current = ctx.createConvolver();
@@ -312,27 +383,22 @@ console.log("[Audio] initializeAudioContext called");
     if (!dryGainRef.current) dryGainRef.current = ctx.createGain();
     if (!wetGainRef.current) wetGainRef.current = ctx.createGain();
 
-    const preDelayAmount = Math.min(0.04, Math.max(0.008, 0.008 + 0.032 * (reverbMix / 100)));
-    reverbPreDelayRef.current.delayTime.value = preDelayAmount;
+    reverbPreDelayRef.current.delayTime.value = reverbPreDelaySeconds(reverbMix);
     
     reverbHighpassRef.current.type = 'highpass';
-    reverbHighpassRef.current.frequency.value = 150;
+    reverbHighpassRef.current.frequency.value = REVERB_WET_HIGHPASS_HZ;
     reverbHighpassRef.current.Q.value = 0.7;
     
     reverbLowpassRef.current.type = 'lowpass';
-    reverbLowpassRef.current.frequency.value = 7500;
+    reverbLowpassRef.current.frequency.value = REVERB_WET_LOWPASS_HZ;
     reverbLowpassRef.current.Q.value = 0.7;
 
     if (irBufferRef.current && !convolverNodeRef.current.buffer) {
       convolverNodeRef.current.buffer = irBufferRef.current;
     }
 
-    const validReverbMix = Number(reverbMix) || 0;
-    const x = enabled.reverb ? clamp(validReverbMix / 100, 0, 1) : 0;
-    const wetAmount = (1 - Math.exp(-x * 3)) / (1 - Math.exp(-3));
-    
     dryGainRef.current.gain.value = 1.0;
-    wetGainRef.current.gain.value = wetAmount * REVERB_WET_GAIN;
+    wetGainRef.current.gain.value = enabled.reverb ? reverbWetGain(reverbMix) : 0;
 
     currentNode.connect(dryGainRef.current);
     currentNode.connect(reverbPreDelayRef.current);
@@ -357,17 +423,20 @@ console.log("[Audio] initializeAudioContext called");
     if (!stereoOutRef.current) stereoOutRef.current = ctx.createGain();
 
     const width = enabled.stereo ? percentToStereoBaseWidth(stereoWidth) : 1;
-    const pseudoAmount = enabled.stereo ? percentToPseudoStereoAmount(stereoWidth) : 0;
+    const basePseudoAmount = enabled.stereo ? percentToPseudoStereoAmount(stereoWidth) : 0;
+    stereoPseudoBaseAmountRef.current = basePseudoAmount;
+    const pseudoAmount = !audioIsStereo ? basePseudoAmount : 0;
     lToLRef.current.gain.value = (1 + width) / 2;
     rToLRef.current.gain.value = (1 - width) / 2;
     lToRRef.current.gain.value = (1 - width) / 2;
     rToRRef.current.gain.value = (1 + width) / 2;
 
+    const stereoSourceNode = currentNode;
     const stereoInput = ctx.createGain();
     stereoInput.channelCount = 2;
     stereoInput.channelCountMode = 'explicit';
     stereoInput.channelInterpretation = 'speakers';
-    currentNode.connect(stereoInput);
+    stereoSourceNode.connect(stereoInput);
     stereoInput.connect(stereoSplitterRef.current);
     stereoSplitterRef.current.connect(lToLRef.current, 0);
     stereoSplitterRef.current.connect(lToRRef.current, 0);
@@ -399,7 +468,7 @@ console.log("[Audio] initializeAudioContext called");
     pseudoDelayRef.current.delayTime.value = 0.006 + 0.007 * pseudoAmount;
     pseudoLeftGainRef.current.gain.value = 1;
     pseudoRightGainRef.current.gain.value = 1;
-    haasWetGainRef.current.gain.value = pseudoAmount > 0 ? 0.07 + 0.07 * pseudoAmount : 0;
+    haasWetGainRef.current.gain.value = pseudoStereoWetGain(pseudoAmount);
 
     currentNode.connect(pseudoMonoRef.current);
     pseudoMonoRef.current.connect(pseudoLeftGainRef.current);
@@ -410,6 +479,10 @@ console.log("[Audio] initializeAudioContext called");
     pseudoRightGainRef.current.connect(pseudoMergerRef.current, 0, 1);
     pseudoMergerRef.current.connect(haasWetGainRef.current);
     haasWetGainRef.current.connect(stereoOutRef.current);
+
+    if (enabled.stereo && audioIsStereo) {
+      startStereoNearMonoAnalysis(stereoDetectionNode, basePseudoAmount);
+    }
 
     currentNode = stereoOutRef.current;
 
@@ -471,9 +544,12 @@ console.log("[Audio] initializeAudioContext called");
     bassGain,
     compMakeupGain,
     eqBands,
+    startStereoNearMonoAnalysis,
+    stopStereoNearMonoAnalysis,
     fxEnabled.master,
     fxEnabled.reverb,
     fxEnabled.stereo,
+    audioIsStereo,
     panValue,
     preampGain,
     reverbMix,
@@ -518,12 +594,9 @@ if (preampNodeRef.current) {
   useEffect(() => {
     if (dryGainRef.current && wetGainRef.current && reverbPreDelayRef.current) {
       if (fxEnabled?.reverb) {
-        const validReverbMix = Number(reverbMix) || 0;
-        const x = clamp(validReverbMix / 100, 0, 1);
-        const wetAmount = (1 - Math.exp(-x * 3)) / (1 - Math.exp(-3));
         dryGainRef.current.gain.value = 1.0;
-        wetGainRef.current.gain.value = wetAmount * REVERB_WET_GAIN;
-        reverbPreDelayRef.current.delayTime.value = 0.008 + 0.032 * x;
+        wetGainRef.current.gain.value = reverbWetGain(reverbMix);
+        reverbPreDelayRef.current.delayTime.value = reverbPreDelaySeconds(reverbMix);
       } else {
         dryGainRef.current.gain.value = 1;
         wetGainRef.current.gain.value = 0;
@@ -540,9 +613,11 @@ if (preampNodeRef.current) {
       rToRRef.current.gain.value = (1 + width) / 2;
     }
     if (haasWetGainRef.current && pseudoDelayRef.current) {
-      const pseudoAmount = fxEnabled.stereo ? percentToPseudoStereoAmount(stereoWidth) : 0;
-      const targetDelay = 0.006 + 0.007 * pseudoAmount;
-      const targetGain = pseudoAmount > 0 ? 0.07 + 0.07 * pseudoAmount : 0;
+      const basePseudoAmount = fxEnabled.stereo ? percentToPseudoStereoAmount(stereoWidth) : 0;
+      stereoPseudoBaseAmountRef.current = basePseudoAmount;
+      const pseudoAmount = !audioIsStereo ? basePseudoAmount : 0;
+      const targetDelay = 0.006 + 0.007 * basePseudoAmount;
+      const targetGain = pseudoStereoWetGain(pseudoAmount);
       
       if (audioContextRef.current) {
         pseudoDelayRef.current.delayTime.setTargetAtTime(targetDelay, audioContextRef.current.currentTime, 0.02);
@@ -552,7 +627,7 @@ if (preampNodeRef.current) {
         haasWetGainRef.current.gain.value = targetGain;
       }
     }
-  }, [stereoWidth, fxEnabled.stereo]);
+  }, [stereoWidth, fxEnabled.stereo, audioIsStereo]);
 
   useEffect(() => {
     if (panNodeRef.current) {
@@ -585,6 +660,13 @@ if (preampNodeRef.current) {
     }
   // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [eqBandsLength]);
+
+  useEffect(() => {
+    if (sourceNodeRef.current) {
+      initializeAudioContext();
+    }
+  // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [audioIsStereo]);
 
   return {
     audioRef,

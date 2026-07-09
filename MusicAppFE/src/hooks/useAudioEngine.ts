@@ -13,9 +13,16 @@ export function useAudioEngine(
   driveToken?: string,
   fetchDriveToken?: () => Promise<string>
 ) {
-  const contextState = useAudioContext(effectsState);
-  
   const metadataState = useAudioMetadata(isAuthenticated, queueState);
+  const currentTrack = queueState.currentTrack;
+  const currentTrackMetadata = currentTrack
+    ? metadataState.metadataCacheRef.current.get(String(currentTrack.id))
+    : undefined;
+  const currentTrackChannelCount = currentTrack?.numberOfChannels ?? currentTrackMetadata?.numberOfChannels;
+  const contextState = useAudioContext({
+    ...effectsState,
+    audioIsStereo: currentTrackChannelCount == null ? true : currentTrackChannelCount >= 2,
+  });
 
   const playbackState = useAudioPlayback(
     isAuthenticated,

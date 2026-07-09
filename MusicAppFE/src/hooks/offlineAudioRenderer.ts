@@ -1,6 +1,7 @@
 import type { EqBand } from './audioTypes';
 import type { AudioRenderParams, FxEnabledFlags } from './audioRenderSignature';
 import {
+  clamp,
   compressorAttackSeconds,
   isNeutralDbGain,
   isNeutralPercentValue,
@@ -12,7 +13,12 @@ import {
   configureMasterLimiter,
   connectStereoWidthMatrix,
   createSoftClipCurve,
-  REVERB_WET_GAIN,
+  generateImpulseResponse,
+  isAudioBufferNearMono,
+  REVERB_WET_HIGHPASS_HZ,
+  REVERB_WET_LOWPASS_HZ,
+  reverbPreDelaySeconds,
+  reverbWetGain,
 } from './audioGraph';
 
 const GAIN_BASED_EQ_TYPES = new Set<BiquadFilterType>(['peaking', 'lowshelf', 'highshelf']);
@@ -38,6 +44,7 @@ export const renderOfflineAudio = async ({
   if (!audioBuffer) return audioBuffer;
   const sampleRate = audioBuffer.sampleRate;
   const length = audioBuffer.length;
+  const shouldUsePseudoStereo = isAudioBufferNearMono(audioBuffer);
   const offlineCtx = new OfflineAudioContext(2, length, sampleRate);
 
   const offlineSource = offlineCtx.createBufferSource();
@@ -59,6 +66,7 @@ export const renderOfflineAudio = async ({
     compRmsSize,
     compMakeupGain,
     reverbMix,
+    reverbTime,
     stereoWidth,
     panValue,
     loudnessNormalization,
@@ -170,24 +178,33 @@ export const renderOfflineAudio = async ({
   let isReverbParallel = false;
   if (enabled.reverb && !isNeutralPercentValue(reverbMix, 0)) {
     const preDelay = offlineCtx.createDelay(1.0);
-    preDelay.delayTime.value = 0.02;
+    preDelay.delayTime.value = reverbPreDelaySeconds(reverbMix);
 
     const convolver = offlineCtx.createConvolver();
-    if (irBuffer) {
-      convolver.buffer = irBuffer;
-    }
+    convolver.buffer = irBuffer ?? generateImpulseResponse(offlineCtx, clamp(reverbTime || 2, 0.1, 10), 2);
+
+    const highpass = offlineCtx.createBiquadFilter();
+    highpass.type = 'highpass';
+    highpass.frequency.value = REVERB_WET_HIGHPASS_HZ;
+    highpass.Q.value = 0.7;
+
+    const lowpass = offlineCtx.createBiquadFilter();
+    lowpass.type = 'lowpass';
+    lowpass.frequency.value = REVERB_WET_LOWPASS_HZ;
+    lowpass.Q.value = 0.7;
 
     dryGain = offlineCtx.createGain();
-    const x = reverbMix / 100;
-    dryGain.gain.value = Math.cos(x * Math.PI / 2);
+    dryGain.gain.value = 1.0;
 
     wetGain = offlineCtx.createGain();
-    wetGain.gain.value = Math.sin(x * Math.PI / 2) * REVERB_WET_GAIN;
+    wetGain.gain.value = reverbWetGain(reverbMix);
 
     currentNode.connect(dryGain);
     currentNode.connect(preDelay);
     preDelay.connect(convolver);
-    convolver.connect(wetGain);
+    convolver.connect(highpass);
+    highpass.connect(lowpass);
+    lowpass.connect(wetGain);
 
     isReverbParallel = true;
   }
@@ -206,7 +223,7 @@ export const renderOfflineAudio = async ({
   if (enabled.stereo && !isNeutralPercentValue(stereoWidth, 100)) {
     const stereoInput = offlineCtx.createGain();
     connectToNext(stereoInput);
-    currentNode = connectStereoWidthMatrix(offlineCtx, stereoInput, stereoWidth);
+    currentNode = connectStereoWidthMatrix(offlineCtx, stereoInput, stereoWidth, shouldUsePseudoStereo);
   }
 
   if (enabled.master && !isNeutralPercentValue(panValue, 0)) {
