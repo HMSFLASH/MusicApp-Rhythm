@@ -6,9 +6,11 @@ import { useGlobalAudio } from '../context/AudioContext'
 import { useAuth } from '../context/AuthContext';;
 import type { Track } from '../hooks/useAudioPlayer';
 import { useLibrary } from '../context/LibraryContext';
+import { useConfirm } from '../context/ConfirmContext';
 
 export function TracksPage() {
   const navigate = useNavigate();
+  const confirm = useConfirm();
   const [searchParams] = useSearchParams();
   const { isAuthenticated } = useAuth();
   const { playerState } = useGlobalAudio();
@@ -149,11 +151,11 @@ export function TracksPage() {
               : 'bg-white/[0.02] border-white/5 hover:bg-white/5 hover:border-white/10'
               }`}
           >
-            <span className="text-xs text-white/20 w-5 text-right md:group-hover:hidden">{(currentPage - 1) * ITEMS_PER_PAGE + idx + 1}</span>
+            <span className="text-xs text-white/20 w-5 text-right lg:group-hover:hidden">{(currentPage - 1) * ITEMS_PER_PAGE + idx + 1}</span>
             <button
               aria-label="Play track"
               onClick={(e) => { e.stopPropagation(); playerState.playTrack(track, displayTracks); }}
-              className={`hidden md:group-hover:flex w-5 items-center justify-center rounded-full transition-colors text-white`}
+              className={`hidden lg:group-hover:flex w-5 items-center justify-center rounded-full transition-colors text-white`}
             >
               <Play size={13} fill="currentColor" />
             </button>
@@ -173,7 +175,7 @@ export function TracksPage() {
                 <span className="text-xs text-white/30 truncate">{track.artist || playerState.getTrackMetadata(track.id)?.artist || (track.fileName?.includes(' - ') ? track.fileName.split(' - ')[0] : 'Unknown Artist')}</span>
               </div>
             </div>
-            <div className={`relative flex items-center gap-2 transition-opacity ${openMenuId === track.id ? 'opacity-100' : 'opacity-100 md:opacity-0 md:group-hover:opacity-100'}`}>
+            <div className={`relative flex items-center gap-2 transition-opacity ${openMenuId === track.id ? 'opacity-100' : 'opacity-100 lg:opacity-0 lg:group-hover:opacity-100'}`}>
               <button
                 aria-label="More options"
                 onClick={(e) => { e.stopPropagation(); setOpenMenuId(openMenuId === track.id ? null : track.id); }}
@@ -222,9 +224,23 @@ export function TracksPage() {
                     <button
                       onClick={async (e) => {
                         e.stopPropagation();
-                        if (confirm(`Are you sure you want to delete "${track.title || track.fileName}" from your library?`)) {
-                          await deleteTrack(track);
-                          setOpenMenuId(null);
+                        const isConfirmed = await confirm({
+                          title: 'Xóa bài hát',
+                          description: `Bạn có chắc chắn muốn xóa bài hát "${track.title || track.fileName}" khỏi thư viện?`,
+                          confirmText: 'Xóa',
+                          confirmColor: 'bg-red-500/20 text-red-400 hover:bg-red-500/30 border-red-500/30'
+                        });
+                        if (isConfirmed) {
+                          const isConfirmed2 = await confirm({
+                            title: 'Xác nhận xóa vĩnh viễn',
+                            description: `Hành động này sẽ xóa vĩnh viễn bài hát "${track.title || track.fileName}" từ Google Drive của bạn và không thể hoàn tác. Bạn vẫn muốn tiếp tục?`,
+                            confirmText: 'Xóa vĩnh viễn',
+                            confirmColor: 'bg-red-600 text-white hover:bg-red-700 border-red-600'
+                          });
+                          if (isConfirmed2) {
+                            await deleteTrack(track);
+                            setOpenMenuId(null);
+                          }
                         }
                       }}
                       className="w-full flex items-center gap-3 px-4 py-2 text-sm text-left text-red-400 hover:bg-white/10 hover:text-red-300"

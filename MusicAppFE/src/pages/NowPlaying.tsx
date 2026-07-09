@@ -8,6 +8,7 @@ import { LyricsView } from '../components/LyricsView';
 import { useNavigate } from 'react-router-dom';
 import { useTranslation } from 'react-i18next';
 import { axiosClient } from '../api/axiosClient';
+import { useConfirm } from '../context/ConfirmContext';
 
 const formatTime = (time: number) => {
   const m = Math.floor(time / 60);
@@ -17,6 +18,7 @@ const formatTime = (time: number) => {
 
 export function NowPlaying() {
   const { t } = useTranslation();
+  const confirm = useConfirm();
   const { isAuthenticated } = useAuth();
   const { playerState } = useGlobalAudio();
   const { deleteTrack } = useLibrary();
@@ -369,9 +371,23 @@ export function NowPlaying() {
                       {currentTrack.sourceType !== 'LOCAL' && (
                         <button
                           onClick={async () => {
-                            if (confirm(`Are you sure you want to delete "${currentTrack.title || currentTrack.fileName}" from your library?`)) {
-                              setShowMenu(false);
-                              await deleteTrack(currentTrack);
+                            const isConfirmed = await confirm({
+                              title: 'Xóa bài hát',
+                              description: `Bạn có chắc chắn muốn xóa bài hát "${currentTrack.title || currentTrack.fileName}" khỏi thư viện?`,
+                              confirmText: 'Xóa',
+                              confirmColor: 'bg-red-500/20 text-red-400 hover:bg-red-500/30 border-red-500/30'
+                            });
+                            if (isConfirmed) {
+                              const isConfirmed2 = await confirm({
+                                title: 'Xác nhận xóa vĩnh viễn',
+                                description: `Hành động này sẽ xóa vĩnh viễn bài hát "${currentTrack.title || currentTrack.fileName}" từ Google Drive của bạn và không thể hoàn tác. Bạn vẫn muốn tiếp tục?`,
+                                confirmText: 'Xóa vĩnh viễn',
+                                confirmColor: 'bg-red-600 text-white hover:bg-red-700 border-red-600'
+                              });
+                              if (isConfirmed2) {
+                                setShowMenu(false);
+                                await deleteTrack(currentTrack);
+                              }
                             }
                           }}
                           className="w-full flex items-center gap-3 px-4 py-3 text-sm text-red-400 hover:bg-white/5 hover:text-red-300 transition-colors border-t border-white/5"

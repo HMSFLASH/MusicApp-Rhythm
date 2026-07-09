@@ -1,4 +1,5 @@
 import { useState, useRef, useEffect } from 'react';
+import { useNavigate } from 'react-router-dom';
 import { Search, Plus, Users, Music, Disc, X, Check, Play, Cloud, ListPlus } from 'lucide-react';
 import { useGlobalAudio } from '../context/AudioContext'
 import { useAuth } from '../context/AuthContext';;
@@ -7,6 +8,7 @@ import type { Track } from '../hooks/useAudioPlayer';
 import { useLibrary } from '../context/LibraryContext';
 
 export function SearchPage() {
+  const navigate = useNavigate();
   const { isAuthenticated } = useAuth();
   const { playerState } = useGlobalAudio();
   const { tracks: allTracks } = useLibrary();
@@ -288,9 +290,9 @@ export function SearchPage() {
                         ? 'bg-primary/10 border-primary/30'
                         : 'bg-white/[0.02] border-white/5 hover:bg-white/5 hover:border-white/10'
                       }`}>
-                      <span className="text-xs text-white/20 w-5 text-right group-hover:hidden">{idx + 1}</span>
+                      <span className="text-xs text-white/20 w-5 text-right lg:group-hover:hidden">{idx + 1}</span>
                       <button onClick={(e) => { e.stopPropagation(); playerState.playTrack(track, searchResults); }}
-                        className="hidden group-hover:flex w-5 items-center justify-center text-white">
+                        className="hidden lg:group-hover:flex w-5 items-center justify-center text-white">
                         <Play size={13} fill="currentColor" />
                       </button>
                       <div className="flex flex-col truncate flex-1">
@@ -302,7 +304,7 @@ export function SearchPage() {
                           <span className="truncate">{track.artist || playerState.getTrackMetadata(track.id)?.artist || (track.fileName?.includes(' - ') ? track.fileName.split(' - ')[0] : 'Unknown Artist')}</span>
                         </span>
                       </div>
-                      <div className="flex items-center gap-2 opacity-100 md:opacity-0 md:group-hover:opacity-100 transition-opacity">
+                      <div className="flex items-center gap-2 opacity-100 lg:opacity-0 lg:group-hover:opacity-100 transition-opacity">
                         <button
                           onClick={(e) => { e.stopPropagation(); setTrackToPlaylist(track); }}
                           className="p-1.5 text-white/40 hover:text-white hover:bg-white/10 rounded-full transition-colors"
@@ -325,15 +327,39 @@ export function SearchPage() {
                   <h3 className="text-sm font-semibold text-white/40 uppercase tracking-widest mb-3">Artists</h3>
                   <div className="flex flex-wrap gap-3">
                     {uniqueArtists.map((artist, i) => (
-                      <div key={i} className="flex items-center gap-3 bg-white/5 hover:bg-white/10 border border-white/5 rounded-xl px-4 py-3 cursor-pointer transition-colors">
-                        <div className="w-10 h-10 rounded-full flex items-center justify-center text-white font-bold"
-                          style={{ background: `linear-gradient(135deg, hsl(${(i * 47) % 360}, 70%, 30%) 0%, hsl(${(i * 47 + 80) % 360}, 90%, 20%) 100%)` }}>
-                          {artist[0]}
+                      <div 
+                        key={i} 
+                        onClick={() => navigate('/artists', { state: { selectedArtist: artist } })}
+                        className="flex items-center justify-between bg-white/5 hover:bg-white/10 border border-white/5 rounded-xl px-4 py-3 cursor-pointer transition-colors group w-full sm:w-auto sm:min-w-[200px] gap-4"
+                      >
+                        <div className="flex items-center gap-3 min-w-0">
+                          <div className="w-10 h-10 rounded-full flex items-center justify-center text-white font-bold shrink-0"
+                            style={{ background: `linear-gradient(135deg, hsl(${(i * 47) % 360}, 70%, 30%) 0%, hsl(${(i * 47 + 80) % 360}, 90%, 20%) 100%)` }}>
+                            {artist[0]}
+                          </div>
+                          <div className="truncate">
+                            <p className="text-sm font-medium text-white truncate">{artist}</p>
+                            <p className="text-xs text-white/40">{allTracks.filter(t => (t.artist || playerState.getTrackMetadata(t.id)?.artist) === artist).length} songs</p>
+                          </div>
                         </div>
-                        <div>
-                          <p className="text-sm font-medium text-white">{artist}</p>
-                          <p className="text-xs text-white/40">{searchResults.filter(t => (t.artist || playerState.getTrackMetadata(t.id)?.artist) === artist).length} songs</p>
-                        </div>
+                        <button
+                          onClick={(e) => {
+                            e.stopPropagation();
+                            const artistTracks = allTracks.filter(t => t.artist === artist || playerState.getTrackMetadata(t.id)?.artist === artist || t.fileName?.startsWith(artist + ' - '));
+                            if (artistTracks.length > 0) {
+                              if (playerState.isShuffle) {
+                                const shuffled = [...artistTracks].sort(() => Math.random() - 0.5);
+                                playerState.playTrack(shuffled[0], shuffled);
+                              } else {
+                                playerState.playTrack(artistTracks[0], artistTracks);
+                              }
+                            }
+                          }}
+                          className="w-8 h-8 rounded-full bg-[#10b981] text-black hover:scale-105 flex items-center justify-center transition-all opacity-100 lg:opacity-0 lg:group-hover:opacity-100 shadow-md shrink-0 animate-in fade-in"
+                          title="Phát tất cả nhạc của artist"
+                        >
+                          <Play size={12} fill="currentColor" className="ml-0.5" />
+                        </button>
                       </div>
                     ))}
                   </div>
@@ -350,8 +376,9 @@ export function SearchPage() {
                   <div className="grid grid-cols-2 md:grid-cols-4 lg:grid-cols-5 gap-4">
                     {uniqueAlbums.map((album, i) => {
                       const track = searchResults.find(t => t.album === album);
+                      const albumTracks = allTracks.filter(t => t.album === album || playerState.getTrackMetadata(t.id)?.album === album);
                       return (
-                        <div key={i} className="group cursor-pointer">
+                        <div key={i} className="group cursor-pointer" onClick={() => navigate('/albums', { state: { selectedAlbum: album } })}>
                           <div className="w-full aspect-square rounded-xl mb-2 flex items-center justify-center border border-white/5 group-hover:border-white/20 transition-all relative overflow-hidden"
                             style={{ background: `linear-gradient(135deg, hsl(${(i * 47) % 360}, 60%, 20%) 0%, hsl(${(i * 47 + 60) % 360}, 80%, 10%) 100%)` }}>
                             {track?.imageUrl ? (
@@ -361,6 +388,41 @@ export function SearchPage() {
                                 <Disc size={40} className="text-white" />
                               </div>
                             )}
+                            <div className="absolute inset-0 bg-black/0 group-hover:bg-black/40 transition-all flex items-center justify-center opacity-0 group-hover:opacity-100 hidden lg:flex">
+                              <button
+                                onClick={(e) => {
+                                  e.stopPropagation();
+                                  if (albumTracks.length > 0) {
+                                    if (playerState.isShuffle) {
+                                      const shuffled = [...albumTracks].sort(() => Math.random() - 0.5);
+                                      playerState.playTrack(shuffled[0], shuffled);
+                                    } else {
+                                      playerState.playTrack(albumTracks[0], albumTracks);
+                                    }
+                                  }
+                                }}
+                                className="w-10 h-10 bg-[#f59e0b] rounded-full flex items-center justify-center hover:scale-110 shadow-lg transition-transform"
+                                title="Phát album"
+                              >
+                                <Play size={16} fill="white" className="ml-1 text-white" />
+                              </button>
+                            </div>
+                            <button
+                              onClick={(e) => {
+                                e.stopPropagation();
+                                if (albumTracks.length > 0) {
+                                  if (playerState.isShuffle) {
+                                    const shuffled = [...albumTracks].sort(() => Math.random() - 0.5);
+                                    playerState.playTrack(shuffled[0], shuffled);
+                                  } else {
+                                    playerState.playTrack(albumTracks[0], albumTracks);
+                                  }
+                                }
+                              }}
+                              className="lg:hidden absolute bottom-2 right-2 w-8 h-8 bg-[#f59e0b] rounded-full flex items-center justify-center shadow-lg z-10"
+                            >
+                              <Play size={12} fill="white" className="ml-0.5 text-white" />
+                            </button>
                           </div>
                           <p className="text-sm font-semibold text-white truncate">{album}</p>
                           <p className="text-xs text-white/40 truncate">{track?.artist || 'Unknown'}</p>

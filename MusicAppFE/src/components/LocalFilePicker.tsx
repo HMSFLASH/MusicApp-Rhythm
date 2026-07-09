@@ -4,6 +4,7 @@ import { useGlobalAudio } from '../context/AudioContext';
 import { useTranslation } from 'react-i18next';
 import { AUDIO_EXTENSIONS } from '../hooks/audioMime';
 import { useLocalFileImport } from './local-file-picker/useLocalFileImport';
+import { useConfirm } from '../context/ConfirmContext';
 
 type LocalPickerButtonProps = {
   label: ReactNode;
@@ -40,19 +41,21 @@ function LocalPickerButton({
 
 export function LocalFilePicker() {
   const { t } = useTranslation();
+  const confirm = useConfirm();
   const fileInputRef = useRef<HTMLInputElement>(null);
   const folderInputRef = useRef<HTMLInputElement>(null);
   const { playerState } = useGlobalAudio();
   const { playTrack, setCurrentTrack, setQueue } = playerState;
   const handleFiles = useLocalFileImport({ playTrack, setCurrentTrack, setQueue });
 
-  const openLocalFolderPicker = () => {
-    const shouldContinue = window.confirm(
-      t(
+  const openLocalFolderPicker = async () => {
+    const shouldContinue = await confirm({
+      title: t('layout.playLocalFolderWarningTitle', 'Cảnh báo thư mục cục bộ'),
+      description: t(
         'layout.playLocalFolderWarning',
         'Opening a large local folder can use a lot of CPU and RAM while scanning files and reading metadata. On weak devices, choose a smaller folder or disable heavy Audio Studio effects if playback crackles. Continue?'
       )
-    );
+    });
 
     if (!shouldContinue) return;
     folderInputRef.current!.value = '';

@@ -9,6 +9,7 @@ import { axiosClient } from '../api/axiosClient';
 import { useGlobalAudio } from '../context/AudioContext'
 import { db } from '../lib/db';
 import { useLibrary } from '../context/LibraryContext';
+import { useConfirm } from '../context/ConfirmContext';
 
 interface PlaylistProps {
   isAuthenticated: boolean;
@@ -47,6 +48,7 @@ type PlaylistDetails = PlaylistSummary & {
 
 export function Playlist({ isAuthenticated, onPlay, currentTrackId }: PlaylistProps) {
   const { t } = useTranslation();
+  const confirm = useConfirm();
   const [playlists, setPlaylists] = useState<PlaylistSummary[]>([]);
   const [searchParams, setSearchParams] = useSearchParams();
   const selectedPlaylistId = searchParams.get('playlistId') ? parseInt(searchParams.get('playlistId')!) : null;
@@ -215,7 +217,13 @@ export function Playlist({ isAuthenticated, onPlay, currentTrackId }: PlaylistPr
 
   const deletePlaylist = async (id: number, e: React.MouseEvent) => {
     e.stopPropagation();
-    if (!confirm(t('playlist.deleteConfirm'))) return;
+    const isConfirmed = await confirm({
+      title: t('playlist.deletePlaylist', 'Xóa danh sách phát'),
+      description: t('playlist.deleteConfirm', 'Bạn có chắc chắn muốn xóa danh sách phát này không?'),
+      confirmText: t('playlist.delete', 'Xóa'),
+      confirmColor: 'bg-red-500/20 text-red-400 hover:bg-red-500/30 border-red-500/30'
+    });
+    if (!isConfirmed) return;
 
     try {
       await axiosClient.delete(`/api/playlists/${id}`);
@@ -339,7 +347,7 @@ export function Playlist({ isAuthenticated, onPlay, currentTrackId }: PlaylistPr
                 onClick={() => { setEditName(selectedPlaylistDetails.name); setIsEditingName(true); }}
               >
                 <span className="truncate">{selectedPlaylistDetails.name}</span>
-                <button className="opacity-100 md:opacity-0 group-hover/title:opacity-100 text-white/40 hover:text-white transition-opacity p-1 shrink-0">
+                <button className="opacity-100 lg:opacity-0 group-hover/title:opacity-100 text-white/40 hover:text-white transition-opacity p-1 shrink-0">
                   <Pencil size={16} />
                 </button>
               </div>
@@ -487,7 +495,7 @@ export function Playlist({ isAuthenticated, onPlay, currentTrackId }: PlaylistPr
                             setEditListName(p.name);
                             setEditingListPlaylistId(p.id);
                           }}
-                          className="opacity-100 md:opacity-0 group-hover/title:opacity-100 text-white/40 hover:text-white transition-opacity p-1 shrink-0"
+                          className="opacity-100 lg:opacity-0 group-hover/title:opacity-100 text-white/40 hover:text-white transition-opacity p-1 shrink-0"
                         >
                           <Pencil size={14} />
                         </button>
@@ -498,7 +506,7 @@ export function Playlist({ isAuthenticated, onPlay, currentTrackId }: PlaylistPr
                 </div>
                 <button
                   onClick={(e) => deletePlaylist(p.id, e)}
-                  className="p-2 text-white/30 md:text-transparent md:group-hover:text-red-400/50 hover:!text-red-400 transition-colors rounded-full hover:bg-red-400/10 shrink-0"
+                  className="p-2 text-white/30 lg:text-transparent lg:group-hover:text-red-400/50 hover:!text-red-400 transition-colors rounded-full hover:bg-red-400/10 shrink-0"
                   title={t('playlist.deletePlaylist')}
                 >
                   <Trash2 size={16} />
@@ -563,7 +571,7 @@ export function Playlist({ isAuthenticated, onPlay, currentTrackId }: PlaylistPr
                     </div>
                   </div>
 
-                  <div className={`relative flex items-center gap-2 transition-opacity ${openMenuId === track.id ? 'opacity-100' : 'opacity-100 md:opacity-0 md:group-hover:opacity-100'}`}>
+                  <div className={`relative flex items-center gap-2 transition-opacity ${openMenuId === track.id ? 'opacity-100' : 'opacity-100 lg:opacity-0 lg:group-hover:opacity-100'}`}>
                     <button
                       onClick={(e) => { e.stopPropagation(); setOpenMenuId(openMenuId === track.id ? null : track.id); }}
                       className="p-1.5 text-white/40 hover:text-white hover:bg-white/10 rounded-full transition-colors"

@@ -1,15 +1,16 @@
 import { useMemo, useState, type MouseEvent } from 'react';
-import { useNavigate } from 'react-router-dom';
-import { ArrowLeft, Album, Cloud, ListMusic, ListPlus, Play } from 'lucide-react';
+import { useNavigate, useLocation } from 'react-router-dom';
+import { ArrowLeft, Album, Cloud, ListMusic, ListPlus, Play, Shuffle } from 'lucide-react';
 import { useGlobalAudio } from '../context/AudioContext';
 import { useLibrary } from '../context/LibraryContext';
 import type { Track } from '../hooks/useAudioPlayer';
 
 export function AlbumsPage() {
   const navigate = useNavigate();
+  const location = useLocation();
   const { playerState } = useGlobalAudio();
   const { tracks } = useLibrary();
-  const [selectedAlbum, setSelectedAlbum] = useState<string | null>(null);
+  const [selectedAlbum, setSelectedAlbum] = useState<string | null>(location.state?.selectedAlbum || null);
 
   const getAlbum = (track: Track) => track.album || playerState.getTrackMetadata(track.id)?.album || '';
   const getArtist = (track: Track) => (
@@ -60,7 +61,7 @@ export function AlbumsPage() {
 
   return (
     <div className="w-full h-full flex flex-col p-4 md:p-8 max-w-6xl mx-auto pb-32 overflow-y-auto">
-      <div className="mb-8 border-b border-white/10 pb-6 flex items-center justify-between">
+      <div className="mb-8 border-b border-white/10 pb-6 flex items-center justify-between flex-wrap gap-4">
         <div>
           <h1 className="text-3xl font-bold font-sans text-white tracking-tight flex items-center gap-3">
             <button onClick={handleBack} className="p-2 hover:bg-white/10 rounded-full transition-colors text-white/50 hover:text-white">
@@ -74,6 +75,55 @@ export function AlbumsPage() {
               : `${albumGroups.length} albums in your library.`}
           </p>
         </div>
+        {selectedAlbumGroup && (
+          <div className="flex flex-wrap gap-2 items-center">
+            <button
+              onClick={() => {
+                const tracks = selectedAlbumGroup.tracks;
+                if (playerState.isShuffle) {
+                  const shuffled = [...tracks].sort(() => Math.random() - 0.5);
+                  playerState.playTrack(shuffled[0], shuffled);
+                } else {
+                  playerState.playTrack(tracks[0], tracks);
+                }
+              }}
+              className="px-3 h-8 rounded-full bg-primary text-black hover:bg-primary/90 flex items-center gap-1.5 transition-all text-sm font-bold shadow-lg shadow-primary/20"
+              title="Play Album"
+            >
+              <Play size={14} fill="currentColor" /> Play
+            </button>
+            <button
+              onClick={() => {
+                playerState.setIsShuffle(true);
+                const tracks = selectedAlbumGroup.tracks;
+                const shuffled = [...tracks].sort(() => Math.random() - 0.5);
+                playerState.playTrack(shuffled[0], shuffled);
+              }}
+              className="px-3 h-8 rounded-full bg-white/10 text-white hover:bg-white hover:text-black flex items-center gap-1.5 transition-all text-sm font-bold"
+              title="Shuffle Album"
+            >
+              <Shuffle size={14} /> Shuffle
+            </button>
+            <button
+              onClick={() => {
+                playerState.addToCurrentQueue(selectedAlbumGroup.tracks);
+              }}
+              className="px-3 h-8 rounded-full bg-white/10 text-white hover:bg-white hover:text-black flex items-center gap-1.5 transition-all text-sm font-bold"
+              title="Add to Queue"
+            >
+              <ListPlus size={14} /> Add to Queue
+            </button>
+            <button
+              onClick={() => {
+                playerState.addToNextQueue(selectedAlbumGroup.tracks);
+              }}
+              className="px-3 h-8 rounded-full bg-white/10 text-white hover:bg-white hover:text-black flex items-center gap-1.5 transition-all text-sm font-bold"
+              title="Play Next"
+            >
+              <ListMusic size={14} /> Play Next
+            </button>
+          </div>
+        )}
       </div>
 
       {selectedAlbumGroup ? (
@@ -120,26 +170,34 @@ export function AlbumsPage() {
             const track = album.coverTrack;
             return (
               <div key={album.name} className="group cursor-pointer" onClick={() => setSelectedAlbum(album.name)}>
-                <div className={`w-full aspect-square rounded-2xl mb-3 flex items-center justify-center border border-white/5 group-hover:border-[#f59e0b]/40 transition-all relative overflow-hidden bg-gradient-to-br`}
-                  style={{ background: `linear-gradient(135deg, hsl(${(i * 47) % 360}, 60%, 20%) 0%, hsl(${(i * 47 + 60) % 360}, 80%, 10%) 100%)` }}>
-                  {track?.imageUrl || playerState.getTrackImage(track.id) ? (
-                    <img src={track.imageUrl || playerState.getTrackImage(track.id)} alt={album.name} className="w-full h-full object-cover group-hover:scale-105 transition-transform duration-500" />
-                  ) : (
-                    <div className="absolute inset-0 flex items-center justify-center opacity-30">
-                      <Album size={64} className="text-white" />
+                <div className="relative w-full aspect-square mb-3">
+                  <div className={`w-full h-full rounded-2xl flex items-center justify-center border border-white/5 group-hover:border-[#f59e0b]/40 transition-all relative overflow-hidden bg-gradient-to-br`}
+                    style={{ background: `linear-gradient(135deg, hsl(${(i * 47) % 360}, 60%, 20%) 0%, hsl(${(i * 47 + 60) % 360}, 80%, 10%) 100%)` }}>
+                    {track?.imageUrl || playerState.getTrackImage(track.id) ? (
+                      <img src={track.imageUrl || playerState.getTrackImage(track.id)} alt={album.name} className="w-full h-full object-cover group-hover:scale-105 transition-transform duration-500" />
+                    ) : (
+                      <div className="absolute inset-0 flex items-center justify-center opacity-30">
+                        <Album size={64} className="text-white" />
+                      </div>
+                    )}
+                    <div className="absolute inset-0 bg-black/0 group-hover:bg-black/40 transition-all flex items-center justify-center opacity-0 group-hover:opacity-100 hidden lg:flex">
+                      <button onClick={(e) => { e.stopPropagation(); playerState.addToCurrentQueue(album.tracks); }} className="w-10 h-10 bg-white/20 hover:bg-white/40 rounded-full flex items-center justify-center hover:scale-110 shadow-lg transition-transform mx-1" title="Thêm vào hàng chờ hiện tại">
+                        <ListPlus size={16} className="text-white" />
+                      </button>
+                      <button onClick={(e) => handlePlayAlbum(album.name, e)} className="w-12 h-12 bg-[#f59e0b] rounded-full flex items-center justify-center hover:scale-110 shadow-lg transition-transform mx-1" title="Phát album">
+                        <Play size={20} fill="white" className="ml-1 text-white" />
+                      </button>
+                      <button onClick={(e) => { e.stopPropagation(); playerState.addToNextQueue(album.tracks); }} className="w-10 h-10 bg-white/20 hover:bg-white/40 rounded-full flex items-center justify-center hover:scale-110 shadow-lg transition-transform mx-1" title="Thêm vào hàng chờ tiếp theo">
+                        <ListMusic size={16} className="text-white" />
+                      </button>
                     </div>
-                  )}
-                  <div className="absolute inset-0 bg-black/0 group-hover:bg-black/40 transition-all flex items-center justify-center opacity-0 group-hover:opacity-100">
-                    <button onClick={(e) => { e.stopPropagation(); playerState.addToCurrentQueue(album.tracks); }} className="w-10 h-10 bg-white/20 hover:bg-white/40 rounded-full flex items-center justify-center hover:scale-110 shadow-lg transition-transform mx-1" title="Thêm vào hàng chờ hiện tại">
-                      <ListPlus size={16} className="text-white" />
-                    </button>
-                    <button onClick={(e) => handlePlayAlbum(album.name, e)} className="w-12 h-12 bg-[#f59e0b] rounded-full flex items-center justify-center hover:scale-110 shadow-lg transition-transform mx-1" title="Phát album">
-                      <Play size={20} fill="white" className="ml-1 text-white" />
-                    </button>
-                    <button onClick={(e) => { e.stopPropagation(); playerState.addToNextQueue(album.tracks); }} className="w-10 h-10 bg-white/20 hover:bg-white/40 rounded-full flex items-center justify-center hover:scale-110 shadow-lg transition-transform mx-1" title="Thêm vào hàng chờ tiếp theo">
-                      <ListMusic size={16} className="text-white" />
-                    </button>
                   </div>
+                  <button 
+                    onClick={(e) => handlePlayAlbum(album.name, e)} 
+                    className="lg:hidden absolute bottom-2 right-2 w-10 h-10 bg-[#f59e0b] rounded-full flex items-center justify-center shadow-lg z-10"
+                  >
+                    <Play size={16} fill="white" className="ml-1 text-white" />
+                  </button>
                 </div>
                 <p className="text-base font-semibold text-white truncate group-hover:text-[#f59e0b] transition-colors">{album.name}</p>
                 <p className="text-sm text-white/40 truncate">{album.tracks.length} songs</p>

@@ -22,6 +22,7 @@ import { OAuthCallback } from './pages/OAuthCallback';
 import { UploadProvider } from './context/UploadContext';
 import { LibraryProvider } from './context/LibraryContext';
 import { Navigate } from 'react-router-dom';
+import { ConfirmProvider } from './context/ConfirmContext';
 
 function ProtectedRoute({ children }: { children: React.ReactNode }) {
   const { isAuthenticated } = useAuth();
@@ -71,7 +72,9 @@ export default function AppWrapper() {
       <AudioProvider>
         <LibraryProvider>
           <UploadProvider>
-            <App />
+            <ConfirmProvider>
+              <App />
+            </ConfirmProvider>
           </UploadProvider>
         </LibraryProvider>
       </AudioProvider>
