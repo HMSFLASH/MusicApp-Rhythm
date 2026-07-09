@@ -1,7 +1,6 @@
 import { useRef, useEffect, useCallback } from 'react';
 import {
   applyMasterLimiterState,
-  configureLoudnessNormalization,
   generateImpulseResponse,
   getStereoSimilarity,
   pseudoStereoWetGain,
@@ -18,6 +17,11 @@ import {
   percentToPseudoStereoAmount,
   percentToStereoBaseWidth,
 } from './audioMath';
+import {
+  BASE_POST_FX_TRIM_DB,
+  calculateAutoPostFxTrimDb,
+  dbToGain,
+} from './audioLoudness';
 
 export {
   configureLoudnessNormalization,
@@ -61,12 +65,11 @@ export function useAudioContext(effectsState: any) {
   const limiterNodeRef = useRef<DynamicsCompressorNode | null>(null);
   const softClipNodeRef = useRef<WaveShaperNode | null>(null);
   const panNodeRef = useRef<StereoPannerNode | null>(null);
+  const trackLoudnessGainRef = useRef<GainNode | null>(null);
+  const trackLoudnessGainValueRef = useRef(1);
   const headroomDropRef = useRef<GainNode | null>(null);
   const headroomRecoverRef = useRef<GainNode | null>(null);
   const preampNodeRef = useRef<GainNode | null>(null);
-  const agcPreGainRef = useRef<GainNode | null>(null);
-  const agcCompressorRef = useRef<DynamicsCompressorNode | null>(null);
-  const agcMakeupRef = useRef<GainNode | null>(null);
   const bassNodeRef = useRef<BiquadFilterNode | null>(null);
   const trebleNodeRef = useRef<BiquadFilterNode | null>(null);
   const compressorNodeRef = useRef<DynamicsCompressorNode | null>(null);
@@ -156,16 +159,16 @@ export function useAudioContext(effectsState: any) {
     }
   }, [compAttack, compKnee, compMakeupGain, compRatio, compRelease, compRmsSize, compThreshold, fxEnabled.comp]);
 
-  const applyLoudnessParams = useCallback(() => {
-    if (!agcPreGainRef.current || !agcCompressorRef.current || !agcMakeupRef.current) return;
+  const setTrackLoudnessGain = useCallback((gain: number) => {
+    const nextGain = Number.isFinite(gain) && gain > 0 ? gain : 1;
+    trackLoudnessGainValueRef.current = nextGain;
 
-    configureLoudnessNormalization(
-      agcPreGainRef.current,
-      agcCompressorRef.current,
-      agcMakeupRef.current,
-      loudnessNormalization
-    );
-  }, [loudnessNormalization]);
+    if (!audioContextRef.current || !trackLoudnessGainRef.current) return;
+
+    const now = audioContextRef.current.currentTime;
+    trackLoudnessGainRef.current.gain.cancelScheduledValues(now);
+    trackLoudnessGainRef.current.gain.setTargetAtTime(nextGain, now, 0.03);
+  }, []);
 
   useEffect(() => () => {
     stopStereoNearMonoAnalysis();
@@ -264,6 +267,7 @@ console.log("[Audio] initializeAudioContext called");
         // Disconnect everything first to rebuild graph
     stopStereoNearMonoAnalysis();
     if (sourceNodeRef.current) sourceNodeRef.current.disconnect();
+    if (trackLoudnessGainRef.current) trackLoudnessGainRef.current.disconnect();
     if (headroomDropRef.current) headroomDropRef.current.disconnect();
     if (preampNodeRef.current) preampNodeRef.current.disconnect();
     if (eqNodesRef.current) {
@@ -298,15 +302,18 @@ console.log("[Audio] initializeAudioContext called");
     if (pseudoMergerRef.current) pseudoMergerRef.current.disconnect();
     if (haasWetGainRef.current) haasWetGainRef.current.disconnect();
     if (headroomRecoverRef.current) headroomRecoverRef.current.disconnect();
-    if (agcPreGainRef.current) agcPreGainRef.current.disconnect();
-    if (agcCompressorRef.current) agcCompressorRef.current.disconnect();
-    if (agcMakeupRef.current) agcMakeupRef.current.disconnect();
     if (limiterNodeRef.current) limiterNodeRef.current.disconnect();
     if (softClipNodeRef.current) softClipNodeRef.current.disconnect();
     if (panNodeRef.current) panNodeRef.current.disconnect();
 
     let currentNode: AudioNode = sourceNodeRef.current;
     const enabled = fxEnabledRef.current;
+
+    // 0. Per-track loudness gain. Actual LUFS measurement is done by playback/pre-render code.
+    if (!trackLoudnessGainRef.current) trackLoudnessGainRef.current = ctx.createGain();
+    trackLoudnessGainRef.current.gain.value = loudnessNormalization ? trackLoudnessGainValueRef.current : 1;
+    currentNode.connect(trackLoudnessGainRef.current);
+    currentNode = trackLoudnessGainRef.current;
 
     // 1. Gain Staging (-6dB)
     if (!headroomDropRef.current) headroomDropRef.current = ctx.createGain();
@@ -493,23 +500,19 @@ console.log("[Audio] initializeAudioContext called");
     currentNode.connect(panNodeRef.current);
     currentNode = panNodeRef.current;
 
-    // 6.5 Loudness Normalization (AGC at the end)
-    if (!agcPreGainRef.current) agcPreGainRef.current = ctx.createGain();
-    if (!agcCompressorRef.current) agcCompressorRef.current = ctx.createDynamicsCompressor();
-    if (!agcMakeupRef.current) agcMakeupRef.current = ctx.createGain();
-    applyLoudnessParams();
-
-    currentNode.connect(agcPreGainRef.current);
-    agcPreGainRef.current.connect(agcCompressorRef.current);
-    agcCompressorRef.current.connect(agcMakeupRef.current);
-    currentNode = agcMakeupRef.current;
-
     // Output
-    // 7. Headroom Recover
+    // 7. Adaptive post-FX trim: keeps boosted EQ/reverb/preamp from leaning on the limiter.
     if (!headroomRecoverRef.current) {
         headroomRecoverRef.current = ctx.createGain();
-        headroomRecoverRef.current.gain.value = 1.414;
     }
+    headroomRecoverRef.current.gain.value = dbToGain(calculateAutoPostFxTrimDb({
+      preampGain,
+      eqBands,
+      bassGain,
+      trebleGain,
+      reverbMix,
+      stereoWidth,
+    }, enabled) || BASE_POST_FX_TRIM_DB);
     currentNode.connect(headroomRecoverRef.current);
     currentNode = headroomRecoverRef.current;
 
@@ -527,9 +530,9 @@ console.log("[Audio] initializeAudioContext called");
       useOversample
     );
 
-    currentNode.connect(limiterNodeRef.current);
-    limiterNodeRef.current.connect(softClipNodeRef.current);
-    currentNode = softClipNodeRef.current;
+    currentNode.connect(softClipNodeRef.current);
+    softClipNodeRef.current.connect(limiterNodeRef.current);
+    currentNode = limiterNodeRef.current;
     
     currentNode.connect(ctx.destination);
     if (audioContextRef.current && audioContextRef.current.state === 'suspended') {
@@ -540,7 +543,6 @@ console.log("[Audio] initializeAudioContext called");
   // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [
     applyCompressorParams,
-    applyLoudnessParams,
     bassGain,
     compMakeupGain,
     eqBands,
@@ -558,6 +560,24 @@ console.log("[Audio] initializeAudioContext called");
     trebleGain,
     useOversample,
   ]);
+
+  useEffect(() => {
+    if (trackLoudnessGainRef.current) {
+      trackLoudnessGainRef.current.gain.value = loudnessNormalization ? trackLoudnessGainValueRef.current : 1;
+    }
+  }, [loudnessNormalization]);
+
+  useEffect(() => {
+    if (!headroomRecoverRef.current) return;
+    headroomRecoverRef.current.gain.value = dbToGain(calculateAutoPostFxTrimDb({
+      preampGain,
+      eqBands,
+      bassGain,
+      trebleGain,
+      reverbMix,
+      stereoWidth,
+    }, fxEnabled) || BASE_POST_FX_TRIM_DB);
+  }, [bassGain, eqBands, fxEnabled, preampGain, reverbMix, stereoWidth, trebleGain]);
 
   useEffect(() => {
     console.log("[Audio] Preamp useEffect triggered: ", preampGain);
@@ -648,10 +668,6 @@ if (preampNodeRef.current) {
     );
   }, [fxEnabled.limiter, useOversample]);
 
-  useEffect(() => {
-    applyLoudnessParams();
-  }, [applyLoudnessParams]);
-
   const eqBandsLength = eqBands ? eqBands.length : 0;
 
   useEffect(() => {
@@ -687,12 +703,11 @@ if (preampNodeRef.current) {
     limiterNodeRef,
     softClipNodeRef,
     panNodeRef,
+    trackLoudnessGainRef,
+    setTrackLoudnessGain,
     headroomDropRef,
     headroomRecoverRef,
     preampNodeRef,
-    agcPreGainRef,
-    agcCompressorRef,
-    agcMakeupRef,
     bassNodeRef,
     trebleNodeRef,
     compressorNodeRef,

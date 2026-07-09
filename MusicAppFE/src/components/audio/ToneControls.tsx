@@ -25,8 +25,8 @@ export function ToneControls() {
         <EffectControlsGate active={playerState.fxEnabled.preamp}>
           <HorizontalSlider
             value={playerState.preampGain}
-            min={-15}
-            max={15}
+            min={-12}
+            max={6}
             onChange={playerState.updatePreampGain}
             label={t('studio.tone.preamp', 'Preamp')}
             color="#00E5FF"

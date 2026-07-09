@@ -52,6 +52,8 @@ const createEqBands = (frequencies: number[], gains?: number[]): EqBand[] =>
     type: 'peaking'
   }));
 
+const clampPreampGain = (value: number) => clamp(value, -12, 6);
+
 export function useAudioEffectsState(savedState: SavedAudioEffectsState = {}) {
   const savedStylisticPreset = STYLISTIC_PRESETS[savedState.eqPresetName as keyof typeof STYLISTIC_PRESETS];
   const [eqPresetName, setEqPresetName] = useState<string>(savedState.eqPresetName || '10_BANDS');
@@ -63,7 +65,9 @@ export function useAudioEffectsState(savedState: SavedAudioEffectsState = {}) {
   });
   const [customEqPresets, setCustomEqPresets] = useState<CustomEqPreset[]>(savedState.customEqPresets || []);
 
-  const [preampGain, setPreampGain] = useState<number>(savedStylisticPreset?.preampGain ?? savedState.preampGain ?? 0);
+  const [preampGain, setPreampGainState] = useState<number>(
+    clampPreampGain(savedStylisticPreset?.preampGain ?? savedState.preampGain ?? 0)
+  );
   const [bassGain, setBassGain] = useState<number>(savedStylisticPreset?.bassGain ?? savedState.bassGain ?? 0);
   const [trebleGain, setTrebleGain] = useState<number>(savedStylisticPreset?.trebleGain ?? savedState.trebleGain ?? 0);
 
@@ -102,6 +106,7 @@ export function useAudioEffectsState(savedState: SavedAudioEffectsState = {}) {
     setStereoWidthState(clamp(value, 0, STEREO_WIDTH_MAX_PERCENT));
   }, []);
   const toggleLoudnessNormalization = useCallback(() => setLoudnessNormalization(prev => !prev), []);
+  const setPreampGain = useCallback((value: number) => setPreampGainState(clampPreampGain(value)), []);
 
   const setCompressorSettings = useCallback((settings: typeof COMPRESSOR_DEFAULTS, enabled = true) => {
     setCompThreshold(settings.threshold);

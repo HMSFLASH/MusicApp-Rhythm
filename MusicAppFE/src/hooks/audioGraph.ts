@@ -3,6 +3,7 @@ import {
   percentToPseudoStereoAmount,
   percentToStereoBaseWidth,
 } from './audioMath';
+import { TRUE_PEAK_CEILING_DB } from './audioLoudness';
 
 export const REVERB_WET_GAIN = 0.35;
 export const REVERB_PRE_DELAY_MIN_SECONDS = 0.008;
@@ -84,6 +85,7 @@ export const createSoftClipCurve = (amount = 44100) => {
   const curve = new Float32Array(amount);
   const threshold = 0.92;
   const knee = 1 - threshold;
+  const ceiling = 0.98;
 
   for (let i = 0; i < amount; ++i) {
     const x = amount > 1 ? (i * 2) / (amount - 1) - 1 : 0;
@@ -95,7 +97,7 @@ export const createSoftClipCurve = (amount = 44100) => {
       const sign = Math.sign(x);
       const normalized = (absX - threshold) / knee;
       const softened = threshold + knee * Math.tanh(normalized);
-      curve[i] = Math.max(-1, Math.min(1, sign * softened));
+      curve[i] = Math.max(-ceiling, Math.min(ceiling, sign * softened));
     }
   }
   return curve;
@@ -112,11 +114,11 @@ export const createIdentityCurve = (amount = 44100) => {
 };
 
 export const configureMasterLimiter = (limiter: DynamicsCompressorNode) => {
-  limiter.threshold.value = -0.8;
+  limiter.threshold.value = TRUE_PEAK_CEILING_DB;
   limiter.knee.value = 0;
   limiter.ratio.value = 20;
-  limiter.attack.value = 0.002;
-  limiter.release.value = 0.08;
+  limiter.attack.value = 0.001;
+  limiter.release.value = 0.1;
 };
 
 const MASTER_LIMITER_RAMP_SECONDS = 0.08;
@@ -147,11 +149,11 @@ export const applyMasterLimiterState = (
   useOversample: boolean,
   smooth = false
 ) => {
-  setAudioParam(ctx, limiter.threshold, enabled ? -0.8 : 0, smooth);
+  setAudioParam(ctx, limiter.threshold, enabled ? TRUE_PEAK_CEILING_DB : 0, smooth);
   setAudioParam(ctx, limiter.knee, 0, smooth);
   setAudioParam(ctx, limiter.ratio, enabled ? 20 : 1, smooth);
-  setAudioParam(ctx, limiter.attack, enabled ? 0.002 : 0, smooth);
-  setAudioParam(ctx, limiter.release, enabled ? 0.08 : 0.25, smooth);
+  setAudioParam(ctx, limiter.attack, enabled ? 0.001 : 0, smooth);
+  setAudioParam(ctx, limiter.release, enabled ? 0.1 : 0.25, smooth);
   softClip.curve = enabled ? createSoftClipCurve(44100) : createIdentityCurve(44100);
   softClip.oversample = useOversample ? '4x' : 'none';
 };
@@ -163,16 +165,7 @@ export const configureLoudnessNormalization = (
   enabled: boolean
 ) => {
   preGain.gain.value = 1;
-
-  if (enabled) {
-    compressor.threshold.value = -18;
-    compressor.knee.value = 12;
-    compressor.ratio.value = 3;
-    compressor.attack.value = 0.003;
-    compressor.release.value = 0.25;
-    makeup.gain.value = 1.25;
-    return;
-  }
+  void enabled;
 
   compressor.threshold.value = 0;
   compressor.knee.value = 0;

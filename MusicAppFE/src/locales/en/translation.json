@@ -50,7 +50,7 @@
       "desc": "Final stage output controls and panning.",
       "lrBalance": "L/R Balance",
       "loudnessNorm": "Loudness Normalization",
-      "loudnessDesc": "Smooths volume differences with a gentle end-of-chain compressor and makeup gain.",
+      "loudnessDesc": "Measures each track and applies fixed LUFS gain with peak-safe headroom. Best quality when pre-calculation is enabled.",
       "hqOversample": "High Quality Oversampling",
       "hqOversampleDesc": "Reduces aliasing in the limiter's soft clip stage. Warning: May cause lag on mobile devices.",
       "precalcIdle": "Pre-calculate for Weak CPUs",
@@ -85,8 +85,8 @@
       "treble": "Treble"
     },
     "dynamics": {
-      "title": "Compressor",
-      "desc": "Controls dynamic range and peaks.",
+      "title": "Compressor / Night Mode",
+      "desc": "Controls dynamic range separately from loudness normalization.",
       "threshold": "Threshold",
       "ratio": "Ratio",
       "attack": "Attack",
@@ -99,7 +99,7 @@
       "resetButton": "Reset",
       "resetTitle": "Reset compressor to neutral settings",
       "limiterTitle": "Anti-Clipping Master Limiter",
-      "limiterDesc": "Limits output peaks before the speakers, reducing crackling when EQ, preamp, or effects raise the level. Recommended to leave on."
+      "limiterDesc": "Catches final output peaks after soft clipping, reducing crackling when EQ, preamp, or effects raise the level. Recommended to leave on."
     },
     "spatial": {
       "reverbTitle": "Reverb FX",

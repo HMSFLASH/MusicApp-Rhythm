@@ -50,7 +50,7 @@
       "desc": "Kiểm soát đầu ra âm thanh cuối cùng và cân bằng trái/phải.",
       "lrBalance": "Cân Bằng L/R",
       "loudnessNorm": "Cân Bằng Âm Lượng",
-      "loudnessDesc": "Làm đều mức âm lượng bằng bộ nén/bù gain nhẹ ở cuối chuỗi xử lý.",
+      "loudnessDesc": "Đo từng bài và áp gain LUFS cố định với headroom an toàn cho peak. Chất lượng tốt nhất khi bật tính toán trước.",
       "hqOversample": "Oversampling chất lượng cao",
       "hqOversampleDesc": "Giảm răng cưa cho soft clip của limiter. Cảnh báo: Có thể gây lag và nóng máy trên điện thoại yếu.",
       "precalcIdle": "Tính toán trước cho máy yếu",
@@ -85,8 +85,8 @@
       "treble": "Treble"
     },
     "dynamics": {
-      "title": "Nén Âm (Compressor)",
-      "desc": "Kiểm soát dải động và các đỉnh âm thanh.",
+      "title": "Compressor / Night Mode",
+      "desc": "Kiểm soát dải động riêng, không thay thế loudness normalization.",
       "threshold": "Ngưỡng (Thresh)",
       "ratio": "Tỷ lệ (Ratio)",
       "attack": "Attack",
@@ -99,7 +99,7 @@
       "resetButton": "Reset",
       "resetTitle": "Đưa Compressor về trạng thái trung tính",
       "limiterTitle": "Chống vỡ tiếng (Master Limiter)",
-      "limiterDesc": "Giới hạn đỉnh tín hiệu trước đầu ra, giảm rè/nổ khi EQ, preamp hoặc hiệu ứng làm âm lượng tăng cao. Khuyến nghị luôn bật."
+      "limiterDesc": "Bắt các peak cuối chuỗi sau soft clip, giảm rè/nổ khi EQ, preamp hoặc hiệu ứng làm âm lượng tăng cao. Khuyến nghị luôn bật."
     },
     "spatial": {
       "reverbTitle": "Hiệu Ứng Vang (Reverb)",

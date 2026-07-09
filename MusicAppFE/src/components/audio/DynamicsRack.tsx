@@ -15,8 +15,8 @@ export function DynamicsRack() {
       <div className="bg-[#0a0a0a] p-8 rounded-2xl border border-white/5 shadow-2xl flex flex-col gap-10">
         <div className="flex flex-col gap-4 border-b border-white/10 pb-4 md:flex-row md:items-center md:justify-between">
           <div>
-            <h2 className="text-xl font-bold font-sans text-white/80 tracking-tight">{t('studio.dynamics.title', 'Dynamics Compressor')}</h2>
-            <p className="text-secondary/60 text-xs font-mono mt-1">{t('studio.dynamics.desc', 'Control the dynamic range of your audio using Web Audio API\'s native compression engine.')}</p>
+            <h2 className="text-xl font-bold font-sans text-white/80 tracking-tight">{t('studio.dynamics.title', 'Compressor / Night Mode')}</h2>
+            <p className="text-secondary/60 text-xs font-mono mt-1">{t('studio.dynamics.desc', 'Controls dynamic range separately from loudness normalization.')}</p>
           </div>
           <div className="flex flex-wrap items-center gap-2">
             <button aria-label="Action"
@@ -126,8 +126,8 @@ export function DynamicsRack() {
       {/* Master Limiter */}
       <div className={`bg-[#0a0a0a] p-8 rounded-2xl border border-white/5 shadow-2xl flex items-center justify-between transition-opacity duration-300 ${playerState.fxEnabled.limiter ? 'opacity-100' : 'opacity-50'}`}>
         <div>
-          <h2 className="text-xl font-bold font-sans text-white/80 tracking-tight">{t('studio.dynamics.limiterTitle', 'Master Limiter (Anti-Crackling)')}</h2>
-          <p className="text-secondary/60 text-xs font-mono mt-2">{t('studio.dynamics.limiterDesc', 'A brickwall limiter at the end of the audio graph. Prevents audio from exceeding 0dB and crackling on mobile speakers. Recommended to leave on.')}</p>
+          <h2 className="text-xl font-bold font-sans text-white/80 tracking-tight">{t('studio.dynamics.limiterTitle', 'Anti-Clipping Master Limiter')}</h2>
+          <p className="text-secondary/60 text-xs font-mono mt-2">{t('studio.dynamics.limiterDesc', 'Catches final output peaks after soft clipping, reducing crackling when EQ, preamp, or effects raise the level. Recommended to leave on.')}</p>
         </div>
         <EffectPowerButton
           size="lg"

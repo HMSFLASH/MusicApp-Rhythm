@@ -2,6 +2,11 @@ import { useState, useRef, useEffect, useCallback } from 'react';
 import type { Track } from './audioTypes';
 import { LOCAL_STORAGE_KEY } from './audioStorage';
 import { clamp } from './audioMath';
+import {
+  calculateAutoPostFxTrimDb,
+  calculateNormalizedTrackGain,
+  INPUT_HEADROOM_DB,
+} from './audioLoudness';
 import { getBufferProgressIntervalMs, getFullCoreCount, isLikelyConstrainedDevice } from './audioDevice';
 import { createRenderSignature as createAudioRenderSignature } from './audioRenderSignature';
 import { renderOfflineAudio } from './offlineAudioRenderer';
@@ -63,7 +68,7 @@ export function useAudioPlayback(
     loudnessNormalization,
     renderSignatureCacheEnabled,
   } = effectsState || {};
-  const { audioContextRef, audioRef, bufferSourceRef, bufferVolumeNodeRef, initializeAudioContext, irBufferRef } = contextState;
+  const { audioContextRef, audioRef, bufferSourceRef, bufferVolumeNodeRef, initializeAudioContext, irBufferRef, setTrackLoudnessGain } = contextState;
   const { blobCacheRef } = metadataState;
 
   const [isPlaying, setIsPlaying] = useState(false);
@@ -92,6 +97,7 @@ export function useAudioPlayback(
   const precalculatedNextBufferRef = useRef<PrecalculatedNextBuffer | null>(null);
   const precalculatedQueueBuffersRef = useRef<Map<string, AudioBuffer>>(new Map());
   const renderSignatureBuffersRef = useRef<Map<string, AudioBuffer>>(new Map());
+  const loudnessGainCacheRef = useRef<Map<string, number>>(new Map());
   const fullQueuePrecalculateCacheRef = useRef<boolean>(false);
   const renderSignatureCacheEnabledRef = useRef<boolean>(renderSignatureCacheEnabled);
   const isPrecalculatingNextRef = useRef<boolean>(false);
@@ -309,6 +315,7 @@ export function useAudioPlayback(
     precalculatedQueueBuffersRef.current.clear();
     fullQueuePrecalculateCacheRef.current = false;
     queuePrecalculateSessionRef.current = null;
+    loudnessGainCacheRef.current.clear();
     stopQueuePrecalculateStatusSoon();
   }, [
     bassGain,
@@ -635,6 +642,27 @@ export function useAudioPlayback(
       irBuffer: irBufferRef.current,
     });
 
+  const getRealtimeTrackLoudnessGain = async (track: Track, audioUrl: string) => {
+    if (!audioParamsRef.current.loudnessNormalization) return 1;
+
+    const trackId = String(track.id);
+    const cachedGain = loudnessGainCacheRef.current.get(trackId);
+    if (cachedGain != null) return cachedGain;
+
+    try {
+      const response = await fetch(audioUrl);
+      const arrayBuffer = await response.arrayBuffer();
+      const audioBuffer = await audioContextRef.current!.decodeAudioData(arrayBuffer);
+      const postFxTrimDb = calculateAutoPostFxTrimDb(audioParamsRef.current, fxEnabledRef.current || {});
+      const gain = calculateNormalizedTrackGain(audioBuffer, INPUT_HEADROOM_DB + postFxTrimDb);
+      loudnessGainCacheRef.current.set(trackId, gain);
+      return gain;
+    } catch (error) {
+      console.warn('[Audio] Loudness measurement failed; using unity gain.', error);
+      return 1;
+    }
+  };
+
   const precalculateTrackBuffer = async (track: Track, keepInQueueCache = false) => {
     const trackId = String(track.id);
     const cachedBuffer = getCachedPrecalculatedQueueBuffer(trackId);
@@ -866,6 +894,7 @@ export function useAudioPlayback(
     }
 
     if (precalculateOnIdle) {
+      setTrackLoudnessGain?.(1);
       usingBufferPlaybackRef.current = true;
       releaseAudioElementSource();
       updateMediaSessionMetadata(startingTrack);
@@ -962,6 +991,12 @@ export function useAudioPlayback(
       audioBufferRef.current = null;
       usingBufferPlaybackRef.current = false;
       bufferPausedTimeRef.current = 0;
+      if (loudnessNormalization) {
+        setLoadingTrackPhase(autoPlay ? 'processing' : null);
+      }
+      const realtimeLoudnessGain = await getRealtimeTrackLoudnessGain(startingTrack, audioUrl);
+      if (decodeSessionRef.current !== playSessionId || precalculateOnIdleRef.current) return;
+      setTrackLoudnessGain?.(realtimeLoudnessGain);
       configureAudioElementSource(audioUrl);
       if (autoPlay) {
         // eslint-disable-next-line @typescript-eslint/no-explicit-any

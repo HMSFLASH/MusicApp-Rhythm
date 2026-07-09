@@ -9,7 +9,6 @@ import {
   percentToPan,
 } from './audioMath';
 import {
-  configureLoudnessNormalization,
   configureMasterLimiter,
   connectStereoWidthMatrix,
   createSoftClipCurve,
@@ -20,6 +19,12 @@ import {
   reverbPreDelaySeconds,
   reverbWetGain,
 } from './audioGraph';
+import {
+  calculateAutoPostFxTrimDb,
+  calculateNormalizedTrackGain,
+  dbToGain,
+  INPUT_HEADROOM_DB,
+} from './audioLoudness';
 
 const GAIN_BASED_EQ_TYPES = new Set<BiquadFilterType>(['peaking', 'lowshelf', 'highshelf']);
 
@@ -71,6 +76,21 @@ export const renderOfflineAudio = async ({
     panValue,
     loudnessNormalization,
   } = params;
+  const postFxTrimDb = calculateAutoPostFxTrimDb({
+    preampGain,
+    eqBands,
+    bassGain,
+    trebleGain,
+    reverbMix,
+    stereoWidth,
+  }, enabled);
+
+  if (loudnessNormalization) {
+    const trackGain = offlineCtx.createGain();
+    trackGain.gain.value = calculateNormalizedTrackGain(audioBuffer, INPUT_HEADROOM_DB + postFxTrimDb);
+    currentNode.connect(trackGain);
+    currentNode = trackGain;
+  }
 
   const headroomDrop = offlineCtx.createGain();
   headroomDrop.gain.value = 0.5;
@@ -232,30 +252,19 @@ export const renderOfflineAudio = async ({
     connectToNext(panNode);
   }
 
-  if (loudnessNormalization) {
-    const agcPreGain = offlineCtx.createGain();
-    const agcComp = offlineCtx.createDynamicsCompressor();
-    const agcMakeup = offlineCtx.createGain();
-    configureLoudnessNormalization(agcPreGain, agcComp, agcMakeup, true);
-    connectToNext(agcPreGain);
-    agcPreGain.connect(agcComp);
-    agcComp.connect(agcMakeup);
-    currentNode = agcMakeup;
-  }
-
   const headroomRecover = offlineCtx.createGain();
-  headroomRecover.gain.value = 1.414;
+  headroomRecover.gain.value = dbToGain(postFxTrimDb);
   connectToNext(headroomRecover);
 
   if (enabled.limiter) {
-    const limiter = offlineCtx.createDynamicsCompressor();
-    configureMasterLimiter(limiter);
-    connectToNext(limiter);
-
     const softClip = offlineCtx.createWaveShaper();
     softClip.curve = createSoftClipCurve(44100);
     softClip.oversample = params.useOversample ? '4x' : 'none';
     connectToNext(softClip);
+
+    const limiter = offlineCtx.createDynamicsCompressor();
+    configureMasterLimiter(limiter);
+    connectToNext(limiter);
   }
 
   connectToNext(offlineCtx.destination);

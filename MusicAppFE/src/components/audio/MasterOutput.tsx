@@ -36,7 +36,7 @@ export function MasterOutput() {
 
       <AudioToggleRow
         title={t('studio.masterOutput.loudnessNorm', 'Loudness Normalization')}
-        description={t('studio.masterOutput.loudnessDesc', 'Smooths volume differences with a gentle end-of-chain compressor and makeup gain.')}
+        description={t('studio.masterOutput.loudnessDesc', 'Measures each track and applies fixed LUFS gain with peak-safe headroom. Best quality when pre-calculation is enabled.')}
         checked={playerState.loudnessNormalization}
         onToggle={playerState.toggleLoudnessNormalization}
       />
