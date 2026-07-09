@@ -1,18 +1,58 @@
-import { useMemo, useEffect } from 'react';
+import { useMemo, useEffect, useCallback, useState } from 'react';
 import { useAudioQueue } from './useAudioQueue';
 import { useAudioEffectsState } from './useAudioEffectsState';
 import { useAudioEngine } from './useAudioEngine';
 import { getAudioConfigStorageKey, getInitialState } from './audioStorage';
+import { getAudioExtension } from './audioMime';
+import type { Track as AudioTrack } from './audioTypes';
 export type { Track } from './audioTypes';
 export { EQ_PRESETS, STYLISTIC_PRESETS } from './audioTypes';
 
+const FLAC_WASM_TRACKS_STORAGE_KEY = 'SONIC_FLAC_WASM_TRACKS_V1';
+
+const loadFlacWasmTrackIds = () => {
+  try {
+    const saved = localStorage.getItem(FLAC_WASM_TRACKS_STORAGE_KEY);
+    const ids = saved ? JSON.parse(saved) : [];
+    return new Set<string>(Array.isArray(ids) ? ids.map(String) : []);
+  } catch {
+    return new Set<string>();
+  }
+};
+
 export function useAudioPlayer(isAuthenticated: boolean, driveToken?: string, fetchDriveToken?: () => Promise<string>) {
   const savedState = useMemo(() => getInitialState(isAuthenticated), [isAuthenticated]);
+  const [flacWasmTrackIds, setFlacWasmTrackIds] = useState<Set<string>>(loadFlacWasmTrackIds);
 
   const queueState = useAudioQueue(savedState, isAuthenticated);
   const effectsState = useAudioEffectsState(savedState);
+  const isFlacWasmEnabled = useCallback((track?: AudioTrack | null) => (
+    Boolean(track && getAudioExtension(track.fileName) === 'flac' && flacWasmTrackIds.has(String(track.id)))
+  ), [flacWasmTrackIds]);
+  const toggleFlacWasmForTrack = useCallback((track: AudioTrack) => {
+    if (getAudioExtension(track.fileName) !== 'flac') return;
+
+    setFlacWasmTrackIds((previous) => {
+      const next = new Set(previous);
+      const trackId = String(track.id);
+      if (next.has(trackId)) {
+        next.delete(trackId);
+      } else {
+        next.add(trackId);
+      }
+      localStorage.setItem(FLAC_WASM_TRACKS_STORAGE_KEY, JSON.stringify([...next]));
+      return next;
+    });
+  }, []);
   // eslint-disable-next-line @typescript-eslint/no-explicit-any
-  const engineState = useAudioEngine(isAuthenticated, queueState as any, effectsState as any, savedState, driveToken, fetchDriveToken);
+  const engineState = useAudioEngine(
+    isAuthenticated,
+    queueState as any,
+    { ...effectsState, flacWasmTrackIds } as any,
+    savedState,
+    driveToken,
+    fetchDriveToken
+  );
 
   useEffect(() => {
     const configToSave = {
@@ -74,5 +114,7 @@ export function useAudioPlayer(isAuthenticated: boolean, driveToken?: string, fe
     loudnessNormalization: effectsState.loudnessNormalization,
     getTrackMetadata: engineState.getTrackMetadata,
     getTrackImage: engineState.getTrackImage,
+    isFlacWasmEnabled,
+    toggleFlacWasmForTrack,
   };
 }

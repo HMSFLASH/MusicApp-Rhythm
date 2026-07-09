@@ -23,7 +23,7 @@ export function useAudioMetadata(isAuthenticated: boolean, queueState: any) {
         if (track.sourceType !== 'LOCAL' && !isAuthenticated) return;
 
         // --- CACHE READ LAYER ---
-        const lsKey = `sonic_meta_v4_${trackId}`;
+        const lsKey = `sonic_meta_v5_${trackId}`;
         const lsData = await db.get<Partial<Track>>(lsKey);
         if (lsData) {
             try {

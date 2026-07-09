@@ -1,7 +1,7 @@
 import { useState, useRef, useEffect } from 'react';
 import { useGlobalAudio } from '../context/AudioContext';
 import { useAuth } from '../context/AuthContext';
-import { Disc, Play, Pause, SkipBack, SkipForward, Shuffle, Repeat, Heart, Info, ListPlus, MoreHorizontal, Repeat1, User, Volume2, VolumeX, BarChart2, Gauge, Music, Check, X, ArrowRight, Square, PauseCircle, ListX, Loader2, Trash2 } from 'lucide-react';
+import { Disc, Play, Pause, SkipBack, SkipForward, Shuffle, Repeat, Heart, Info, ListPlus, MoreHorizontal, Repeat1, User, Volume2, VolumeX, BarChart2, Gauge, Music, Check, X, ArrowRight, Square, PauseCircle, ListX, Loader2, Trash2, Cpu } from 'lucide-react';
 import { HorizontalSlider } from '../components/HorizontalSlider';
 import { useLibrary } from '../context/LibraryContext';
 import { LyricsView } from '../components/LyricsView';
@@ -9,6 +9,7 @@ import { useNavigate } from 'react-router-dom';
 import { useTranslation } from 'react-i18next';
 import { axiosClient } from '../api/axiosClient';
 import { useConfirm } from '../context/ConfirmContext';
+import { getAudioExtension } from '../hooks/audioMime';
 
 const formatTime = (time: number) => {
   const m = Math.floor(time / 60);
@@ -368,6 +369,18 @@ export function NowPlaying() {
                           unit="x"
                         />
                       </div>
+                      {getAudioExtension(currentTrack.fileName) === 'flac' && (
+                        <button
+                          onClick={() => {
+                            playerState.toggleFlacWasmForTrack(currentTrack);
+                            setShowMenu(false);
+                          }}
+                          className="w-full flex items-center gap-3 px-4 py-3 text-sm text-white/80 hover:bg-white/5 transition-colors border-b border-white/5"
+                        >
+                          <Cpu size={16} className={playerState.isFlacWasmEnabled(currentTrack) ? 'text-primary' : ''} />
+                          <span>{playerState.isFlacWasmEnabled(currentTrack) ? 'Use Normal FLAC' : 'Use FLAC WASM'}</span>
+                        </button>
+                      )}
                       {currentTrack.sourceType !== 'LOCAL' && (
                         <button
                           onClick={async () => {

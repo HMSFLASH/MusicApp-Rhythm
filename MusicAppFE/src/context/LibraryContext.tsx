@@ -63,7 +63,7 @@ const parseTrack = (d: BackendTrack): Track => ({
 });
 
 const mergeCachedMetadata = async (track: Track): Promise<Track> => {
-  const cached = await db.get<Partial<Track>>(`sonic_meta_v4_${track.id}`);
+  const cached = await db.get<Partial<Track>>(`sonic_meta_v5_${track.id}`);
   if (!cached) return track;
 
   const merged = { ...track };
@@ -189,7 +189,7 @@ export function LibraryProvider({ children }: { children: ReactNode }) {
       if (!trackId) return;
 
       const applyCachedMetadata = async () => {
-        const metadata = await db.get<Partial<Track>>(`sonic_meta_v4_${trackId}`);
+        const metadata = await db.get<Partial<Track>>(`sonic_meta_v5_${trackId}`);
         if (!metadata) return;
 
         const applyToTracks = (items: Track[]) => items.map((track) => {

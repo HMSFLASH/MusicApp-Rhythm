@@ -184,10 +184,10 @@ export function EqRack() {
         </div>
       </div>
 
-      <div className="flex-1 p-4 md:p-8 w-full overflow-x-auto no-scrollbar">
-        <div className="flex items-end gap-x-4 px-2 min-w-max pb-4 justify-start md:justify-center">
+      <div className="flex-1 p-4 md:p-8 w-full overflow-x-auto md:overflow-x-visible no-scrollbar">
+        <div className="flex items-end gap-x-4 px-2 min-w-max md:min-w-0 md:w-full pb-4 justify-start md:justify-center">
 
-          <div className={`flex items-end gap-x-4 transition-opacity duration-300 ${playerState.fxEnabled.eq ? 'opacity-100' : 'opacity-30 pointer-events-none'}`}>
+          <div className={`flex items-end gap-x-4 md:flex-wrap md:gap-x-2 md:gap-y-12 transition-opacity duration-300 ${playerState.fxEnabled.eq ? 'opacity-100' : 'opacity-30 pointer-events-none'}`}>
 
           {playerState.eqBands.map((band) => (
             <div key={band.id} className="flex flex-col items-center gap-3 group">

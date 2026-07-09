@@ -34,6 +34,8 @@ import {
   getPlaybackAvailability,
 } from './audioPlaybackQueue';
 import { loadTrackAudioUrl } from './audioTrackLoader';
+import { getAudioExtension } from './audioMime';
+import { decodeFlacToAudioBuffer } from './flacDecoder';
 
 export function useAudioPlayback(
   isAuthenticated: boolean,
@@ -73,6 +75,7 @@ export function useAudioPlayback(
     panValue,
     loudnessNormalization,
     renderSignatureCacheEnabled,
+    flacWasmTrackIds,
   } = effectsState || {};
   const { audioContextRef, audioRef, bufferSourceRef, bufferVolumeNodeRef, initializeAudioContext, irBufferRef, setTrackLoudnessGain } = contextState;
   const { blobCacheRef } = metadataState;
@@ -136,6 +139,37 @@ export function useAudioPlayback(
     setLoadingTrackPhase(null);
   }, []);
 
+  const resolveTrustedNativeDuration = useCallback((nativeDuration: number, track: Track | null) => {
+    if (!Number.isFinite(nativeDuration) || nativeDuration <= 0) return 0;
+
+    const savedDuration = track?.durationSeconds;
+    if (
+      getAudioExtension(track?.fileName) === 'flac' &&
+      Number.isFinite(savedDuration) &&
+      savedDuration &&
+      nativeDuration < savedDuration - 1
+    ) {
+      return savedDuration;
+    }
+
+    return nativeDuration;
+  }, []);
+
+  const applyLoadedMetadataDuration = useCallback((nativeDuration: number) => {
+    const activeTrack = currentTrackSnapshotRef.current;
+    const trustedDuration = resolveTrustedNativeDuration(nativeDuration, activeTrack);
+    setDuration(trustedDuration);
+
+    if (trustedDuration > 0 && activeTrack && Number.isFinite(trustedDuration)) {
+      const currentSavedDur = activeTrack.durationSeconds || 0;
+      if (Math.abs(trustedDuration - currentSavedDur) > 1) {
+        const updatedTrack = { ...activeTrack, durationSeconds: trustedDuration };
+        if (setCurrentTrack) setCurrentTrack(updatedTrack);
+        if (setQueue) setQueue((prevQueue: Track[]) => prevQueue.map((t) => t.id === updatedTrack.id ? { ...t, durationSeconds: trustedDuration } : t));
+      }
+    }
+  }, [resolveTrustedNativeDuration, setCurrentTrack, setQueue]);
+
   const stopQueuePrecalculateStatusSoon = useCallback(() => {
     window.setTimeout(() => {
       setQueuePrecalculateStatus((previous) => (
@@ -162,12 +196,22 @@ export function useAudioPlayback(
     onSeekTo: (time) => seekRef.current?.(time),
   });
 
-  const decodeAudioDataForPreRender = useCallback((arrayBuffer: ArrayBuffer) => {
+  const createDecodeContext = useCallback(() => {
     // eslint-disable-next-line @typescript-eslint/no-explicit-any
     const OfflineAudioContextCtor = window.OfflineAudioContext || (window as any).webkitOfflineAudioContext;
-    const decodeContext = new OfflineAudioContextCtor(1, 1, 44100) as OfflineAudioContext;
-    return decodeContext.decodeAudioData(arrayBuffer);
+    return new OfflineAudioContextCtor(1, 1, 44100) as OfflineAudioContext;
   }, []);
+
+  const decodeAudioDataForPreRender = useCallback((arrayBuffer: ArrayBuffer) => {
+    const decodeContext = createDecodeContext();
+    return decodeContext.decodeAudioData(arrayBuffer);
+  }, [createDecodeContext]);
+
+  const shouldUseFlacWasmPlayback = useCallback((track: Track | null | undefined) => (
+    getAudioExtension(track?.fileName) === 'flac' &&
+    flacWasmTrackIds instanceof Set &&
+    flacWasmTrackIds.has(String(track?.id))
+  ), [flacWasmTrackIds]);
 
   const revokeRenderedAudioUrl = useCallback(() => {
     if (!renderedAudioUrlRef.current) return;
@@ -226,16 +270,7 @@ export function useAudioPlayback(
       document.addEventListener('visibilitychange', handleVisibilityChange);
       visibilityHandlerRef.current = handleVisibilityChange;
       audioRef.current.addEventListener('loadedmetadata', () => {
-        const dur = audioRef.current?.duration || 0;
-        setDuration(dur);
-        if (dur > 0 && currentTrackSnapshotRef.current && Number.isFinite(dur)) {
-          const currentSavedDur = currentTrackSnapshotRef.current.durationSeconds || 0;
-          if (Math.abs(dur - currentSavedDur) > 1) {
-            const updatedTrack = { ...currentTrackSnapshotRef.current, durationSeconds: dur };
-            if (setCurrentTrack) setCurrentTrack(updatedTrack);
-            if (setQueue) setQueue((prevQueue: Track[]) => prevQueue.map((t) => t.id === updatedTrack.id ? { ...t, durationSeconds: dur } : t));
-          }
-        }
+        applyLoadedMetadataDuration(audioRef.current?.duration || 0);
       });
       audioRef.current.addEventListener('ended', () => {
         if (!usingBufferPlaybackRef.current) clearTrackLoading();
@@ -277,16 +312,7 @@ export function useAudioPlayback(
       });
 
       renderedAudio.addEventListener('loadedmetadata', () => {
-        const dur = renderedAudio.duration || 0;
-        setDuration(dur);
-        if (dur > 0 && currentTrackSnapshotRef.current && Number.isFinite(dur)) {
-          const currentSavedDur = currentTrackSnapshotRef.current.durationSeconds || 0;
-          if (Math.abs(dur - currentSavedDur) > 1) {
-            const updatedTrack = { ...currentTrackSnapshotRef.current, durationSeconds: dur };
-            if (setCurrentTrack) setCurrentTrack(updatedTrack);
-            if (setQueue) setQueue((prevQueue: Track[]) => prevQueue.map((t) => t.id === updatedTrack.id ? { ...t, durationSeconds: dur } : t));
-          }
-        }
+        applyLoadedMetadataDuration(renderedAudio.duration || 0);
       });
 
       renderedAudio.addEventListener('ended', () => {
@@ -806,7 +832,13 @@ export function useAudioPlayback(
 
     const response = await fetch(audioUrl);
     const arrayBuffer = await response.arrayBuffer();
-    const audioBuffer = await decodeAudioDataForPreRender(arrayBuffer);
+    const audioBuffer = shouldUseFlacWasmPlayback(track)
+      ? await decodeFlacToAudioBuffer(
+        audioContextRef.current || createDecodeContext(),
+        new Uint8Array(arrayBuffer),
+        track.durationSeconds,
+      )
+      : await decodeAudioDataForPreRender(arrayBuffer);
     const finalRenderedBuffer = await performOfflineRender(audioBuffer);
 
     if (renderSettingsVersionRef.current !== renderVersion) {
@@ -1046,7 +1078,9 @@ export function useAudioPlayback(
       return;
     }
 
-    if (precalculateOnIdle) {
+    const useRenderedBufferPlayback = precalculateOnIdle || shouldUseFlacWasmPlayback(startingTrack);
+
+    if (useRenderedBufferPlayback) {
       setTrackLoudnessGain?.(1);
       usingBufferPlaybackRef.current = true;
       releaseAudioElementSource();
@@ -1074,7 +1108,10 @@ export function useAudioPlayback(
           }
 
           // Check if session changed while decoding
-          if (decodeSessionRef.current !== playSessionId || !precalculateOnIdleRef.current) return;
+          if (
+            decodeSessionRef.current !== playSessionId ||
+            (!precalculateOnIdleRef.current && !shouldUseFlacWasmPlayback(startingTrack))
+          ) return;
 
           // SAFETY: Verify the current track is still the one we decoded for.
           // This guards against a rapid track-switch race where setCurrentTrack
@@ -1186,9 +1223,10 @@ export function useAudioPlayback(
 
     // Read current precalculate state from ref to avoid stale closure
     const isPrecalc = precalculateOnIdleRef.current;
+    const isRenderedBufferPlayback = isPrecalc || (usingBufferPlaybackRef.current && Boolean(renderedAudioUrlRef.current));
 
     if (songEndMode === 'repeat_one') {
-      if (isPrecalc && (renderedAudioUrlRef.current || audioBufferRef.current)) {
+      if (isRenderedBufferPlayback && (renderedAudioUrlRef.current || audioBufferRef.current)) {
         playCurrentBuffer(0);
       } else if (audioRef.current) {
         audioRef.current.currentTime = 0;
@@ -1199,7 +1237,7 @@ export function useAudioPlayback(
     }
 
     if (songEndMode === 'stop') {
-      if (isPrecalc) {
+      if (isRenderedBufferPlayback) {
         stopBufferPlayback();
         if (renderedAudioRef.current) {
           renderedAudioRef.current.currentTime = 0;
@@ -1277,7 +1315,7 @@ export function useAudioPlayback(
       initializeAudioContext();
     }
     if (isPlaying) {
-      if (precalculateOnIdle && renderedAudioRef.current && renderedAudioUrlRef.current) {
+      if ((precalculateOnIdle || usingBufferPlaybackRef.current) && renderedAudioRef.current && renderedAudioUrlRef.current) {
         bufferPausedTimeRef.current = renderedAudioRef.current.currentTime || currentTime;
         renderedAudioRef.current.pause();
         setIsPlaying(false);
@@ -1289,7 +1327,7 @@ export function useAudioPlayback(
         audioRef.current.pause();
       }
     } else {
-      if (precalculateOnIdle && (renderedAudioUrlRef.current || audioBufferRef.current)) {
+      if ((precalculateOnIdle || usingBufferPlaybackRef.current) && (renderedAudioUrlRef.current || audioBufferRef.current)) {
         playCurrentBuffer(bufferPausedTimeRef.current);
       } else if (!precalculateOnIdle && (!audioRef.current.src || audioRef.current.src === window.location.href || audioRef.current.src.endsWith('/'))) {
         if (currentTrack) {
@@ -1306,7 +1344,7 @@ export function useAudioPlayback(
 
 
   const seek = (time: number) => {
-    if (precalculateOnIdle && renderedAudioRef.current && renderedAudioUrlRef.current) {
+    if ((precalculateOnIdle || usingBufferPlaybackRef.current) && renderedAudioRef.current && renderedAudioUrlRef.current) {
       const safeTime = audioBufferRef.current
         ? clamp(time, 0, Math.max(0, audioBufferRef.current.duration - 0.05))
         : Math.max(0, time);

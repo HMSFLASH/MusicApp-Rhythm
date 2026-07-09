@@ -1,12 +1,13 @@
 import { useState } from 'react';
 import { useNavigate, useSearchParams } from 'react-router-dom';
-import { Heart, ListMusic, Cloud, Star, Clock, ListPlus, Play, ArrowLeft, Shuffle, MoreHorizontal, Info, X, ListEnd, ListStart, RefreshCw, Trash2 } from 'lucide-react';
+import { Heart, ListMusic, Cloud, Star, Clock, ListPlus, Play, ArrowLeft, Shuffle, MoreHorizontal, Info, X, ListEnd, ListStart, RefreshCw, Trash2, Cpu } from 'lucide-react';
 import { AddToPlaylistModal } from '../components/AddToPlaylistModal';
 import { useGlobalAudio } from '../context/AudioContext';
 import { useAuth } from '../context/AuthContext';
 import type { Track } from '../hooks/useAudioPlayer';
 import { useLibrary } from '../context/LibraryContext';
 import { useConfirm } from '../context/ConfirmContext';
+import { getAudioExtension } from '../hooks/audioMime';
 
 export function TracksPage() {
   const navigate = useNavigate();
@@ -186,7 +187,7 @@ export function TracksPage() {
               </button>
 
               {openMenuId === track.id && (
-                <div className="absolute right-0 top-full mt-1 w-48 bg-[#1A1A1A] border border-white/10 rounded-lg shadow-xl overflow-hidden z-50 py-1">
+                <div className="absolute right-0 top-full mt-1 w-56 bg-[#1A1A1A] border border-white/10 rounded-lg shadow-xl overflow-hidden z-50 py-1">
                   <button
                     onClick={(e) => handlePlayNext(track, e)}
                     className="w-full flex items-center gap-3 px-4 py-2 text-sm text-left text-white/80 hover:bg-white/10"
@@ -212,6 +213,19 @@ export function TracksPage() {
                     >
                       <Heart size={14} fill={favorites.some(f => f.id === track.id) ? "currentColor" : "none"} className={favorites.some(f => f.id === track.id) ? "text-primary" : ""} /> 
                       {favorites.some(f => f.id === track.id) ? "Remove from Favorites" : "Add to Favorites"}
+                    </button>
+                  )}
+                  {getAudioExtension(track.fileName) === 'flac' && (
+                    <button
+                      onClick={(e) => {
+                        e.stopPropagation();
+                        playerState.toggleFlacWasmForTrack(track);
+                        setOpenMenuId(null);
+                      }}
+                      className="w-full flex items-center gap-3 px-4 py-2 text-sm text-left text-white/80 hover:bg-white/10"
+                    >
+                      <Cpu size={14} className={playerState.isFlacWasmEnabled(track) ? 'text-primary' : ''} />
+                      {playerState.isFlacWasmEnabled(track) ? 'Use Normal FLAC' : 'Use FLAC WASM'}
                     </button>
                   )}
                   <button
