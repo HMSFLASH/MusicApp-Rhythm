@@ -2,8 +2,7 @@ import { useRef, useEffect, useState } from 'react';
 import type { Track } from './audioTypes';
 import { getCover, saveCover } from '../utils/idb';
 import { db } from '../lib/db';
-
-const BACKEND_URL = `http://${window.location.hostname}:8080`;
+import { BACKEND_URL } from '../config/env';
 
 // eslint-disable-next-line @typescript-eslint/no-explicit-any
 export function useAudioMetadata(isAuthenticated: boolean, queueState: any) {
@@ -30,7 +29,7 @@ export function useAudioMetadata(isAuthenticated: boolean, queueState: any) {
             try {
                 const parsed = lsData;
                 const idbCover = await getCover(trackId);
-                
+
                 if (idbCover) {
                     const imgUrl = URL.createObjectURL(new Blob([idbCover.data.buffer as ArrayBuffer], { type: idbCover.mimeType }));
                     parsed.imageUrl = imgUrl;
@@ -77,7 +76,7 @@ export function useAudioMetadata(isAuthenticated: boolean, queueState: any) {
 
                 const arrayBuffer = await track.localFile.arrayBuffer();
                 const buffer = new Uint8Array(arrayBuffer);
-                
+
                 // eslint-disable-next-line @typescript-eslint/no-explicit-any
                 const fileInfo: any = { size: track.localFile.size };
                 if (track.fileName) fileInfo.path = track.fileName;
@@ -91,7 +90,7 @@ export function useAudioMetadata(isAuthenticated: boolean, queueState: any) {
                     timeoutId = setTimeout(() => reject(new Error('Local metadata parse timeout')), 10000);
                 });
                 metadata = await Promise.race([parsePromise, timeoutPromise]).finally(() => clearTimeout(timeoutId!));
-                
+
                 if (track.localFile.size > 0) {
                     up.fileSize = track.localFile.size;
                     cachePayload.fileSize = track.localFile.size;
@@ -111,7 +110,7 @@ export function useAudioMetadata(isAuthenticated: boolean, queueState: any) {
                     const arrayBuffer = await fetched.arrayBuffer();
                     const buffer = new Uint8Array(arrayBuffer);
                     const fetchedMimeType = fetched.headers.get('Content-Type');
-                    
+
                     const contentLengthHeader = fetched.headers.get('Content-Length');
                     const fileSize = contentLengthHeader ? parseInt(contentLengthHeader, 10) : (track.fileSize || 0);
                     if (fileSize > 0) {
@@ -119,16 +118,16 @@ export function useAudioMetadata(isAuthenticated: boolean, queueState: any) {
                         cachePayload.fileSize = fileSize;
                         trueFileSize = fileSize;
                     }
-                    
+
                     parsedBufferLength = buffer.byteLength;
-                    
+
                     // eslint-disable-next-line @typescript-eslint/no-explicit-any
                     const fileInfo: any = { size: fileSize };
                     if (track.fileName) fileInfo.path = track.fileName;
                     if (!ext) {
                         fileInfo.mimeType = (fetchedMimeType && fetchedMimeType !== 'application/octet-stream') ? fetchedMimeType : 'audio/mpeg';
                     }
-                    
+
                     metadata = await parseBufferFn(buffer, fileInfo, { duration: false });
                 } else {
                     const fetchUrl = `${BACKEND_URL}/api/music/stream/${track.id}`;
@@ -207,14 +206,14 @@ export function useAudioMetadata(isAuthenticated: boolean, queueState: any) {
                 up.lyrics = extractedLyrics;
                 cachePayload.lyrics = extractedLyrics;
             }
-            
+
             if (metadata.format) {
                 const isPartialBuffer = trueFileSize > 0 && parsedBufferLength < trueFileSize;
                 const isOggOrWebM = ['Ogg', 'EBML/WebM', 'WebM', 'Matroska'].includes(metadata.format.container || '');
                 if (isPartialBuffer && isOggOrWebM) {
                     delete metadata.format.duration;
                 }
-                
+
                 if (metadata.format.container) { up.fileFormat = metadata.format.container; cachePayload.fileFormat = metadata.format.container; }
                 if (metadata.format.codec) { up.codec = metadata.format.codec; cachePayload.codec = metadata.format.codec; }
                 if (metadata.format.bitrate) { up.bitrate = metadata.format.bitrate; cachePayload.bitrate = metadata.format.bitrate; }
@@ -231,7 +230,7 @@ export function useAudioMetadata(isAuthenticated: boolean, queueState: any) {
                 const imgUrl = URL.createObjectURL(new Blob([new Uint8Array(pic.data)], { type: mime }));
                 up.imageUrl = imgUrl;
                 imageCacheRef.current.set(trackId, imgUrl);
-                
+
                 // Save to IndexedDB (do not await to avoid blocking)
                 saveCover(trackId, new Uint8Array(pic.data), mime);
             }
