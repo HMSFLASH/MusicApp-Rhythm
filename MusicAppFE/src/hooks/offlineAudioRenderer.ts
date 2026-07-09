@@ -1,10 +1,7 @@
-import type { EqBand } from './audioTypes';
 import type { AudioRenderParams, FxEnabledFlags } from './audioRenderSignature';
 import {
   clamp,
   compressorAttackSeconds,
-  isNeutralDbGain,
-  isNeutralPercentValue,
   msToAudioSeconds,
   percentToPan,
 } from './audioMath';
@@ -27,13 +24,7 @@ import {
   dbToGain,
   INPUT_HEADROOM_DB,
 } from './audioLoudness';
-
-const GAIN_BASED_EQ_TYPES = new Set<BiquadFilterType>(['peaking', 'lowshelf', 'highshelf']);
-
-const isActiveEqBand = (band: EqBand) => {
-  const type = (band.type || 'peaking') as BiquadFilterType;
-  return !GAIN_BASED_EQ_TYPES.has(type) || !isNeutralDbGain(band.gain);
-};
+import { getAudioFxActivity, isActiveEqBand } from './audioFxActivity';
 
 type RenderOfflineAudioOptions = {
   audioBuffer: AudioBuffer;
@@ -51,14 +42,6 @@ export const renderOfflineAudio = async ({
   if (!audioBuffer) return audioBuffer;
   const sampleRate = audioBuffer.sampleRate;
   const length = audioBuffer.length;
-  const shouldUsePseudoStereo = isAudioBufferNearMono(audioBuffer);
-  const offlineCtx = new OfflineAudioContext(2, length, sampleRate);
-
-  const offlineSource = offlineCtx.createBufferSource();
-  offlineSource.buffer = audioBuffer;
-  offlineSource.playbackRate.value = 1.0;
-
-  let currentNode: AudioNode = offlineSource;
   const enabled = fxEnabled || {};
   const {
     preampGain,
@@ -78,14 +61,57 @@ export const renderOfflineAudio = async ({
     panValue,
     loudnessNormalization,
   } = params;
-  const postFxTrimDb = calculateAutoPostFxTrimDb({
+  const activity = getAudioFxActivity({
     preampGain,
     eqBands,
     bassGain,
     trebleGain,
     reverbMix,
     stereoWidth,
+    panValue,
   }, enabled);
+
+  if (!activity.any && !loudnessNormalization) {
+    return audioBuffer;
+  }
+
+  const postFxTrimDb = activity.any
+    ? calculateAutoPostFxTrimDb({
+      preampGain,
+      eqBands,
+      bassGain,
+      trebleGain,
+      reverbMix,
+      stereoWidth,
+    }, enabled)
+    : 0;
+
+  const offlineCtx = new OfflineAudioContext(2, length, sampleRate);
+
+  const offlineSource = offlineCtx.createBufferSource();
+  offlineSource.buffer = audioBuffer;
+  offlineSource.playbackRate.value = 1.0;
+
+  let currentNode: AudioNode = offlineSource;
+
+  if (!activity.any && loudnessNormalization) {
+    const trackGain = offlineCtx.createGain();
+    const downstreamGainDb = INPUT_HEADROOM_DB + calculateAutoPostFxTrimDb({
+      preampGain,
+      eqBands,
+      bassGain,
+      trebleGain,
+      reverbMix,
+      stereoWidth,
+    }, enabled);
+    trackGain.gain.value =
+      calculateNormalizedTrackGain(audioBuffer, downstreamGainDb) *
+      dbToGain(downstreamGainDb);
+    offlineSource.connect(trackGain);
+    trackGain.connect(offlineCtx.destination);
+    offlineSource.start(0);
+    return offlineCtx.startRendering();
+  }
 
   if (loudnessNormalization) {
     const trackGain = offlineCtx.createGain();
@@ -99,14 +125,14 @@ export const renderOfflineAudio = async ({
   currentNode.connect(headroomDrop);
   currentNode = headroomDrop;
 
-  if (enabled.preamp && !isNeutralDbGain(preampGain)) {
+  if (activity.preamp) {
     const preamp = offlineCtx.createGain();
     preamp.gain.value = Math.pow(10, preampGain / 20);
     currentNode.connect(preamp);
     currentNode = preamp;
   }
 
-  const activeEqBands = enabled.eq && eqBands ? eqBands.filter(isActiveEqBand) : [];
+  const activeEqBands = activity.eq && eqBands ? eqBands.filter(isActiveEqBand) : [];
   if (activeEqBands.length > 0) {
     const filters = activeEqBands.map((band) => {
       const filter = offlineCtx.createBiquadFilter();
@@ -157,8 +183,8 @@ export const renderOfflineAudio = async ({
     currentNode = merger;
   }
 
-  if (enabled.tone && (!isNeutralDbGain(bassGain) || !isNeutralDbGain(trebleGain))) {
-    if (!isNeutralDbGain(bassGain)) {
+  if (activity.tone) {
+    if (bassGain !== 0) {
       const bass = offlineCtx.createBiquadFilter();
       bass.type = 'lowshelf';
       bass.frequency.value = 150;
@@ -168,7 +194,7 @@ export const renderOfflineAudio = async ({
       currentNode = bass;
     }
 
-    if (!isNeutralDbGain(trebleGain)) {
+    if (trebleGain !== 0) {
       const treble = offlineCtx.createBiquadFilter();
       treble.type = 'highshelf';
       treble.frequency.value = 4000;
@@ -179,7 +205,7 @@ export const renderOfflineAudio = async ({
     }
   }
 
-  if (enabled.comp) {
+  if (activity.comp) {
     const comp = offlineCtx.createDynamicsCompressor();
     comp.threshold.value = compThreshold;
     comp.ratio.value = compRatio;
@@ -198,7 +224,7 @@ export const renderOfflineAudio = async ({
   let dryGain: GainNode | null = null;
   let wetGain: GainNode | null = null;
   let isReverbParallel = false;
-  if (enabled.reverb && !isNeutralPercentValue(reverbMix, 0)) {
+  if (activity.reverb) {
     const preDelay = offlineCtx.createDelay(1.0);
     preDelay.delayTime.value = reverbPreDelaySeconds(reverbMix);
 
@@ -242,13 +268,14 @@ export const renderOfflineAudio = async ({
     currentNode = nextNode;
   };
 
-  if (enabled.stereo && !isNeutralPercentValue(stereoWidth, 100)) {
+  if (activity.stereo) {
     const stereoInput = offlineCtx.createGain();
     connectToNext(stereoInput);
+    const shouldUsePseudoStereo = isAudioBufferNearMono(audioBuffer);
     currentNode = connectStereoWidthMatrix(offlineCtx, stereoInput, stereoWidth, shouldUsePseudoStereo);
   }
 
-  if (enabled.master && !isNeutralPercentValue(panValue, 0)) {
+  if (activity.master) {
     const panNode = offlineCtx.createStereoPanner();
     panNode.pan.value = percentToPan(panValue);
     connectToNext(panNode);
@@ -258,7 +285,7 @@ export const renderOfflineAudio = async ({
   headroomRecover.gain.value = dbToGain(postFxTrimDb);
   connectToNext(headroomRecover);
 
-  if (enabled.limiter) {
+  if (activity.limiter) {
     let softClip: AudioNode;
     const canUseWorklet =
       params.useOversample &&

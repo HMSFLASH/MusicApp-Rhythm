@@ -25,12 +25,21 @@ import {
   calculateAutoPostFxTrimDb,
   dbToGain,
 } from './audioLoudness';
+import { getAudioFxActivity } from './audioFxActivity';
 
 export {
   configureLoudnessNormalization,
   configureMasterLimiter,
   createSoftClipCurve,
 } from './audioGraph';
+
+const disconnectNode = (node: AudioNode | null) => {
+  try {
+    node?.disconnect();
+  } catch {
+    // Ignore stale Web Audio connections during rapid graph rebuilds.
+  }
+};
 
 // eslint-disable-next-line @typescript-eslint/no-explicit-any
 export function useAudioContext(effectsState: any) {
@@ -84,14 +93,17 @@ export function useAudioContext(effectsState: any) {
   const convolverNodeRef = useRef<ConvolverNode | null>(null);
   const dryGainRef = useRef<GainNode | null>(null);
   const wetGainRef = useRef<GainNode | null>(null);
+  const reverbOutRef = useRef<GainNode | null>(null);
   const reverbPreDelayRef = useRef<DelayNode | null>(null);
   const reverbHighpassRef = useRef<BiquadFilterNode | null>(null);
   const reverbLowpassRef = useRef<BiquadFilterNode | null>(null);
+  const stereoInputRef = useRef<GainNode | null>(null);
   const stereoAnalysisSplitterRef = useRef<ChannelSplitterNode | null>(null);
   const stereoLeftAnalyserRef = useRef<AnalyserNode | null>(null);
   const stereoRightAnalyserRef = useRef<AnalyserNode | null>(null);
   const stereoAnalysisIntervalRef = useRef<number | null>(null);
   const stereoPseudoBaseAmountRef = useRef(0);
+  const initializeAudioContextRef = useRef<(() => void) | null>(null);
 
   const stopStereoNearMonoAnalysis = useCallback(() => {
     if (stereoAnalysisIntervalRef.current != null) {
@@ -115,14 +127,13 @@ export function useAudioContext(effectsState: any) {
       oversampledSoftClipperReadyRef.current = ready;
       oversampledSoftClipperLoadingRef.current = null;
 
-      if (ready && sourceNodeRef.current && fxEnabledRef.current?.limiter && effectsState?.useOversample) {
-        window.setTimeout(() => initializeAudioContext(), 0);
+      if (ready && sourceNodeRef.current && fxEnabledRef.current?.limiter && useOversample) {
+        window.setTimeout(() => initializeAudioContextRef.current?.(), 0);
       }
 
       return ready;
     });
-  // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [effectsState?.useOversample]);
+  }, [useOversample]);
 
   const startStereoNearMonoAnalysis = useCallback((sourceNode: AudioNode, basePseudoAmount: number) => {
     if (!audioContextRef.current || !pseudoDelayRef.current || !haasWetGainRef.current || basePseudoAmount <= 0) return;
@@ -191,6 +202,31 @@ export function useAudioContext(effectsState: any) {
     trackLoudnessGainRef.current.gain.cancelScheduledValues(now);
     trackLoudnessGainRef.current.gain.setTargetAtTime(nextGain, now, 0.03);
   }, []);
+
+  const currentGraphActivity = getAudioFxActivity({
+    preampGain,
+    eqBands,
+    bassGain,
+    trebleGain,
+    reverbMix,
+    stereoWidth,
+    panValue,
+  }, effectsState?.fxEnabled || {});
+
+  const graphStructureKey = JSON.stringify({
+    loudnessNormalization: Boolean(loudnessNormalization),
+    preamp: currentGraphActivity.preamp,
+    eq: currentGraphActivity.eq,
+    eqBandCount: currentGraphActivity.eq && Array.isArray(eqBands) ? eqBands.length : 0,
+    tone: currentGraphActivity.tone,
+    comp: currentGraphActivity.comp,
+    reverb: currentGraphActivity.reverb,
+    stereo: currentGraphActivity.stereo,
+    audioIsStereo: currentGraphActivity.stereo ? Boolean(audioIsStereo) : null,
+    master: currentGraphActivity.master,
+    limiter: currentGraphActivity.limiter,
+    useOversample: currentGraphActivity.limiter ? Boolean(useOversample) : null,
+  });
 
   useEffect(() => () => {
     stopStereoNearMonoAnalysis();
@@ -285,74 +321,89 @@ export function useAudioContext(effectsState: any) {
 
     if (!sourceNodeRef.current) return;
     
-        // Disconnect everything first to rebuild graph
+    // Disconnect everything first to rebuild graph. Every call is wrapped
+    // because browsers may throw if a node was already disconnected.
     stopStereoNearMonoAnalysis();
-    if (sourceNodeRef.current) sourceNodeRef.current.disconnect();
-    if (trackLoudnessGainRef.current) trackLoudnessGainRef.current.disconnect();
-    if (headroomDropRef.current) headroomDropRef.current.disconnect();
-    if (preampNodeRef.current) preampNodeRef.current.disconnect();
-    if (eqNodesRef.current) {
-      eqNodesRef.current.forEach(filter => {
-        if (filter) filter.disconnect();
-      });
-    }
-    if (bassNodeRef.current) bassNodeRef.current.disconnect();
-    if (trebleNodeRef.current) trebleNodeRef.current.disconnect();
-    if (compressorNodeRef.current) compressorNodeRef.current.disconnect();
-    if (compMakeupNodeRef.current) compMakeupNodeRef.current.disconnect();
-    if (dryGainRef.current) dryGainRef.current.disconnect();
-    if (wetGainRef.current) wetGainRef.current.disconnect();
-    if (reverbPreDelayRef.current) reverbPreDelayRef.current.disconnect();
-    if (reverbHighpassRef.current) reverbHighpassRef.current.disconnect();
-    if (reverbLowpassRef.current) reverbLowpassRef.current.disconnect();
-    if (convolverNodeRef.current) convolverNodeRef.current.disconnect();
-    if (stereoSplitterRef.current) stereoSplitterRef.current.disconnect();
-    if (stereoMergerRef.current) stereoMergerRef.current.disconnect();
-    // eslint-disable-next-line @typescript-eslint/no-explicit-any
-    if (lToLRef.current) (lToLRef.current as any).disconnect();
-    // eslint-disable-next-line @typescript-eslint/no-explicit-any
-    if (rToLRef.current) (rToLRef.current as any).disconnect();
-    if (lToRRef.current) lToRRef.current.disconnect();
-    if (rToRRef.current) rToRRef.current.disconnect();
-    if (stereoOutRef.current) stereoOutRef.current.disconnect();
-    if (pseudoMonoRef.current) pseudoMonoRef.current.disconnect();
-    if (pseudoDelayRef.current) pseudoDelayRef.current.disconnect();
-    if (pseudoHighpassRef.current) pseudoHighpassRef.current.disconnect();
-    if (pseudoLeftGainRef.current) pseudoLeftGainRef.current.disconnect();
-    if (pseudoRightGainRef.current) pseudoRightGainRef.current.disconnect();
-    if (pseudoMergerRef.current) pseudoMergerRef.current.disconnect();
-    if (haasWetGainRef.current) haasWetGainRef.current.disconnect();
-    if (headroomRecoverRef.current) headroomRecoverRef.current.disconnect();
-    if (limiterNodeRef.current) limiterNodeRef.current.disconnect();
-    if (softClipNodeRef.current) softClipNodeRef.current.disconnect();
+    disconnectNode(sourceNodeRef.current);
+    disconnectNode(trackLoudnessGainRef.current);
+    disconnectNode(headroomDropRef.current);
+    disconnectNode(preampNodeRef.current);
+    eqNodesRef.current.forEach(disconnectNode);
+    disconnectNode(bassNodeRef.current);
+    disconnectNode(trebleNodeRef.current);
+    disconnectNode(compressorNodeRef.current);
+    disconnectNode(compMakeupNodeRef.current);
+    disconnectNode(dryGainRef.current);
+    disconnectNode(wetGainRef.current);
+    disconnectNode(reverbOutRef.current);
+    disconnectNode(reverbPreDelayRef.current);
+    disconnectNode(reverbHighpassRef.current);
+    disconnectNode(reverbLowpassRef.current);
+    disconnectNode(convolverNodeRef.current);
+    disconnectNode(stereoInputRef.current);
+    disconnectNode(stereoSplitterRef.current);
+    disconnectNode(stereoMergerRef.current);
+    disconnectNode(lToLRef.current);
+    disconnectNode(rToLRef.current);
+    disconnectNode(lToRRef.current);
+    disconnectNode(rToRRef.current);
+    disconnectNode(stereoOutRef.current);
+    disconnectNode(pseudoMonoRef.current);
+    disconnectNode(pseudoDelayRef.current);
+    disconnectNode(pseudoHighpassRef.current);
+    disconnectNode(pseudoLeftGainRef.current);
+    disconnectNode(pseudoRightGainRef.current);
+    disconnectNode(pseudoMergerRef.current);
+    disconnectNode(haasWetGainRef.current);
+    disconnectNode(headroomRecoverRef.current);
+    disconnectNode(limiterNodeRef.current);
+    disconnectNode(softClipNodeRef.current);
     if (softClipWaveShaperRef.current && softClipWaveShaperRef.current !== softClipNodeRef.current) {
-      softClipWaveShaperRef.current.disconnect();
+      disconnectNode(softClipWaveShaperRef.current);
     }
-    if (panNodeRef.current) panNodeRef.current.disconnect();
+    disconnectNode(panNodeRef.current);
 
     let currentNode: AudioNode = sourceNodeRef.current;
-    const enabled = fxEnabledRef.current;
+    const enabled = fxEnabledRef.current || {};
+    const activity = getAudioFxActivity({
+      preampGain,
+      eqBands,
+      bassGain,
+      trebleGain,
+      reverbMix,
+      stereoWidth,
+      panValue,
+    }, enabled);
+
+    const connectStage = <T extends AudioNode>(node: T) => {
+      currentNode.connect(node);
+      currentNode = node;
+      return node;
+    };
 
     // 0. Per-track loudness gain. Actual LUFS measurement is done by playback/pre-render code.
-    if (!trackLoudnessGainRef.current) trackLoudnessGainRef.current = ctx.createGain();
-    trackLoudnessGainRef.current.gain.value = loudnessNormalization ? trackLoudnessGainValueRef.current : 1;
-    currentNode.connect(trackLoudnessGainRef.current);
-    currentNode = trackLoudnessGainRef.current;
+    if (loudnessNormalization) {
+      if (!trackLoudnessGainRef.current) trackLoudnessGainRef.current = ctx.createGain();
+      trackLoudnessGainRef.current.gain.value = trackLoudnessGainValueRef.current;
+      connectStage(trackLoudnessGainRef.current);
+    }
 
     // 1. Gain Staging (-6dB)
-    if (!headroomDropRef.current) headroomDropRef.current = ctx.createGain();
-    headroomDropRef.current.gain.value = 0.5;
-    currentNode.connect(headroomDropRef.current);
-    currentNode = headroomDropRef.current;
+    if (activity.any) {
+      if (!headroomDropRef.current) headroomDropRef.current = ctx.createGain();
+      headroomDropRef.current.gain.value = 0.5;
+      connectStage(headroomDropRef.current);
+    }
 
     // 1.5 Preamp
-    if (!preampNodeRef.current) preampNodeRef.current = ctx.createGain();
-    preampNodeRef.current.gain.value = enabled.preamp ? Math.pow(10, preampGain / 20) : 1;
-    currentNode.connect(preampNodeRef.current);
-    currentNode = preampNodeRef.current;
+    if (activity.preamp) {
+      if (!preampNodeRef.current) preampNodeRef.current = ctx.createGain();
+      preampNodeRef.current.gain.value = Math.pow(10, preampGain / 20);
+      connectStage(preampNodeRef.current);
+    }
 
     // 2. EQ
-    if (eqBands && eqBands.length > 0) {
+    if (activity.eq && eqBands && eqBands.length > 0) {
       if (eqNodesRef.current.length !== eqBands.length) {
         eqNodesRef.current = eqBands.map(() => ctx.createBiquadFilter());
       }
@@ -362,7 +413,7 @@ export function useAudioContext(effectsState: any) {
         filter.type = band.type || 'peaking';
         filter.frequency.value = band.frequency;
         filter.Q.value = band.q;
-        filter.gain.value = enabled.eq ? band.gain : 0;
+        filter.gain.value = band.gain;
       });
 
       let prevEq = currentNode;
@@ -374,208 +425,214 @@ export function useAudioContext(effectsState: any) {
     }
 
     // 3. Tone
-    if (!bassNodeRef.current) {
-      bassNodeRef.current = ctx.createBiquadFilter();
-      bassNodeRef.current.type = 'lowshelf';
-      bassNodeRef.current.frequency.value = 150;
+    if (activity.tone) {
+      if (!bassNodeRef.current) {
+        bassNodeRef.current = ctx.createBiquadFilter();
+        bassNodeRef.current.type = 'lowshelf';
+        bassNodeRef.current.frequency.value = 150;
+      }
+      if (!trebleNodeRef.current) {
+        trebleNodeRef.current = ctx.createBiquadFilter();
+        trebleNodeRef.current.type = 'highshelf';
+        trebleNodeRef.current.frequency.value = 4000;
+      }
+      bassNodeRef.current.gain.value = bassGain;
+      trebleNodeRef.current.gain.value = trebleGain;
+
+      currentNode.connect(bassNodeRef.current);
+      bassNodeRef.current.connect(trebleNodeRef.current);
+      currentNode = trebleNodeRef.current;
     }
-    if (!trebleNodeRef.current) {
-      trebleNodeRef.current = ctx.createBiquadFilter();
-      trebleNodeRef.current.type = 'highshelf';
-      trebleNodeRef.current.frequency.value = 4000;
-    }
-    bassNodeRef.current.gain.value = enabled.tone ? bassGain : 0;
-    trebleNodeRef.current.gain.value = enabled.tone ? trebleGain : 0;
-    
-    currentNode.connect(bassNodeRef.current);
-    bassNodeRef.current.connect(trebleNodeRef.current);
-    currentNode = trebleNodeRef.current;
 
     // 4. Compressor
-    if (!compressorNodeRef.current) compressorNodeRef.current = ctx.createDynamicsCompressor();
-    if (!compMakeupNodeRef.current) compMakeupNodeRef.current = ctx.createGain();
-    
-    if (enabled.comp) {
-        applyCompressorParams(compressorNodeRef.current, compMakeupNodeRef.current);
-    } else {
-        applyCompressorParams(compressorNodeRef.current, compMakeupNodeRef.current);
+    if (activity.comp) {
+      if (!compressorNodeRef.current) compressorNodeRef.current = ctx.createDynamicsCompressor();
+      if (!compMakeupNodeRef.current) compMakeupNodeRef.current = ctx.createGain();
+
+      applyCompressorParams(compressorNodeRef.current, compMakeupNodeRef.current);
+      currentNode.connect(compressorNodeRef.current);
+      compressorNodeRef.current.connect(compMakeupNodeRef.current);
+      currentNode = compMakeupNodeRef.current;
     }
-    currentNode.connect(compressorNodeRef.current);
-    compressorNodeRef.current.connect(compMakeupNodeRef.current);
-    currentNode = compMakeupNodeRef.current;
 
     const stereoDetectionNode = currentNode;
     
     // 5. Reverb
-    if (!convolverNodeRef.current) convolverNodeRef.current = ctx.createConvolver();
-    if (!reverbPreDelayRef.current) reverbPreDelayRef.current = ctx.createDelay(1.0);
-    if (!reverbHighpassRef.current) reverbHighpassRef.current = ctx.createBiquadFilter();
-    if (!reverbLowpassRef.current) reverbLowpassRef.current = ctx.createBiquadFilter();
-    if (!dryGainRef.current) dryGainRef.current = ctx.createGain();
-    if (!wetGainRef.current) wetGainRef.current = ctx.createGain();
+    if (activity.reverb) {
+      if (!convolverNodeRef.current) convolverNodeRef.current = ctx.createConvolver();
+      if (!reverbPreDelayRef.current) reverbPreDelayRef.current = ctx.createDelay(1.0);
+      if (!reverbHighpassRef.current) reverbHighpassRef.current = ctx.createBiquadFilter();
+      if (!reverbLowpassRef.current) reverbLowpassRef.current = ctx.createBiquadFilter();
+      if (!dryGainRef.current) dryGainRef.current = ctx.createGain();
+      if (!wetGainRef.current) wetGainRef.current = ctx.createGain();
+      if (!reverbOutRef.current) reverbOutRef.current = ctx.createGain();
 
-    reverbPreDelayRef.current.delayTime.value = reverbPreDelaySeconds(reverbMix);
-    
-    reverbHighpassRef.current.type = 'highpass';
-    reverbHighpassRef.current.frequency.value = REVERB_WET_HIGHPASS_HZ;
-    reverbHighpassRef.current.Q.value = 0.7;
-    
-    reverbLowpassRef.current.type = 'lowpass';
-    reverbLowpassRef.current.frequency.value = REVERB_WET_LOWPASS_HZ;
-    reverbLowpassRef.current.Q.value = 0.7;
+      reverbPreDelayRef.current.delayTime.value = reverbPreDelaySeconds(reverbMix);
 
-    if (irBufferRef.current && !convolverNodeRef.current.buffer) {
-      convolverNodeRef.current.buffer = irBufferRef.current;
+      reverbHighpassRef.current.type = 'highpass';
+      reverbHighpassRef.current.frequency.value = REVERB_WET_HIGHPASS_HZ;
+      reverbHighpassRef.current.Q.value = 0.7;
+
+      reverbLowpassRef.current.type = 'lowpass';
+      reverbLowpassRef.current.frequency.value = REVERB_WET_LOWPASS_HZ;
+      reverbLowpassRef.current.Q.value = 0.7;
+
+      if (irBufferRef.current && !convolverNodeRef.current.buffer) {
+        convolverNodeRef.current.buffer = irBufferRef.current;
+      }
+
+      dryGainRef.current.gain.value = 1.0;
+      wetGainRef.current.gain.value = reverbWetGain(reverbMix);
+
+      currentNode.connect(dryGainRef.current);
+      currentNode.connect(reverbPreDelayRef.current);
+      reverbPreDelayRef.current.connect(convolverNodeRef.current);
+      convolverNodeRef.current.connect(reverbHighpassRef.current);
+      reverbHighpassRef.current.connect(reverbLowpassRef.current);
+      reverbLowpassRef.current.connect(wetGainRef.current);
+
+      dryGainRef.current.connect(reverbOutRef.current);
+      wetGainRef.current.connect(reverbOutRef.current);
+      currentNode = reverbOutRef.current;
     }
-
-    dryGainRef.current.gain.value = 1.0;
-    wetGainRef.current.gain.value = enabled.reverb ? reverbWetGain(reverbMix) : 0;
-
-    currentNode.connect(dryGainRef.current);
-    currentNode.connect(reverbPreDelayRef.current);
-    reverbPreDelayRef.current.connect(convolverNodeRef.current);
-    convolverNodeRef.current.connect(reverbHighpassRef.current);
-    reverbHighpassRef.current.connect(reverbLowpassRef.current);
-    reverbLowpassRef.current.connect(wetGainRef.current);
-
-    const reverbOut = ctx.createGain();
-    dryGainRef.current.connect(reverbOut);
-    wetGainRef.current.connect(reverbOut);
-    currentNode = reverbOut;
 
     // 5.5 Stereo Width Matrix
-    if (!stereoSplitterRef.current) stereoSplitterRef.current = ctx.createChannelSplitter(2);
-    if (!stereoMergerRef.current) stereoMergerRef.current = ctx.createChannelMerger(2);
-    
-    if (!lToLRef.current) lToLRef.current = ctx.createGain();
-    if (!rToLRef.current) rToLRef.current = ctx.createGain();
-    if (!lToRRef.current) lToRRef.current = ctx.createGain();
-    if (!rToRRef.current) rToRRef.current = ctx.createGain();
-    if (!stereoOutRef.current) stereoOutRef.current = ctx.createGain();
+    if (activity.stereo) {
+      if (!stereoInputRef.current) stereoInputRef.current = ctx.createGain();
+      if (!stereoSplitterRef.current) stereoSplitterRef.current = ctx.createChannelSplitter(2);
+      if (!stereoMergerRef.current) stereoMergerRef.current = ctx.createChannelMerger(2);
 
-    const width = enabled.stereo ? percentToStereoBaseWidth(stereoWidth) : 1;
-    const basePseudoAmount = enabled.stereo ? percentToPseudoStereoAmount(stereoWidth) : 0;
-    stereoPseudoBaseAmountRef.current = basePseudoAmount;
-    const pseudoAmount = !audioIsStereo ? basePseudoAmount : 0;
-    lToLRef.current.gain.value = (1 + width) / 2;
-    rToLRef.current.gain.value = (1 - width) / 2;
-    lToRRef.current.gain.value = (1 - width) / 2;
-    rToRRef.current.gain.value = (1 + width) / 2;
+      if (!lToLRef.current) lToLRef.current = ctx.createGain();
+      if (!rToLRef.current) rToLRef.current = ctx.createGain();
+      if (!lToRRef.current) lToRRef.current = ctx.createGain();
+      if (!rToRRef.current) rToRRef.current = ctx.createGain();
+      if (!stereoOutRef.current) stereoOutRef.current = ctx.createGain();
 
-    const stereoSourceNode = currentNode;
-    const stereoInput = ctx.createGain();
-    stereoInput.channelCount = 2;
-    stereoInput.channelCountMode = 'explicit';
-    stereoInput.channelInterpretation = 'speakers';
-    stereoSourceNode.connect(stereoInput);
-    stereoInput.connect(stereoSplitterRef.current);
-    stereoSplitterRef.current.connect(lToLRef.current, 0);
-    stereoSplitterRef.current.connect(lToRRef.current, 0);
-    stereoSplitterRef.current.connect(rToLRef.current, 1);
-    stereoSplitterRef.current.connect(rToRRef.current, 1);
+      const width = percentToStereoBaseWidth(stereoWidth);
+      const basePseudoAmount = percentToPseudoStereoAmount(stereoWidth);
+      stereoPseudoBaseAmountRef.current = basePseudoAmount;
+      const pseudoAmount = !audioIsStereo ? basePseudoAmount : 0;
+      lToLRef.current.gain.value = (1 + width) / 2;
+      rToLRef.current.gain.value = (1 - width) / 2;
+      lToRRef.current.gain.value = (1 - width) / 2;
+      rToRRef.current.gain.value = (1 + width) / 2;
 
-    lToLRef.current.connect(stereoMergerRef.current, 0, 0);
-    rToLRef.current.connect(stereoMergerRef.current, 0, 0);
-    lToRRef.current.connect(stereoMergerRef.current, 0, 1);
-    rToRRef.current.connect(stereoMergerRef.current, 0, 1);
+      stereoInputRef.current.channelCount = 2;
+      stereoInputRef.current.channelCountMode = 'explicit';
+      stereoInputRef.current.channelInterpretation = 'speakers';
+      currentNode.connect(stereoInputRef.current);
+      stereoInputRef.current.connect(stereoSplitterRef.current);
+      stereoSplitterRef.current.connect(lToLRef.current, 0);
+      stereoSplitterRef.current.connect(lToRRef.current, 0);
+      stereoSplitterRef.current.connect(rToLRef.current, 1);
+      stereoSplitterRef.current.connect(rToRRef.current, 1);
 
-    stereoMergerRef.current.connect(stereoOutRef.current);
+      lToLRef.current.connect(stereoMergerRef.current, 0, 0);
+      rToLRef.current.connect(stereoMergerRef.current, 0, 0);
+      lToRRef.current.connect(stereoMergerRef.current, 0, 1);
+      rToRRef.current.connect(stereoMergerRef.current, 0, 1);
 
-    if (!pseudoMonoRef.current) pseudoMonoRef.current = ctx.createGain();
-    if (!pseudoDelayRef.current) pseudoDelayRef.current = ctx.createDelay(0.05);
-    if (!pseudoHighpassRef.current) {
-      pseudoHighpassRef.current = ctx.createBiquadFilter();
-      pseudoHighpassRef.current.type = 'highpass';
-      pseudoHighpassRef.current.frequency.value = 180;
+      stereoMergerRef.current.connect(stereoOutRef.current);
+
+      if (!pseudoMonoRef.current) pseudoMonoRef.current = ctx.createGain();
+      if (!pseudoDelayRef.current) pseudoDelayRef.current = ctx.createDelay(0.05);
+      if (!pseudoHighpassRef.current) {
+        pseudoHighpassRef.current = ctx.createBiquadFilter();
+        pseudoHighpassRef.current.type = 'highpass';
+        pseudoHighpassRef.current.frequency.value = 180;
+      }
+      if (!pseudoLeftGainRef.current) pseudoLeftGainRef.current = ctx.createGain();
+      if (!pseudoRightGainRef.current) pseudoRightGainRef.current = ctx.createGain();
+      if (!pseudoMergerRef.current) pseudoMergerRef.current = ctx.createChannelMerger(2);
+      if (!haasWetGainRef.current) haasWetGainRef.current = ctx.createGain();
+
+      pseudoMonoRef.current.channelCount = 1;
+      pseudoMonoRef.current.channelCountMode = 'explicit';
+      pseudoMonoRef.current.channelInterpretation = 'speakers';
+      pseudoDelayRef.current.delayTime.value = 0.006 + 0.007 * pseudoAmount;
+      pseudoLeftGainRef.current.gain.value = 1;
+      pseudoRightGainRef.current.gain.value = 1;
+      haasWetGainRef.current.gain.value = pseudoStereoWetGain(pseudoAmount);
+
+      currentNode.connect(pseudoMonoRef.current);
+      pseudoMonoRef.current.connect(pseudoLeftGainRef.current);
+      pseudoMonoRef.current.connect(pseudoDelayRef.current);
+      pseudoDelayRef.current.connect(pseudoHighpassRef.current);
+      pseudoHighpassRef.current.connect(pseudoRightGainRef.current);
+      pseudoLeftGainRef.current.connect(pseudoMergerRef.current, 0, 0);
+      pseudoRightGainRef.current.connect(pseudoMergerRef.current, 0, 1);
+      pseudoMergerRef.current.connect(haasWetGainRef.current);
+      haasWetGainRef.current.connect(stereoOutRef.current);
+
+      if (audioIsStereo) {
+        startStereoNearMonoAnalysis(stereoDetectionNode, basePseudoAmount);
+      }
+
+      currentNode = stereoOutRef.current;
     }
-    if (!pseudoLeftGainRef.current) pseudoLeftGainRef.current = ctx.createGain();
-    if (!pseudoRightGainRef.current) pseudoRightGainRef.current = ctx.createGain();
-    if (!pseudoMergerRef.current) pseudoMergerRef.current = ctx.createChannelMerger(2);
-    if (!haasWetGainRef.current) haasWetGainRef.current = ctx.createGain();
-
-    pseudoMonoRef.current.channelCount = 1;
-    pseudoMonoRef.current.channelCountMode = 'explicit';
-    pseudoMonoRef.current.channelInterpretation = 'speakers';
-    pseudoDelayRef.current.delayTime.value = 0.006 + 0.007 * pseudoAmount;
-    pseudoLeftGainRef.current.gain.value = 1;
-    pseudoRightGainRef.current.gain.value = 1;
-    haasWetGainRef.current.gain.value = pseudoStereoWetGain(pseudoAmount);
-
-    currentNode.connect(pseudoMonoRef.current);
-    pseudoMonoRef.current.connect(pseudoLeftGainRef.current);
-    pseudoMonoRef.current.connect(pseudoDelayRef.current);
-    pseudoDelayRef.current.connect(pseudoHighpassRef.current);
-    pseudoHighpassRef.current.connect(pseudoRightGainRef.current);
-    pseudoLeftGainRef.current.connect(pseudoMergerRef.current, 0, 0);
-    pseudoRightGainRef.current.connect(pseudoMergerRef.current, 0, 1);
-    pseudoMergerRef.current.connect(haasWetGainRef.current);
-    haasWetGainRef.current.connect(stereoOutRef.current);
-
-    if (enabled.stereo && audioIsStereo) {
-      startStereoNearMonoAnalysis(stereoDetectionNode, basePseudoAmount);
-    }
-
-    currentNode = stereoOutRef.current;
 
 
     // 6. Pan
-    if (!panNodeRef.current) panNodeRef.current = ctx.createStereoPanner();
-    panNodeRef.current.pan.value = enabled.master ? percentToPan(panValue) : 0;
-    currentNode.connect(panNodeRef.current);
-    currentNode = panNodeRef.current;
+    if (activity.master) {
+      if (!panNodeRef.current) panNodeRef.current = ctx.createStereoPanner();
+      panNodeRef.current.pan.value = percentToPan(panValue);
+      connectStage(panNodeRef.current);
+    }
 
     // Output
     // 7. Adaptive post-FX trim: keeps boosted EQ/reverb/preamp from leaning on the limiter.
-    if (!headroomRecoverRef.current) {
+    if (activity.any) {
+      if (!headroomRecoverRef.current) {
         headroomRecoverRef.current = ctx.createGain();
-    }
-    headroomRecoverRef.current.gain.value = dbToGain(calculateAutoPostFxTrimDb({
-      preampGain,
-      eqBands,
-      bassGain,
-      trebleGain,
-      reverbMix,
-      stereoWidth,
-    }, enabled) || BASE_POST_FX_TRIM_DB);
-    currentNode.connect(headroomRecoverRef.current);
-    currentNode = headroomRecoverRef.current;
-
-    if (!limiterNodeRef.current) {
-      limiterNodeRef.current = ctx.createDynamicsCompressor();
-    }
-    if (Boolean(enabled.limiter) && useOversample) {
-      ensureOversampledSoftClipperWorklet(ctx);
+      }
+      headroomRecoverRef.current.gain.value = dbToGain(calculateAutoPostFxTrimDb({
+        preampGain,
+        eqBands,
+        bassGain,
+        trebleGain,
+        reverbMix,
+        stereoWidth,
+      }, enabled) || BASE_POST_FX_TRIM_DB);
+      connectStage(headroomRecoverRef.current);
     }
 
-    const useWorkletSoftClipper =
-      Boolean(enabled.limiter) &&
-      useOversample &&
-      oversampledSoftClipperReadyRef.current;
+    if (activity.limiter) {
+      if (!limiterNodeRef.current) {
+        limiterNodeRef.current = ctx.createDynamicsCompressor();
+      }
+      if (useOversample) {
+        ensureOversampledSoftClipperWorklet(ctx);
+      }
 
-    softClipWaveShaperRef.current = null;
-    if (useWorkletSoftClipper) {
-      softClipNodeRef.current = createOversampledSoftClipperNode(ctx);
-      applyMasterLimiterCompressorState(
-        ctx,
-        limiterNodeRef.current,
-        Boolean(enabled.limiter)
-      );
+      const useWorkletSoftClipper = useOversample && oversampledSoftClipperReadyRef.current;
+
+      softClipWaveShaperRef.current = null;
+      if (useWorkletSoftClipper) {
+        softClipNodeRef.current = createOversampledSoftClipperNode(ctx);
+        applyMasterLimiterCompressorState(
+          ctx,
+          limiterNodeRef.current,
+          true
+        );
+      } else {
+        const waveShaper = ctx.createWaveShaper();
+        applyMasterLimiterState(
+          ctx,
+          limiterNodeRef.current,
+          waveShaper,
+          true,
+          useOversample
+        );
+        softClipWaveShaperRef.current = waveShaper;
+        softClipNodeRef.current = waveShaper;
+      }
+
+      currentNode.connect(softClipNodeRef.current);
+      softClipNodeRef.current.connect(limiterNodeRef.current);
+      currentNode = limiterNodeRef.current;
     } else {
-      const waveShaper = ctx.createWaveShaper();
-      applyMasterLimiterState(
-        ctx,
-        limiterNodeRef.current,
-        waveShaper,
-        Boolean(enabled.limiter),
-        useOversample
-      );
-      softClipWaveShaperRef.current = waveShaper;
-      softClipNodeRef.current = waveShaper;
+      softClipWaveShaperRef.current = null;
     }
-
-    currentNode.connect(softClipNodeRef.current);
-    softClipNodeRef.current.connect(limiterNodeRef.current);
-    currentNode = limiterNodeRef.current;
     
     currentNode.connect(ctx.destination);
     if (audioContextRef.current && audioContextRef.current.state === 'suspended') {
@@ -591,10 +648,16 @@ export function useAudioContext(effectsState: any) {
     eqBands,
     startStereoNearMonoAnalysis,
     stopStereoNearMonoAnalysis,
+    fxEnabled.comp,
+    fxEnabled.eq,
     fxEnabled.master,
+    fxEnabled.limiter,
+    fxEnabled.preamp,
     fxEnabled.reverb,
     fxEnabled.stereo,
+    fxEnabled.tone,
     audioIsStereo,
+    loudnessNormalization,
     panValue,
     preampGain,
     reverbMix,
@@ -603,6 +666,16 @@ export function useAudioContext(effectsState: any) {
     trebleGain,
     useOversample,
   ]);
+  useEffect(() => {
+    initializeAudioContextRef.current = initializeAudioContext;
+  }, [initializeAudioContext]);
+
+  useEffect(() => {
+    if (!sourceNodeRef.current) return;
+    initializeAudioContext();
+  // Rebuild only when graph shape changes. Parameter changes below update existing nodes.
+  // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [graphStructureKey]);
 
   useEffect(() => {
     if (trackLoudnessGainRef.current) {
@@ -705,12 +778,12 @@ if (preampNodeRef.current) {
     if (!isChanged) return;
     prevLimiterDepsRef.current = { limiter: fxEnabled.limiter, oversample: useOversample };
 
-    if (!audioContextRef.current || !limiterNodeRef.current) return;
-
     if (sourceNodeRef.current) {
       initializeAudioContext();
       return;
     }
+
+    if (!audioContextRef.current || !limiterNodeRef.current) return;
 
     if (!softClipWaveShaperRef.current) return;
 
@@ -722,7 +795,7 @@ if (preampNodeRef.current) {
       useOversample,
       true
     );
-  }, [fxEnabled.limiter, useOversample]);
+  }, [fxEnabled.limiter, initializeAudioContext, useOversample]);
 
   const eqBandsLength = eqBands ? eqBands.length : 0;
   const prevEqBandsLengthRef = useRef(eqBandsLength);
@@ -732,7 +805,7 @@ if (preampNodeRef.current) {
     if (sourceNodeRef.current) {
       initializeAudioContext();
     }
-  }, [eqBandsLength]);
+  }, [eqBandsLength, initializeAudioContext]);
 
   const prevAudioIsStereoRef = useRef(audioIsStereo);
   useEffect(() => {
@@ -741,7 +814,7 @@ if (preampNodeRef.current) {
     if (sourceNodeRef.current) {
       initializeAudioContext();
     }
-  }, [audioIsStereo]);
+  }, [audioIsStereo, initializeAudioContext]);
 
   return {
     audioRef,

@@ -5,10 +5,16 @@ import { clamp } from './audioMath';
 import {
   calculateAutoPostFxTrimDb,
   calculateNormalizedTrackGain,
+  dbToGain,
   INPUT_HEADROOM_DB,
 } from './audioLoudness';
+import { getAudioFxActivity } from './audioFxActivity';
 import { getBufferProgressIntervalMs, getFullCoreCount, isLikelyConstrainedDevice } from './audioDevice';
-import { createRenderSignature as createAudioRenderSignature } from './audioRenderSignature';
+import {
+  createRenderSignature as createAudioRenderSignature,
+  type AudioRenderParams,
+  type FxEnabledFlags,
+} from './audioRenderSignature';
 import { renderOfflineAudio } from './offlineAudioRenderer';
 import { useMediaSessionPlayback } from './useMediaSessionPlayback';
 import {
@@ -120,6 +126,7 @@ export function useAudioPlayback(
   const upcomingQueuesSnapshotRef = useRef<Track[][]>(upcomingQueues ?? []);
   const usingBufferPlaybackRef = useRef<boolean>(false);
   const playTrackSpamGuardRef = useRef<{ trackId: string; timestamp: number } | null>(null);
+  const visibilityHandlerRef = useRef<(() => void) | null>(null);
 
   const clearTrackLoading = useCallback(() => {
     setIsLoadingTrack(false);
@@ -172,9 +179,7 @@ export function useAudioPlayback(
         }
       };
       document.addEventListener('visibilitychange', handleVisibilityChange);
-      // Store the handler on the ref for cleanup
-      // eslint-disable-next-line @typescript-eslint/no-explicit-any
-      (audioRef as any).current._visibilityHandler = handleVisibilityChange;
+      visibilityHandlerRef.current = handleVisibilityChange;
       audioRef.current.addEventListener('loadedmetadata', () => {
         const dur = audioRef.current?.duration || 0;
         setDuration(dur);
@@ -183,8 +188,7 @@ export function useAudioPlayback(
           if (Math.abs(dur - currentSavedDur) > 1) {
             const updatedTrack = { ...currentTrackSnapshotRef.current, durationSeconds: dur };
             if (setCurrentTrack) setCurrentTrack(updatedTrack);
-            // eslint-disable-next-line @typescript-eslint/no-explicit-any
-            if (setQueue) setQueue((prevQueue: any[]) => prevQueue.map((t: any) => t.id === updatedTrack.id ? { ...t, durationSeconds: dur } : t));
+            if (setQueue) setQueue((prevQueue: Track[]) => prevQueue.map((t) => t.id === updatedTrack.id ? { ...t, durationSeconds: dur } : t));
           }
         }
       });
@@ -218,8 +222,9 @@ export function useAudioPlayback(
     return () => {
       // Cleanup on unmount (critical for React Hot Reload / Fast Refresh)
       if (audioRef.current) {
-        if ((audioRef as any).current._visibilityHandler) {
-          document.removeEventListener('visibilitychange', (audioRef as any).current._visibilityHandler);
+        if (visibilityHandlerRef.current) {
+          document.removeEventListener('visibilitychange', visibilityHandlerRef.current);
+          visibilityHandlerRef.current = null;
         }
         audioRef.current.pause();
         audioRef.current.src = "";
@@ -234,8 +239,7 @@ export function useAudioPlayback(
   }, []);
   const allowedIdsRef = useRef<Set<string>>(new Set());
   const blobLoadingPromisesRef = useRef<Map<string, Promise<string>>>(new Map());
-  // eslint-disable-next-line @typescript-eslint/no-explicit-any
-  const audioParamsRef = useRef<any>({
+  const audioParamsRef = useRef<AudioRenderParams>({
     preampGain,
     eqBands,
     bassGain,
@@ -254,10 +258,10 @@ export function useAudioPlayback(
     useOversample,
     loudnessNormalization,
   });
-  const fxEnabledRef = useRef<any>(fxEnabled);
+  const fxEnabledRef = useRef<FxEnabledFlags>(fxEnabled || {});
 
   useEffect(() => {
-    fxEnabledRef.current = fxEnabled;
+    fxEnabledRef.current = fxEnabled || {};
   }, [fxEnabled]);
 
   useEffect(() => {
@@ -348,7 +352,9 @@ export function useAudioPlayback(
     try {
       const existing = JSON.parse(localStorage.getItem(LOCAL_STORAGE_KEY) || '{}');
       localStorage.setItem(LOCAL_STORAGE_KEY, JSON.stringify({ ...existing, volume: newVolume }));
-    } catch (e) { }
+    } catch {
+      // Ignore localStorage write failures.
+    }
   }, [audioRef, bufferVolumeNodeRef]);
 
   const getTrackAudioUrl = useCallback(async (track: Track) => {
@@ -650,8 +656,14 @@ export function useAudioPlayback(
       const response = await fetch(audioUrl);
       const arrayBuffer = await response.arrayBuffer();
       const audioBuffer = await audioContextRef.current!.decodeAudioData(arrayBuffer);
-      const postFxTrimDb = calculateAutoPostFxTrimDb(audioParamsRef.current, fxEnabledRef.current || {});
-      const gain = calculateNormalizedTrackGain(audioBuffer, INPUT_HEADROOM_DB + postFxTrimDb);
+      const enabled = fxEnabledRef.current || {};
+      const fxActivity = getAudioFxActivity(audioParamsRef.current, enabled);
+      const postFxTrimDb = calculateAutoPostFxTrimDb(audioParamsRef.current, enabled);
+      const downstreamGainDb = INPUT_HEADROOM_DB + postFxTrimDb;
+      const normalizedGain = calculateNormalizedTrackGain(audioBuffer, downstreamGainDb);
+      const gain = fxActivity.any
+        ? normalizedGain
+        : normalizedGain * dbToGain(downstreamGainDb);
       loudnessGainCacheRef.current.set(trackId, gain);
       return gain;
     } catch (error) {
