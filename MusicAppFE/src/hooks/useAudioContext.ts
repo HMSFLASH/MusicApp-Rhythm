@@ -699,7 +699,13 @@ if (preampNodeRef.current) {
     }
   }, [panValue, fxEnabled.master]);
 
+  const prevLimiterDepsRef = useRef({ limiter: fxEnabled.limiter, oversample: useOversample });
   useEffect(() => {
+    const isChanged = prevLimiterDepsRef.current.limiter !== fxEnabled.limiter || 
+                      prevLimiterDepsRef.current.oversample !== useOversample;
+    if (!isChanged) return;
+    prevLimiterDepsRef.current = { limiter: fxEnabled.limiter, oversample: useOversample };
+
     if (!audioContextRef.current || !limiterNodeRef.current) return;
 
     if (sourceNodeRef.current) {
@@ -720,19 +726,22 @@ if (preampNodeRef.current) {
   }, [fxEnabled.limiter, useOversample]);
 
   const eqBandsLength = eqBands ? eqBands.length : 0;
-
+  const prevEqBandsLengthRef = useRef(eqBandsLength);
   useEffect(() => {
+    if (prevEqBandsLengthRef.current === eqBandsLength) return;
+    prevEqBandsLengthRef.current = eqBandsLength;
     if (sourceNodeRef.current) {
       initializeAudioContext();
     }
-  // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [eqBandsLength]);
 
+  const prevAudioIsStereoRef = useRef(audioIsStereo);
   useEffect(() => {
+    if (prevAudioIsStereoRef.current === audioIsStereo) return;
+    prevAudioIsStereoRef.current = audioIsStereo;
     if (sourceNodeRef.current) {
       initializeAudioContext();
     }
-  // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [audioIsStereo]);
 
   return {
