@@ -866,15 +866,13 @@ export function useAudioPlayback(
     initializeAudioContext();
     if (!startingTrack) return;
 
-    // Spam guard: prevent rapid repeated calls from launching overlapping pipelines
+    // Spam guard: prevent rapid repeated calls for the SAME track
     const now = performance.now();
     const lastCall = playTrackSpamGuardRef.current;
     if (lastCall) {
       const elapsed = now - lastCall.timestamp;
-      // Same track clicked again within 300ms → skip
+      // Same track clicked again within 300ms → skip (prevents double-click spam)
       if (lastCall.trackId === String(startingTrack.id) && elapsed < 300) return;
-      // Any track switch within 100ms → skip (too fast, likely spam)
-      if (elapsed < 100) return;
     }
     playTrackSpamGuardRef.current = { trackId: String(startingTrack.id), timestamp: now };
     if (!currentQueue) currentQueue = [startingTrack];
