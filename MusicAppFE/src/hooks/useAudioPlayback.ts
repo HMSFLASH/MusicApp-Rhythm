@@ -119,6 +119,7 @@ export function useAudioPlayback(
   const queueSnapshotRef = useRef<Track[]>(queue ?? []);
   const upcomingQueuesSnapshotRef = useRef<Track[][]>(upcomingQueues ?? []);
   const usingBufferPlaybackRef = useRef<boolean>(false);
+  const playTrackSpamGuardRef = useRef<{ trackId: string; timestamp: number } | null>(null);
 
   const clearTrackLoading = useCallback(() => {
     setIsLoadingTrack(false);
@@ -864,6 +865,18 @@ export function useAudioPlayback(
   const playTrack = async (startingTrack: Track | null, currentQueue?: Track[], autoPlay = true, ..._args: any[]) => {
     initializeAudioContext();
     if (!startingTrack) return;
+
+    // Spam guard: prevent rapid repeated calls from launching overlapping pipelines
+    const now = performance.now();
+    const lastCall = playTrackSpamGuardRef.current;
+    if (lastCall) {
+      const elapsed = now - lastCall.timestamp;
+      // Same track clicked again within 300ms → skip
+      if (lastCall.trackId === String(startingTrack.id) && elapsed < 300) return;
+      // Any track switch within 100ms → skip (too fast, likely spam)
+      if (elapsed < 100) return;
+    }
+    playTrackSpamGuardRef.current = { trackId: String(startingTrack.id), timestamp: now };
     if (!currentQueue) currentQueue = [startingTrack];
     setCurrentTrack(startingTrack);
     setQueue(currentQueue);
