@@ -17,7 +17,7 @@ public class ScheduledTasks {
     private final InvalidatedTokenRepository invalidatedTokenRepository;
 
     // Run every day at midnight (or whatever interval suits your needs, here 1 hour for safety)
-    @Scheduled(fixedRate = 3600000)
+    @Scheduled(fixedRate = 86400000)
     @Transactional
     public void cleanupExpiredTokens() {
         log.info("Starting cleanup of expired invalidated tokens...");
