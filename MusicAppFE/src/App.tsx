@@ -66,18 +66,27 @@ function App() {
   );
 }
 
+function AppProviders() {
+  const { isAuthenticated } = useAuth();
+  const audioScope = isAuthenticated ? 'authenticated' : 'guest';
+
+  return (
+    <AudioProvider key={audioScope}>
+      <LibraryProvider>
+        <UploadProvider>
+          <ConfirmProvider>
+            <App />
+          </ConfirmProvider>
+        </UploadProvider>
+      </LibraryProvider>
+    </AudioProvider>
+  );
+}
+
 export default function AppWrapper() {
   return (
     <AuthProvider>
-      <AudioProvider>
-        <LibraryProvider>
-          <UploadProvider>
-            <ConfirmProvider>
-              <App />
-            </ConfirmProvider>
-          </UploadProvider>
-        </LibraryProvider>
-      </AudioProvider>
+      <AppProviders />
     </AuthProvider>
   );
 }

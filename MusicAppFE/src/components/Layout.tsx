@@ -27,8 +27,10 @@ import { LocalFilePicker } from './LocalFilePicker';
 import { UploadQueuePanel } from './UploadQueuePanel';
 import { SetLocalPasswordModal } from './SetLocalPasswordModal';
 import { db } from '../lib/db';
+import { clearCovers } from '../utils/idb';
 import { useGlobalAudio } from '../context/AudioContext';
 import { BACKEND_URL } from '../config/env';
+import { LOCAL_STORAGE_KEY, PLAYBACK_STORAGE_KEY } from '../hooks/audioStorage';
 
 // parseJwt removed as user data is now fetched from /me
 
@@ -135,7 +137,16 @@ export function Layout() {
     } finally {
       localStorage.removeItem('music_app_access_token');
       localStorage.removeItem('music_app_refresh_token');
+      localStorage.removeItem('music_app_logged_in');
       setIsAuthenticated(false);
+      localStorage.removeItem(LOCAL_STORAGE_KEY);
+      localStorage.removeItem(PLAYBACK_STORAGE_KEY);
+      await Promise.allSettled([
+        db.clear(),
+        clearCovers(),
+      ]);
+      localStorage.removeItem(LOCAL_STORAGE_KEY);
+      localStorage.removeItem(PLAYBACK_STORAGE_KEY);
       setIsLoggingOut(false);
       navigate('/login');
     }

@@ -2,14 +2,14 @@ import { useMemo, useEffect } from 'react';
 import { useAudioQueue } from './useAudioQueue';
 import { useAudioEffectsState } from './useAudioEffectsState';
 import { useAudioEngine } from './useAudioEngine';
-import { getInitialState, LOCAL_STORAGE_KEY } from './audioStorage';
+import { getAudioConfigStorageKey, getInitialState } from './audioStorage';
 export type { Track } from './audioTypes';
 export { EQ_PRESETS, STYLISTIC_PRESETS } from './audioTypes';
 
 export function useAudioPlayer(isAuthenticated: boolean, driveToken?: string, fetchDriveToken?: () => Promise<string>) {
-  const savedState = useMemo(() => getInitialState(), []);
+  const savedState = useMemo(() => getInitialState(isAuthenticated), [isAuthenticated]);
 
-  const queueState = useAudioQueue(savedState);
+  const queueState = useAudioQueue(savedState, isAuthenticated);
   const effectsState = useAudioEffectsState(savedState);
   // eslint-disable-next-line @typescript-eslint/no-explicit-any
   const engineState = useAudioEngine(isAuthenticated, queueState as any, effectsState as any, savedState, driveToken, fetchDriveToken);
@@ -49,11 +49,12 @@ export function useAudioPlayer(isAuthenticated: boolean, driveToken?: string, fe
     
     // Add a simple throttle to avoid too frequent writes
     const timeoutId = setTimeout(() => {
-        localStorage.setItem(LOCAL_STORAGE_KEY, JSON.stringify(configToSave));
+        localStorage.setItem(getAudioConfigStorageKey(isAuthenticated), JSON.stringify(configToSave));
     }, 500);
 
     return () => clearTimeout(timeoutId);
   }, [
+    isAuthenticated,
     queueState.isShuffleState, queueState.songEndMode, queueState.queueEndMode, queueState.repeatMode,
     queueState.cycleQueues, queueState.upcomingQueues,
     effectsState.eqPresetName, effectsState.eqBands, effectsState.customEqPresets,

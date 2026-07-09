@@ -1,9 +1,14 @@
 export const LOCAL_STORAGE_KEY = 'SONIC_DEPTH_AUDIO_CONFIG';
+export const GUEST_LOCAL_STORAGE_KEY = 'SONIC_DEPTH_AUDIO_CONFIG_GUEST';
 export const PLAYBACK_STORAGE_KEY = 'SONIC_DEPTH_PLAYBACK_STATE';
 
-export const getInitialState = () => {
+export const getAudioConfigStorageKey = (isAuthenticated: boolean) => (
+  isAuthenticated ? LOCAL_STORAGE_KEY : GUEST_LOCAL_STORAGE_KEY
+);
+
+export const getInitialState = (isAuthenticated = true) => {
   try {
-    const saved = localStorage.getItem(LOCAL_STORAGE_KEY);
+    const saved = localStorage.getItem(getAudioConfigStorageKey(isAuthenticated));
     if (saved) {
       const parsed = JSON.parse(saved);
       if (parsed.upcomingQueues) {
@@ -25,5 +30,3 @@ export const getInitialState = () => {
   }
   return {};
 };
-
-

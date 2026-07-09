@@ -4,6 +4,13 @@ const STORE_NAME = 'store';
 
 let dbInstance: IDBDatabase | null = null;
 
+function closeDB() {
+  if (dbInstance) {
+    dbInstance.close();
+    dbInstance = null;
+  }
+}
+
 function openDB(): Promise<IDBDatabase> {
   if (dbInstance) return Promise.resolve(dbInstance);
   return new Promise((resolve, reject) => {
@@ -98,6 +105,31 @@ export const db = {
 
       transaction.oncomplete = () => resolve();
       transaction.onerror = () => reject(transaction.error);
+    });
+  },
+
+  async clear(): Promise<void> {
+    const database = await openDB();
+    return new Promise((resolve, reject) => {
+      const transaction = database.transaction(STORE_NAME, 'readwrite');
+      const store = transaction.objectStore(STORE_NAME);
+      store.clear();
+
+      transaction.oncomplete = () => resolve();
+      transaction.onerror = () => reject(transaction.error);
+    });
+  },
+
+  async deleteDatabase(): Promise<void> {
+    closeDB();
+    return new Promise((resolve, reject) => {
+      const request = indexedDB.deleteDatabase(DB_NAME);
+
+      request.onsuccess = () => resolve();
+      request.onerror = () => reject(request.error);
+      request.onblocked = () => {
+        reject(new Error(`Unable to delete IndexedDB database "${DB_NAME}" because it is still open.`));
+      };
     });
   }
 };

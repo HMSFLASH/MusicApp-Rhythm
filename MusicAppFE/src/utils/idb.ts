@@ -5,6 +5,13 @@ const STORE_NAME = 'covers';
 
 let dbPromise: Promise<IDBDatabase> | null = null;
 
+async function closeDB() {
+  if (!dbPromise) return;
+  const db = await dbPromise.catch(() => null);
+  db?.close();
+  dbPromise = null;
+}
+
 function getDB(): Promise<IDBDatabase> {
   if (!dbPromise) {
     dbPromise = new Promise((resolve, reject) => {
@@ -50,5 +57,34 @@ export async function getCover(trackId: string): Promise<{ data: Uint8Array; mim
   } catch (e) {
     console.error('Failed to get cover from IndexedDB', e);
     return null;
+  }
+}
+
+export async function clearCovers(): Promise<void> {
+  try {
+    const db = await getDB();
+    await new Promise<void>((resolve, reject) => {
+      const tx = db.transaction(STORE_NAME, 'readwrite');
+      const store = tx.objectStore(STORE_NAME);
+      store.clear();
+      tx.oncomplete = () => resolve();
+      tx.onerror = () => reject(tx.error);
+    });
+  } catch (e) {
+    console.error('Failed to clear covers from IndexedDB', e);
+  }
+}
+
+export async function deleteCoverDatabase(): Promise<void> {
+  try {
+    await closeDB();
+    await new Promise<void>((resolve, reject) => {
+      const request = indexedDB.deleteDatabase(DB_NAME);
+      request.onsuccess = () => resolve();
+      request.onerror = () => reject(request.error);
+      request.onblocked = () => reject(new Error(`Unable to delete IndexedDB database "${DB_NAME}" because it is still open.`));
+    });
+  } catch (e) {
+    console.error('Failed to delete cover IndexedDB', e);
   }
 }

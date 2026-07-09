@@ -23,7 +23,7 @@ const filterUpcomingQueues = (
   .map((candidateQueue) => candidateQueue.filter(predicate))
   .filter((candidateQueue) => candidateQueue.length > 0);
 
-export function useAudioQueue(savedState: SavedAudioQueueState) {
+export function useAudioQueue(savedState: SavedAudioQueueState, isAuthenticated: boolean) {
   const [currentTrack, setCurrentTrack] = useState<Track | null>(null);
   const [queue, setQueue] = useState<Track[]>([]);
   const [loaded, setLoaded] = useState(false);
@@ -36,36 +36,66 @@ export function useAudioQueue(savedState: SavedAudioQueueState) {
   const [cycleQueues, setCycleQueues] = useState<boolean>(savedState.cycleQueues || false);
 
   useEffect(() => {
-    db.get<{currentTrack: Track | null, queue: Track[]}>(PLAYBACK_STORAGE_KEY).then(saved => {
-      if (saved) {
-        let parsedQueue = saved.queue || [];
-        let parsedTrack = saved.currentTrack || null;
-        
-        parsedQueue = parsedQueue.filter((track) => track.sourceType !== 'LOCAL');
-        parsedQueue.forEach((track) => {
-          if (track.imageUrl?.startsWith('blob:')) track.imageUrl = '';
-        });
+    let cancelled = false;
 
-        if (parsedTrack) {
-          if (parsedTrack.sourceType === 'LOCAL') {
-            parsedTrack = parsedQueue.length > 0 ? parsedQueue[0] : null;
-          } else if (parsedTrack.imageUrl?.startsWith('blob:')) {
-            parsedTrack.imageUrl = '';
-          }
-        }
+    if (!isAuthenticated) {
+      void db.remove(PLAYBACK_STORAGE_KEY).finally(() => {
+        if (cancelled) return;
+        setCurrentTrack(null);
+        setQueue([]);
+        setOriginalQueue([]);
+        setUpcomingQueues([]);
+        setLoaded(true);
+      });
+
+      return () => {
+        cancelled = true;
+      };
+    }
+
+    void Promise.resolve()
+      .then(() => {
+        if (!cancelled) setLoaded(false);
+        return db.get<{currentTrack: Track | null, queue: Track[]}>(PLAYBACK_STORAGE_KEY);
+      })
+      .then(saved => {
+        if (cancelled) return;
+        if (saved) {
+          let parsedQueue = saved.queue || [];
+          let parsedTrack = saved.currentTrack || null;
         
-        setQueue(parsedQueue);
-        setCurrentTrack(parsedTrack);
-      }
-      setLoaded(true);
-    });
-  }, []);
+          parsedQueue = parsedQueue.filter((track) => track.sourceType !== 'LOCAL');
+          parsedQueue.forEach((track) => {
+            if (track.imageUrl?.startsWith('blob:')) track.imageUrl = '';
+          });
+
+          if (parsedTrack) {
+            if (parsedTrack.sourceType === 'LOCAL') {
+              parsedTrack = parsedQueue.length > 0 ? parsedQueue[0] : null;
+            } else if (parsedTrack.imageUrl?.startsWith('blob:')) {
+              parsedTrack.imageUrl = '';
+            }
+          }
+        
+          setQueue(parsedQueue);
+          setCurrentTrack(parsedTrack);
+        }
+        setLoaded(true);
+      })
+      .catch((error) => {
+        console.error('Failed to load playback state from IndexedDB', error);
+        if (!cancelled) setLoaded(true);
+      });
+    return () => {
+      cancelled = true;
+    };
+  }, [isAuthenticated]);
 
   useEffect(() => {
-    if (loaded) {
+    if (loaded && isAuthenticated) {
       db.set(PLAYBACK_STORAGE_KEY, { currentTrack, queue });
     }
-  }, [currentTrack, queue, loaded]);
+  }, [currentTrack, queue, loaded, isAuthenticated]);
 
   useEffect(() => {
     const handleMusicDeleted = (e: Event) => {

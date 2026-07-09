@@ -46,6 +46,7 @@ export function AuthProvider({ children }: { children: ReactNode }) {
       localStorage.removeItem('music_app_access_token');
       localStorage.removeItem('music_app_refresh_token');
       setUser(null);
+      setDriveTokenState('');
     }
     setIsAuthenticatedState(auth);
   };

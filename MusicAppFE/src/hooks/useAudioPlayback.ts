@@ -1,6 +1,6 @@
 import { useState, useRef, useEffect, useCallback } from 'react';
 import type { Track } from './audioTypes';
-import { LOCAL_STORAGE_KEY } from './audioStorage';
+import { getAudioConfigStorageKey } from './audioStorage';
 import { clamp } from './audioMath';
 import {
   calculateAutoPostFxTrimDb,
@@ -50,8 +50,7 @@ export function useAudioPlayback(
   driveToken?: string,
   fetchDriveToken?: () => Promise<string>
 ) {
-  void isAuthenticated;
-
+  const configStorageKey = getAudioConfigStorageKey(isAuthenticated);
   const { currentTrack, setCurrentTrack, queue, setQueue, isShuffleState, songEndMode, queueEndMode, upcomingQueues, cycleQueues, setUpcomingQueues } = queueState || {};
   const {
     useOversample,
@@ -453,12 +452,12 @@ export function useAudioPlayback(
       renderedAudioRef.current.volume = newVolume;
     }
     try {
-      const existing = JSON.parse(localStorage.getItem(LOCAL_STORAGE_KEY) || '{}');
-      localStorage.setItem(LOCAL_STORAGE_KEY, JSON.stringify({ ...existing, volume: newVolume }));
+      const existing = JSON.parse(localStorage.getItem(configStorageKey) || '{}');
+      localStorage.setItem(configStorageKey, JSON.stringify({ ...existing, volume: newVolume }));
     } catch {
       // Ignore localStorage write failures.
     }
-  }, [audioRef, bufferVolumeNodeRef]);
+  }, [audioRef, bufferVolumeNodeRef, configStorageKey]);
 
   const getTrackAudioUrl = useCallback(async (track: Track) => {
     return loadTrackAudioUrl({
@@ -568,12 +567,12 @@ export function useAudioPlayback(
       bufferSourceRef.current.playbackRate.value = playbackRate;
     }
     try {
-      const existing = JSON.parse(localStorage.getItem(LOCAL_STORAGE_KEY) || '{}');
-      localStorage.setItem(LOCAL_STORAGE_KEY, JSON.stringify({ ...existing, playbackRate, preservesPitch }));
+      const existing = JSON.parse(localStorage.getItem(configStorageKey) || '{}');
+      localStorage.setItem(configStorageKey, JSON.stringify({ ...existing, playbackRate, preservesPitch }));
     } catch {
       // Ignore localStorage write failures.
     }
-  }, [playbackRate, preservesPitch, audioRef, bufferSourceRef]);
+  }, [playbackRate, preservesPitch, audioRef, bufferSourceRef, configStorageKey]);
 
   useEffect(() => {
     currentTimeSnapshotRef.current = currentTime;
