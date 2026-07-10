@@ -5,6 +5,7 @@ import { db } from '../lib/db';
 import { BACKEND_URL } from '../config/env';
 import { parseLocalAudioMetadata } from '../utils/localAudioFiles';
 import { getAudioMimeType, shouldUseLegacyMetadataParser } from './audioMime';
+import { getMetadataCacheKey } from '../utils/metadataCache';
 
 type ParsedPicture = {
     data: Uint8Array;
@@ -89,7 +90,7 @@ export function useAudioMetadata(isAuthenticated: boolean, queueState: any, sett
         const useLegacyMetadataParser = shouldUseLegacyMetadataParser(track, legacyMetadataOverrides);
 
         // --- CACHE READ LAYER ---
-        const lsKey = `sonic_meta_v7_${useLegacyMetadataParser ? 'legacy' : 'modern'}_${trackId}`;
+        const lsKey = getMetadataCacheKey(trackId, useLegacyMetadataParser);
         if (track.sourceType !== 'LOCAL') {
             const lsData = await db.get<Partial<Track>>(lsKey);
             if (lsData) {
@@ -98,7 +99,7 @@ export function useAudioMetadata(isAuthenticated: boolean, queueState: any, sett
                     const idbCover = await getCover(trackId);
 
                     if (idbCover) {
-                        const imgUrl = URL.createObjectURL(new Blob([idbCover.data.buffer as ArrayBuffer], { type: idbCover.mimeType }));
+                        const imgUrl = URL.createObjectURL(new Blob([new Uint8Array(idbCover.data)], { type: idbCover.mimeType }));
                         parsed.imageUrl = imgUrl;
                         imageCacheRef.current.set(trackId, imgUrl);
                     }
@@ -291,8 +292,7 @@ export function useAudioMetadata(isAuthenticated: boolean, queueState: any, sett
                 imageCacheRef.current.set(trackId, imgUrl);
 
                 if (track.sourceType !== 'LOCAL') {
-                    // Save to IndexedDB (do not await to avoid blocking)
-                    saveCover(trackId, new Uint8Array(pictureData), mime);
+                    await saveCover(trackId, new Uint8Array(pictureData), mime);
                 }
             }
 

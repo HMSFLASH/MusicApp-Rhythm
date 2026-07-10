@@ -4,6 +4,8 @@ import { useAuth } from './AuthContext';
 import type { Track } from '../hooks/useAudioPlayer';
 import { db } from '../lib/db';
 import { removeCachedAudio } from '../utils/mediaCache';
+import { getCover } from '../utils/idb';
+import { getCachedMetadataForTrack } from '../utils/metadataCache';
 
 interface LibraryContextType {
   tracks: Track[];
@@ -71,21 +73,37 @@ const parseTrack = (d: BackendTrack): Track => ({
 });
 
 const mergeCachedMetadata = async (track: Track): Promise<Track> => {
-  const cached = await db.get<Partial<Track>>(`sonic_meta_v5_${track.id}`);
-  if (!cached) return track;
+  const cached = await getCachedMetadataForTrack(track);
+  const idbCover = await getCover(String(track.id));
+  if (!cached && !idbCover) return track;
 
   const merged = { ...track };
-  for (const field of metadataFields) {
-    const currentValue = merged[field];
-    const cachedValue = cached[field];
-    if ((currentValue === undefined || currentValue === null || currentValue === '') && cachedValue !== undefined && cachedValue !== null && cachedValue !== '') {
-      (merged as Record<string, unknown>)[field] = cachedValue;
+  if (cached) {
+    for (const field of metadataFields) {
+      const currentValue = merged[field];
+      const cachedValue = cached[field];
+      if ((currentValue === undefined || currentValue === null || currentValue === '') && cachedValue !== undefined && cachedValue !== null && cachedValue !== '') {
+        (merged as Record<string, unknown>)[field] = cachedValue;
+      }
     }
   }
+
+  if ((!merged.imageUrl || merged.imageUrl.startsWith('blob:')) && idbCover) {
+    merged.imageUrl = URL.createObjectURL(new Blob([new Uint8Array(idbCover.data)], { type: idbCover.mimeType }));
+  }
+
   return merged;
 };
 
 const enrichTracksWithCachedMetadata = (items: Track[]) => Promise.all(items.map(mergeCachedMetadata));
+
+const sanitizeTrackForLibraryCache = (track: Track): Track => {
+  if (!track.imageUrl?.startsWith('blob:')) return track;
+  return { ...track, imageUrl: '' };
+};
+
+const saveTrackListCache = (key: string, items: Track[]) =>
+  db.set(key, items.map(sanitizeTrackForLibraryCache));
 
 const dispatchLibraryRefreshed = (items: Track[]) => {
   window.dispatchEvent(new CustomEvent('music-library-refreshed', {
@@ -119,8 +137,8 @@ export function LibraryProvider({ children }: { children: ReactNode }) {
       setTracks(parsedTracks);
       setFavorites(parsedFavs);
 
-      await db.set('sonic_library_tracks', parsedTracks);
-      await db.set('sonic_favorites', parsedFavs);
+      await saveTrackListCache('sonic_library_tracks', parsedTracks);
+      await saveTrackListCache('sonic_favorites', parsedFavs);
       dispatchLibraryRefreshed(parsedTracks);
     } catch (err) {
       console.error('Failed to load library', err);
@@ -144,8 +162,8 @@ export function LibraryProvider({ children }: { children: ReactNode }) {
       setTracks(parsedTracks);
       setFavorites(parsedFavs);
 
-      await db.set('sonic_library_tracks', parsedTracks);
-      await db.set('sonic_favorites', parsedFavs);
+      await saveTrackListCache('sonic_library_tracks', parsedTracks);
+      await saveTrackListCache('sonic_favorites', parsedFavs);
       dispatchLibraryRefreshed(parsedTracks);
     } catch (err) {
       console.error('Failed to sync library', err);
@@ -164,12 +182,12 @@ export function LibraryProvider({ children }: { children: ReactNode }) {
           if (cachedTracks) {
             const enrichedCachedTracks = await enrichTracksWithCachedMetadata(cachedTracks);
             setTracks(enrichedCachedTracks);
-            void db.set('sonic_library_tracks', enrichedCachedTracks);
+            void saveTrackListCache('sonic_library_tracks', enrichedCachedTracks);
           }
           if (cachedFavs) {
             const enrichedCachedFavs = await enrichTracksWithCachedMetadata(cachedFavs);
             setFavorites(enrichedCachedFavs);
-            void db.set('sonic_favorites', enrichedCachedFavs);
+            void saveTrackListCache('sonic_favorites', enrichedCachedFavs);
           }
         } catch (e) { console.error('Error loading from IDB', e); }
 
@@ -196,35 +214,24 @@ export function LibraryProvider({ children }: { children: ReactNode }) {
       const trackId = (event as CustomEvent<string>).detail;
       if (!trackId) return;
 
-      const applyCachedMetadata = async () => {
-        const metadata = await db.get<Partial<Track>>(`sonic_meta_v5_${trackId}`);
-        if (!metadata) return;
+      const applyToTracks = async (items: Track[]) => Promise.all(items.map(async (track) => (
+        String(track.id) === String(trackId) ? mergeCachedMetadata(track) : track
+      )));
 
-        const applyToTracks = (items: Track[]) => items.map((track) => {
-          if (String(track.id) !== String(trackId)) return track;
-          const merged = { ...track };
-          for (const field of metadataFields) {
-            const cachedValue = metadata[field];
-            if (cachedValue !== undefined && cachedValue !== null && cachedValue !== '') {
-              (merged as Record<string, unknown>)[field] = cachedValue;
-            }
-          }
-          return merged;
+      setTracks(prev => {
+        void applyToTracks(prev).then((next) => {
+          setTracks(next);
+          void saveTrackListCache('sonic_library_tracks', next);
         });
-
-        setTracks(prev => {
-          const next = applyToTracks(prev);
-          void db.set('sonic_library_tracks', next);
-          return next;
+        return prev;
+      });
+      setFavorites(prev => {
+        void applyToTracks(prev).then((next) => {
+          setFavorites(next);
+          void saveTrackListCache('sonic_favorites', next);
         });
-        setFavorites(prev => {
-          const next = applyToTracks(prev);
-          void db.set('sonic_favorites', next);
-          return next;
-        });
-      };
-
-      void applyCachedMetadata();
+        return prev;
+      });
     };
 
     const handlePlayCounted = (event: Event) => {
@@ -239,12 +246,12 @@ export function LibraryProvider({ children }: { children: ReactNode }) {
 
       setTracks(prev => {
         const next = applyPlayCount(prev);
-        void db.set('sonic_library_tracks', next);
+        void saveTrackListCache('sonic_library_tracks', next);
         return next;
       });
       setFavorites(prev => {
         const next = applyPlayCount(prev);
-        void db.set('sonic_favorites', next);
+        void saveTrackListCache('sonic_favorites', next);
         return next;
       });
     };
@@ -268,13 +275,13 @@ export function LibraryProvider({ children }: { children: ReactNode }) {
     if (isFav) {
       setFavorites(prev => {
         const newFavs = prev.filter(f => f.id !== track.id);
-        void db.set('sonic_favorites', newFavs);
+        void saveTrackListCache('sonic_favorites', newFavs);
         return newFavs;
       });
     } else {
       setFavorites(prev => {
         const newFavs = [...prev, track];
-        void db.set('sonic_favorites', newFavs);
+        void saveTrackListCache('sonic_favorites', newFavs);
         return newFavs;
       });
     }
@@ -291,13 +298,13 @@ export function LibraryProvider({ children }: { children: ReactNode }) {
       if (isFav) {
         setFavorites(prev => {
           const newFavs = [...prev, track];
-          void db.set('sonic_favorites', newFavs);
+          void saveTrackListCache('sonic_favorites', newFavs);
           return newFavs;
         });
       } else {
         setFavorites(prev => {
           const newFavs = prev.filter(f => f.id !== track.id);
-          void db.set('sonic_favorites', newFavs);
+          void saveTrackListCache('sonic_favorites', newFavs);
           return newFavs;
         });
       }
@@ -318,12 +325,12 @@ export function LibraryProvider({ children }: { children: ReactNode }) {
       if (track.driveFileId) void removeCachedAudio(`drive:${track.driveFileId}`);
       setTracks(prev => {
         const next = prev.filter(t => t.id !== track.id);
-        void db.set('sonic_library_tracks', next);
+        void saveTrackListCache('sonic_library_tracks', next);
         return next;
       });
       setFavorites(prev => {
         const next = prev.filter(t => t.id !== track.id);
-        void db.set('sonic_favorites', next);
+        void saveTrackListCache('sonic_favorites', next);
         return next;
       });
       window.dispatchEvent(new CustomEvent('music-deleted', { detail: track.id }));

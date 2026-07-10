@@ -6,11 +6,11 @@ import { getAudioConfigStorageKey, getInitialState } from './audioStorage';
 import { getAudioExtension, getDefaultLegacyMetadataParser, shouldUseLegacyMetadataParser } from './audioMime';
 import type { Track as AudioTrack } from './audioTypes';
 import { db } from '../lib/db';
+import { LEGACY_METADATA_TRACKS_STORAGE_KEY } from '../utils/metadataCache';
 export type { Track } from './audioTypes';
 export { EQ_PRESETS, STYLISTIC_PRESETS } from './audioTypes';
 
 const FLAC_WASM_TRACKS_STORAGE_KEY = 'SONIC_FLAC_WASM_TRACKS_V1';
-const LEGACY_METADATA_TRACKS_STORAGE_KEY = 'SONIC_LEGACY_METADATA_TRACKS_V1';
 
 export function useAudioPlayer(
   isAuthenticated: boolean,

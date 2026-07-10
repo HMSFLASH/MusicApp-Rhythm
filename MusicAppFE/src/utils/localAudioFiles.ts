@@ -124,7 +124,8 @@ export async function readLocalTrackMetadata(
     console.log('[Metadata] Found picture:', pic.format, 'Size:', pic.data.length, 'bytes');
     const fmt = pic.format || 'jpeg';
     const imgMime = fmt.startsWith('image/') ? fmt : `image/${fmt}`;
-    update.imageUrl = URL.createObjectURL(new Blob([new Uint8Array(pic.data)], { type: imgMime }));
+    const pictureData = new Uint8Array(pic.data);
+    update.imageUrl = URL.createObjectURL(new Blob([pictureData], { type: imgMime }));
   }
 
   return update;
