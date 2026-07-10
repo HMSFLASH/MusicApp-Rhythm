@@ -26,6 +26,7 @@ import org.springframework.transaction.annotation.Transactional;
 
 import java.util.List;
 import java.util.Map;
+import java.util.UUID;
 import java.util.stream.Collectors;
 
 @Service
@@ -144,17 +145,14 @@ public class BackupService {
 
             if (backupData.getFavorites() != null) {
                 List<Favorite> existingFavorites = favoriteRepository.findByUserId(userId);
-                favoriteRepository.deleteAll(existingFavorites);
+                favoriteRepository.deleteAllInBatch(existingFavorites);
+                favoriteRepository.flush();
 
                 for (MusicItemDto trackDto : backupData.getFavorites()) {
                     MusicLibrary lib = resolveOwnedDriveTrack(trackDto, user);
 
                     if (lib != null) {
-                        Favorite fav = Favorite.builder()
-                                .user(user)
-                                .musicLibrary(lib)
-                                .build();
-                        favoriteRepository.save(fav);
+                        favoriteRepository.insertIgnore(UUID.randomUUID().toString(), userId, lib.getId());
                     }
                 }
             }
