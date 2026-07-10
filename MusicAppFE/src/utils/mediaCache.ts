@@ -1,6 +1,6 @@
 const DB_NAME = 'SonicMediaCache';
 const STORE_NAME = 'audio';
-const MAX_CACHE_BYTES = 512 * 1024 * 1024;
+const MAX_CACHE_BYTES = 7 * 1024 * 1024 * 1024;
 const MAX_ITEM_BYTES = 100 * 1024 * 1024;
 
 type AudioCacheEntry = {
