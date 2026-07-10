@@ -1,5 +1,5 @@
 import { useMemo, useState } from 'react';
-import { Cpu, Zap, XCircle } from 'lucide-react';
+import { Cpu, Zap, XCircle, RefreshCw } from 'lucide-react';
 import { useTranslation } from 'react-i18next';
 import { getFullCoreCount, getQueuePrecalculateWorkerSettings } from '../../hooks/audioDevice';
 import type { QueuePrecalculateStatus } from '../../hooks/audioPlaybackCache';
@@ -9,6 +9,7 @@ type QueuePrecalculatePlayerState = {
   queuePrecalculateStatus?: QueuePrecalculateStatus;
   precalculateEntireQueue: (workerCount?: number) => void;
   cancelQueuePrecalculate?: () => void;
+  retryFailedQueuePrecalculate?: (workerCount?: number) => void;
 };
 
 type QueuePrecalculatePanelProps = {
@@ -20,7 +21,7 @@ export function QueuePrecalculatePanel({ playerState }: QueuePrecalculatePanelPr
   const queuePrecalculateStatus = playerState.queuePrecalculateStatus;
   const queueCount = playerState.queue?.length ?? 0;
   const totalCores = getFullCoreCount();
-  const { recommendedWorkers, maxWorkers } = getQueuePrecalculateWorkerSettings(queueCount);
+  const { recommendedWorkers, maxWorkers, isConstrained } = getQueuePrecalculateWorkerSettings(queueCount);
   const [requestedWorkers, setRequestedWorkers] = useState<number | null>(null);
   const completedCount = queuePrecalculateStatus?.completed ?? 0;
   const failedCount = queuePrecalculateStatus?.failed ?? 0;
@@ -44,6 +45,14 @@ export function QueuePrecalculatePanel({ playerState }: QueuePrecalculatePanelPr
     playerState.cancelQueuePrecalculate?.();
   };
 
+  const failedTrackIds = queuePrecalculateStatus?.failedTrackIds ?? [];
+  const hasFailedTracks = !isRunning && failedTrackIds.length > 0;
+
+  const handleRetryFailed = () => {
+    if (!hasFailedTracks) return;
+    playerState.retryFailedQueuePrecalculate?.(selectedWorkers);
+  };
+
   return (
     <div className="flex flex-col gap-3 mt-2 p-4 bg-red-500/5 rounded-xl border border-red-500/20">
       <div className="flex items-start gap-3">
@@ -53,7 +62,7 @@ export function QueuePrecalculatePanel({ playerState }: QueuePrecalculatePanelPr
             {t('studio.masterOutput.queuePrecalcTitle', 'Full Queue Pre-calculate')}
           </span>
           <span className="text-xs text-red-300/65 font-mono mt-1 block">
-            {maxWorkers > 1
+            {!isConstrained
               ? t('studio.masterOutput.queuePrecalcDesc', {
                 cores: totalCores,
                 workers: recommendedWorkers,
@@ -155,6 +164,21 @@ export function QueuePrecalculatePanel({ playerState }: QueuePrecalculatePanelPr
               })}
           </span>
         </div>
+      )}
+
+      {hasFailedTracks && (
+        <button
+          aria-label={t('studio.masterOutput.queuePrecalcRetryButton', 'Retry Failed ({{count}})', { count: failedTrackIds.length })}
+          title={t('studio.masterOutput.queuePrecalcRetryButton', 'Retry Failed ({{count}})', { count: failedTrackIds.length })}
+          onClick={handleRetryFailed}
+          className="w-full h-10 rounded-lg bg-amber-500/20 hover:bg-amber-500/30 text-amber-100 border border-amber-400/30
+            flex items-center justify-center gap-2 text-xs font-bold uppercase transition-colors"
+        >
+          <RefreshCw size={15} />
+          <span>
+            {t('studio.masterOutput.queuePrecalcRetryButton', 'Retry Failed ({{count}})', { count: failedTrackIds.length })}
+          </span>
+        </button>
       )}
     </div>
   );
