@@ -3,6 +3,8 @@ import type { Track } from './audioTypes';
 import { getCover, saveCover } from '../utils/idb';
 import { db } from '../lib/db';
 import { BACKEND_URL } from '../config/env';
+import { parseLocalAudioMetadata } from '../utils/localAudioFiles';
+import { getAudioMimeType, shouldUseLegacyMetadataParser } from './audioMime';
 
 type ParsedPicture = {
     data: Uint8Array;
@@ -30,11 +32,47 @@ type ParsedAudioMetadata = {
     native?: Record<string, Array<{ id?: string; value?: unknown }>>;
 };
 
+type AudioMetadataSettings = {
+    legacyMetadataOverrides?: Record<string, boolean>;
+};
+
+type MetadataFileInfo = {
+    size?: number;
+    path?: string;
+    mimeType?: string;
+};
+
+async function parseMetadataBuffer(
+    buffer: Uint8Array,
+    fileInfo: MetadataFileInfo,
+    mimeType: string,
+    useLegacyMetadataParser: boolean,
+) {
+    if (useLegacyMetadataParser) {
+        const mmBrowser = await import('music-metadata-browser');
+        const browserModule = mmBrowser as typeof import('music-metadata-browser') & {
+            default?: { parseBuffer?: typeof mmBrowser.parseBuffer };
+        };
+        const parseBufferFn = mmBrowser.parseBuffer || browserModule.default?.parseBuffer;
+        if (!parseBufferFn) throw new Error('parseBuffer not found in music-metadata-browser');
+        return parseBufferFn(buffer, mimeType, { duration: false }) as Promise<ParsedAudioMetadata>;
+    }
+
+    const mm = await import('music-metadata');
+    const metadataModule = mm as typeof import('music-metadata') & {
+        default?: { parseBuffer?: typeof mm.parseBuffer };
+    };
+    const parseBufferFn = mm.parseBuffer || metadataModule.default?.parseBuffer;
+    if (!parseBufferFn) throw new Error('parseBuffer not found');
+    return parseBufferFn(buffer, fileInfo, { duration: false }) as Promise<ParsedAudioMetadata>;
+}
+
 // eslint-disable-next-line @typescript-eslint/no-explicit-any
-export function useAudioMetadata(isAuthenticated: boolean, queueState: any) {
+export function useAudioMetadata(isAuthenticated: boolean, queueState: any, settings: AudioMetadataSettings = {}) {
     const setCurrentTrack = queueState?.setCurrentTrack;
     const setQueue = queueState?.setQueue;
     const currentTrack = queueState?.currentTrack;
+    const legacyMetadataOverrides = settings.legacyMetadataOverrides || {};
 
 
     const [metadataVersion, setMetadataVersion] = useState(0);
@@ -42,14 +80,16 @@ export function useAudioMetadata(isAuthenticated: boolean, queueState: any) {
     const metadataCacheRef = useRef<Map<string, Partial<Track> & { pending?: boolean }>>(new Map());
     const imageCacheRef = useRef<Map<string, string>>(new Map());
     const blobCacheRef = useRef<Map<string, string>>(new Map());
+    const metadataParserModeRef = useRef<Map<string, boolean>>(new Map());
 
     async function extractMetadata(track: Track) {
         const trackId = String(track.id);
         if (metadataCacheRef.current.has(trackId)) return;
         if (track.sourceType !== 'LOCAL' && !isAuthenticated) return;
+        const useLegacyMetadataParser = shouldUseLegacyMetadataParser(track, legacyMetadataOverrides);
 
         // --- CACHE READ LAYER ---
-        const lsKey = `sonic_meta_v6_${trackId}`;
+        const lsKey = `sonic_meta_v7_${useLegacyMetadataParser ? 'legacy' : 'modern'}_${trackId}`;
         if (track.sourceType !== 'LOCAL') {
             const lsData = await db.get<Partial<Track>>(lsKey);
             if (lsData) {
@@ -88,47 +128,25 @@ export function useAudioMetadata(isAuthenticated: boolean, queueState: any) {
         const up: Partial<Track> = {};
 
         try {
-            const mm = await import('music-metadata');
             let metadata: ParsedAudioMetadata;
-            let timeoutId: ReturnType<typeof setTimeout>;
 
             let parsedBufferLength = 0;
             let trueFileSize = 0;
 
             if (track.sourceType === 'LOCAL' && track.localFile) {
-                const mmBrowser = await import('music-metadata-browser');
-                const browserModule = mmBrowser as typeof import('music-metadata-browser') & {
-                    default?: { parseBuffer?: typeof mmBrowser.parseBuffer };
-                };
-                const parseBufferFn = mmBrowser.parseBuffer || browserModule.default?.parseBuffer;
-                if (!parseBufferFn) throw new Error('parseBuffer not found in music-metadata-browser');
-
-                const arrayBuffer = await track.localFile.arrayBuffer();
-                const buffer = new Uint8Array(arrayBuffer);
-
-                const ext = track.fileName?.split('.').pop()?.toLowerCase();
-                const mimeMap: Record<string, string> = { mp3: 'audio/mpeg', m4a: 'audio/mp4', flac: 'audio/flac', wav: 'audio/wav', ogg: 'audio/ogg', opus: 'audio/ogg', aac: 'audio/aac', wma: 'audio/x-ms-wma' };
-                const mimeType = mimeMap[ext || ''] || track.localFile.type || 'audio/mpeg';
-
-                const parsePromise = parseBufferFn(buffer, mimeType, { duration: false });
-                const timeoutPromise = new Promise<never>((_, reject) => {
-                    timeoutId = setTimeout(() => reject(new Error('Local metadata parse timeout')), 10000);
+                const localMetadata = await parseLocalAudioMetadata(track.localFile, track.fileName, {
+                    useLegacyMetadataParser,
                 });
-                metadata = await Promise.race([parsePromise, timeoutPromise]).finally(() => clearTimeout(timeoutId!)) as ParsedAudioMetadata;
+                metadata = localMetadata.metadata as ParsedAudioMetadata;
 
                 if (track.localFile.size > 0) {
                     up.fileSize = track.localFile.size;
                     cachePayload.fileSize = track.localFile.size;
                     trueFileSize = track.localFile.size;
                 }
-                parsedBufferLength = buffer.byteLength;
+                parsedBufferLength = localMetadata.parsedBufferLength;
             } else {
                 const ext = track.fileName?.split('.').pop()?.toLowerCase();
-                const metadataModule = mm as typeof import('music-metadata') & {
-                    default?: { parseBuffer?: typeof mm.parseBuffer };
-                };
-                const parseBufferFn = mm.parseBuffer || metadataModule.default?.parseBuffer;
-                if (!parseBufferFn) throw new Error('parseBuffer not found');
 
                 // eslint-disable-next-line prefer-const
                 let blobUrl = blobCacheRef.current.get(trackId);
@@ -149,13 +167,18 @@ export function useAudioMetadata(isAuthenticated: boolean, queueState: any) {
                     parsedBufferLength = buffer.byteLength;
 
                     // eslint-disable-next-line @typescript-eslint/no-explicit-any
-                    const fileInfo: any = { size: fileSize };
+                    const fileInfo: MetadataFileInfo = { size: fileSize };
                     if (track.fileName) fileInfo.path = track.fileName;
                     if (!ext) {
                         fileInfo.mimeType = (fetchedMimeType && fetchedMimeType !== 'application/octet-stream') ? fetchedMimeType : 'audio/mpeg';
                     }
 
-                    metadata = await parseBufferFn(buffer, fileInfo, { duration: false }) as ParsedAudioMetadata;
+                    metadata = await parseMetadataBuffer(
+                        buffer,
+                        fileInfo,
+                        getAudioMimeType(track.fileName, fetchedMimeType),
+                        useLegacyMetadataParser,
+                    );
                 } else {
                     const fetchUrl = `${BACKEND_URL}/api/music/stream/${track.id}`;
                     const controller = new AbortController();
@@ -194,13 +217,18 @@ export function useAudioMetadata(isAuthenticated: boolean, queueState: any) {
                     }
 
                     // eslint-disable-next-line @typescript-eslint/no-explicit-any
-                    const fileInfo: any = { size: fileSize };
+                    const fileInfo: MetadataFileInfo = { size: fileSize };
                     if (track.fileName) fileInfo.path = track.fileName;
                     if (!ext) {
                         fileInfo.mimeType = (fetchedMimeType && fetchedMimeType !== 'application/octet-stream') ? fetchedMimeType : 'audio/mpeg';
                     }
 
-                    metadata = await parseBufferFn(buffer, fileInfo, { duration: false }) as ParsedAudioMetadata;
+                    metadata = await parseMetadataBuffer(
+                        buffer,
+                        fileInfo,
+                        getAudioMimeType(track.fileName, fetchedMimeType),
+                        useLegacyMetadataParser,
+                    );
                 }
             }
 
@@ -291,11 +319,25 @@ export function useAudioMetadata(isAuthenticated: boolean, queueState: any) {
     }
 
     useEffect(() => {
+        if (currentTrack) {
+            const trackId = String(currentTrack.id);
+            const useLegacyMetadataParser = shouldUseLegacyMetadataParser(currentTrack, legacyMetadataOverrides);
+            const previousParserMode = metadataParserModeRef.current.get(trackId);
+            metadataParserModeRef.current.set(trackId, useLegacyMetadataParser);
+
+            if (previousParserMode !== undefined && previousParserMode !== useLegacyMetadataParser) {
+                metadataCacheRef.current.delete(trackId);
+                const imageUrl = imageCacheRef.current.get(trackId);
+                if (imageUrl?.startsWith('blob:')) URL.revokeObjectURL(imageUrl);
+                imageCacheRef.current.delete(trackId);
+            }
+        }
+
         if (currentTrack && !metadataCacheRef.current.has(String(currentTrack.id))) {
             void extractMetadata(currentTrack);
         }
         // eslint-disable-next-line react-hooks/exhaustive-deps
-    }, [currentTrack]);
+    }, [currentTrack, legacyMetadataOverrides]);
 
     return {
         extractMetadata,

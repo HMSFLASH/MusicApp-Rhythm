@@ -11,12 +11,14 @@ type UseLocalFileImportOptions = {
   playTrack: (track: Track, queue: Track[], autoPlay?: boolean) => void;
   setCurrentTrack: Dispatch<SetStateAction<Track | null>>;
   setQueue: Dispatch<SetStateAction<Track[]>>;
+  isLegacyMetadataEnabled: (track?: Track | null) => boolean;
 };
 
 export function useLocalFileImport({
   playTrack,
   setCurrentTrack,
   setQueue,
+  isLegacyMetadataEnabled,
 }: UseLocalFileImportOptions) {
   return useCallback((files: FileList | null) => {
     if (!files || files.length === 0) return;
@@ -29,7 +31,9 @@ export function useLocalFileImport({
 
     tracks.forEach(async (stub) => {
       try {
-        const update = await readLocalTrackMetadata(stub);
+        const update = await readLocalTrackMetadata(stub, {
+          useLegacyMetadataParser: isLegacyMetadataEnabled(stub),
+        });
         if (Object.keys(update).length === 0) return;
 
         setCurrentTrack((currentTrack) => (
@@ -44,5 +48,5 @@ export function useLocalFileImport({
         console.warn('Metadata skipped for', stub.fileName, e);
       }
     });
-  }, [playTrack, setCurrentTrack, setQueue]);
+  }, [isLegacyMetadataEnabled, playTrack, setCurrentTrack, setQueue]);
 }

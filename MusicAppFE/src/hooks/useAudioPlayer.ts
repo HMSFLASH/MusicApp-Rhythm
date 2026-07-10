@@ -3,17 +3,19 @@ import { useAudioQueue } from './useAudioQueue';
 import { useAudioEffectsState } from './useAudioEffectsState';
 import { useAudioEngine } from './useAudioEngine';
 import { getAudioConfigStorageKey, getInitialState } from './audioStorage';
-import { getAudioExtension } from './audioMime';
+import { getAudioExtension, getDefaultLegacyMetadataParser, shouldUseLegacyMetadataParser } from './audioMime';
 import type { Track as AudioTrack } from './audioTypes';
 import { db } from '../lib/db';
 export type { Track } from './audioTypes';
 export { EQ_PRESETS, STYLISTIC_PRESETS } from './audioTypes';
 
 const FLAC_WASM_TRACKS_STORAGE_KEY = 'SONIC_FLAC_WASM_TRACKS_V1';
+const LEGACY_METADATA_TRACKS_STORAGE_KEY = 'SONIC_LEGACY_METADATA_TRACKS_V1';
 
 export function useAudioPlayer(isAuthenticated: boolean, driveToken?: string, fetchDriveToken?: () => Promise<string>) {
   const savedState = useMemo(() => getInitialState(isAuthenticated), [isAuthenticated]);
   const [flacWasmOverrides, setFlacWasmOverrides] = useState<Record<string, boolean>>({});
+  const [legacyMetadataOverrides, setLegacyMetadataOverrides] = useState<Record<string, boolean>>({});
 
   const queueState = useAudioQueue(savedState, isAuthenticated);
   const effectsState = useAudioEffectsState(savedState);
@@ -28,6 +30,20 @@ export function useAudioPlayer(isAuthenticated: boolean, driveToken?: string, fe
         setFlacWasmOverrides(normalized);
       })
       .catch((error) => console.warn('[Audio] Failed to load FLAC WASM settings', error));
+
+    return () => {
+      cancelled = true;
+    };
+  }, []);
+
+  useEffect(() => {
+    let cancelled = false;
+    void db.get<Record<string, boolean>>(LEGACY_METADATA_TRACKS_STORAGE_KEY)
+      .then((saved) => {
+        if (cancelled || !saved) return;
+        setLegacyMetadataOverrides(saved);
+      })
+      .catch((error) => console.warn('[Audio] Failed to load legacy metadata settings', error));
 
     return () => {
       cancelled = true;
@@ -52,10 +68,32 @@ export function useAudioPlayer(isAuthenticated: boolean, driveToken?: string, fe
       return next;
     });
   }, [isFlacWasmEnabled]);
+
+  const isLegacyMetadataEnabled = useCallback((track?: AudioTrack | null) => (
+    shouldUseLegacyMetadataParser(track, legacyMetadataOverrides)
+  ), [legacyMetadataOverrides]);
+
+  const toggleLegacyMetadataForTrack = useCallback((track: AudioTrack) => {
+    const trackId = String(track.id);
+    const nextEnabled = !isLegacyMetadataEnabled(track);
+
+    setLegacyMetadataOverrides((previous) => {
+      const next = { ...previous };
+      if (nextEnabled === getDefaultLegacyMetadataParser(track)) {
+        delete next[trackId];
+      } else {
+        next[trackId] = nextEnabled;
+      }
+      void db.set(LEGACY_METADATA_TRACKS_STORAGE_KEY, next)
+        .catch((error) => console.warn('[Audio] Failed to save legacy metadata settings', error));
+      return next;
+    });
+  }, [isLegacyMetadataEnabled]);
+
   const engineState = useAudioEngine(
     isAuthenticated,
     queueState as Parameters<typeof useAudioEngine>[1],
-    { ...effectsState, flacWasmOverrides } as Parameters<typeof useAudioEngine>[2],
+    { ...effectsState, flacWasmOverrides, legacyMetadataOverrides } as Parameters<typeof useAudioEngine>[2],
     savedState,
     driveToken,
     fetchDriveToken
@@ -123,5 +161,7 @@ export function useAudioPlayer(isAuthenticated: boolean, driveToken?: string, fe
     getTrackImage: engineState.getTrackImage,
     isFlacWasmEnabled,
     toggleFlacWasmForTrack,
+    isLegacyMetadataEnabled,
+    toggleLegacyMetadataForTrack,
   };
 }

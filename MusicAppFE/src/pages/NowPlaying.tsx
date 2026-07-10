@@ -1,7 +1,7 @@
 import { useState, useRef, useEffect, useCallback } from 'react';
 import { useGlobalAudio } from '../context/AudioContext';
 import { useAuth } from '../context/AuthContext';
-import { Disc, Play, Pause, SkipBack, SkipForward, Shuffle, Repeat, Heart, Info, ListPlus, MoreHorizontal, Repeat1, User, Volume2, VolumeX, BarChart2, Gauge, Music, Check, X, ArrowRight, Square, PauseCircle, ListX, Loader2, Trash2, Cpu } from 'lucide-react';
+import { Disc, Play, Pause, SkipBack, SkipForward, Shuffle, Repeat, Heart, Info, ListPlus, MoreHorizontal, Repeat1, User, Volume2, VolumeX, BarChart2, Gauge, Music, Check, X, ArrowRight, Square, PauseCircle, ListX, Loader2, Trash2, Cpu, Tags } from 'lucide-react';
 import { HorizontalSlider } from '../components/HorizontalSlider';
 import { useLibrary } from '../context/LibraryContext';
 import { LyricsView } from '../components/LyricsView';
@@ -430,6 +430,18 @@ export function NowPlaying() {
                         >
                           <Cpu size={16} className={playerState.isFlacWasmEnabled(currentTrack) ? 'text-primary' : ''} />
                           <span>{playerState.isFlacWasmEnabled(currentTrack) ? 'Use Normal FLAC' : 'Use FLAC WASM'}</span>
+                        </button>
+                      )}
+                      {currentTrack && (
+                        <button
+                          onClick={() => {
+                            playerState.toggleLegacyMetadataForTrack(currentTrack);
+                            setShowMenu(false);
+                          }}
+                          className="w-full flex items-center gap-3 px-4 py-3 text-sm text-white/80 hover:bg-white/5 transition-colors border-b border-white/5"
+                        >
+                          <Tags size={16} className={playerState.isLegacyMetadataEnabled(currentTrack) ? 'text-primary' : ''} />
+                          <span>{playerState.isLegacyMetadataEnabled(currentTrack) ? 'Use New Metadata Parser' : 'Use Legacy Metadata Parser'}</span>
                         </button>
                       )}
                       {currentTrack.sourceType !== 'LOCAL' && (

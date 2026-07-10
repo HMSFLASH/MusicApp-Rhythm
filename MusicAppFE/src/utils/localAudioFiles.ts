@@ -6,17 +6,29 @@ type ParsedPicture = {
   format?: string;
 };
 
-type ParsedAudioMetadata = {
+export type ParsedAudioMetadata = {
   common: {
     title?: string;
     artist?: string;
     album?: string;
     genre?: string[];
+    lyrics?: Array<{ text?: string } | string>;
     picture?: ParsedPicture[];
   };
   format: {
+    container?: string;
+    codec?: string;
+    bitrate?: number;
+    sampleRate?: number;
+    numberOfChannels?: number;
+    bitsPerSample?: number;
     duration?: number;
   };
+  native?: Record<string, Array<{ id?: string; value?: unknown }>>;
+};
+
+type ReadLocalTrackMetadataOptions = {
+  useLegacyMetadataParser?: boolean;
 };
 
 export const filterAudioFiles = (files: FileList | File[]) =>
@@ -33,25 +45,51 @@ export function buildLocalTrackStub(file: File): Track {
   };
 }
 
-export async function readLocalTrackMetadata(track: Track): Promise<Partial<Track>> {
-  if (!track.localFile) return {};
-  
-  const mm = await import('music-metadata-browser');
-  const browserModule = mm as typeof import('music-metadata-browser') & {
-    default?: { parseBuffer?: typeof mm.parseBuffer };
-  };
-  const parseBufferFn = mm.parseBuffer || browserModule.default?.parseBuffer;
-  if (!parseBufferFn) {
-    console.error('music-metadata import failed. Exported keys:', Object.keys(mm));
-    return {};
-  }
-
-  const arrayBuffer = await track.localFile.arrayBuffer();
+export async function parseLocalAudioMetadata(
+  file: File,
+  fileName?: string,
+  options: ReadLocalTrackMetadataOptions = {},
+) {
+  const arrayBuffer = await file.arrayBuffer();
   const buffer = new Uint8Array(arrayBuffer);
-  const mimeType = getAudioMimeType(track.fileName, track.localFile.type) || 'audio/mpeg';
+  const mimeType = getAudioMimeType(fileName, file.type) || 'audio/mpeg';
 
   let timeoutId: ReturnType<typeof setTimeout>;
-  const parsePromise: Promise<ParsedAudioMetadata> = parseBufferFn(buffer, mimeType, { duration: false })
+  let parsePromise: Promise<ParsedAudioMetadata>;
+
+  if (options.useLegacyMetadataParser) {
+    const mm = await import('music-metadata-browser');
+    const browserModule = mm as typeof import('music-metadata-browser') & {
+      default?: { parseBuffer?: typeof mm.parseBuffer };
+    };
+    const parseBufferFn = mm.parseBuffer || browserModule.default?.parseBuffer;
+    if (!parseBufferFn) {
+      console.error('music-metadata-browser import failed. Exported keys:', Object.keys(mm));
+      throw new Error('parseBuffer not found in music-metadata-browser');
+    }
+    parsePromise = parseBufferFn(buffer, mimeType, { duration: false })
+      .then((metadata) => metadata as ParsedAudioMetadata);
+  } else {
+    const mm = await import('music-metadata');
+    const metadataModule = mm as typeof import('music-metadata') & {
+      default?: { parseBuffer?: typeof mm.parseBuffer };
+    };
+    const parseBufferFn = mm.parseBuffer || metadataModule.default?.parseBuffer;
+    if (!parseBufferFn) {
+      console.error('music-metadata import failed. Exported keys:', Object.keys(mm));
+      throw new Error('parseBuffer not found in music-metadata');
+    }
+
+    const fileInfo = {
+      mimeType,
+      path: fileName,
+      size: file.size,
+    };
+    parsePromise = parseBufferFn(buffer, fileInfo, { duration: false })
+      .then((metadata) => metadata as ParsedAudioMetadata);
+  }
+
+  const guardedParsePromise = parsePromise
     .then((metadata) => metadata as ParsedAudioMetadata)
     .catch((err: unknown) => {
       console.error('parseBuffer threw error:', err);
@@ -60,7 +98,19 @@ export async function readLocalTrackMetadata(track: Track): Promise<Partial<Trac
   const timeoutPromise = new Promise<never>((_, reject) => {
     timeoutId = setTimeout(() => reject(new Error('timeout')), 10000);
   });
-  const metadata = await Promise.race([parsePromise, timeoutPromise]).finally(() => clearTimeout(timeoutId!));
+  return {
+    metadata: await Promise.race([guardedParsePromise, timeoutPromise]).finally(() => clearTimeout(timeoutId!)),
+    parsedBufferLength: buffer.byteLength,
+  };
+}
+
+export async function readLocalTrackMetadata(
+  track: Track,
+  options: ReadLocalTrackMetadataOptions = {},
+): Promise<Partial<Track>> {
+  if (!track.localFile) return {};
+
+  const { metadata } = await parseLocalAudioMetadata(track.localFile, track.fileName, options);
 
   const update: Partial<Track> = {};
   if (metadata.common.title) update.title = metadata.common.title;

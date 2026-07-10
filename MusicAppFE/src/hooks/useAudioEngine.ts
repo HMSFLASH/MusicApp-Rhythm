@@ -4,16 +4,23 @@ import { useAudioPlayback } from './useAudioPlayback';
 import type { useAudioQueue } from './useAudioQueue';
 import type { useAudioEffectsState } from './useAudioEffectsState';
 
+type AudioEngineEffectsState = ReturnType<typeof useAudioEffectsState> & {
+  flacWasmOverrides?: Record<string, boolean>;
+  legacyMetadataOverrides?: Record<string, boolean>;
+};
+
 export function useAudioEngine(
   isAuthenticated: boolean,
   queueState: ReturnType<typeof useAudioQueue>,
-  effectsState: ReturnType<typeof useAudioEffectsState>,
+  effectsState: AudioEngineEffectsState,
   // eslint-disable-next-line @typescript-eslint/no-explicit-any
   savedState: any,
   driveToken?: string,
   fetchDriveToken?: () => Promise<string>
 ) {
-  const metadataState = useAudioMetadata(isAuthenticated, queueState);
+  const metadataState = useAudioMetadata(isAuthenticated, queueState, {
+    legacyMetadataOverrides: effectsState.legacyMetadataOverrides,
+  });
   const currentTrack = queueState.currentTrack;
   const currentTrackMetadata = currentTrack
     ? metadataState.metadataCacheRef.current.get(String(currentTrack.id))

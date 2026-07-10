@@ -17,6 +17,20 @@ export const AUDIO_MIME_BY_EXTENSION: Record<string, string> = {
 
 export const getAudioExtension = (fileName?: string) => fileName?.split('.').pop()?.toLowerCase();
 
+export const isLocalTrack = (track?: Track | null) =>
+  track?.sourceType === 'LOCAL';
+
+export const getDefaultLegacyMetadataParser = (_track?: Track | null) => false;
+
+export const shouldUseLegacyMetadataParser = (
+  track?: Track | null,
+  overrides: Record<string, boolean> = {},
+) => {
+  if (!track) return false;
+  const override = overrides[String(track.id)];
+  return override ?? getDefaultLegacyMetadataParser(track);
+};
+
 export const getAudioMimeType = (fileName?: string, fallback?: string | null) => {
   const ext = getAudioExtension(fileName);
   const mimeType = ext ? AUDIO_MIME_BY_EXTENSION[ext] : undefined;
