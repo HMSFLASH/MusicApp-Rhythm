@@ -12,34 +12,74 @@ export const STYLISTIC_PRESETS = {
   'BASS_BOOST': {
     name: 'Bass Boost',
     eqBands: [31.5, 63, 125, 250, 500, 1000, 2000, 4000, 8000, 16000],
-    gains: [3, 4, 3, 1, 0, -1, 0, 1, 1, 1],
-    bassGain: 4,
+    gains: [5, 6, 4, 1, 0, -1, 0, 1, 2, 2],
+    bassGain: 5,
     trebleGain: 1,
-    preampGain: -2
+    preampGain: -4
   },
   'VOCAL_CLEAR': {
     name: 'Vocal Clear',
     eqBands: [31.5, 63, 125, 250, 500, 1000, 2000, 4000, 8000, 16000],
-    gains: [-2, -1, 0, 1, 2, 3, 3, 2, 1, 0],
-    bassGain: -1,
+    gains: [-2, -2, -1, 1, 3, 5, 4, 2, 1, 0],
+    bassGain: -2,
     trebleGain: 2,
-    preampGain: -1
+    preampGain: -2
   },
   'TREBLE_BRIGHT': {
     name: 'Treble Bright',
     eqBands: [31.5, 63, 125, 250, 500, 1000, 2000, 4000, 8000, 16000],
-    gains: [-1, -1, 0, 0, 0, 1, 2, 3, 4, 4],
-    bassGain: 0,
-    trebleGain: 4,
-    preampGain: -2
+    gains: [-2, -1, 0, 0, 0, 1, 3, 4, 5, 5],
+    bassGain: -1,
+    trebleGain: 5,
+    preampGain: -3
   },
   'NIGHT_MODE': {
     name: 'Night Mode',
     eqBands: [31.5, 63, 125, 250, 500, 1000, 2000, 4000, 8000, 16000],
-    gains: [-4, -3, -2, -1, 1, 2, 1, -1, -2, -3],
-    bassGain: -4,
-    trebleGain: -3,
-    preampGain: 1
+    gains: [-5, -4, -2, -1, 1, 3, 1, -1, -3, -4],
+    bassGain: -5,
+    trebleGain: -4,
+    preampGain: 2
+  },
+  'EDM_DANCE': {
+    name: 'EDM / Dance',
+    eqBands: [31.5, 63, 125, 250, 500, 1000, 2000, 4000, 8000, 16000],
+    gains: [5, 6, 3, 0, -2, -1, 2, 4, 5, 4],
+    bassGain: 4,
+    trebleGain: 4,
+    preampGain: -4
+  },
+  'ROCK': {
+    name: 'Rock',
+    eqBands: [31.5, 63, 125, 250, 500, 1000, 2000, 4000, 8000, 16000],
+    gains: [4, 3, 2, 0, -2, -1, 1, 3, 4, 3],
+    bassGain: 3,
+    trebleGain: 3,
+    preampGain: -3
+  },
+  'POP': {
+    name: 'Pop',
+    eqBands: [31.5, 63, 125, 250, 500, 1000, 2000, 4000, 8000, 16000],
+    gains: [-1, 0, 2, 4, 3, 1, 2, 3, 2, 1],
+    bassGain: 1,
+    trebleGain: 2,
+    preampGain: -2
+  },
+  'ACOUSTIC': {
+    name: 'Acoustic / Classical',
+    eqBands: [31.5, 63, 125, 250, 500, 1000, 2000, 4000, 8000, 16000],
+    gains: [2, 3, 2, 1, 0, 1, 2, 3, 2, 1],
+    bassGain: 2,
+    trebleGain: 2,
+    preampGain: -2
+  },
+  'JAZZ': {
+    name: 'Jazz',
+    eqBands: [31.5, 63, 125, 250, 500, 1000, 2000, 4000, 8000, 16000],
+    gains: [3, 4, 2, 1, -1, -2, 0, 2, 3, 2],
+    bassGain: 3,
+    trebleGain: 2,
+    preampGain: -2
   }
 };
 
@@ -92,7 +132,7 @@ export type CustomEqPreset = {
 };
 
 export interface Track {
-  id: string | number;
+  id: string;
   fileName: string;
   sourceType: 'DRIVE' | 'LOCAL';
   driveFileId?: string;
