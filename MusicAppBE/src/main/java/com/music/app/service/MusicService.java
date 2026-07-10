@@ -88,6 +88,7 @@ public class MusicService {
         return toDto(lib);
     }
 
+    @org.springframework.transaction.annotation.Transactional
     public List<MusicItemDto> syncWithDrive(String userId) {
         User user = userRepository.findById(userId)
                 .orElseThrow(() -> new AppException(ErrorCode.USER_NOT_EXISTED));
@@ -108,6 +109,17 @@ public class MusicService {
                     .collect(Collectors.toList());
 
             if (!toDelete.isEmpty()) {
+                List<String> idsToDelete = toDelete.stream().map(MusicLibrary::getId).collect(Collectors.toList());
+                try {
+                    entityManager.createQuery("DELETE FROM PlaylistItem p WHERE p.musicLibrary.id IN :ids")
+                            .setParameter("ids", idsToDelete)
+                            .executeUpdate();
+                    entityManager.createQuery("DELETE FROM Favorite f WHERE f.musicLibrary.id IN :ids")
+                            .setParameter("ids", idsToDelete)
+                            .executeUpdate();
+                } catch (Exception e) {
+                    log.error("Failed to delete related records during sync", e);
+                }
                 musicLibraryRepository.deleteAll(toDelete);
                 log.info("Synced with Drive: deleted {} missing files from DB for user {}", toDelete.size(), userId);
             }
@@ -152,7 +164,8 @@ public class MusicService {
     public MusicItemDto uploadToDrive(MultipartFile file, String title, String artist, String album, String genre,
             String imageUrl, String lyrics, String userId) {
         try {
-            if (file.isEmpty() || file.getOriginalFilename() == null || !isSupportedAudioFile(file.getOriginalFilename())) {
+            if (file.isEmpty() || file.getOriginalFilename() == null
+                    || !isSupportedAudioFile(file.getOriginalFilename())) {
                 throw new AppException(ErrorCode.NOT_FOUND, "A supported non-empty audio file is required");
             }
             User user = userRepository.findById(userId)
