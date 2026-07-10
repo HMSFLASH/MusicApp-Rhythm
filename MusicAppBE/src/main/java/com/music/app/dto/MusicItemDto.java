@@ -21,4 +21,5 @@ public class MusicItemDto {
     private Long durationSeconds;
     private String sourceType;
     private String driveFileId;
+    private Long playCount;
 }

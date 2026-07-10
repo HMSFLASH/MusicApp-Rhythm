@@ -26,19 +26,12 @@ export function LoginPage() {
     setError('');
 
     try {
-      // eslint-disable-next-line @typescript-eslint/no-explicit-any
-      const response: any = await axiosClient.post('/api/auth/login', {
+      await axiosClient.post('/api/auth/login', {
         loginId,
         password
       });
-      if (response && response.accessToken) {
-        localStorage.setItem('music_app_access_token', response.accessToken);
-        if (response.refreshToken) {
-          localStorage.setItem('music_app_refresh_token', response.refreshToken);
-        }
-        setIsAuthenticated(true);
-        navigate('/');
-      }
+      setIsAuthenticated(true);
+      navigate('/');
       // eslint-disable-next-line @typescript-eslint/no-explicit-any
     } catch (err: any) {
       setError(err.message || 'Invalid credentials');

@@ -14,6 +14,7 @@ export type QueuePrecalculateStatus = {
   completed: number;
   failed: number;
   cores: number;
+  failedTrackIds: string[];
 };
 
 export type PrecalculatedNextBuffer = {

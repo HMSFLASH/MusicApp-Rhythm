@@ -7,18 +7,18 @@ import org.springframework.data.jpa.repository.Query;
 import org.springframework.stereotype.Repository;
 
 @Repository
-public interface PlaylistItemRepository extends JpaRepository<PlaylistItem, Long> {
+public interface PlaylistItemRepository extends JpaRepository<PlaylistItem, String> {
 
     @Modifying
     @Query("DELETE FROM PlaylistItem pi WHERE pi.playlist.id = :playlistId AND pi.musicLibrary.id = :musicLibraryId")
-    void deleteByPlaylistIdAndMusicLibraryId(Long playlistId, Long musicLibraryId);
+    void deleteByPlaylistIdAndMusicLibraryId(String playlistId, String musicLibraryId);
 
     @Modifying
     @Query("DELETE FROM PlaylistItem pi WHERE pi.playlist.id = :playlistId AND pi.musicLibrary.driveFileId = :driveFileId")
-    void deleteByPlaylistIdAndDriveFileId(Long playlistId, String driveFileId);
+    void deleteByPlaylistIdAndDriveFileId(String playlistId, String driveFileId);
 
-    boolean existsByPlaylistIdAndMusicLibraryId(Long playlistId, Long musicLibraryId);
+    boolean existsByPlaylistIdAndMusicLibraryId(String playlistId, String musicLibraryId);
 
     @Query("SELECT COALESCE(MAX(pi.position), -1) FROM PlaylistItem pi WHERE pi.playlist.id = :playlistId")
-    int getMaxPosition(Long playlistId);
+    int getMaxPosition(String playlistId);
 }

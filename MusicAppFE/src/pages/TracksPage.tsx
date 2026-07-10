@@ -9,6 +9,8 @@ import { useLibrary } from '../context/LibraryContext';
 import { useConfirm } from '../context/ConfirmContext';
 import { getAudioExtension } from '../hooks/audioMime';
 
+type SortMode = 'default' | 'leastPlayed' | 'mostPlayed';
+
 export function TracksPage() {
   const navigate = useNavigate();
   const confirm = useConfirm();
@@ -18,8 +20,9 @@ export function TracksPage() {
   const { tracks, favorites, toggleFavorite: ctxToggleFavorite, deleteTrack, syncLibrary, isLoading } = useLibrary();
   const activeTab = searchParams.get('tab') === 'favorites' ? 'favorites' : 'all';
   const [trackToPlaylist, setTrackToPlaylist] = useState<Track | null>(null);
-  const [openMenuId, setOpenMenuId] = useState<string | number | null>(null);
+  const [openMenuId, setOpenMenuId] = useState<string | null>(null);
   const [infoTrack, setInfoTrack] = useState<Track | null>(null);
+  const [sortMode, setSortMode] = useState<SortMode>('default');
   
   const [currentPage, setCurrentPage] = useState(1);
   const ITEMS_PER_PAGE = 20;
@@ -62,10 +65,23 @@ export function TracksPage() {
     setOpenMenuId(null);
   };
 
-  const displayTracks = activeTab === 'favorites' ? favorites : tracks;
+  const sourceTracks = activeTab === 'favorites' ? favorites : tracks;
+  const titleOf = (track: Track) => (
+    track.title || playerState.getTrackMetadata(track.id)?.title || track.fileName || ''
+  ).toLowerCase();
+  const displayTracks = sortMode === 'default'
+    ? sourceTracks
+    : [...sourceTracks].sort((a, b) => {
+      const playDiff = (a.playCount ?? 0) - (b.playCount ?? 0);
+      if (playDiff !== 0) {
+        return sortMode === 'leastPlayed' ? playDiff : -playDiff;
+      }
+      return titleOf(a).localeCompare(titleOf(b));
+    });
   
   const totalPages = Math.ceil(displayTracks.length / ITEMS_PER_PAGE);
-  const currentTracks = displayTracks.slice((currentPage - 1) * ITEMS_PER_PAGE, currentPage * ITEMS_PER_PAGE);
+  const boundedCurrentPage = Math.min(currentPage, Math.max(1, totalPages));
+  const currentTracks = displayTracks.slice((boundedCurrentPage - 1) * ITEMS_PER_PAGE, boundedCurrentPage * ITEMS_PER_PAGE);
   const infoTrackMetadata = infoTrack ? playerState.getTrackMetadata(infoTrack.id) : undefined;
   const infoTrackFileSize = infoTrack?.fileSize ?? infoTrackMetadata?.fileSize;
   const infoTrackBitrate = infoTrack?.bitrate ?? infoTrackMetadata?.bitrate;
@@ -112,6 +128,19 @@ export function TracksPage() {
         </div>
         {displayTracks.length > 0 && (
           <div className="flex items-center gap-2 flex-wrap">
+            <select
+              value={sortMode}
+              onChange={(event) => {
+                setSortMode(event.target.value as SortMode);
+                setCurrentPage(1);
+              }}
+              className="h-9 rounded-full bg-white/5 border border-white/10 px-3 text-sm text-white/70 hover:bg-white/10 focus:outline-none focus:border-primary/50"
+              title="Sort songs"
+            >
+              <option value="default" className="bg-[#1A1A1A] text-white">Default order</option>
+              <option value="leastPlayed" className="bg-[#1A1A1A] text-white">Least played</option>
+              <option value="mostPlayed" className="bg-[#1A1A1A] text-white">Most played</option>
+            </select>
             <button
               onClick={() => {
                 if (playerState.isShuffle) {
@@ -132,10 +161,40 @@ export function TracksPage() {
                 const shuffled = [...displayTracks].sort(() => Math.random() - 0.5);
                 playerState.playTrack(shuffled[0], shuffled);
               }}
-              className="px-4 h-9 rounded-full bg-white/10 text-white hover:bg-white hover:text-black flex items-center gap-1.5 transition-all text-sm font-bold"
+              className="px-4 h-9 rounded-full bg-white/10 text-white hover:bg-white hover:text-black flex items-center gap-1.5 transition-all text-sm font-bold hidden md:flex"
               title="Shuffle & Play"
             >
               <Shuffle size={15} /> Shuffle
+            </button>
+            <button
+              onClick={() => {
+                const currentQueue = playerState.queue;
+                if (currentQueue.length === 0 && !playerState.currentTrack) {
+                  playerState.playTrack(displayTracks[0], displayTracks);
+                } else {
+                  const currentIndex = currentQueue.findIndex(t => t.id === playerState.currentTrack?.id);
+                  if (currentIndex !== -1) {
+                    const newQueue = [...currentQueue];
+                    newQueue.splice(currentIndex + 1, 0, ...displayTracks);
+                    playerState.setQueue(newQueue);
+                  } else {
+                    playerState.setQueue([...currentQueue, ...displayTracks]);
+                  }
+                }
+              }}
+              className="px-4 h-9 rounded-full bg-white/10 text-white hover:bg-white hover:text-black flex items-center gap-1.5 transition-all text-sm font-bold hidden md:flex"
+              title="Play Next"
+            >
+              <ListStart size={15} /> Play Next
+            </button>
+            <button
+              onClick={() => {
+                playerState.setQueue([...playerState.queue, ...displayTracks]);
+              }}
+              className="px-4 h-9 rounded-full bg-white/10 text-white hover:bg-white hover:text-black flex items-center gap-1.5 transition-all text-sm font-bold"
+              title="Add to Queue"
+            >
+              <ListEnd size={15} /> Add to Queue
             </button>
           </div>
         )}
@@ -174,6 +233,8 @@ export function TracksPage() {
               <div className="flex items-center gap-2 mt-1">
                 <Cloud size={12} className="text-blue-400" />
                 <span className="text-xs text-white/30 truncate">{track.artist || playerState.getTrackMetadata(track.id)?.artist || (track.fileName?.includes(' - ') ? track.fileName.split(' - ')[0] : 'Unknown Artist')}</span>
+                <span className="text-xs text-white/20">|</span>
+                <span className="text-xs text-white/30 shrink-0">{track.playCount ?? 0} listens</span>
               </div>
             </div>
             <div className={`relative flex items-center gap-2 transition-opacity ${openMenuId === track.id ? 'opacity-100' : 'opacity-100 lg:opacity-0 lg:group-hover:opacity-100'}`}>
@@ -275,18 +336,18 @@ export function TracksPage() {
           <button
             aria-label="Previous page"
             onClick={() => setCurrentPage(p => Math.max(1, p - 1))}
-            disabled={currentPage === 1}
+            disabled={boundedCurrentPage === 1}
             className="px-4 py-2 rounded-xl bg-white/5 hover:bg-white/10 disabled:opacity-30 disabled:cursor-not-allowed text-sm font-medium transition-colors border border-white/5"
           >
             Previous
           </button>
           <div className="text-sm text-white/50">
-            Page <span className="text-white font-bold">{currentPage}</span> of <span className="text-white font-bold">{totalPages}</span>
+            Page <span className="text-white font-bold">{boundedCurrentPage}</span> of <span className="text-white font-bold">{totalPages}</span>
           </div>
           <button
             aria-label="Next page"
             onClick={() => setCurrentPage(p => Math.min(totalPages, p + 1))}
-            disabled={currentPage === totalPages}
+            disabled={boundedCurrentPage === totalPages}
             className="px-4 py-2 rounded-xl bg-white/5 hover:bg-white/10 disabled:opacity-30 disabled:cursor-not-allowed text-sm font-medium transition-colors border border-white/5"
           >
             Next
@@ -326,6 +387,7 @@ export function TracksPage() {
                   { label: 'Album', value: infoTrack.album || infoTrackMetadata?.album },
                   { label: 'Genre', value: infoTrack.genre || infoTrackMetadata?.genre },
                   { label: 'Duration', value: infoTrack.durationSeconds ? `${Math.floor(infoTrack.durationSeconds / 60)}:${Math.floor(infoTrack.durationSeconds % 60).toString().padStart(2, '0')}` : null },
+                  { label: 'Play Count', value: `${infoTrack.playCount ?? 0}` },
                   { label: 'File Name', value: infoTrack.fileName },
                   { label: 'Source', value: infoTrack.sourceType },
                   { label: 'Track ID', value: String(infoTrack.id) },

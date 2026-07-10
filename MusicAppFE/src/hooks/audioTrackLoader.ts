@@ -1,8 +1,7 @@
 import { axiosClient } from '../api/axiosClient';
+import { cacheAudio, getCachedAudio } from '../utils/mediaCache';
 import { getTrackMimeType } from './audioMime';
 import type { Track } from './audioTypes';
-
-const DRIVE_MEDIA_URL = 'https://www.googleapis.com/drive/v3/files';
 
 type LoadTrackAudioUrlOptions = {
   track: Track;
@@ -32,41 +31,29 @@ export const loadTrackAudioUrl = async ({
   if (track.sourceType !== 'LOCAL') {
     let driveFileId = track.driveFileId;
     if (!driveFileId) {
-      try {
-        const library = await axiosClient.get('/api/music/list') as Track[];
-        const latestTrack = Array.isArray(library)
-          ? library.find((item) => String(item.id) === trackId)
-          : null;
-        driveFileId = latestTrack?.driveFileId;
-        if (driveFileId) {
-          track.driveFileId = driveFileId;
-        }
-      } catch (e) {
-        console.error("[Audio] Failed to refresh track Drive metadata", e);
-      }
+      const library = await axiosClient.get('/api/music/list') as Track[];
+      driveFileId = library.find((item) => String(item.id) === trackId)?.driveFileId;
     }
-
-    if (!driveFileId) {
-      console.error("[Audio] Cannot load remote track because driveFileId is missing", track);
-      return '';
-    }
+    if (!driveFileId) return '';
+    const mediaCacheId = `drive:${driveFileId}`;
 
     const pendingBlobUrl = blobLoadingPromises.get(trackId);
     if (pendingBlobUrl) return pendingBlobUrl;
 
     const loadPromise = (async () => {
-      const token = driveToken || await fetchDriveToken?.();
-      if (!token) {
-        console.error("[Audio] Cannot load remote track because Drive access token is missing");
-        return '';
+      const cachedBlob = await getCachedAudio(mediaCacheId);
+      if (cachedBlob) {
+        const cachedUrl = URL.createObjectURL(cachedBlob);
+        blobCache.set(trackId, cachedUrl);
+        return cachedUrl;
       }
 
-      const url = `${DRIVE_MEDIA_URL}/${encodeURIComponent(driveFileId)}?alt=media`;
+      const token = driveToken || await fetchDriveToken?.();
+      if (!token) return '';
+      const url = `https://www.googleapis.com/drive/v3/files/${encodeURIComponent(driveFileId)}?alt=media`;
       const response = await fetch(url, {
         mode: 'cors',
-        headers: {
-          Authorization: `Bearer ${token}`,
-        },
+        headers: { Authorization: `Bearer ${token}` },
       });
       if (!response.ok) {
         throw new Error(`Drive audio fetch failed: HTTP ${response.status}`);
@@ -78,6 +65,7 @@ export const loadTrackAudioUrl = async ({
       const objectUrl = URL.createObjectURL(audioBlob);
 
       blobCache.set(trackId, objectUrl);
+      void cacheAudio(mediaCacheId, audioBlob);
       return objectUrl;
     })();
 

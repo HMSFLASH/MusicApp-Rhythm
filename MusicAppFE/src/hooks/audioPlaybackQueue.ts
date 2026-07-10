@@ -7,7 +7,7 @@ export const getCurrentTrackIndex = (currentTrack: Track | null, queue: Track[])
 );
 
 export const getAdjacentTrackWindow = (
-  currentId: string | number,
+  currentId: string,
   currentQueue: Track[],
   options: { wrap?: boolean } = {}
 ) => {

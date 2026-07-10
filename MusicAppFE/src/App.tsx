@@ -25,7 +25,8 @@ import { Navigate } from 'react-router-dom';
 import { ConfirmProvider } from './context/ConfirmContext';
 
 function ProtectedRoute({ children }: { children: React.ReactNode }) {
-  const { isAuthenticated } = useAuth();
+  const { isAuthenticated, isAuthResolved } = useAuth();
+  if (!isAuthResolved) return null;
   if (!isAuthenticated) {
     return <Navigate to="/login" replace />;
   }

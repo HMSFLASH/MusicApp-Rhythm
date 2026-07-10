@@ -1,5 +1,6 @@
 import { useState, useRef, useEffect, useCallback } from 'react';
 import type { Track } from './audioTypes';
+import { axiosClient } from '../api/axiosClient';
 import { getAudioConfigStorageKey } from './audioStorage';
 import { clamp } from './audioMath';
 import {
@@ -91,7 +92,9 @@ export function useAudioPlayback(
     completed: 0,
     failed: 0,
     cores: getFullCoreCount(),
+    failedTrackIds: [],
   });
+  const failedTrackIdsRef = useRef<string[]>([]);
   const [currentTime, setCurrentTime] = useState(0);
   const [duration, setDuration] = useState(0);
 
@@ -132,6 +135,10 @@ export function useAudioPlayback(
   const usingBufferPlaybackRef = useRef<boolean>(false);
   const playTrackSpamGuardRef = useRef<{ trackId: string; timestamp: number } | null>(null);
   const visibilityHandlerRef = useRef<(() => void) | null>(null);
+  const playCountSessionRef = useRef<symbol | null>(null);
+  const playCountedSessionRef = useRef<symbol | null>(null);
+  const listenedSecondsRef = useRef<number>(0);
+  const lastListenTickRef = useRef<number | null>(null);
 
   const clearTrackLoading = useCallback(() => {
     setIsLoadingTrack(false);
@@ -180,7 +187,8 @@ export function useAudioPlayback(
 
   const resetQueuePrecalculateStatusSoon = useCallback(() => {
     window.setTimeout(() => {
-      setQueuePrecalculateStatus({ isRunning: false, total: 0, completed: 0, failed: 0, cores: 0 });
+      failedTrackIdsRef.current = [];
+      setQueuePrecalculateStatus({ isRunning: false, total: 0, completed: 0, failed: 0, cores: 0, failedTrackIds: [] });
     }, 0);
   }, []);
 
@@ -516,6 +524,43 @@ export function useAudioPlayback(
     });
   }, [blobCacheRef, driveToken, fetchDriveToken]);
 
+  const resetPlayCountTracking = useCallback((sessionId: symbol | null) => {
+    playCountSessionRef.current = sessionId;
+    playCountedSessionRef.current = null;
+    listenedSecondsRef.current = 0;
+    lastListenTickRef.current = null;
+  }, []);
+
+  const recordCurrentTrackPlay = useCallback(async (track: Track) => {
+    if (!isAuthenticated || track.sourceType === 'LOCAL') return;
+
+    try {
+      const updated = await axiosClient.post(`/api/music/${track.id}/play`) as { id?: string; playCount?: number };
+      const playCount = typeof updated.playCount === 'number'
+        ? updated.playCount
+        : (track.playCount ?? 0) + 1;
+
+      const updatedTrack = { ...track, playCount };
+      if (setCurrentTrack) {
+        setCurrentTrack((previous: Track | null) => (
+          previous && String(previous.id) === String(track.id)
+            ? { ...previous, playCount }
+            : previous
+        ));
+      }
+      if (setQueue) {
+        setQueue((previous: Track[]) => previous.map((item) => (
+          String(item.id) === String(track.id) ? { ...item, playCount } : item
+        )));
+      }
+      window.dispatchEvent(new CustomEvent('music-play-counted', {
+        detail: { trackId: String(track.id), playCount: updatedTrack.playCount }
+      }));
+    } catch (error) {
+      console.warn('[Audio] Failed to record play count', error);
+    }
+  }, [isAuthenticated, setCurrentTrack, setQueue]);
+
   const connectBufferOutputChain = useCallback(() => {
     if (!audioContextRef.current || !bufferVolumeNodeRef.current) return;
 
@@ -635,6 +680,47 @@ export function useAudioPlayback(
   useEffect(() => {
     currentTimeSnapshotRef.current = currentTime;
   }, [currentTime]);
+
+  useEffect(() => {
+    const track = currentTrack ?? null;
+    const sessionId = playCountSessionRef.current;
+    if (!isAuthenticated || !track || track.sourceType === 'LOCAL' || !sessionId) {
+      lastListenTickRef.current = null;
+      return;
+    }
+
+    if (!isPlaying || playCountedSessionRef.current === sessionId) {
+      lastListenTickRef.current = null;
+      return;
+    }
+
+    const now = performance.now();
+    const previousTick = lastListenTickRef.current;
+    lastListenTickRef.current = now;
+    if (previousTick == null) return;
+
+    const elapsedSeconds = Math.max(0, Math.min(2, ((now - previousTick) / 1000) * playbackRate));
+    listenedSecondsRef.current += elapsedSeconds;
+
+    const effectiveDuration = duration > 0 ? duration : (track.durationSeconds ?? 0);
+    const thresholdSeconds = effectiveDuration > 0
+      ? Math.min(30, Math.max(5, effectiveDuration * 0.5))
+      : 30;
+
+    if (listenedSecondsRef.current >= thresholdSeconds) {
+      playCountedSessionRef.current = sessionId;
+      lastListenTickRef.current = null;
+      void recordCurrentTrackPlay(track);
+    }
+  }, [
+    currentTime,
+    currentTrack,
+    duration,
+    isAuthenticated,
+    isPlaying,
+    playbackRate,
+    recordCurrentTrackPlay,
+  ]);
 
   useEffect(() => {
     isPlayingSnapshotRef.current = isPlaying;
@@ -860,6 +946,17 @@ export function useAudioPlayback(
     }
   };
 
+  const withRenderTimeout = <T>(promise: Promise<T>, ms: number, label: string): Promise<T> => {
+    let timeoutId: ReturnType<typeof setTimeout>;
+    const timeoutPromise = new Promise<never>((_, reject) => {
+      timeoutId = setTimeout(() => reject(new Error(`Timeout: ${label} exceeded ${ms}ms`)), ms);
+    });
+    return Promise.race([promise, timeoutPromise]).finally(() => clearTimeout(timeoutId));
+  };
+
+  const PRECALCULATE_TIMEOUT_MS = 120_000; // 2 minutes per track
+  const FETCH_TIMEOUT_MS = 30_000; // 30 seconds for network operations
+
   const precalculateTrackBuffer = async (
     track: Track,
     keepInQueueCache = false,
@@ -890,31 +987,51 @@ export function useAudioPlayback(
     const renderPromise = (async () => {
       try {
         const renderVersion = renderSettingsVersionRef.current;
-        const audioUrl = await getTrackAudioUrl(track);
+        const audioUrl = await withRenderTimeout(
+          getTrackAudioUrl(track),
+          FETCH_TIMEOUT_MS,
+          `getTrackAudioUrl(${trackId})`
+        );
         if (!audioUrl) {
           throw new Error(`No audio URL for track ${trackId}`);
         }
 
-        const response = await fetch(audioUrl);
-        const arrayBuffer = await response.arrayBuffer();
+        const response = await withRenderTimeout(
+          fetch(audioUrl),
+          FETCH_TIMEOUT_MS,
+          `fetch(${trackId})`
+        );
+        const arrayBuffer = await withRenderTimeout(
+          response.arrayBuffer(),
+          FETCH_TIMEOUT_MS,
+          `arrayBuffer(${trackId})`
+        );
 
         if (checkAborted?.()) {
           throw new Error('Precalculation aborted');
         }
 
-        const audioBuffer = shouldUseFlacWasmPlayback(track)
-          ? await decodeFlacToAudioBuffer(
-            audioContextRef.current || createDecodeContext(),
-            new Uint8Array(arrayBuffer),
-            track.durationSeconds,
-          )
-          : await decodeAudioDataForPreRender(arrayBuffer);
+        const audioBuffer = await withRenderTimeout(
+          shouldUseFlacWasmPlayback(track)
+            ? decodeFlacToAudioBuffer(
+              audioContextRef.current || createDecodeContext(),
+              new Uint8Array(arrayBuffer),
+              track.durationSeconds,
+            )
+            : decodeAudioDataForPreRender(arrayBuffer),
+          PRECALCULATE_TIMEOUT_MS,
+          `decode(${trackId})`
+        );
 
         if (checkAborted?.()) {
           throw new Error('Precalculation aborted before rendering');
         }
 
-        const finalRenderedBuffer = await performOfflineRender(audioBuffer);
+        const finalRenderedBuffer = await withRenderTimeout(
+          performOfflineRender(audioBuffer),
+          PRECALCULATE_TIMEOUT_MS,
+          `render(${trackId})`
+        );
 
         if (renderSettingsVersionRef.current !== renderVersion) {
           throw new Error('Audio settings changed while pre-calculating');
@@ -937,11 +1054,11 @@ export function useAudioPlayback(
     return finalRenderedBuffer;
   };
 
-  const precalculateEntireQueue = async (requestedWorkerCount?: number) => {
+  const precalculateEntireQueue = async (requestedWorkerCount?: number, tracksToProcess?: Track[]) => {
     if (!precalculateOnIdleRef.current || !fullQueueCacheEnabled || !Array.isArray(queue) || queue.length === 0) return;
     if (queuePrecalculateSessionRef.current) return;
 
-    const tracks = [...queue];
+    const tracks = tracksToProcess ? [...tracksToProcess] : [...queue];
     const total = tracks.length;
     const { recommendedWorkers, maxWorkers } = getQueuePrecalculateWorkerSettings(total);
     if (maxWorkers === 0) return;
@@ -952,10 +1069,12 @@ export function useAudioPlayback(
     let cursor = 0;
     let completed = 0;
     let failed = 0;
+    const localFailedIds: string[] = [];
 
     queuePrecalculateSessionRef.current = sessionId;
     fullQueuePrecalculateCacheRef.current = true;
-    setQueuePrecalculateStatus({ isRunning: true, total, completed, failed, cores: workerCount });
+    failedTrackIdsRef.current = [];
+    setQueuePrecalculateStatus({ isRunning: true, total, completed, failed, cores: workerCount, failedTrackIds: [] });
 
     const runWorker = async () => {
       while (queuePrecalculateSessionRef.current === sessionId) {
@@ -965,15 +1084,16 @@ export function useAudioPlayback(
 
         const track = tracks[index];
         try {
-          await precalculateTrackBuffer(track, true);
+          await precalculateTrackBuffer(track, true, () => queuePrecalculateSessionRef.current !== sessionId);
           completed += 1;
         } catch (e) {
           failed += 1;
+          localFailedIds.push(String(track.id));
           console.error('[Queue Precalculate] Failed for track', track.title || track.fileName || track.id, e);
         }
 
         if (queuePrecalculateSessionRef.current !== sessionId) return;
-        setQueuePrecalculateStatus({ isRunning: true, total, completed, failed, cores: workerCount });
+        setQueuePrecalculateStatus({ isRunning: true, total, completed, failed, cores: workerCount, failedTrackIds: [...localFailedIds] });
       }
     };
 
@@ -981,7 +1101,8 @@ export function useAudioPlayback(
 
     if (queuePrecalculateSessionRef.current === sessionId) {
       queuePrecalculateSessionRef.current = null;
-      setQueuePrecalculateStatus({ isRunning: false, total, completed, failed, cores: workerCount });
+      failedTrackIdsRef.current = [...localFailedIds];
+      setQueuePrecalculateStatus({ isRunning: false, total, completed, failed, cores: workerCount, failedTrackIds: [...localFailedIds] });
     }
   };
 
@@ -994,6 +1115,20 @@ export function useAudioPlayback(
       isRunning: false,
     }));
   }, []);
+
+  const retryFailedQueuePrecalculate = useCallback((requestedWorkerCount?: number) => {
+    const failedIds = failedTrackIdsRef.current;
+    if (!failedIds.length || !Array.isArray(queue) || queue.length === 0) return;
+    const failedTracks = queue.filter((t: Track) => failedIds.includes(String(t.id)));
+    if (failedTracks.length === 0) return;
+    // Clear failed cache entries so they get re-rendered
+    for (const id of failedIds) {
+      inFlightRef.current.delete(id);
+    }
+    failedTrackIdsRef.current = [];
+    precalculateEntireQueue(requestedWorkerCount, failedTracks);
+  // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [queue]);
 
   // Download tracks into RAM-backed blob URLs. The backend only provides the
   // Drive access token; playback happens from the browser's blob cache.
@@ -1055,7 +1190,7 @@ export function useAudioPlayback(
   };
 
 
-  const preloadAdjacentTracks = async (currentId: string | number, currentQueue: Track[], shouldPreload = true) => {
+  const preloadAdjacentTracks = async (currentId: string, currentQueue: Track[], shouldPreload = true) => {
     const { allowedIds, prev1, next1 } = getAdjacentTrackWindow(currentId, currentQueue, {
       wrap: queueEndMode === 'repeat',
     });
@@ -1163,6 +1298,7 @@ export function useAudioPlayback(
 
     const playSessionId = Symbol();
     decodeSessionRef.current = playSessionId;
+    resetPlayCountTracking(playSessionId);
     // Invalidate any in-flight preloadNextTrack from a previous playTrack call
     precalculateNextSessionRef.current = null;
     isDecodingRef.current = false;
@@ -1421,6 +1557,7 @@ export function useAudioPlayback(
     const isRenderedBufferPlayback = isPrecalc || (usingBufferPlaybackRef.current && Boolean(renderedAudioUrlRef.current));
 
     if (songEndMode === 'repeat_one') {
+      resetPlayCountTracking(Symbol());
       if (isRenderedBufferPlayback && (renderedAudioUrlRef.current || audioBufferRef.current)) {
         playCurrentBuffer(0);
       } else if (audioRef.current) {
@@ -1487,7 +1624,7 @@ export function useAudioPlayback(
     } else {
       setIsPlaying(false);
     }
-  }, [currentTrack, queue, songEndMode, queueEndMode, isShuffleState, upcomingQueues, cycleQueues]);
+  }, [currentTrack, queue, songEndMode, queueEndMode, isShuffleState, upcomingQueues, cycleQueues, resetPlayCountTracking]);
 
 
   const playPrevious = useCallback(() => {
@@ -1604,7 +1741,7 @@ export function useAudioPlayback(
       track.sourceType === 'LOCAL' || !validIds || validIds.has(String(track.id))
     );
 
-    const continueAfterDeletedCurrentTrack = (deletedId: string | number, validIds?: Set<string>) => {
+    const continueAfterDeletedCurrentTrack = (deletedId: string, validIds?: Set<string>) => {
       const activeTrack = currentTrackSnapshotRef.current;
       if (!activeTrack || String(activeTrack.id) !== String(deletedId)) return;
 
@@ -1671,7 +1808,7 @@ export function useAudioPlayback(
     };
 
     const handleLibraryRefreshed = (e: Event) => {
-      const trackIds = (e as CustomEvent<{ trackIds?: Array<string | number> }>).detail?.trackIds;
+      const trackIds = (e as CustomEvent<{ trackIds?: Array<string> }>).detail?.trackIds;
       if (!Array.isArray(trackIds)) return;
 
       const validIds = new Set(trackIds.map(String));
@@ -1723,6 +1860,7 @@ export function useAudioPlayback(
     queuePrecalculateStatus,
     precalculateEntireQueue,
     cancelQueuePrecalculate,
+    retryFailedQueuePrecalculate,
     playTrack,
     playNext,
     playPrevious,

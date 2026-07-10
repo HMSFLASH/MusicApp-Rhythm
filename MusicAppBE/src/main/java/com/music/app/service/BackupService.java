@@ -45,7 +45,7 @@ public class BackupService {
             .registerModule(new com.fasterxml.jackson.datatype.jsr310.JavaTimeModule())
             .disable(com.fasterxml.jackson.databind.SerializationFeature.WRITE_DATES_AS_TIMESTAMPS);
 
-    public void backupToDrive(Map<String, Object> config, Map<String, Object> idbData, Long userId) throws org.hibernate.FetchNotFoundException {
+    public void backupToDrive(Map<String, Object> config, Map<String, Object> idbData, String userId) throws org.hibernate.FetchNotFoundException {
         User user = userRepository.findById(userId).orElseThrow(() -> new AppException(ErrorCode.UNAUTHENTICATED));
         if (user.getRefreshToken() == null) {
             throw new AppException(ErrorCode.DRIVE_NOT_LINKED);
@@ -90,7 +90,7 @@ public class BackupService {
     }
 
     @Transactional
-    public Map<String, Object> restoreFromDrive(Long userId) {
+    public Map<String, Object> restoreFromDrive(String userId) {
         User user = userRepository.findById(userId).orElseThrow(() -> new AppException(ErrorCode.UNAUTHENTICATED));
         if (user.getRefreshToken() == null) {
             throw new AppException(ErrorCode.DRIVE_NOT_LINKED);
@@ -106,33 +106,7 @@ public class BackupService {
 
             if (backupData.getLibrary() != null) {
                 for (MusicItemDto trackDto : backupData.getLibrary()) {
-                    String trackIdStr = trackDto.getId();
-                    if (trackIdStr == null || trackIdStr.matches("\\d+"))
-                        continue;
-
-                    MusicLibrary lib = musicLibraryRepository.findByDriveFileId(trackIdStr).orElse(null);
-                    if (lib == null) {
-                        lib = MusicLibrary.builder()
-                                .name(trackDto.getTitle() != null ? trackDto.getTitle() : "Drive File")
-                                .driveFileId(trackIdStr)
-                                .sourceType("DRIVE")
-                                .user(user)
-                                .title(trackDto.getTitle())
-                                .artist(trackDto.getArtist())
-                                .album(trackDto.getAlbum())
-                                .genre(trackDto.getGenre())
-                                .imageUrl(trackDto.getImageUrl())
-                                .lyrics(trackDto.getLyrics())
-                                .build();
-                    } else {
-                        lib.setTitle(trackDto.getTitle());
-                        lib.setArtist(trackDto.getArtist());
-                        lib.setAlbum(trackDto.getAlbum());
-                        lib.setGenre(trackDto.getGenre());
-                        lib.setImageUrl(trackDto.getImageUrl());
-                        lib.setLyrics(trackDto.getLyrics());
-                    }
-                    musicLibraryRepository.save(lib);
+                    resolveOwnedDriveTrack(trackDto, user);
                 }
             }
 
@@ -153,30 +127,7 @@ public class BackupService {
                     if (pDto.getTracks() != null) {
                         for (int i = 0; i < pDto.getTracks().size(); i++) {
                             MusicItemDto trackDto = pDto.getTracks().get(i);
-                            String trackIdStr = trackDto.getId();
-                            if (trackIdStr == null)
-                                continue;
-
-                            MusicLibrary lib = null;
-                            if (trackIdStr.matches("\\d+")) {
-                                lib = musicLibraryRepository.findById(Long.valueOf(trackIdStr)).orElse(null);
-                            } else {
-                                lib = musicLibraryRepository.findByDriveFileId(trackIdStr).orElse(null);
-                                if (lib == null) {
-                                    lib = musicLibraryRepository.save(MusicLibrary.builder()
-                                            .name(trackDto.getTitle() != null ? trackDto.getTitle() : "Drive File")
-                                            .driveFileId(trackIdStr)
-                                            .sourceType("DRIVE")
-                                            .user(user)
-                                            .title(trackDto.getTitle())
-                                            .artist(trackDto.getArtist())
-                                            .album(trackDto.getAlbum())
-                                            .genre(trackDto.getGenre())
-                                            .imageUrl(trackDto.getImageUrl())
-                                            .lyrics(trackDto.getLyrics())
-                                            .build());
-                                }
-                            }
+                            MusicLibrary lib = resolveOwnedDriveTrack(trackDto, user);
                             if (lib != null) {
                                 PlaylistItem item = PlaylistItem.builder()
                                         .playlist(playlist)
@@ -196,30 +147,7 @@ public class BackupService {
                 favoriteRepository.deleteAll(existingFavorites);
 
                 for (MusicItemDto trackDto : backupData.getFavorites()) {
-                    String trackIdStr = trackDto.getId();
-                    if (trackIdStr == null)
-                        continue;
-
-                    MusicLibrary lib = null;
-                    if (trackIdStr.matches("\\d+")) {
-                        lib = musicLibraryRepository.findById(Long.valueOf(trackIdStr)).orElse(null);
-                    } else {
-                        lib = musicLibraryRepository.findByDriveFileId(trackIdStr).orElse(null);
-                        if (lib == null) {
-                            lib = musicLibraryRepository.save(MusicLibrary.builder()
-                                    .name(trackDto.getTitle() != null ? trackDto.getTitle() : "Drive File")
-                                    .driveFileId(trackIdStr)
-                                    .sourceType("DRIVE")
-                                    .user(user)
-                                    .title(trackDto.getTitle())
-                                    .artist(trackDto.getArtist())
-                                    .album(trackDto.getAlbum())
-                                    .genre(trackDto.getGenre())
-                                    .imageUrl(trackDto.getImageUrl())
-                                    .lyrics(trackDto.getLyrics())
-                                    .build());
-                        }
-                    }
+                    MusicLibrary lib = resolveOwnedDriveTrack(trackDto, user);
 
                     if (lib != null) {
                         Favorite fav = Favorite.builder()
@@ -241,5 +169,27 @@ public class BackupService {
             log.error("Restore failed", e);
             throw new AppException(ErrorCode.RESTORE_FAILED);
         }
+    }
+
+    private MusicLibrary resolveOwnedDriveTrack(MusicItemDto trackDto, User user) {
+        String driveFileId = trackDto.getDriveFileId();
+        if (driveFileId == null || driveFileId.isBlank()) {
+            return null;
+        }
+        MusicLibrary lib = musicLibraryRepository.findByDriveFileIdAndUserId(driveFileId, user.getId())
+                .orElseGet(() -> MusicLibrary.builder().driveFileId(driveFileId).sourceType("DRIVE").user(user).build());
+        lib.setName(trackDto.getName() != null ? trackDto.getName()
+                : (trackDto.getTitle() != null ? trackDto.getTitle() : "Drive File"));
+        lib.setTitle(trackDto.getTitle());
+        lib.setArtist(trackDto.getArtist());
+        lib.setAlbum(trackDto.getAlbum());
+        lib.setGenre(trackDto.getGenre());
+        lib.setImageUrl(trackDto.getImageUrl());
+        lib.setLyrics(trackDto.getLyrics());
+        lib.setDurationSeconds(trackDto.getDurationSeconds());
+        if (trackDto.getPlayCount() != null) {
+            lib.setPlayCount(trackDto.getPlayCount());
+        }
+        return musicLibraryRepository.save(lib);
     }
 }

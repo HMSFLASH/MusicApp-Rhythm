@@ -16,5 +16,6 @@ public interface UserMapper {
 
     @Mapping(target = "password", ignore = true)
     @Mapping(target = "refreshToken", ignore = true)
+    @Mapping(target = "authTokenVersion", ignore = true)
     User toEntity(UserDto userDto);
 }

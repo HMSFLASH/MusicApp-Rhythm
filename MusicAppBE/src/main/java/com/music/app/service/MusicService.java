@@ -48,22 +48,19 @@ public class MusicService {
                 .durationSeconds(lib.getDurationSeconds())
                 .sourceType(lib.getSourceType())
                 .driveFileId(lib.getDriveFileId())
+                .playCount(lib.getPlayCount() == null ? 0L : lib.getPlayCount())
                 .build();
     }
 
-    public List<MusicItemDto> listMusic(Long userId) {
+    public List<MusicItemDto> listMusic(String userId) {
         return musicLibraryRepository.findByUserId(userId).stream()
                 .map(this::toDto)
                 .collect(Collectors.toList());
     }
 
-    public MusicItemDto updateMetadata(Long id, MusicItemDto dto, Long userId) {
-        MusicLibrary lib = musicLibraryRepository.findById(id)
+    public MusicItemDto updateMetadata(String id, MusicItemDto dto, String userId) {
+        MusicLibrary lib = musicLibraryRepository.findByIdAndUserId(id, userId)
                 .orElseThrow(() -> new AppException(ErrorCode.NOT_FOUND));
-
-        if (!lib.getUser().getId().equals(userId)) {
-            throw new AppException(ErrorCode.FORBIDDEN);
-        }
 
         if (dto.getTitle() != null)
             lib.setTitle(dto.getTitle());
@@ -83,7 +80,15 @@ public class MusicService {
         return toDto(musicLibraryRepository.save(lib));
     }
 
-    public List<MusicItemDto> syncWithDrive(Long userId) {
+    @org.springframework.transaction.annotation.Transactional
+    public MusicItemDto recordPlay(String id, String userId) {
+        MusicLibrary lib = musicLibraryRepository.findByIdAndUserId(id, userId)
+                .orElseThrow(() -> new AppException(ErrorCode.NOT_FOUND));
+        lib.setPlayCount((lib.getPlayCount() == null ? 0L : lib.getPlayCount()) + 1);
+        return toDto(lib);
+    }
+
+    public List<MusicItemDto> syncWithDrive(String userId) {
         User user = userRepository.findById(userId)
                 .orElseThrow(() -> new AppException(ErrorCode.USER_NOT_EXISTED));
         if (user.getRefreshToken() == null) {
@@ -116,12 +121,9 @@ public class MusicService {
     }
 
     @org.springframework.transaction.annotation.Transactional
-    public void deleteMusic(Long id, Long userId) {
-        MusicLibrary lib = musicLibraryRepository.findById(id)
+    public void deleteMusic(String id, String userId) {
+        MusicLibrary lib = musicLibraryRepository.findByIdAndUserId(id, userId)
                 .orElseThrow(() -> new AppException(ErrorCode.NOT_FOUND));
-        if (!lib.getUser().getId().equals(userId)) {
-            throw new AppException(ErrorCode.FORBIDDEN);
-        }
 
         // Fix logic error when deleting songs that are in favorites or playlists
         try {
@@ -148,8 +150,11 @@ public class MusicService {
     }
 
     public MusicItemDto uploadToDrive(MultipartFile file, String title, String artist, String album, String genre,
-            String imageUrl, String lyrics, Long userId) {
+            String imageUrl, String lyrics, String userId) {
         try {
+            if (file.isEmpty() || file.getOriginalFilename() == null || !isSupportedAudioFile(file.getOriginalFilename())) {
+                throw new AppException(ErrorCode.NOT_FOUND, "A supported non-empty audio file is required");
+            }
             User user = userRepository.findById(userId)
                     .orElseThrow(() -> new AppException(ErrorCode.USER_NOT_EXISTED));
 
@@ -325,21 +330,27 @@ public class MusicService {
         }
     }
 
-    public String getDriveToken(Long userId) {
+    private boolean isSupportedAudioFile(String filename) {
+        String lower = filename.toLowerCase(java.util.Locale.ROOT);
+        return lower.endsWith(".mp3") || lower.endsWith(".m4a") || lower.endsWith(".flac")
+                || lower.endsWith(".wav") || lower.endsWith(".ogg") || lower.endsWith(".opus")
+                || lower.endsWith(".aac") || lower.endsWith(".wma");
+    }
+
+    public String getDriveToken(String userId) {
         try {
             User user = userRepository.findById(userId)
                     .orElseThrow(() -> new AppException(ErrorCode.USER_NOT_EXISTED));
-
             if (user.getRefreshToken() == null) {
                 throw new AppException(ErrorCode.FORBIDDEN, "User Google Drive not linked");
             }
-
             return googleDriveService.getAccessToken(user.getRefreshToken());
-        } catch (AppException e) {
-            throw e;
-        } catch (Exception e) {
-            log.error("Failed to get drive token", e);
-            throw new AppException(ErrorCode.UNCATEGORIZED_EXCEPTION, "Failed to get drive token");
+        } catch (AppException exception) {
+            throw exception;
+        } catch (Exception exception) {
+            log.error("Failed to obtain Google Drive access token", exception);
+            throw new AppException(ErrorCode.UNCATEGORIZED_EXCEPTION, "Failed to connect to Google Drive");
         }
     }
+
 }

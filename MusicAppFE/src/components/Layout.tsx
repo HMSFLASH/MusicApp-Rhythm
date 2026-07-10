@@ -26,7 +26,9 @@ import { useAuth } from '../context/AuthContext';
 import { LocalFilePicker } from './LocalFilePicker';
 import { UploadQueuePanel } from './UploadQueuePanel';
 import { SetLocalPasswordModal } from './SetLocalPasswordModal';
+import { ChangePasswordModal } from './ChangePasswordModal';
 import { db } from '../lib/db';
+import { clearCachedAudio } from '../utils/mediaCache';
 import { clearCovers } from '../utils/idb';
 import { useGlobalAudio } from '../context/AudioContext';
 import { BACKEND_URL } from '../config/env';
@@ -43,6 +45,8 @@ export function Layout() {
   const [syncing, setSyncing] = useState(false);
   const [isLoggingOut, setIsLoggingOut] = useState(false);
   const [isPasswordModalOpen, setIsPasswordModalOpen] = useState(false);
+  const [isChangePasswordModalOpen, setIsChangePasswordModalOpen] = useState(false);
+  const [isAvatarMenuOpen, setIsAvatarMenuOpen] = useState(false);
   const [isMobileMenuOpen, setIsMobileMenuOpen] = useState(false);
   const [showRestoreConfirm, setShowRestoreConfirm] = useState(false);
   const [showBackupConfirm, setShowBackupConfirm] = useState(false);
@@ -124,14 +128,12 @@ export function Layout() {
         // ignore logout error
       }
     } finally {
-      localStorage.removeItem('music_app_access_token');
-      localStorage.removeItem('music_app_refresh_token');
-      localStorage.removeItem('music_app_logged_in');
       setIsAuthenticated(false);
       localStorage.removeItem(LOCAL_STORAGE_KEY);
       localStorage.removeItem(PLAYBACK_STORAGE_KEY);
       await Promise.allSettled([
         db.clear(),
+        clearCachedAudio(),
         clearCovers(),
       ]);
       localStorage.removeItem(LOCAL_STORAGE_KEY);
@@ -295,9 +297,12 @@ export function Layout() {
               </button>
             </div>
             {isAuthenticated ? (
-              <div className="flex items-center justify-between p-2 rounded-lg bg-white/5">
-                <div className="flex items-center gap-3 overflow-hidden">
-                  <div className="w-8 h-8 rounded-full bg-primary/20 flex items-center justify-center text-primary shrink-0 overflow-hidden">
+              <div className="flex items-center justify-between p-2 rounded-lg bg-white/5 relative">
+                <div 
+                  className="flex items-center gap-3 overflow-hidden cursor-pointer group"
+                  onClick={() => setIsAvatarMenuOpen(!isAvatarMenuOpen)}
+                >
+                  <div className="w-8 h-8 rounded-full bg-primary/20 flex items-center justify-center text-primary shrink-0 overflow-hidden border-2 border-transparent group-hover:border-primary transition-colors">
                     {user?.avatarUrl ? (
                       <img src={user?.avatarUrl} alt="Avatar" className="w-full h-full object-cover" referrerPolicy="no-referrer" />
                     ) : (
@@ -305,11 +310,45 @@ export function Layout() {
                     )}
                   </div>
                   <div className="flex flex-col truncate">
-                    <span className="text-sm font-medium text-white truncate">
+                    <span className="text-sm font-medium text-white group-hover:text-primary transition-colors truncate">
                       {user?.fullName || user?.email?.split('@')[0] || user?.username || 'User'}
                     </span>
                   </div>
                 </div>
+
+                {/* Dropdown Menu */}
+                {isAvatarMenuOpen && (
+                  <>
+                    <div 
+                      className="fixed inset-0 z-40" 
+                      onClick={() => setIsAvatarMenuOpen(false)}
+                    />
+                    <div className="absolute bottom-full left-0 mb-2 w-48 bg-[#1A1A1A] border border-white/10 rounded-lg shadow-xl z-50 py-1 overflow-hidden">
+                      {user?.hasPassword && (
+                        <button
+                          onClick={() => {
+                            setIsAvatarMenuOpen(false);
+                            setIsChangePasswordModalOpen(true);
+                          }}
+                          className="w-full flex items-center gap-3 px-4 py-2 text-sm text-left text-white/80 hover:bg-white/10 hover:text-white"
+                        >
+                          <Key size={14} /> Đổi mật khẩu
+                        </button>
+                      )}
+                      <button
+                        onClick={() => {
+                          setIsAvatarMenuOpen(false);
+                          handleLogout();
+                        }}
+                        disabled={isLoggingOut}
+                        className="w-full flex items-center gap-3 px-4 py-2 text-sm text-left text-red-400 hover:bg-white/10 hover:text-red-300 disabled:opacity-50"
+                      >
+                        {isLoggingOut ? <Loader2 size={14} className="animate-spin" /> : <LogOut size={14} />} 
+                        Đăng xuất
+                      </button>
+                    </div>
+                  </>
+                )}
                 <div className="flex items-center gap-1">
                   {(!isAuthenticated || user?.hasPassword !== true) && (
                     <button
@@ -454,6 +493,10 @@ export function Layout() {
         isOpen={isPasswordModalOpen}
         onClose={() => setIsPasswordModalOpen(false)}
         defaultEmail={isAuthenticated ? (user?.email || user?.loginId) : ''}
+      />
+      <ChangePasswordModal 
+        isOpen={isChangePasswordModalOpen} 
+        onClose={() => setIsChangePasswordModalOpen(false)} 
       />
     </div>
   );

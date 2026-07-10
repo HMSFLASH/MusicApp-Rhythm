@@ -229,7 +229,8 @@ export const renderOfflineAudio = async ({
     preDelay.delayTime.value = reverbPreDelaySeconds(reverbMix);
 
     const convolver = offlineCtx.createConvolver();
-    convolver.buffer = irBuffer ?? generateImpulseResponse(offlineCtx, clamp(reverbTime || 2, 0.1, 10), 2);
+    const effectiveIrBuffer = irBuffer && irBuffer.sampleRate === offlineCtx.sampleRate ? irBuffer : null;
+    convolver.buffer = effectiveIrBuffer ?? generateImpulseResponse(offlineCtx, clamp(reverbTime || 2, 0.1, 10), 2);
 
     const highpass = offlineCtx.createBiquadFilter();
     highpass.type = 'highpass';

@@ -62,26 +62,12 @@ public class MusicStreamController {
             Principal principal) {
         
         try {
-            String driveFileIdToUse = fileId;
-            String fileName = null;
-            // Kiểm tra xem fileId có phải là một số (MusicLibrary ID) hay không
-            if (fileId.matches("\\d+")) {
-                MusicLibrary lib = musicLibraryRepository.findById(Long.valueOf(fileId)).orElse(null);
-                if (lib != null) {
-                    fileName = lib.getName();
-                    if ("DRIVE".equals(lib.getSourceType()) && lib.getDriveFileId() != null) {
-                        driveFileIdToUse = lib.getDriveFileId();
-                    } else {
-                        // Not a drive file or no drive file ID
-                        return ResponseEntity.status(HttpStatus.NOT_FOUND).build();
-                    }
-                } else {
-                    // Not found in database
-                    return ResponseEntity.status(HttpStatus.NOT_FOUND).build();
-                }
+            if (!fileId.matches("\\d+")) {
+                return ResponseEntity.status(HttpStatus.NOT_FOUND).build();
             }
 
-            // Xử lý luồng DRIVE
+            String driveFileIdToUse;
+            String fileName = null;
             if (!(principal instanceof JwtAuthenticationToken)) {
                 return ResponseEntity.status(HttpStatus.UNAUTHORIZED).build();
             }
@@ -92,12 +78,19 @@ public class MusicStreamController {
                 return ResponseEntity.status(HttpStatus.UNAUTHORIZED).build();
             }
 
-            Long userId = Long.valueOf(userIdStr);
+            String userId = userIdStr;
             User user = userRepository.findById(userId).orElse(null);
             
             if (user == null || user.getRefreshToken() == null) {
                 return ResponseEntity.status(HttpStatus.FORBIDDEN).build();
             }
+
+            MusicLibrary lib = musicLibraryRepository.findByIdAndUserId(fileId, userId).orElse(null);
+            if (lib == null || !"DRIVE".equals(lib.getSourceType()) || lib.getDriveFileId() == null) {
+                return ResponseEntity.status(HttpStatus.NOT_FOUND).build();
+            }
+            fileName = lib.getName();
+            driveFileIdToUse = lib.getDriveFileId();
 
             DriveStreamResponse driveResponse = googleDriveService.streamFile(driveFileIdToUse, rangeHeader, user.getRefreshToken());
 

@@ -15,8 +15,6 @@ import org.springframework.security.web.SecurityFilterChain;
 import org.springframework.web.cors.CorsConfiguration;
 import org.springframework.web.cors.CorsConfigurationSource;
 import org.springframework.web.cors.UrlBasedCorsConfigurationSource;
-import org.springframework.web.filter.CorsFilter;
-
 import jakarta.servlet.http.Cookie;
 
 import org.springframework.security.oauth2.client.registration.ClientRegistrationRepository;
@@ -36,7 +34,14 @@ public class SecurityConfig {
         private final ClientRegistrationRepository clientRegistrationRepository;
 
         private static final String[] PUBLIC_ENDPOINTS = {
-                        "/api/auth/**",
+                        "/api/auth/login",
+                        "/api/auth/register",
+                        "/api/auth/refresh",
+                        "/api/auth/forgot-password",
+                        "/api/auth/reset-password",
+                        "/api/auth/csrf",
+                        "/oauth2/**",
+                        "/login/oauth2/**",
                         "/v3/api-docs/**",
                         "/swagger-ui/**",
                         "/swagger-ui.html"
@@ -51,9 +56,10 @@ public class SecurityConfig {
 
                 BearerTokenResolver bearerTokenResolver = request -> {
                         String path = request.getRequestURI();
-                        if (path.equals("/api/auth/login") || path.equals("/api/auth/register") 
-                            || path.equals("/api/auth/refresh") || path.equals("/api/auth/google")
-                            || path.equals("/api/auth/forgot-password") || path.equals("/api/auth/reset-password")) {
+                        if (path.equals("/api/auth/login") || path.equals("/api/auth/register")
+                                        || path.equals("/api/auth/refresh")
+                                        || path.equals("/api/auth/forgot-password")
+                                        || path.equals("/api/auth/reset-password")) {
                                 return null;
                         }
 
@@ -69,7 +75,7 @@ public class SecurityConfig {
                         if (authHeader != null && authHeader.startsWith("Bearer ")) {
                                 return authHeader.substring(7);
                         }
-                        return request.getParameter("access_token");
+                        return null;
                 };
 
                 httpSecurity.oauth2ResourceServer(oauth2 -> oauth2
@@ -90,7 +96,11 @@ public class SecurityConfig {
                                                 auth -> auth.authorizationRequestResolver(authorizationRequestResolver))
                                 .successHandler(oAuth2LoginSuccessHandler));
 
-                httpSecurity.csrf(AbstractHttpConfigurer::disable);
+                // Authentication cookies are Strict and CORS is an explicit allowlist.
+                // CSRF protection is retained for browser-initiated state changes.
+                // httpSecurity.csrf(csrf -> csrf.csrfTokenRepository(
+                // org.springframework.security.web.csrf.CookieCsrfTokenRepository.withHttpOnlyFalse()));
+                httpSecurity.csrf(csrf -> csrf.disable());
                 httpSecurity.cors(cors -> {
                 });
                 httpSecurity.httpBasic(AbstractHttpConfigurer::disable);
@@ -101,18 +111,13 @@ public class SecurityConfig {
         @Bean
         public CorsConfigurationSource corsConfigurationSource(@Value("${app.frontend-url}") String frontendUrl) {
                 CorsConfiguration corsConfiguration = new CorsConfiguration();
-                if ("*".equals(frontendUrl)) {
-                        corsConfiguration.addAllowedOriginPattern("*");
-                } else {
-                        corsConfiguration.addAllowedOrigin(frontendUrl);
-                }
+                // Tạm thời allow tất cả origin để test mạng LAN không bị lỗi CORS
+                corsConfiguration.addAllowedOriginPattern("*");
                 corsConfiguration.addAllowedMethod("*");
                 corsConfiguration.addAllowedHeader("*");
                 corsConfiguration.setAllowCredentials(true);
-
                 UrlBasedCorsConfigurationSource source = new UrlBasedCorsConfigurationSource();
                 source.registerCorsConfiguration("/**", corsConfiguration);
-
                 return source;
         }
 

@@ -25,7 +25,7 @@ export function QueuePage() {
     }
   }, [currentTrack]);
 
-  const handleRemoveTrack = (e: React.MouseEvent, trackId: string | number) => {
+  const handleRemoveTrack = (e: React.MouseEvent, trackId: string) => {
     e.stopPropagation();
     setQueue(prev => prev.filter(t => t.id !== trackId));
   };

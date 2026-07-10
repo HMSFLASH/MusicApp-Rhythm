@@ -17,7 +17,7 @@ export function SetLocalPasswordModal({ isOpen, onClose, defaultEmail = '' }: Se
   const [error, setError] = useState('');
   const [success, setSuccess] = useState(false);
   
-  const { setIsAuthenticated } = useAuth();
+  const { refreshUser } = useAuth();
 
   if (!isOpen) return null;
 
@@ -30,21 +30,18 @@ export function SetLocalPasswordModal({ isOpen, onClose, defaultEmail = '' }: Se
       return;
     }
 
-    if (password.length < 6) {
-      setError('Password must be at least 6 characters');
+    if (password.length < 12) {
+      setError('Password must be at least 12 characters');
       return;
     }
 
     setLoading(true);
     try {
-      // eslint-disable-next-line @typescript-eslint/no-explicit-any
-      const response: any = await axiosClient.post('/api/auth/set-password', {
-        password
+      await axiosClient.post('/api/auth/set-password', {
+        loginId,
+        password,
       });
-      // Update global token if the backend returned a new one
-      if (response && response.accessToken) {
-        setIsAuthenticated(true);
-      }
+      await refreshUser();
       setSuccess(true);
       setTimeout(() => {
         onClose();

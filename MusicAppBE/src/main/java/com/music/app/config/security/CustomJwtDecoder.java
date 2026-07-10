@@ -1,6 +1,7 @@
 package com.music.app.config.security;
 
 import com.music.app.repository.InvalidatedTokenRepository;
+import com.music.app.repository.UserRepository;
 import lombok.RequiredArgsConstructor;
 import org.springframework.beans.factory.annotation.Value;
 import org.springframework.security.oauth2.jose.jws.MacAlgorithm;
@@ -23,6 +24,7 @@ public class CustomJwtDecoder implements JwtDecoder {
     private String signerKey;
 
     private final InvalidatedTokenRepository invalidatedTokenRepository;
+    private final UserRepository userRepository;
 
     private NimbusJwtDecoder nimbusJwtDecoder = null;
 
@@ -34,6 +36,16 @@ public class CustomJwtDecoder implements JwtDecoder {
             String jit = signedJWT.getJWTClaimsSet().getJWTID();
             if (jit != null && invalidatedTokenRepository.existsById(jit)) {
                 throw new BadJwtException("Token has been invalidated");
+            }
+            if (!"ACCESS".equals(signedJWT.getJWTClaimsSet().getStringClaim("token_type"))) {
+                throw new BadJwtException("Refresh tokens cannot access protected resources");
+            }
+            String userId = signedJWT.getJWTClaimsSet().getStringClaim("userId");
+            Number tokenVersion = (Number) signedJWT.getJWTClaimsSet().getClaim("token_version");
+            if (userId == null || tokenVersion == null || userRepository.findById(userId)
+                    .map(user -> user.getAuthTokenVersion() == null || user.getAuthTokenVersion().longValue() != tokenVersion.longValue())
+                    .orElse(true)) {
+                throw new BadJwtException("Token has been superseded");
             }
         } catch (ParseException e) {
             throw new BadJwtException("Invalid token format", e);

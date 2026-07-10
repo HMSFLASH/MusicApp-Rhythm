@@ -21,15 +21,15 @@ public class FavoriteController {
 
     @GetMapping
     public ApiResponse<List<MusicItemDto>> getFavorites(Principal principal) {
-        Long userId = SecurityUtils.extractUserId(principal);
+        String userId = SecurityUtils.extractUserId(principal);
         return ApiResponse.<List<MusicItemDto>>builder()
                 .result(favoriteService.getFavorites(userId))
                 .build();
     }
 
     @PostMapping("/{trackId}")
-    public ApiResponse<String> addFavorite(@PathVariable Long trackId, Principal principal) {
-        Long userId = SecurityUtils.extractUserId(principal);
+    public ApiResponse<String> addFavorite(@PathVariable String trackId, Principal principal) {
+        String userId = SecurityUtils.extractUserId(principal);
         favoriteService.addFavorite(trackId, userId);
         return ApiResponse.<String>builder()
                 .result("Added to favorites")
@@ -37,8 +37,8 @@ public class FavoriteController {
     }
 
     @DeleteMapping("/{trackId}")
-    public ApiResponse<String> removeFavorite(@PathVariable Long trackId, Principal principal) {
-        Long userId = SecurityUtils.extractUserId(principal);
+    public ApiResponse<String> removeFavorite(@PathVariable String trackId, Principal principal) {
+        String userId = SecurityUtils.extractUserId(principal);
         favoriteService.removeFavorite(trackId, userId);
         return ApiResponse.<String>builder()
                 .result("Removed from favorites")
@@ -46,8 +46,8 @@ public class FavoriteController {
     }
 
     @GetMapping("/check/{trackId}")
-    public ApiResponse<Boolean> checkFavorite(@PathVariable Long trackId, Principal principal) {
-        Long userId = SecurityUtils.extractUserId(principal);
+    public ApiResponse<Boolean> checkFavorite(@PathVariable String trackId, Principal principal) {
+        String userId = SecurityUtils.extractUserId(principal);
         return ApiResponse.<Boolean>builder()
                 .result(favoriteService.checkFavorite(trackId, userId))
                 .build();

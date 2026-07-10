@@ -3,6 +3,7 @@ import { axiosClient } from '../api/axiosClient';
 import { useAuth } from './AuthContext';
 import type { Track } from '../hooks/useAudioPlayer';
 import { db } from '../lib/db';
+import { removeCachedAudio } from '../utils/mediaCache';
 
 interface LibraryContextType {
   tracks: Track[];
@@ -15,7 +16,7 @@ interface LibraryContextType {
 }
 
 type BackendTrack = {
-  id: string | number;
+  id: string;
   name?: string;
   fileName?: string;
   sourceType: Track['sourceType'];
@@ -26,7 +27,13 @@ type BackendTrack = {
   album?: string;
   genre?: string;
   durationSeconds?: number;
+  playCount?: number;
   lyrics?: string;
+};
+
+type PlayCountedDetail = {
+  trackId?: string;
+  playCount?: number;
 };
 
 const LibraryContext = createContext<LibraryContextType | undefined>(undefined);
@@ -59,6 +66,7 @@ const parseTrack = (d: BackendTrack): Track => ({
   album: d.album,
   genre: d.genre,
   durationSeconds: d.durationSeconds,
+  playCount: d.playCount ?? 0,
   lyrics: d.lyrics
 });
 
@@ -185,7 +193,7 @@ export function LibraryProvider({ children }: { children: ReactNode }) {
     };
 
     const handleMetadataUpdated = (event: Event) => {
-      const trackId = (event as CustomEvent<string | number>).detail;
+      const trackId = (event as CustomEvent<string>).detail;
       if (!trackId) return;
 
       const applyCachedMetadata = async () => {
@@ -219,12 +227,36 @@ export function LibraryProvider({ children }: { children: ReactNode }) {
       void applyCachedMetadata();
     };
 
+    const handlePlayCounted = (event: Event) => {
+      const detail = (event as CustomEvent<PlayCountedDetail>).detail;
+      if (!detail?.trackId || typeof detail.playCount !== 'number') return;
+
+      const applyPlayCount = (items: Track[]) => items.map((track) => (
+        String(track.id) === String(detail.trackId)
+          ? { ...track, playCount: detail.playCount }
+          : track
+      ));
+
+      setTracks(prev => {
+        const next = applyPlayCount(prev);
+        void db.set('sonic_library_tracks', next);
+        return next;
+      });
+      setFavorites(prev => {
+        const next = applyPlayCount(prev);
+        void db.set('sonic_favorites', next);
+        return next;
+      });
+    };
+
     window.addEventListener('DriveConfigRestored', handleRestore);
     window.addEventListener('sonic_metadata_updated', handleMetadataUpdated);
+    window.addEventListener('music-play-counted', handlePlayCounted);
 
     return () => {
       window.removeEventListener('DriveConfigRestored', handleRestore);
       window.removeEventListener('sonic_metadata_updated', handleMetadataUpdated);
+      window.removeEventListener('music-play-counted', handlePlayCounted);
     };
   }, [fetchLibrary, isAuthenticated]);
 
@@ -283,6 +315,7 @@ export function LibraryProvider({ children }: { children: ReactNode }) {
     if (track.sourceType === 'LOCAL') return;
     try {
       await axiosClient.delete(`/api/music/${track.id}`);
+      if (track.driveFileId) void removeCachedAudio(`drive:${track.driveFileId}`);
       setTracks(prev => {
         const next = prev.filter(t => t.id !== track.id);
         void db.set('sonic_library_tracks', next);

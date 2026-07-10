@@ -11,7 +11,7 @@ import java.util.Set;
 @NoArgsConstructor
 @AllArgsConstructor
 public class RoleDto {
-    private Long id;
+    private String id;
     private String name;
     private Set<PermissionDto> permissions;
 }

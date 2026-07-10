@@ -7,7 +7,7 @@ interface AddTracksModalProps {
   isOpen: boolean;
   onClose: () => void;
   isAuthenticated: boolean;
-  playlistId: number;
+  playlistId: string;
   playlistTracks: Track[]; // to check which are already added
   onSuccess: () => void;
 }
@@ -18,12 +18,12 @@ import { useLibrary } from '../context/LibraryContext';
 export function AddTracksModal({ isOpen, onClose, playlistId, playlistTracks, onSuccess }: AddTracksModalProps) {
   const { playerState } = useGlobalAudio();
   const { tracks: allTracks, isLoading: loading } = useLibrary();
-  const [addingIds, setAddingIds] = useState<Set<string | number>>(new Set());
+  const [addingIds, setAddingIds] = useState<Set<string>>(new Set());
   const [searchQuery, setSearchQuery] = useState('');
 
   if (!isOpen) return null;
 
-  const handleAddTrack = async (trackId: string | number) => {
+  const handleAddTrack = async (trackId: string) => {
     setAddingIds(prev => new Set(prev).add(trackId));
     try {
       const track = allTracks.find(t => t.id === trackId);
@@ -46,7 +46,7 @@ export function AddTracksModal({ isOpen, onClose, playlistId, playlistTracks, on
     (t.artist || '').toLowerCase().includes(searchQuery.toLowerCase())
   );
 
-  const isTrackInPlaylist = (trackId: string | number) => {
+  const isTrackInPlaylist = (trackId: string) => {
     return playlistTracks.some(pt => pt.id === trackId);
   };
 

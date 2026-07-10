@@ -14,18 +14,18 @@ import { useConfirm } from '../context/ConfirmContext';
 interface PlaylistProps {
   isAuthenticated: boolean;
   onPlay: (track: Track, queue?: Track[]) => void;
-  currentTrackId?: string | number;
+  currentTrackId?: string;
 }
 
 type PlaylistSummary = {
-  id: number;
+  id: string;
   name: string;
   trackCount?: number;
   imageUrl?: string;
 };
 
 type PlaylistTrackResponse = {
-  id: string | number;
+  id: string;
   name?: string;
   fileName?: string;
   sourceType: Track['sourceType'];
@@ -36,6 +36,7 @@ type PlaylistTrackResponse = {
   album?: string;
   genre?: string;
   durationSeconds?: number;
+  playCount?: number;
 };
 
 type PlaylistDetailsResponse = PlaylistSummary & {
@@ -51,9 +52,9 @@ export function Playlist({ isAuthenticated, onPlay, currentTrackId }: PlaylistPr
   const confirm = useConfirm();
   const [playlists, setPlaylists] = useState<PlaylistSummary[]>([]);
   const [searchParams, setSearchParams] = useSearchParams();
-  const selectedPlaylistId = searchParams.get('playlistId') ? parseInt(searchParams.get('playlistId')!) : null;
+  const selectedPlaylistId = searchParams.get('playlistId') || null;
   
-  const setSelectedPlaylistId = (id: number | null) => {
+  const setSelectedPlaylistId = (id: string | null) => {
     if (id) {
       setSearchParams({ playlistId: id.toString() });
     } else {
@@ -68,9 +69,9 @@ export function Playlist({ isAuthenticated, onPlay, currentTrackId }: PlaylistPr
   const [isAddTracksModalOpen, setIsAddTracksModalOpen] = useState(false);
   const [isEditingName, setIsEditingName] = useState(false);
   const [editName, setEditName] = useState('');
-  const [editingListPlaylistId, setEditingListPlaylistId] = useState<number | null>(null);
+  const [editingListPlaylistId, setEditingListPlaylistId] = useState<string | null>(null);
   const [editListName, setEditListName] = useState('');
-  const [openMenuId, setOpenMenuId] = useState<string | number | null>(null);
+  const [openMenuId, setOpenMenuId] = useState<string | null>(null);
   const [infoTrack, setInfoTrack] = useState<Track | null>(null);
 
   const handleToggleFavorite = async (track: Track, e: React.MouseEvent) => {
@@ -124,7 +125,7 @@ export function Playlist({ isAuthenticated, onPlay, currentTrackId }: PlaylistPr
     }
   };
 
-  const fetchPlaylistDetails = async (id: number) => {
+  const fetchPlaylistDetails = async (id: string) => {
     try {
       setLoading(true);
       const data = await axiosClient.get(`/api/playlists/${id}`) as unknown as PlaylistDetailsResponse;
@@ -139,7 +140,8 @@ export function Playlist({ isAuthenticated, onPlay, currentTrackId }: PlaylistPr
           title: d.title,
           album: d.album,
           genre: d.genre,
-          durationSeconds: d.durationSeconds
+          durationSeconds: d.durationSeconds,
+          playCount: d.playCount ?? 0
       }));
       const details: PlaylistDetails = { ...data, tracks: mappedTracks };
       setSelectedPlaylistDetails(details);
@@ -215,7 +217,7 @@ export function Playlist({ isAuthenticated, onPlay, currentTrackId }: PlaylistPr
     return () => { isCancelled = true; };
   }, [selectedPlaylistDetails]); // eslint-disable-line react-hooks/exhaustive-deps
 
-  const deletePlaylist = async (id: number, e: React.MouseEvent) => {
+  const deletePlaylist = async (id: string, e: React.MouseEvent) => {
     e.stopPropagation();
     const isConfirmed = await confirm({
       title: t('playlist.deletePlaylist', 'Xóa danh sách phát'),
@@ -251,7 +253,7 @@ export function Playlist({ isAuthenticated, onPlay, currentTrackId }: PlaylistPr
     }
   };
 
-  const renamePlaylistFromList = async (id: number, currentName: string, e: React.MouseEvent | React.KeyboardEvent) => {
+  const renamePlaylistFromList = async (id: string, currentName: string, e: React.MouseEvent | React.KeyboardEvent) => {
     e.stopPropagation();
     if (!editListName.trim() || editListName.trim() === currentName) {
       setEditingListPlaylistId(null);
@@ -268,7 +270,7 @@ export function Playlist({ isAuthenticated, onPlay, currentTrackId }: PlaylistPr
     }
   };
 
-  const removeTrackFromPlaylist = async (trackId: string | number, e: React.MouseEvent) => {
+  const removeTrackFromPlaylist = async (trackId: string, e: React.MouseEvent) => {
     e.stopPropagation();
     if (!selectedPlaylistId) return;
 
@@ -299,10 +301,10 @@ export function Playlist({ isAuthenticated, onPlay, currentTrackId }: PlaylistPr
         isOpen={isAddTracksModalOpen}
         onClose={() => setIsAddTracksModalOpen(false)}
         isAuthenticated={isAuthenticated}
-        playlistId={selectedPlaylistId as number}
+        playlistId={selectedPlaylistId as string}
         playlistTracks={selectedPlaylistDetails?.tracks || []}
         onSuccess={() => {
-          fetchPlaylistDetails(selectedPlaylistId as number);
+          fetchPlaylistDetails(selectedPlaylistId as string);
           fetchPlaylists(); // update track counts in the list view
         }}
       />

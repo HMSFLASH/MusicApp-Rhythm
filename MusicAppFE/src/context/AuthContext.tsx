@@ -1,9 +1,9 @@
-import { createContext, useContext, useState, useEffect } from 'react';
+import { createContext, useContext, useState, useEffect, useCallback } from 'react';
 import type { ReactNode } from 'react';
 import { axiosClient } from '../api/axiosClient';
 
 type AuthUser = {
-  id?: string | number;
+  id?: string;
   email?: string;
   loginId?: string;
   username?: string;
@@ -14,74 +14,71 @@ type AuthUser = {
   hasPassword?: boolean;
 };
 
-type DriveTokenResponse = {
-  accessToken?: string;
-  result?: {
-    accessToken?: string;
-  };
-};
-
 interface AuthContextType {
   isAuthenticated: boolean;
+  isAuthResolved: boolean;
   setIsAuthenticated: (auth: boolean) => void;
   driveToken: string;
   fetchDriveToken: () => Promise<string>;
   user: AuthUser | null;
+  refreshUser: () => Promise<void>;
 }
 
 const AuthContext = createContext<AuthContextType | undefined>(undefined);
 
 export function AuthProvider({ children }: { children: ReactNode }) {
-  const [isAuthenticated, setIsAuthenticatedState] = useState<boolean>(() => {
-    return localStorage.getItem('music_app_logged_in') === 'true';
-  });
-  const [driveToken, setDriveTokenState] = useState<string>('');
+  const [isAuthenticated, setIsAuthenticatedState] = useState(false);
+  const [isAuthResolved, setIsAuthResolved] = useState(false);
   const [user, setUser] = useState<AuthUser | null>(null);
+  const [driveToken, setDriveToken] = useState('');
 
   const setIsAuthenticated = (auth: boolean) => {
-    if (auth) {
-      localStorage.setItem('music_app_logged_in', 'true');
-    } else {
-      localStorage.removeItem('music_app_logged_in');
-      localStorage.removeItem('music_app_access_token');
-      localStorage.removeItem('music_app_refresh_token');
+    if (!auth) {
       setUser(null);
-      setDriveTokenState('');
+      setDriveToken('');
     }
     setIsAuthenticatedState(auth);
   };
 
-  const fetchDriveToken = async () => {
+  const fetchDriveToken = useCallback(async () => {
     try {
-      const response = await axiosClient.get('/api/music/drive-token') as unknown as DriveTokenResponse;
-      const token = response.accessToken || response.result?.accessToken || '';
-      if (token) {
-        setDriveTokenState(token);
-      }
+      const response = await axiosClient.get('/api/music/drive-token') as { accessToken?: string };
+      const token = response.accessToken || '';
+      setDriveToken(token);
       return token;
-    } catch (e) {
-      console.error("Failed to fetch drive token", e);
+    } catch {
+      setDriveToken('');
       return '';
     }
-  };
+  }, []);
+
+  const refreshUser = useCallback(async () => {
+    try {
+      const res = await axiosClient.get('/api/auth/me');
+      setUser(res as AuthUser);
+    } catch (error) {
+      console.error('Failed to refresh user', error);
+    }
+  }, []);
 
   useEffect(() => {
-    if (isAuthenticated) {
-      axiosClient.get('/api/auth/me')
-        .then((res) => setUser(res as unknown as AuthUser))
-        .catch(() => setIsAuthenticated(false));
-      
-      if (!driveToken) {
-        window.setTimeout(() => {
-          void fetchDriveToken();
-        }, 0);
-      }
-    }
-  // eslint-disable-next-line react-hooks/exhaustive-deps
+    void axiosClient.get('/api/auth/csrf')
+      .then(() => axiosClient.get('/api/auth/me'))
+      .then((res) => {
+        setUser(res as AuthUser);
+        setIsAuthenticatedState(true);
+      })
+      .catch(() => setIsAuthenticatedState(false))
+      .finally(() => setIsAuthResolved(true));
   }, [isAuthenticated]);
 
+  useEffect(() => {
+    // eslint-disable-next-line react-hooks/set-state-in-effect
+    if (isAuthenticated) void fetchDriveToken();
+  }, [isAuthenticated, fetchDriveToken]);
+
   return (
-    <AuthContext.Provider value={{ isAuthenticated, setIsAuthenticated, driveToken, fetchDriveToken, user }}>
+    <AuthContext.Provider value={{ isAuthenticated, isAuthResolved, setIsAuthenticated, driveToken, fetchDriveToken, user, refreshUser }}>
       {children}
     </AuthContext.Provider>
   );

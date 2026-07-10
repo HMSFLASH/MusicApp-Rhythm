@@ -22,15 +22,15 @@ public class PlaylistController {
 
     @GetMapping
     public ApiResponse<List<PlaylistDto>> getPlaylists(Principal principal) {
-        Long userId = SecurityUtils.extractUserId(principal);
+        String userId = SecurityUtils.extractUserId(principal);
         return ApiResponse.<List<PlaylistDto>>builder()
                 .result(playlistService.getPlaylists(userId))
                 .build();
     }
 
     @GetMapping("/{id}")
-    public ApiResponse<PlaylistDto> getPlaylist(@PathVariable Long id, Principal principal) {
-        Long userId = SecurityUtils.extractUserId(principal);
+    public ApiResponse<PlaylistDto> getPlaylist(@PathVariable String id, Principal principal) {
+        String userId = SecurityUtils.extractUserId(principal);
         return ApiResponse.<PlaylistDto>builder()
                 .result(playlistService.getPlaylist(id, userId))
                 .build();
@@ -38,25 +38,25 @@ public class PlaylistController {
 
     @PostMapping
     public ApiResponse<PlaylistDto> createPlaylist(@RequestBody CreatePlaylistRequest req, Principal principal) {
-        Long userId = SecurityUtils.extractUserId(principal);
+        String userId = SecurityUtils.extractUserId(principal);
         return ApiResponse.<PlaylistDto>builder()
                 .result(playlistService.createPlaylist(req, userId))
                 .build();
     }
 
     @PutMapping("/{id}")
-    public ApiResponse<PlaylistDto> updatePlaylist(@PathVariable Long id,
+    public ApiResponse<PlaylistDto> updatePlaylist(@PathVariable String id,
                                                    @RequestBody CreatePlaylistRequest req,
                                                    Principal principal) {
-        Long userId = SecurityUtils.extractUserId(principal);
+        String userId = SecurityUtils.extractUserId(principal);
         return ApiResponse.<PlaylistDto>builder()
                 .result(playlistService.updatePlaylist(id, req, userId))
                 .build();
     }
 
     @DeleteMapping("/{id}")
-    public ApiResponse<String> deletePlaylist(@PathVariable Long id, Principal principal) {
-        Long userId = SecurityUtils.extractUserId(principal);
+    public ApiResponse<String> deletePlaylist(@PathVariable String id, Principal principal) {
+        String userId = SecurityUtils.extractUserId(principal);
         playlistService.deletePlaylist(id, userId);
         return ApiResponse.<String>builder()
                 .result("Deleted")
@@ -64,8 +64,8 @@ public class PlaylistController {
     }
 
     @PostMapping("/{id}/tracks/{trackId}")
-    public ApiResponse<String> addTrack(@PathVariable Long id, @PathVariable String trackId, @RequestParam(required = false) String name, Principal principal) {
-        Long userId = SecurityUtils.extractUserId(principal);
+    public ApiResponse<String> addTrack(@PathVariable String id, @PathVariable String trackId, @RequestParam(required = false) String name, Principal principal) {
+        String userId = SecurityUtils.extractUserId(principal);
         playlistService.addTrack(id, trackId, name, userId);
         return ApiResponse.<String>builder()
                 .result("Added")
@@ -73,8 +73,8 @@ public class PlaylistController {
     }
 
     @DeleteMapping("/{id}/tracks/{trackId}")
-    public ApiResponse<String> removeTrack(@PathVariable Long id, @PathVariable String trackId, Principal principal) {
-        Long userId = SecurityUtils.extractUserId(principal);
+    public ApiResponse<String> removeTrack(@PathVariable String id, @PathVariable String trackId, Principal principal) {
+        String userId = SecurityUtils.extractUserId(principal);
         playlistService.removeTrack(id, trackId, userId);
         return ApiResponse.<String>builder()
                 .result("Removed")

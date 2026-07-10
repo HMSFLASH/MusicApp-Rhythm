@@ -21,7 +21,7 @@ public class BackupController {
 
     @PostMapping("/drive")
     public ApiResponse<String> backupToDrive(@RequestBody BackupRequest request, Principal principal) {
-        Long userId = SecurityUtils.extractUserId(principal);
+        String userId = SecurityUtils.extractUserId(principal);
         backupService.backupToDrive(request.getConfig(), request.getIdbData(), userId);
         return ApiResponse.<String>builder()
                 .result("Backup successful")
@@ -30,7 +30,7 @@ public class BackupController {
 
     @GetMapping("/drive")
     public ApiResponse<Map<String, Object>> restoreFromDrive(Principal principal) {
-        Long userId = SecurityUtils.extractUserId(principal);
+        String userId = SecurityUtils.extractUserId(principal);
         return ApiResponse.<Map<String, Object>>builder()
                 .result(backupService.restoreFromDrive(userId))
                 .build();

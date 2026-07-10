@@ -111,7 +111,7 @@ export function useAudioQueue(savedState: SavedAudioQueueState, isAuthenticated:
     };
 
     const handleLibraryRefreshed = (e: Event) => {
-      const trackIds = (e as CustomEvent<{ trackIds?: Array<string | number> }>).detail?.trackIds;
+      const trackIds = (e as CustomEvent<{ trackIds?: Array<string> }>).detail?.trackIds;
       if (!Array.isArray(trackIds)) return;
 
       const validIds = new Set(trackIds.map(String));

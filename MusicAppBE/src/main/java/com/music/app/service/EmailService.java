@@ -65,13 +65,10 @@ public class EmailService {
                 "</body>\n" +
                 "</html>";
 
-        // Check if mail is configured, otherwise fallback to console
+        // Never write password-reset URLs to logs: they are bearer credentials.
         if (mailSender == null || senderEmail == null || senderEmail.trim().isEmpty()) {
-            log.info("\n========================================================\n" +
-                    "SMTP is not configured. Email to {} has been mocked.\n" +
-                    "RESET LINK: {}\n" +
-                    "========================================================", to, resetLink);
-            return;
+            log.error("SMTP is not configured; password-reset email was not sent to {}", to);
+            throw new IllegalStateException("Email service is unavailable");
         }
 
         try {

@@ -143,6 +143,7 @@ export interface Track {
   album?: string;
   genre?: string;
   durationSeconds?: number;
+  playCount?: number;
   bitrate?: number;
   numberOfChannels?: number;
   sampleRate?: number;

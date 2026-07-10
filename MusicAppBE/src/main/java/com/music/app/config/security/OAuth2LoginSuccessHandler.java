@@ -18,6 +18,9 @@ import org.springframework.stereotype.Component;
 import java.io.IOException;
 
 import org.springframework.context.annotation.Lazy;
+import org.springframework.beans.factory.annotation.Value;
+import org.springframework.http.ResponseCookie;
+import org.springframework.http.HttpStatus;
 
 @Component
 @Slf4j
@@ -25,10 +28,16 @@ public class OAuth2LoginSuccessHandler extends SimpleUrlAuthenticationSuccessHan
 
     private final AuthService authService;
     private final OAuth2AuthorizedClientService authorizedClientService;
+    private final String frontendUrl;
+    private final boolean secureCookies;
 
-    public OAuth2LoginSuccessHandler(@Lazy AuthService authService, OAuth2AuthorizedClientService authorizedClientService) {
+    public OAuth2LoginSuccessHandler(@Lazy AuthService authService, OAuth2AuthorizedClientService authorizedClientService,
+            @Value("${app.frontend-url}") String frontendUrl,
+            @Value("${app.cookie.secure:true}") boolean secureCookies) {
         this.authService = authService;
         this.authorizedClientService = authorizedClientService;
+        this.frontendUrl = frontendUrl;
+        this.secureCookies = secureCookies;
     }
 
     @Override
@@ -41,6 +50,12 @@ public class OAuth2LoginSuccessHandler extends SimpleUrlAuthenticationSuccessHan
             String email = oAuth2User.getAttribute("email");
             String name = oAuth2User.getAttribute("name");
             String picture = oAuth2User.getAttribute("picture");
+            Boolean emailVerified = oAuth2User.getAttribute("email_verified");
+
+            if (googleId == null || email == null || !Boolean.TRUE.equals(emailVerified)) {
+                response.sendError(HttpStatus.UNAUTHORIZED.value(), "Google account email is not verified");
+                return;
+            }
             
             OAuth2AuthorizedClient client = authorizedClientService.loadAuthorizedClient(
                     oauthToken.getAuthorizedClientRegistrationId(), oauthToken.getName());
@@ -57,31 +72,18 @@ public class OAuth2LoginSuccessHandler extends SimpleUrlAuthenticationSuccessHan
 
             AuthenticationResponse authResponse = authService.loginWithGoogleAndSaveRefresh(googleId, email, name, picture, refreshToken);
 
-            String requestOrigin = request.getHeader("Origin");
-            if (requestOrigin == null || requestOrigin.isEmpty()) {
-                requestOrigin = request.getHeader("Referer");
-            }
-            String host = "localhost:5173";
-            if (requestOrigin != null && !requestOrigin.isEmpty()) {
-                 try {
-                     java.net.URL url = new java.net.URL(requestOrigin);
-                     host = url.getHost() + ":5173";
-                 } catch (Exception e) {
-                     // ignore
-                 }
-            } else {
-                 host = request.getServerName() + ":5173";
-            }
-            
-            String scheme = request.getScheme(); // http or https
-            String targetUrl = scheme + "://" + host + "/oauth2/callback";
+            String targetUrl = frontendUrl.replaceAll("/$", "") + "/oauth2/callback";
             
             String token = authResponse.getAccessToken();
-            response.addHeader("Set-Cookie", "music_app_token=" + token + "; Path=/; Max-Age=" + (7 * 24 * 60 * 60) + "; HttpOnly; SameSite=Lax");
+            response.addHeader("Set-Cookie", ResponseCookie.from("music_app_token", token)
+                    .httpOnly(true).secure(secureCookies).sameSite("Strict").path("/")
+                    .maxAge(7 * 24 * 60 * 60).build().toString());
             
             String backendRefreshToken = authResponse.getRefreshToken();
             if (backendRefreshToken != null) {
-                response.addHeader("Set-Cookie", "music_app_refresh_token=" + backendRefreshToken + "; Path=/api/auth/refresh; Max-Age=" + (30 * 24 * 60 * 60) + "; HttpOnly; SameSite=Lax");
+                response.addHeader("Set-Cookie", ResponseCookie.from("music_app_refresh_token", backendRefreshToken)
+                        .httpOnly(true).secure(secureCookies).sameSite("Strict").path("/api/auth/refresh")
+                        .maxAge(30 * 24 * 60 * 60).build().toString());
             }
             
             getRedirectStrategy().sendRedirect(request, response, targetUrl);

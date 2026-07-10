@@ -37,20 +37,13 @@ export function RegisterPage() {
     setError('');
 
     try {
-      // eslint-disable-next-line @typescript-eslint/no-explicit-any
-      const response: any = await axiosClient.post('/api/auth/register', {
+      await axiosClient.post('/api/auth/register', {
         username: displayName,
         email,
         password
       });
-      if (response && response.accessToken) {
-        localStorage.setItem('music_app_access_token', response.accessToken);
-        if (response.refreshToken) {
-          localStorage.setItem('music_app_refresh_token', response.refreshToken);
-        }
-        setIsAuthenticated(true);
-        navigate('/');
-      }
+      setIsAuthenticated(true);
+      navigate('/');
       // eslint-disable-next-line @typescript-eslint/no-explicit-any
     } catch (err: any) {
       setError(err.response?.data?.message || err.message || 'Registration failed. Email or username might already exist.');

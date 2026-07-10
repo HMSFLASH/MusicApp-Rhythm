@@ -24,7 +24,7 @@ public class MusicController {
 
     @GetMapping("/list")
     public ApiResponse<List<MusicItemDto>> listMusic(Principal principal) {
-        Long userId = SecurityUtils.extractUserId(principal);
+        String userId = SecurityUtils.extractUserId(principal);
         return ApiResponse.<List<MusicItemDto>>builder()
                 .result(musicService.listMusic(userId))
                 .build();
@@ -32,25 +32,33 @@ public class MusicController {
 
     @PostMapping("/sync")
     public ApiResponse<List<MusicItemDto>> syncWithDrive(Principal principal) {
-        Long userId = SecurityUtils.extractUserId(principal);
+        String userId = SecurityUtils.extractUserId(principal);
         return ApiResponse.<List<MusicItemDto>>builder()
                 .result(musicService.syncWithDrive(userId))
                 .build();
     }
 
     @PutMapping("/{id}/metadata")
-    public ApiResponse<MusicItemDto> updateMetadata(@PathVariable Long id,
+    public ApiResponse<MusicItemDto> updateMetadata(@PathVariable String id,
             @RequestBody MusicItemDto dto,
             Principal principal) {
-        Long userId = SecurityUtils.extractUserId(principal);
+        String userId = SecurityUtils.extractUserId(principal);
         return ApiResponse.<MusicItemDto>builder()
                 .result(musicService.updateMetadata(id, dto, userId))
                 .build();
     }
 
+    @PostMapping("/{id}/play")
+    public ApiResponse<MusicItemDto> recordPlay(@PathVariable String id, Principal principal) {
+        String userId = SecurityUtils.extractUserId(principal);
+        return ApiResponse.<MusicItemDto>builder()
+                .result(musicService.recordPlay(id, userId))
+                .build();
+    }
+
     @DeleteMapping("/{id}")
-    public ApiResponse<Void> deleteMusic(@PathVariable Long id, Principal principal) {
-        Long userId = SecurityUtils.extractUserId(principal);
+    public ApiResponse<Void> deleteMusic(@PathVariable String id, Principal principal) {
+        String userId = SecurityUtils.extractUserId(principal);
         musicService.deleteMusic(id, userId);
         return ApiResponse.<Void>builder()
                 .result(null)
@@ -68,7 +76,7 @@ public class MusicController {
             @RequestParam(value = "lyrics", required = false) String lyrics,
             Principal principal) {
 
-        Long userId = SecurityUtils.extractUserId(principal);
+        String userId = SecurityUtils.extractUserId(principal);
         return ApiResponse.<MusicItemDto>builder()
                 .result(musicService.uploadToDrive(file, title, artist, album, genre, imageUrl, lyrics, userId))
                 .build();
@@ -76,10 +84,10 @@ public class MusicController {
 
     @GetMapping("/drive-token")
     public ApiResponse<Map<String, String>> getDriveToken(Principal principal) {
-        Long userId = SecurityUtils.extractUserId(principal);
-        String token = musicService.getDriveToken(userId);
+        String userId = SecurityUtils.extractUserId(principal);
         return ApiResponse.<Map<String, String>>builder()
-                .result(Map.of("accessToken", token))
+                .result(Map.of("accessToken", musicService.getDriveToken(userId)))
                 .build();
     }
+
 }

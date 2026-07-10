@@ -37,8 +37,8 @@ export function useAudioEngine(
 
   return {
     ...playbackState,
-    getTrackMetadata: (id: number | string) => metadataState.metadataCacheRef.current.get(String(id)),
-    getTrackImage: (id: number | string) => metadataState.imageCacheRef.current.get(String(id)),
+    getTrackMetadata: (id: string) => metadataState.metadataCacheRef.current.get(id),
+    getTrackImage: (id: string) => metadataState.imageCacheRef.current.get(id),
     metadataVersion: metadataState.metadataVersion
   };
 }

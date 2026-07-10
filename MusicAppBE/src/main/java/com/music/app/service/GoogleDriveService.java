@@ -6,8 +6,8 @@ import com.google.api.client.json.gson.GsonFactory;
 import com.google.api.services.drive.Drive;
 import com.google.api.services.drive.model.File;
 import com.google.auth.http.HttpCredentialsAdapter;
-import com.google.auth.oauth2.AccessToken;
 import com.google.auth.oauth2.UserCredentials;
+import com.google.auth.oauth2.AccessToken;
 import lombok.RequiredArgsConstructor;
 import lombok.extern.slf4j.Slf4j;
 import org.springframework.beans.factory.annotation.Value;
@@ -21,8 +21,6 @@ import com.google.api.services.drive.model.FileList;
 import com.google.api.client.http.HttpResponse;
 import jakarta.annotation.PostConstruct;
 import java.util.Collections;
-import java.util.Map;
-import java.util.concurrent.ConcurrentHashMap;
 import java.io.ByteArrayOutputStream;
 import java.io.ByteArrayInputStream;
 import java.nio.charset.StandardCharsets;
@@ -34,25 +32,15 @@ public class GoogleDriveService {
 
     private NetHttpTransport httpTransport;
     private final GsonFactory jsonFactory = GsonFactory.getDefaultInstance();
-    private final Map<String, Drive> driveCache = new ConcurrentHashMap<>();
-
     private Drive getDrive(String refreshToken) {
-        return driveCache.computeIfAbsent(refreshToken, token -> {
-            UserCredentials credentials = UserCredentials.newBuilder()
-                    .setClientId(clientId)
-                    .setClientSecret(clientSecret)
-                    .setRefreshToken(token)
-                    .build();
-
-            HttpCredentialsAdapter requestInitializer = new HttpCredentialsAdapter(credentials);
-
-            return new Drive.Builder(
-                    httpTransport,
-                    jsonFactory,
-                    requestInitializer)
-                    .setApplicationName("MusicApp")
-                    .build();
-        });
+        UserCredentials credentials = UserCredentials.newBuilder()
+                .setClientId(clientId)
+                .setClientSecret(clientSecret)
+                .setRefreshToken(refreshToken)
+                .build();
+        return new Drive.Builder(httpTransport, jsonFactory, new HttpCredentialsAdapter(credentials))
+                .setApplicationName("MusicApp")
+                .build();
     }
 
     public String getAccessToken(String refreshToken) throws Exception {
@@ -141,7 +129,7 @@ public class GoogleDriveService {
         Drive.Files.Create createRequest = drive.files().create(fileMetadata, mediaContent)
                 .setFields("id");
 
-        // Add progress listener for debugging
+        // Progress logs intentionally omit the file name and identifier.
         createRequest.getMediaHttpUploader()
                 .setDirectUploadEnabled(false)
                 .setProgressListener(uploader -> {

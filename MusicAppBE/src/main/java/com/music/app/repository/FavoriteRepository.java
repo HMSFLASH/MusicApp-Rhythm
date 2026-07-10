@@ -11,15 +11,15 @@ import java.util.List;
 import java.util.Optional;
 
 @Repository
-public interface FavoriteRepository extends JpaRepository<Favorite, Long> {
-    List<Favorite> findByUserId(Long userId);
+public interface FavoriteRepository extends JpaRepository<Favorite, String> {
+    List<Favorite> findByUserId(String userId);
     
     @Query("SELECT f FROM Favorite f JOIN FETCH f.musicLibrary WHERE f.user.id = :userId")
-    List<Favorite> findByUserIdWithMusicLibrary(@Param("userId") Long userId);
+    List<Favorite> findByUserIdWithMusicLibrary(@Param("userId") String userId);
 
-    Optional<Favorite> findByUserIdAndMusicLibraryId(Long userId, Long musicLibraryId);
-    boolean existsByUserIdAndMusicLibraryId(Long userId, Long musicLibraryId);
+    Optional<Favorite> findByUserIdAndMusicLibraryId(String userId, String musicLibraryId);
+    boolean existsByUserIdAndMusicLibraryId(String userId, String musicLibraryId);
     
     @Transactional
-    void deleteByUserIdAndMusicLibraryId(Long userId, Long musicLibraryId);
+    void deleteByUserIdAndMusicLibraryId(String userId, String musicLibraryId);
 }

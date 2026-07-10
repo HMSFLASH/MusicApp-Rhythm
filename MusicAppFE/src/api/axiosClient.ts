@@ -7,34 +7,22 @@ export const axiosClient = axios.create({
     'Content-Type': 'application/json',
   },
   withCredentials: true,
+  withXSRFToken: true,
 });
 
 let isRefreshing = false;
 let failedQueue: Array<{ resolve: (value?: unknown) => void; reject: (reason?: unknown) => void }> = [];
 
-type RefreshResponse = {
-  accessToken?: string;
-  refreshToken?: string;
-};
-
-const processQueue = (error: unknown, token: string | null = null) => {
+const processQueue = (error: unknown) => {
   failedQueue.forEach((prom) => {
     if (error) {
       prom.reject(error);
     } else {
-      prom.resolve(token);
+      prom.resolve();
     }
   });
   failedQueue = [];
 };
-
-axiosClient.interceptors.request.use((config) => {
-  const token = localStorage.getItem('music_app_access_token');
-  if (token) {
-    config.headers.Authorization = `Bearer ${token}`;
-  }
-  return config;
-});
 
 axiosClient.interceptors.response.use(
   (response) => {
@@ -49,25 +37,19 @@ axiosClient.interceptors.response.use(
   async (error) => {
     const originalRequest = error.config;
 
-    // If refresh fails, log out
+    const authEndpointsWithoutRefresh = new Set([
+      '/api/auth/login', '/api/auth/register', '/api/auth/forgot-password', '/api/auth/reset-password', '/api/auth/refresh',
+    ]);
+
     if (originalRequest.url === '/api/auth/refresh') {
-      localStorage.removeItem('music_app_logged_in');
-      localStorage.removeItem('music_app_access_token');
-      localStorage.removeItem('music_app_refresh_token');
-      if (window.location.pathname !== '/login') {
-        window.location.href = '/login';
-      }
       return Promise.reject(error);
     }
 
-    if (error.response?.status === 401 && !originalRequest._retry) {
+    if (error.response?.status === 401 && !originalRequest._retry && !authEndpointsWithoutRefresh.has(originalRequest.url)) {
       if (isRefreshing) {
         return new Promise(function (resolve, reject) {
           failedQueue.push({ resolve, reject });
-        }).then((token) => {
-          if (token) {
-            originalRequest.headers.Authorization = `Bearer ${token}`;
-          }
+        }).then(() => {
           return axiosClient(originalRequest);
         }).catch((err) => {
           return Promise.reject(err);
@@ -78,29 +60,11 @@ axiosClient.interceptors.response.use(
       isRefreshing = true;
 
       try {
-        const refreshToken = localStorage.getItem('music_app_refresh_token');
-        const res = await axiosClient.post('/api/auth/refresh', { refreshToken }) as RefreshResponse;
-        let newAccessToken = null;
-        if (res && res.accessToken) {
-          newAccessToken = res.accessToken;
-          localStorage.setItem('music_app_access_token', newAccessToken);
-          if (res.refreshToken) {
-            localStorage.setItem('music_app_refresh_token', res.refreshToken);
-          }
-        }
-        processQueue(null, newAccessToken);
-        if (newAccessToken) {
-          originalRequest.headers.Authorization = `Bearer ${newAccessToken}`;
-        }
+        await axiosClient.post('/api/auth/refresh');
+        processQueue(null);
         return axiosClient(originalRequest);
       } catch (err) {
-        processQueue(err, null);
-        localStorage.removeItem('music_app_logged_in');
-        localStorage.removeItem('music_app_access_token');
-        localStorage.removeItem('music_app_refresh_token');
-        if (window.location.pathname !== '/login') {
-          window.location.href = '/login';
-        }
+        processQueue(err);
         return Promise.reject(err);
       } finally {
         isRefreshing = false;

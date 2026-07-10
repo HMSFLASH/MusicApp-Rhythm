@@ -9,24 +9,24 @@ import java.security.Principal;
 
 public class SecurityUtils {
 
-    public static Long extractUserId(Principal principal) {
+    public static String extractUserId(Principal principal) {
         if (principal == null) {
             throw new AppException(ErrorCode.UNAUTHORIZED);
         }
         if (principal instanceof org.springframework.security.oauth2.server.resource.authentication.JwtAuthenticationToken jwtAuth) {
             String userId = jwtAuth.getToken().getClaimAsString("userId");
             if (userId != null) {
-                return Long.parseLong(userId);
+                return userId;
             }
         }
         try {
-            return Long.parseLong(principal.getName());
+            return principal.getName();
         } catch (NumberFormatException e) {
             throw new AppException(ErrorCode.UNAUTHORIZED);
         }
     }
 
-    public static Long getCurrentUserId() {
+    public static String getCurrentUserId() {
         Authentication auth = SecurityContextHolder.getContext().getAuthentication();
         if (auth == null || !auth.isAuthenticated()) {
             throw new AppException(ErrorCode.UNAUTHORIZED);
@@ -34,11 +34,11 @@ public class SecurityUtils {
         if (auth instanceof org.springframework.security.oauth2.server.resource.authentication.JwtAuthenticationToken jwtAuth) {
             String userId = jwtAuth.getToken().getClaimAsString("userId");
             if (userId != null) {
-                return Long.parseLong(userId);
+                return userId;
             }
         }
         try {
-            return Long.parseLong(auth.getName());
+            return auth.getName();
         } catch (NumberFormatException e) {
             throw new AppException(ErrorCode.UNAUTHORIZED);
         }

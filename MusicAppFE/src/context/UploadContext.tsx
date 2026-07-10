@@ -46,8 +46,8 @@ export function UploadProvider({ children }: { children: ReactNode }) {
         
         // Parse metadata with a timeout to prevent hanging
         try {
-          const musicMetadata = await import('music-metadata-browser');
-          const parseBufferFn = musicMetadata.parseBuffer || musicMetadata.default?.parseBuffer;
+          const musicMetadata = await import('music-metadata');
+          const parseBufferFn = musicMetadata.parseBuffer;
           if (!parseBufferFn) throw new Error('parseBuffer not found');
 
           const arrayBuffer = await file.arrayBuffer();
@@ -94,7 +94,8 @@ export function UploadProvider({ children }: { children: ReactNode }) {
                         // eslint-disable-next-line @typescript-eslint/no-explicit-any
                         const lyricTag = tags.find((t: any) => t.id === 'USLT' || t.id === 'SYLT' || t.id === 'LYRICS' || t.id === 'WM/Lyrics');
                         if (lyricTag && lyricTag.value) {
-                            extractedLyrics = typeof lyricTag.value === 'string' ? lyricTag.value : (lyricTag.value.text || JSON.stringify(lyricTag.value));
+                            const lyricValue = lyricTag.value as string | { text?: string };
+                            extractedLyrics = typeof lyricValue === 'string' ? lyricValue : (lyricValue.text || JSON.stringify(lyricValue));
                             break;
                         }
                     }

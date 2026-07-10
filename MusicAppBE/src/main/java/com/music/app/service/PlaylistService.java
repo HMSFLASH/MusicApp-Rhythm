@@ -61,19 +61,19 @@ public class PlaylistService {
                 .build();
     }
 
-    public List<PlaylistDto> getPlaylists(Long userId) {
+    public List<PlaylistDto> getPlaylists(String userId) {
         return playlistRepository.findByUserIdOrderByCreatedAtDesc(userId)
                 .stream().map(p -> toDto(p, false)).collect(Collectors.toList());
     }
 
-    public PlaylistDto getPlaylist(Long id, Long userId) {
+    public PlaylistDto getPlaylist(String id, String userId) {
         return playlistRepository.findByIdAndUserIdWithItems(id, userId)
                 .map(p -> toDto(p, true))
                 .orElseThrow(() -> new AppException(ErrorCode.NOT_FOUND));
     }
 
     @Transactional
-    public PlaylistDto createPlaylist(CreatePlaylistRequest req, Long userId) {
+    public PlaylistDto createPlaylist(CreatePlaylistRequest req, String userId) {
         User user = userRepository.findById(userId)
                 .orElseThrow(() -> new AppException(ErrorCode.USER_NOT_EXISTED));
 
@@ -89,7 +89,7 @@ public class PlaylistService {
     }
 
     @Transactional
-    public PlaylistDto updatePlaylist(Long id, CreatePlaylistRequest req, Long userId) {
+    public PlaylistDto updatePlaylist(String id, CreatePlaylistRequest req, String userId) {
         Playlist p = playlistRepository.findByIdAndUserId(id, userId)
                 .orElseThrow(() -> new AppException(ErrorCode.NOT_FOUND));
 
@@ -103,38 +103,26 @@ public class PlaylistService {
     }
 
     @Transactional
-    public void deletePlaylist(Long id, Long userId) {
+    public void deletePlaylist(String id, String userId) {
         Playlist p = playlistRepository.findByIdAndUserId(id, userId)
                 .orElseThrow(() -> new AppException(ErrorCode.NOT_FOUND));
         playlistRepository.delete(p);
     }
 
     @Transactional
-    public void addTrack(Long id, String trackId, String name, Long userId) {
+    public void addTrack(String id, String trackId, String name, String userId) {
         Playlist p = playlistRepository.findByIdAndUserId(id, userId)
                 .orElseThrow(() -> new AppException(ErrorCode.NOT_FOUND));
 
-        MusicLibrary lib = null;
-        if (trackId.matches("\\d+")) {
-            lib = musicLibraryRepository.findById(Long.valueOf(trackId)).orElse(null);
-        } else {
-            lib = musicLibraryRepository.findByDriveFileId(trackId).orElse(null);
-            if (lib == null) {
-                User user = userRepository.findById(userId)
-                        .orElseThrow(() -> new AppException(ErrorCode.USER_NOT_EXISTED));
-                lib = musicLibraryRepository.save(MusicLibrary.builder()
-                        .name(name != null ? name : "Drive File")
-                        .driveFileId(trackId)
-                        .sourceType("DRIVE")
-                        .user(user)
-                        .build());
-            }
+        if (!trackId.matches("\\d+")) {
+            throw new AppException(ErrorCode.NOT_FOUND);
         }
+        MusicLibrary lib = musicLibraryRepository.findByIdAndUserId(trackId, userId).orElse(null);
         if (lib == null) {
             throw new AppException(ErrorCode.NOT_FOUND);
         }
 
-        final Long finalLibId = lib.getId();
+        final String finalLibId = lib.getId();
         if (playlistItemRepository.existsByPlaylistIdAndMusicLibraryId(id, finalLibId)) {
             return;
         }
@@ -146,13 +134,13 @@ public class PlaylistService {
     }
 
     @Transactional
-    public void removeTrack(Long id, String trackId, Long userId) {
+    public void removeTrack(String id, String trackId, String userId) {
         // verify playlist exists and belongs to user
         playlistRepository.findByIdAndUserId(id, userId)
                 .orElseThrow(() -> new AppException(ErrorCode.NOT_FOUND));
 
         if (trackId.matches("\\d+")) {
-            playlistItemRepository.deleteByPlaylistIdAndMusicLibraryId(id, Long.valueOf(trackId));
+            playlistItemRepository.deleteByPlaylistIdAndMusicLibraryId(id, trackId);
         } else {
             playlistItemRepository.deleteByPlaylistIdAndDriveFileId(id, trackId);
         }

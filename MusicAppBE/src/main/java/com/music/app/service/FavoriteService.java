@@ -25,14 +25,14 @@ public class FavoriteService {
     private final UserRepository userRepository;
     private final MusicService musicService;
 
-    public List<MusicItemDto> getFavorites(Long userId) {
+    public List<MusicItemDto> getFavorites(String userId) {
         return favoriteRepository.findByUserIdWithMusicLibrary(userId).stream()
                 .map(fav -> musicService.toDto(fav.getMusicLibrary()))
                 .collect(Collectors.toList());
     }
 
     @Transactional
-    public void addFavorite(Long trackId, Long userId) {
+    public void addFavorite(String trackId, String userId) {
         if (favoriteRepository.existsByUserIdAndMusicLibraryId(userId, trackId)) {
             return;
         }
@@ -40,18 +40,18 @@ public class FavoriteService {
         User user = userRepository.findById(userId)
                 .orElseThrow(() -> new AppException(ErrorCode.USER_NOT_EXISTED));
                 
-        MusicLibrary lib = musicLibraryRepository.findById(trackId)
+        MusicLibrary lib = musicLibraryRepository.findByIdAndUserId(trackId, userId)
                 .orElseThrow(() -> new AppException(ErrorCode.NOT_FOUND));
 
         favoriteRepository.save(Favorite.builder().user(user).musicLibrary(lib).build());
     }
 
     @Transactional
-    public void removeFavorite(Long trackId, Long userId) {
+    public void removeFavorite(String trackId, String userId) {
         favoriteRepository.deleteByUserIdAndMusicLibraryId(userId, trackId);
     }
 
-    public boolean checkFavorite(Long trackId, Long userId) {
+    public boolean checkFavorite(String trackId, String userId) {
         return favoriteRepository.existsByUserIdAndMusicLibraryId(userId, trackId);
     }
 }

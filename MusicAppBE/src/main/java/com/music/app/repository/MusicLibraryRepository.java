@@ -7,10 +7,12 @@ import org.springframework.stereotype.Repository;
 import java.util.List;
 
 @Repository
-public interface MusicLibraryRepository extends JpaRepository<MusicLibrary, Long> {
+public interface MusicLibraryRepository extends JpaRepository<MusicLibrary, String> {
     List<MusicLibrary> findBySourceType(String sourceType);
-    List<MusicLibrary> findByUserIdAndSourceType(Long userId, String sourceType);
+    List<MusicLibrary> findByUserIdAndSourceType(String userId, String sourceType);
 
-    List<MusicLibrary> findByUserId(Long userId);
+    List<MusicLibrary> findByUserId(String userId);
+    java.util.Optional<MusicLibrary> findByIdAndUserId(String id, String userId);
+    java.util.Optional<MusicLibrary> findByDriveFileIdAndUserId(String driveFileId, String userId);
     java.util.Optional<MusicLibrary> findByDriveFileId(String driveFileId);
 }
