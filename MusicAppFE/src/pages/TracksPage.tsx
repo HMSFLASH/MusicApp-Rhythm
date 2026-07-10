@@ -1,6 +1,6 @@
 import { useState } from 'react';
 import { useNavigate, useSearchParams } from 'react-router-dom';
-import { Heart, ListMusic, Cloud, Star, Clock, ListPlus, Play, ArrowLeft, Shuffle, MoreHorizontal, Info, X, ListEnd, ListStart, RefreshCw, Trash2, Cpu, Tags } from 'lucide-react';
+import { Heart, ListMusic, Cloud, Star, Clock, ListPlus, Play, ArrowLeft, Shuffle, MoreHorizontal, Info, X, ListEnd, ListStart, RefreshCw, Trash2, Cpu, Tags, ChevronDown } from 'lucide-react';
 import { AddToPlaylistModal } from '../components/AddToPlaylistModal';
 import { useGlobalAudio } from '../context/AudioContext';
 import { useAuth } from '../context/AuthContext';
@@ -23,6 +23,7 @@ export function TracksPage() {
   const [openMenuId, setOpenMenuId] = useState<string | null>(null);
   const [infoTrack, setInfoTrack] = useState<Track | null>(null);
   const [sortMode, setSortMode] = useState<SortMode>('default');
+  const [isSortMenuOpen, setIsSortMenuOpen] = useState(false);
   
   const [currentPage, setCurrentPage] = useState(1);
   const ITEMS_PER_PAGE = 20;
@@ -128,19 +129,40 @@ export function TracksPage() {
         </div>
         {displayTracks.length > 0 && (
           <div className="flex items-center gap-2 flex-wrap">
-            <select
-              value={sortMode}
-              onChange={(event) => {
-                setSortMode(event.target.value as SortMode);
-                setCurrentPage(1);
-              }}
-              className="h-9 rounded-full bg-white/5 border border-white/10 px-3 text-sm text-white/70 hover:bg-white/10 focus:outline-none focus:border-primary/50"
-              title="Sort songs"
-            >
-              <option value="default" className="bg-[#1A1A1A] text-white">Default order</option>
-              <option value="leastPlayed" className="bg-[#1A1A1A] text-white">Least played</option>
-              <option value="mostPlayed" className="bg-[#1A1A1A] text-white">Most played</option>
-            </select>
+            <div className="relative">
+              <button
+                onClick={() => setIsSortMenuOpen(!isSortMenuOpen)}
+                className="h-9 rounded-full bg-white/5 border border-white/10 px-4 text-sm text-white/70 hover:bg-white/10 focus:outline-none flex items-center gap-2 transition-colors"
+                title="Sort songs"
+              >
+                {sortMode === 'default' ? 'Default order' : sortMode === 'leastPlayed' ? 'Least played' : 'Most played'}
+                <ChevronDown size={14} className={`transition-transform duration-200 ${isSortMenuOpen ? 'rotate-180' : ''}`} />
+              </button>
+              {isSortMenuOpen && (
+                <>
+                  <div className="fixed inset-0 z-40" onClick={() => setIsSortMenuOpen(false)}></div>
+                  <div className="absolute left-0 top-full mt-2 w-48 bg-[#1A1A1A] border border-white/10 rounded-xl shadow-2xl overflow-hidden z-50 py-1 flex flex-col">
+                    {[
+                      { value: 'default', label: 'Default order' },
+                      { value: 'leastPlayed', label: 'Least played' },
+                      { value: 'mostPlayed', label: 'Most played' }
+                    ].map(option => (
+                      <button
+                        key={option.value}
+                        onClick={() => {
+                          setSortMode(option.value as SortMode);
+                          setCurrentPage(1);
+                          setIsSortMenuOpen(false);
+                        }}
+                        className={`px-4 py-2.5 text-sm text-left transition-colors flex items-center gap-2 ${sortMode === option.value ? 'bg-primary/10 text-primary font-medium' : 'text-white/80 hover:bg-white/10 hover:text-white'}`}
+                      >
+                        {option.label}
+                      </button>
+                    ))}
+                  </div>
+                </>
+              )}
+            </div>
             <button
               onClick={() => {
                 if (playerState.isShuffle) {
