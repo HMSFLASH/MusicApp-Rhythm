@@ -1,7 +1,7 @@
 import { useMemo, useState } from 'react';
 import { Cpu, Zap, XCircle } from 'lucide-react';
 import { useTranslation } from 'react-i18next';
-import { getFullCoreCount, getConstrainedWorkerCount } from '../../hooks/audioDevice';
+import { getFullCoreCount, getQueuePrecalculateWorkerSettings } from '../../hooks/audioDevice';
 import type { QueuePrecalculateStatus } from '../../hooks/audioPlaybackCache';
 
 type QueuePrecalculatePlayerState = {
@@ -20,9 +20,8 @@ export function QueuePrecalculatePanel({ playerState }: QueuePrecalculatePanelPr
   const queuePrecalculateStatus = playerState.queuePrecalculateStatus;
   const queueCount = playerState.queue?.length ?? 0;
   const totalCores = getFullCoreCount();
-  const maxWorkers = Math.max(1, Math.min(totalCores, queueCount || totalCores));
-  const recommendedWorkers = Math.max(1, Math.min(getConstrainedWorkerCount(queueCount || totalCores), maxWorkers));
-  const [workerInput, setWorkerInput] = useState(String(recommendedWorkers));
+  const { recommendedWorkers, maxWorkers } = getQueuePrecalculateWorkerSettings(queueCount);
+  const [requestedWorkers, setRequestedWorkers] = useState<number | null>(null);
   const completedCount = queuePrecalculateStatus?.completed ?? 0;
   const failedCount = queuePrecalculateStatus?.failed ?? 0;
   const totalCount = queuePrecalculateStatus?.total ?? 0;
@@ -31,14 +30,13 @@ export function QueuePrecalculatePanel({ playerState }: QueuePrecalculatePanelPr
   const isRunning = queuePrecalculateStatus?.isRunning ?? false;
   const canPrecalculateQueue = queueCount > 0;
   const selectedWorkers = useMemo(() => {
-    const parsed = Number.parseInt(workerInput, 10);
-    return Number.isFinite(parsed)
-      ? Math.max(1, Math.min(parsed, maxWorkers))
-      : recommendedWorkers;
-  }, [maxWorkers, recommendedWorkers, workerInput]);
+    if (maxWorkers === 0) return 0;
+    if (requestedWorkers == null) return recommendedWorkers;
+    return Math.max(1, Math.min(requestedWorkers, maxWorkers));
+  }, [maxWorkers, recommendedWorkers, requestedWorkers]);
 
   const handlePrecalculateQueue = () => {
-    if (!canPrecalculateQueue || isRunning) return;
+    if (!canPrecalculateQueue || maxWorkers === 0 || isRunning) return;
     playerState.precalculateEntireQueue(selectedWorkers);
   };
 
@@ -55,16 +53,22 @@ export function QueuePrecalculatePanel({ playerState }: QueuePrecalculatePanelPr
             {t('studio.masterOutput.queuePrecalcTitle', 'Full Queue Pre-calculate')}
           </span>
           <span className="text-xs text-red-300/65 font-mono mt-1 block">
-            {t('studio.masterOutput.queuePrecalcDesc', {
-              cores: totalCores,
-              workers: recommendedWorkers,
-              defaultValue: 'Detected {{cores}} CPU cores. Recommended: {{workers}} workers. Choose fewer workers if playback or the browser starts lagging.'
-            })}
+            {maxWorkers > 1
+              ? t('studio.masterOutput.queuePrecalcDesc', {
+                cores: totalCores,
+                workers: recommendedWorkers,
+                maxWorkers,
+                defaultValue: 'Detected {{cores}} CPU cores. Recommended: {{workers}} workers. Max: {{maxWorkers}} workers.'
+              })
+              : t('studio.masterOutput.queuePrecalcDescSingleWorker', {
+                cores: totalCores,
+                defaultValue: 'Detected {{cores}} CPU cores. This device is limited to 1 safe worker to avoid browser lag.'
+              })}
           </span>
         </div>
       </div>
 
-      {!isRunning && (
+      {!isRunning && maxWorkers > 1 && (
         <div className="flex items-center gap-2">
           <label className="text-xs text-red-300/70 font-mono whitespace-nowrap shrink-0">
             {t('studio.masterOutput.queuePrecalcWorkers', 'Workers:')}
@@ -74,23 +78,22 @@ export function QueuePrecalculatePanel({ playerState }: QueuePrecalculatePanelPr
             min={1}
             max={maxWorkers}
             value={selectedWorkers}
-            onChange={(e) => setWorkerInput(e.target.value)}
+            onChange={(e) => setRequestedWorkers(Number(e.target.value))}
             className="min-w-0 flex-1 accent-red-400"
           />
           <input
             type="number"
             min={1}
             max={maxWorkers}
-            value={workerInput}
-            onChange={(e) => setWorkerInput(e.target.value)}
-            onBlur={() => setWorkerInput(String(selectedWorkers))}
+            value={selectedWorkers}
+            onChange={(e) => setRequestedWorkers(Number(e.target.value))}
             className="w-14 h-8 rounded-md bg-white/5 border border-red-400/20 text-center text-sm text-red-100 font-mono
               focus:outline-none focus:border-red-400/50 [appearance:textfield]
               [&::-webkit-outer-spin-button]:appearance-none [&::-webkit-inner-spin-button]:appearance-none"
           />
           <button
             type="button"
-            onClick={() => setWorkerInput(String(recommendedWorkers))}
+            onClick={() => setRequestedWorkers(null)}
             className="h-8 px-2 rounded-md bg-red-500/15 hover:bg-red-500/25 border border-red-400/20
               text-[11px] text-red-200 font-bold uppercase transition-colors whitespace-nowrap"
           >

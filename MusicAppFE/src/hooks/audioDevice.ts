@@ -36,6 +36,19 @@ export const getConstrainedWorkerCount = (total: number) => {
   return Math.min(cores, total);
 };
 
+export const getQueuePrecalculateWorkerSettings = (queueCount: number) => {
+  const total = Math.max(0, Math.floor(queueCount));
+  if (total === 0) return { recommendedWorkers: 0, maxWorkers: 0 };
+  const cores = getFullCoreCount();
+  const quarterCoreRecommendation = cores < 4 ? 1 : Math.floor(cores / 4);
+  const recommendedWorkers = Math.min(quarterCoreRecommendation, total);
+  const maxWorkers = cores > 8
+    ? Math.min(cores, total)
+    : recommendedWorkers;
+
+  return { recommendedWorkers, maxWorkers };
+};
+
 export const getPrecalculateDelayMs = () => {
   const cores = getFullCoreCount();
   if (isLikelyConstrainedDevice() || cores <= 4) return 2000;

@@ -9,7 +9,7 @@ import {
   INPUT_HEADROOM_DB,
 } from './audioLoudness';
 import { getAudioFxActivity } from './audioFxActivity';
-import { getBufferProgressIntervalMs, getConstrainedWorkerCount, getFullCoreCount, getPrecalculateDelayMs, isLikelyConstrainedDevice, isMobileDevice } from './audioDevice';
+import { getBufferProgressIntervalMs, getFullCoreCount, getPrecalculateDelayMs, getQueuePrecalculateWorkerSettings, isLikelyConstrainedDevice, isMobileDevice } from './audioDevice';
 import { audioBufferToWavBlob } from './audioBufferWav';
 import {
   type AudioRenderParams,
@@ -943,11 +943,11 @@ export function useAudioPlayback(
 
     const tracks = [...queue];
     const total = tracks.length;
-    const maxWorkers = Math.max(1, Math.min(getFullCoreCount(), total));
-    const defaultWorkers = getConstrainedWorkerCount(total);
+    const { recommendedWorkers, maxWorkers } = getQueuePrecalculateWorkerSettings(total);
+    if (maxWorkers === 0) return;
     const workerCount = requestedWorkerCount != null
       ? Math.max(1, Math.min(Math.floor(requestedWorkerCount), maxWorkers))
-      : Math.max(1, Math.min(defaultWorkers, maxWorkers));
+      : recommendedWorkers;
     const sessionId = Symbol();
     let cursor = 0;
     let completed = 0;
