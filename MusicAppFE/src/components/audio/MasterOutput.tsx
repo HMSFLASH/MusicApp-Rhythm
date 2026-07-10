@@ -56,20 +56,18 @@ export function MasterOutput() {
         onToggle={() => playerState.setPrecalculateOnIdle(!playerState.precalculateOnIdle)}
       />
 
-      {playerState.precalculateOnIdle && (
-        <>
-          <AudioToggleRow
-            tone="amber"
-            title={t('studio.masterOutput.renderSignatureCache', 'Reusable Render Cache')}
-            description={t('studio.masterOutput.renderSignatureCacheDesc', 'Keeps rendered buffers by track and audio settings signature so returning to an older EQ/effects setup can reuse RAM cache. Uses extra memory.')}
-            checked={playerState.renderSignatureCacheEnabled}
-            onToggle={() => playerState.setRenderSignatureCacheEnabled(!playerState.renderSignatureCacheEnabled)}
-            titleClassName="text-amber-300/90"
-            descriptionClassName="text-amber-300/65"
-          />
+      <AudioToggleRow
+        tone="amber"
+        title={t('studio.masterOutput.fullQueueCache', 'Full Queue RAM Cache')}
+        description={t('studio.masterOutput.fullQueueCacheDesc', 'Keep precalculated audio buffers for the entire queue in RAM and unlock full-queue pre-calculation. Allows instant playback of any rendered track, but consumes significantly more memory.')}
+        checked={playerState.fullQueueCacheEnabled}
+        onToggle={() => playerState.setFullQueueCacheEnabled(!playerState.fullQueueCacheEnabled)}
+        titleClassName="text-amber-300/90"
+        descriptionClassName="text-amber-300/65"
+      />
 
-          <QueuePrecalculatePanel playerState={playerState} />
-        </>
+      {playerState.precalculateOnIdle && playerState.fullQueueCacheEnabled && (
+        <QueuePrecalculatePanel playerState={playerState} />
       )}
     </AudioEffectPanel>
   );

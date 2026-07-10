@@ -1,4 +1,9 @@
-export const MAX_PRECALCULATED_BUFFER_CACHE_SIZE = 3;
+import { isMobileDevice, getFullCoreCount } from './audioDevice';
+
+export const getPrecalculatedBufferCacheSize = () => {
+  if (isMobileDevice()) return 2;
+  return getFullCoreCount() > 8 ? 3 : 2;
+};
 export const MAX_RENDER_SIGNATURE_CACHE_ENTRIES = 24;
 
 export type LoadingTrackPhase = 'downloading' | 'processing';
@@ -110,7 +115,7 @@ export const prunePrecalculatedQueueBuffers = ({
     }
   }
 
-  pruneAudioBufferCache(cache, MAX_PRECALCULATED_BUFFER_CACHE_SIZE);
+  pruneAudioBufferCache(cache, getPrecalculatedBufferCacheSize());
   return nextPrecalculatedBuffer;
 };
 

@@ -190,7 +190,12 @@ export function BottomPlayerBar() {
           <button 
             onClick={(e) => { e.stopPropagation(); togglePlay(); }}
             aria-label="Play or pause"
-            className="w-8 h-8 md:w-8 md:h-8 shrink-0 rounded-full bg-white flex items-center justify-center text-black hover:scale-105 transition-transform"
+            disabled={isLoadingTrack}
+            className={`w-8 h-8 md:w-8 md:h-8 shrink-0 rounded-full flex items-center justify-center transition-transform ${
+              isLoadingTrack 
+                ? 'bg-white/50 text-black/50 cursor-not-allowed' 
+                : 'bg-white text-black hover:scale-105'
+            }`}
           >
             {isLoadingTrack ? (
               <Loader2 size={16} className="animate-spin" />

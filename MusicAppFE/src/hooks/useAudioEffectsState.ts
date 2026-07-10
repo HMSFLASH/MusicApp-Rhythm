@@ -27,7 +27,7 @@ type SavedAudioEffectsState = Partial<{
   loudnessNormalization: boolean;
   useOversample: boolean;
   precalculateOnIdle: boolean;
-  renderSignatureCacheEnabled: boolean;
+  fullQueueCacheEnabled: boolean;
   fxEnabled: Partial<FxEnabledState>;
 }>;
 
@@ -89,7 +89,7 @@ export function useAudioEffectsState(savedState: SavedAudioEffectsState = {}) {
   const [loudnessNormalization, setLoudnessNormalization] = useState<boolean>(savedState.loudnessNormalization ?? true);
   const [useOversample, setUseOversample] = useState<boolean>(savedState.useOversample ?? false);
   const [precalculateOnIdle, setPrecalculateOnIdle] = useState<boolean>(savedState.precalculateOnIdle ?? false);
-  const [renderSignatureCacheEnabled, setRenderSignatureCacheEnabled] = useState<boolean>(savedState.renderSignatureCacheEnabled ?? false);
+  const [fullQueueCacheEnabled, setFullQueueCacheEnabled] = useState<boolean>(savedState.fullQueueCacheEnabled ?? false);
 
   const initialFxEnabled: FxEnabledState = { ...DEFAULT_FX_ENABLED, ...savedState.fxEnabled };
   const [fxEnabled, setFxEnabled] = useState<FxEnabledState>(initialFxEnabled);
@@ -97,9 +97,9 @@ export function useAudioEffectsState(savedState: SavedAudioEffectsState = {}) {
 
   const toggleFx = useCallback((key: FxKey) => {
     setFxEnabled((prev) => {
-        const next = { ...prev, [key]: !prev[key] };
-        fxEnabledRef.current = next;
-        return next;
+      const next = { ...prev, [key]: !prev[key] };
+      fxEnabledRef.current = next;
+      return next;
     });
   }, []);
   const setStereoWidth = useCallback((value: number) => {
@@ -135,24 +135,24 @@ export function useAudioEffectsState(savedState: SavedAudioEffectsState = {}) {
   const applyPreset = useCallback((presetName: string) => {
     setEqPresetName(presetName);
     if (EQ_PRESETS[presetName as keyof typeof EQ_PRESETS]) {
-        setEqBands(createEqBands(EQ_PRESETS[presetName as keyof typeof EQ_PRESETS]));
-        setBassGain(0);
-        setTrebleGain(0);
-        setPreampGain(0);
+      setEqBands(createEqBands(EQ_PRESETS[presetName as keyof typeof EQ_PRESETS]));
+      setBassGain(0);
+      setTrebleGain(0);
+      setPreampGain(0);
     }
-  }, []);
-  
+  }, [setPreampGain]);
+
   const applyStylisticPreset = useCallback((presetName: string) => {
     const preset = STYLISTIC_PRESETS[presetName as keyof typeof STYLISTIC_PRESETS];
     if (preset) {
-        setEqPresetName(presetName);
-        setEqBands(createEqBands(preset.eqBands, preset.gains));
-        setBassGain(preset.bassGain);
-        setTrebleGain(preset.trebleGain);
-        setPreampGain(preset.preampGain);
+      setEqPresetName(presetName);
+      setEqBands(createEqBands(preset.eqBands, preset.gains));
+      setBassGain(preset.bassGain);
+      setTrebleGain(preset.trebleGain);
+      setPreampGain(preset.preampGain);
     }
-  }, []);
-  
+  }, [setPreampGain]);
+
   const setCustomPreset = useCallback(() => setEqPresetName('CUSTOM'), []);
   const setParametricPreset = useCallback(() => setEqPresetName('PARAMETRIC'), []);
   const saveCustomPreset = useCallback((name: string) => {
@@ -177,16 +177,16 @@ export function useAudioEffectsState(savedState: SavedAudioEffectsState = {}) {
   const applyCustomSavedPreset = useCallback((name: string) => {
     setEqPresetName(name);
     setCustomEqPresets(prev => {
-        const preset = prev.find(p => p.name === name);
-        if (preset) {
-          setEqBands(preset.bands.map(band => ({ ...band })));
-          if (typeof preset.preampGain === 'number') setPreampGain(preset.preampGain);
-          if (typeof preset.bassGain === 'number') setBassGain(preset.bassGain);
-          if (typeof preset.trebleGain === 'number') setTrebleGain(preset.trebleGain);
-        }
-        return prev;
+      const preset = prev.find(p => p.name === name);
+      if (preset) {
+        setEqBands(preset.bands.map(band => ({ ...band })));
+        if (typeof preset.preampGain === 'number') setPreampGain(preset.preampGain);
+        if (typeof preset.bassGain === 'number') setBassGain(preset.bassGain);
+        if (typeof preset.trebleGain === 'number') setTrebleGain(preset.trebleGain);
+      }
+      return prev;
     });
-  }, []);
+  }, [setPreampGain]);
   const renameCustomPreset = useCallback((oldName: string, newName: string) => {
     setCustomEqPresets(prev => {
       if (prev.some(p => p.name === newName)) return prev;
@@ -223,7 +223,7 @@ export function useAudioEffectsState(savedState: SavedAudioEffectsState = {}) {
     loudnessNormalization, setLoudnessNormalization, toggleLoudnessNormalization,
     useOversample, setUseOversample,
     precalculateOnIdle, setPrecalculateOnIdle,
-    renderSignatureCacheEnabled, setRenderSignatureCacheEnabled,
+    fullQueueCacheEnabled, setFullQueueCacheEnabled,
     fxEnabled, setFxEnabled, toggleFx, fxEnabledRef,
     applyPreset, applyStylisticPreset, setCustomPreset, setParametricPreset,
     saveCustomPreset, applyCustomSavedPreset, renameCustomPreset, deleteCustomPreset,

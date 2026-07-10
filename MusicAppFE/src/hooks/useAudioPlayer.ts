@@ -52,11 +52,10 @@ export function useAudioPlayer(isAuthenticated: boolean, driveToken?: string, fe
       return next;
     });
   }, [isFlacWasmEnabled]);
-  // eslint-disable-next-line @typescript-eslint/no-explicit-any
   const engineState = useAudioEngine(
     isAuthenticated,
-    queueState as any,
-    { ...effectsState, flacWasmOverrides } as any,
+    queueState as Parameters<typeof useAudioEngine>[1],
+    { ...effectsState, flacWasmOverrides } as Parameters<typeof useAudioEngine>[2],
     savedState,
     driveToken,
     fetchDriveToken
@@ -91,7 +90,7 @@ export function useAudioPlayer(isAuthenticated: boolean, driveToken?: string, fe
       loudnessNormalization: effectsState.loudnessNormalization,
       useOversample: effectsState.useOversample,
       precalculateOnIdle: effectsState.precalculateOnIdle,
-      renderSignatureCacheEnabled: effectsState.renderSignatureCacheEnabled,
+      fullQueueCacheEnabled: effectsState.fullQueueCacheEnabled,
       fxEnabled: effectsState.fxEnabled
     };
     
@@ -111,7 +110,7 @@ export function useAudioPlayer(isAuthenticated: boolean, driveToken?: string, fe
     effectsState.compAttack, effectsState.compRelease, effectsState.compRmsSize, effectsState.compMakeupGain,
     effectsState.panValue, effectsState.stereoWidth, effectsState.reverbMix, effectsState.reverbTime,
     effectsState.loudnessNormalization, effectsState.useOversample, effectsState.precalculateOnIdle,
-    effectsState.renderSignatureCacheEnabled, effectsState.fxEnabled
+    effectsState.fullQueueCacheEnabled, effectsState.fxEnabled
   ]);
 
   return {

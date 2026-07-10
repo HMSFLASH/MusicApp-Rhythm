@@ -31,7 +31,7 @@ const getBackendUrl = (): string => {
       url.hostname = currentHostname;
     }
     return url.toString().replace(/\/$/, '');
-  } catch (e) {
+  } catch {
     return envUrl;
   }
 };
