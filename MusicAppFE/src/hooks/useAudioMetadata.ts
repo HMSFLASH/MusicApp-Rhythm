@@ -5,7 +5,7 @@ import { db } from '../lib/db';
 import { BACKEND_URL } from '../config/env';
 import { parseLocalAudioMetadata } from '../utils/localAudioFiles';
 import { getAudioMimeType, shouldUseLegacyMetadataParser } from './audioMime';
-import { getMetadataCacheKey } from '../utils/metadataCache';
+import { getCachedMetadataForTrack, getMetadataCacheKey, sanitizeMetadataForCache } from '../utils/metadataCache';
 
 type ParsedPicture = {
     data: Uint8Array;
@@ -90,31 +90,42 @@ export function useAudioMetadata(isAuthenticated: boolean, queueState: any, sett
         const useLegacyMetadataParser = shouldUseLegacyMetadataParser(track, legacyMetadataOverrides);
 
         // --- CACHE READ LAYER ---
-        const lsKey = getMetadataCacheKey(trackId, useLegacyMetadataParser);
+        const lsKey = getMetadataCacheKey(trackId);
         if (track.sourceType !== 'LOCAL') {
-            const lsData = await db.get<Partial<Track>>(lsKey);
+            const lsData = await getCachedMetadataForTrack(track);
+            const idbCover = await getCover(trackId);
+            const cachedCoverUpdate: Partial<Track> = {};
+
+            if (idbCover) {
+                const imgUrl = URL.createObjectURL(new Blob([new Uint8Array(idbCover.data)], { type: idbCover.mimeType }));
+                cachedCoverUpdate.imageUrl = imgUrl;
+                imageCacheRef.current.set(trackId, imgUrl);
+            }
+
+            if (idbCover && !lsData) {
+                setMetadataVersion(v => v + 1);
+                // eslint-disable-next-line @typescript-eslint/no-explicit-any
+                setCurrentTrack((prev: any) => prev && String(prev.id) === trackId ? { ...prev, ...cachedCoverUpdate } : prev);
+                // eslint-disable-next-line @typescript-eslint/no-explicit-any
+                setQueue((prevQ: any) => prevQ?.map ? prevQ.map((t: any) => String(t.id) === trackId ? { ...t, ...cachedCoverUpdate } : t) : prevQ);
+                window.dispatchEvent(new CustomEvent('sonic_metadata_updated', { detail: trackId }));
+            }
+
             if (lsData) {
                 try {
-                    const parsed = lsData;
-                    const idbCover = await getCover(trackId);
-
-                    if (idbCover) {
-                        const imgUrl = URL.createObjectURL(new Blob([new Uint8Array(idbCover.data)], { type: idbCover.mimeType }));
-                        parsed.imageUrl = imgUrl;
-                        imageCacheRef.current.set(trackId, imgUrl);
-                    }
-
-                    metadataCacheRef.current.set(trackId, parsed);
-                    setMetadataVersion(v => v + 1);
-
+                    const cacheData = sanitizeMetadataForCache(lsData);
+                    const parsed = { ...cacheData, ...cachedCoverUpdate };
                     if (Object.keys(parsed).length > 0) {
+                        metadataCacheRef.current.set(trackId, parsed);
+                        await db.set(lsKey, cacheData);
+                        setMetadataVersion(v => v + 1);
                         // eslint-disable-next-line @typescript-eslint/no-explicit-any
                         setCurrentTrack((prev: any) => prev && String(prev.id) === trackId ? { ...prev, ...parsed } : prev);
                         // eslint-disable-next-line @typescript-eslint/no-explicit-any
                         setQueue((prevQ: any) => prevQ?.map ? prevQ.map((t: any) => String(t.id) === trackId ? { ...t, ...parsed } : t) : prevQ);
                         window.dispatchEvent(new CustomEvent('sonic_metadata_updated', { detail: trackId }));
+                        return; // SKIP EXTRACTION!
                     }
-                    return; // SKIP EXTRACTION!
                 } catch (e) {
                     console.warn('[Metadata] Failed to load cache from storage', e);
                 }
