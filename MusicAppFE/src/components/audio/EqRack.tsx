@@ -50,19 +50,19 @@ export function EqRack() {
             onClick={() => playerState.toggleFx('eq')}
             activeClassName="bg-[#00E5FF]/20 text-[#00E5FF] shadow-[0_0_15px_rgba(0,229,255,0.4)]"
           />
-          <div className="relative">
+          <div className="relative flex-1 min-w-0 md:flex-none">
             <button aria-label="Action"
               onClick={() => setShowPresetMenu(!showPresetMenu)}
-              className="flex items-center gap-2 px-4 py-2 rounded-lg bg-white/5 hover:bg-white/10 text-white font-medium text-sm transition-colors border border-white/10 whitespace-nowrap shrink-0"
+              className="flex items-center justify-between md:justify-start w-full gap-2 px-4 py-2 rounded-lg bg-white/5 hover:bg-white/10 text-white font-medium text-sm transition-colors border border-white/10"
             >
-              <span>{playerState.eqPresetName.replace('_', ' ')}</span>
-              <ChevronDown size={16} />
+              <span className="truncate max-w-[200px] md:max-w-xs">{playerState.eqPresetName.replace('_', ' ')}</span>
+              <ChevronDown size={16} className="shrink-0" />
             </button>
 
             {showPresetMenu && (
               <>
                 <div className="fixed inset-0 z-40" onClick={() => setShowPresetMenu(false)} />
-                <div className="absolute top-full left-0 mt-2 w-64 bg-[#1a1a1a] border border-white/10 rounded-lg shadow-2xl z-50 overflow-hidden py-1 max-h-96 overflow-y-auto">
+                <div className="absolute top-full left-0 mt-2 w-64 max-w-[calc(100vw-32px)] bg-[#1a1a1a] border border-white/10 rounded-lg shadow-2xl z-50 overflow-hidden py-1 max-h-96 overflow-y-auto">
                   {Object.keys(EQ_PRESETS).map((key) => (
                     <button aria-label="Action"
                       key={key}
