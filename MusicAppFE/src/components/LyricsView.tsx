@@ -1,4 +1,4 @@
-import { useEffect, useRef, useMemo } from 'react';
+import { useEffect, useRef, useMemo, useState } from 'react';
 
 interface LyricsViewProps {
   lyrics: string;
@@ -13,6 +13,17 @@ interface LyricLine {
 
 export function LyricsView({ lyrics, currentTime, onSeek }: LyricsViewProps) {
   const containerRef = useRef<HTMLDivElement>(null);
+  const [isUserScrolling, setIsUserScrolling] = useState(false);
+  const scrollTimeoutRef = useRef<NodeJS.Timeout | null>(null);
+
+  const handleUserInteraction = () => {
+    setIsUserScrolling(true);
+    if (scrollTimeoutRef.current) clearTimeout(scrollTimeoutRef.current);
+    scrollTimeoutRef.current = setTimeout(() => {
+      setIsUserScrolling(false);
+    }, 12000); // 12 seconds
+  };
+
 
   const parsedLyrics = useMemo(() => {
     const lines = lyrics.split('\n');
@@ -50,7 +61,7 @@ export function LyricsView({ lyrics, currentTime, onSeek }: LyricsViewProps) {
   }, [parsedLyrics, currentTime]);
 
   useEffect(() => {
-    if (parsedLyrics.isSynced && activeIndex !== -1 && containerRef.current) {
+    if (!isUserScrolling && parsedLyrics.isSynced && activeIndex !== -1 && containerRef.current) {
       const activeEl = containerRef.current.querySelector(`[data-index="${activeIndex}"]`) as HTMLElement;
       if (activeEl) {
         containerRef.current.scrollTo({
@@ -59,7 +70,7 @@ export function LyricsView({ lyrics, currentTime, onSeek }: LyricsViewProps) {
         });
       }
     }
-  }, [activeIndex, parsedLyrics.isSynced]);
+  }, [activeIndex, parsedLyrics.isSynced, isUserScrolling]);
 
   if (!parsedLyrics.isSynced) {
     return (
@@ -75,6 +86,8 @@ export function LyricsView({ lyrics, currentTime, onSeek }: LyricsViewProps) {
   return (
     <div 
       ref={containerRef} 
+      onWheel={handleUserInteraction}
+      onTouchMove={handleUserInteraction}
       className="flex-1 w-full h-full flex flex-col gap-6 overflow-y-auto overflow-x-hidden scroll-smooth pt-8 pb-8 relative mask-image-fade scrollbar-thin scrollbar-thumb-white/20 scrollbar-track-transparent hover:scrollbar-thumb-white/40"
       style={{ WebkitMaskImage: 'linear-gradient(to bottom, transparent, black 10%, black 90%, transparent)' }}
     >
