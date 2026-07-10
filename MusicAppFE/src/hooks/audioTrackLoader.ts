@@ -1,5 +1,5 @@
 import { axiosClient } from '../api/axiosClient';
-import { cacheAudio, getCachedAudio } from '../utils/mediaCache';
+import { cacheAudio, getCachedAudio, removeCachedAudio } from '../utils/mediaCache';
 import { getTrackMimeType } from './audioMime';
 import type { Track } from './audioTypes';
 
@@ -9,6 +9,7 @@ type LoadTrackAudioUrlOptions = {
   blobLoadingPromises: Map<string, Promise<string>>;
   driveToken?: string;
   fetchDriveToken?: () => Promise<string>;
+  forceReloadFromDrive?: boolean;
 };
 
 export const loadTrackAudioUrl = async ({
@@ -17,10 +18,15 @@ export const loadTrackAudioUrl = async ({
   blobLoadingPromises,
   driveToken,
   fetchDriveToken,
+  forceReloadFromDrive = false,
 }: LoadTrackAudioUrlOptions) => {
   const trackId = String(track.id);
   const cachedUrl = blobCache.get(trackId);
-  if (cachedUrl) return cachedUrl;
+  if (cachedUrl && !forceReloadFromDrive) return cachedUrl;
+  if (cachedUrl && forceReloadFromDrive) {
+    URL.revokeObjectURL(cachedUrl);
+    blobCache.delete(trackId);
+  }
 
   if (track.sourceType === 'LOCAL' && track.localFile instanceof Blob) {
     const objectUrl = URL.createObjectURL(track.localFile);
@@ -38,14 +44,21 @@ export const loadTrackAudioUrl = async ({
     const mediaCacheId = `drive:${driveFileId}`;
 
     const pendingBlobUrl = blobLoadingPromises.get(trackId);
-    if (pendingBlobUrl) return pendingBlobUrl;
+    if (pendingBlobUrl && !forceReloadFromDrive) return pendingBlobUrl;
+    if (pendingBlobUrl && forceReloadFromDrive) {
+      blobLoadingPromises.delete(trackId);
+    }
 
     const loadPromise = (async () => {
-      const cachedBlob = await getCachedAudio(mediaCacheId);
-      if (cachedBlob) {
-        const cachedUrl = URL.createObjectURL(cachedBlob);
-        blobCache.set(trackId, cachedUrl);
-        return cachedUrl;
+      if (forceReloadFromDrive) {
+        await removeCachedAudio(mediaCacheId);
+      } else {
+        const cachedBlob = await getCachedAudio(mediaCacheId);
+        if (cachedBlob) {
+          const cachedUrl = URL.createObjectURL(cachedBlob);
+          blobCache.set(trackId, cachedUrl);
+          return cachedUrl;
+        }
       }
 
       const token = driveToken || await fetchDriveToken?.();
@@ -53,6 +66,7 @@ export const loadTrackAudioUrl = async ({
       const url = `https://www.googleapis.com/drive/v3/files/${encodeURIComponent(driveFileId)}?alt=media`;
       const response = await fetch(url, {
         mode: 'cors',
+        cache: forceReloadFromDrive ? 'reload' : 'default',
         headers: { Authorization: `Bearer ${token}` },
       });
       if (!response.ok) {

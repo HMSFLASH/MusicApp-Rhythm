@@ -60,6 +60,21 @@ export async function getCover(trackId: string): Promise<{ data: Uint8Array; mim
   }
 }
 
+export async function removeCover(trackId: string): Promise<void> {
+  try {
+    const db = await getDB();
+    await new Promise<void>((resolve, reject) => {
+      const tx = db.transaction(STORE_NAME, 'readwrite');
+      const store = tx.objectStore(STORE_NAME);
+      const request = store.delete(trackId);
+      request.onsuccess = () => resolve();
+      request.onerror = () => reject(request.error);
+    });
+  } catch (e) {
+    console.error('Failed to remove cover from IndexedDB', e);
+  }
+}
+
 export async function clearCovers(): Promise<void> {
   try {
     const db = await getDB();

@@ -54,6 +54,20 @@ export async function getCachedAudio(id: string): Promise<Blob | null> {
   }
 }
 
+export async function removeCachedAudio(id: string): Promise<void> {
+  try {
+    const database = await openDatabase();
+    await new Promise<void>((resolve, reject) => {
+      const transaction = database.transaction(STORE_NAME, 'readwrite');
+      transaction.objectStore(STORE_NAME).delete(id);
+      transaction.oncomplete = () => resolve();
+      transaction.onerror = () => reject(transaction.error);
+    });
+  } catch {
+    // Ignore cache cleanup failures.
+  }
+}
+
 export async function cacheAudio(id: string, blob: Blob): Promise<void> {
   if (blob.size === 0 || blob.size > MAX_ITEM_BYTES) return;
   try {
@@ -84,20 +98,6 @@ export async function cacheAudio(id: string, blob: Blob): Promise<void> {
     });
   } catch {
     // Storage quota can vary by browser; playback must continue without a persistent cache.
-  }
-}
-
-export async function removeCachedAudio(id: string): Promise<void> {
-  try {
-    const database = await openDatabase();
-    await new Promise<void>((resolve, reject) => {
-      const transaction = database.transaction(STORE_NAME, 'readwrite');
-      transaction.objectStore(STORE_NAME).delete(id);
-      transaction.oncomplete = () => resolve();
-      transaction.onerror = () => reject(transaction.error);
-    });
-  } catch {
-    // Ignore cache cleanup failures.
   }
 }
 

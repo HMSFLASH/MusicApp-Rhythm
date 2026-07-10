@@ -151,6 +151,7 @@
     "fileName": "File Name",
     "source": "Source",
     "trackId": "Track ID",
+    "reloadFromDrive": "Reload from Drive",
     "unknown": "unknown"
   },
   "playlist": {
@@ -183,6 +184,7 @@
     "vinyl": "Vinyl",
     "tempo": "Tempo",
     "viewLyrics": "View Lyrics",
+    "reloadFromDrive": "Reload from Drive",
     "simple": "Simple",
     "advanced": "Advanced",
     "whenSongEnds": "When a song ends...",

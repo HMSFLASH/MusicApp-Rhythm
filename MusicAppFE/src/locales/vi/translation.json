@@ -151,6 +151,7 @@
     "fileName": "Tên tệp",
     "source": "Nguồn",
     "trackId": "Mã bài hát",
+    "reloadFromDrive": "Tải lại từ Drive",
     "unknown": "không rõ"
   },
   "playlist": {
@@ -183,6 +184,7 @@
     "vinyl": "Vinyl",
     "tempo": "Tempo",
     "viewLyrics": "Xem lời bài hát",
+    "reloadFromDrive": "Tải lại từ Drive",
     "simple": "Đơn giản",
     "advanced": "Nâng cao",
     "whenSongEnds": "Khi một bài hát kết thúc...",

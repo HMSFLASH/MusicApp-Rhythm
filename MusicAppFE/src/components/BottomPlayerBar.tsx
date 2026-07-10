@@ -3,7 +3,7 @@ import { useNavigate, useLocation } from 'react-router-dom';
 import { useGlobalAudio } from '../context/AudioContext';
 import { useAuth } from '../context/AuthContext';
 import { useLibrary } from '../context/LibraryContext';
-import { Play, Pause, SkipForward, SkipBack, Cloud, Disc, Heart, Shuffle, Repeat, Repeat1, Square, PauseCircle, ListX, ListPlus, Maximize2, Info, ListMusic, Volume2, VolumeX, X, ArrowRight, Loader2 } from 'lucide-react';
+import { Play, Pause, SkipForward, SkipBack, Cloud, Disc, Heart, Shuffle, Repeat, Repeat1, Square, PauseCircle, ListX, ListPlus, Maximize2, Info, ListMusic, Volume2, VolumeX, X, ArrowRight, Loader2, RefreshCw } from 'lucide-react';
 import { HorizontalSlider } from './HorizontalSlider';
 import { useTranslation } from 'react-i18next';
 
@@ -323,6 +323,17 @@ export function BottomPlayerBar() {
         <button onClick={() => navigate('/')} className="hover:text-white transition-colors" aria-label="Now Playing">
           <Maximize2 size={16} />
         </button>
+        {currentTrack.sourceType === 'DRIVE' && (
+          <button
+            onClick={() => void playerState.reloadCurrentTrackFromDrive()}
+            disabled={isLoadingTrack}
+            className={`transition-colors ${isLoadingTrack ? 'text-white/20 cursor-not-allowed' : 'hover:text-white'}`}
+            aria-label={t('bottomPlayer.reloadFromDrive', 'Reload from Drive')}
+            title={t('bottomPlayer.reloadFromDrive', 'Reload from Drive')}
+          >
+            <RefreshCw size={16} className={isLoadingTrack ? 'animate-spin' : ''} />
+          </button>
+        )}
         <button onClick={() => setShowMetadata(true)} className="hover:text-white transition-colors" aria-label="Track Information"><Info size={16} /></button>
         <div className="relative" ref={queueRef}>
           <button 

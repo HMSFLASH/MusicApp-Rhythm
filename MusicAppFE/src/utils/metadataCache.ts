@@ -16,7 +16,8 @@ export async function getLegacyMetadataOverrides() {
 }
 
 export function sanitizeMetadataForCache(metadata: Partial<Track>): Partial<Track> {
-  const { imageUrl: _imageUrl, ...rest } = metadata;
+  const rest = { ...metadata };
+  delete rest.imageUrl;
   return rest;
 }
 
@@ -29,4 +30,13 @@ export async function getCachedMetadataForTrack(track: Track): Promise<Partial<T
     await db.get<Partial<Track>>(getParserMetadataCacheKey(trackId, true)) ||
     await db.get<Partial<Track>>(getOldMetadataCacheKey(trackId))
   );
+}
+
+export async function removeCachedMetadataForTrack(trackId: string): Promise<void> {
+  await Promise.all([
+    db.remove(getMetadataCacheKey(trackId)),
+    db.remove(getParserMetadataCacheKey(trackId, false)),
+    db.remove(getParserMetadataCacheKey(trackId, true)),
+    db.remove(getOldMetadataCacheKey(trackId)),
+  ]);
 }

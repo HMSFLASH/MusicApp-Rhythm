@@ -1,11 +1,11 @@
 import { useRef, useEffect, useState } from 'react';
 import type { Track } from './audioTypes';
-import { getCover, saveCover } from '../utils/idb';
+import { getCover, removeCover, saveCover } from '../utils/idb';
 import { db } from '../lib/db';
 import { BACKEND_URL } from '../config/env';
 import { parseLocalAudioMetadata } from '../utils/localAudioFiles';
 import { getAudioMimeType, shouldUseLegacyMetadataParser } from './audioMime';
-import { getCachedMetadataForTrack, getMetadataCacheKey, sanitizeMetadataForCache } from '../utils/metadataCache';
+import { getCachedMetadataForTrack, getMetadataCacheKey, removeCachedMetadataForTrack, sanitizeMetadataForCache } from '../utils/metadataCache';
 
 type ParsedPicture = {
     data: Uint8Array;
@@ -41,6 +41,31 @@ type MetadataFileInfo = {
     size?: number;
     path?: string;
     mimeType?: string;
+};
+
+const refreshableMetadataFields: Array<keyof Track> = [
+    'title',
+    'artist',
+    'album',
+    'genre',
+    'imageUrl',
+    'durationSeconds',
+    'bitrate',
+    'numberOfChannels',
+    'sampleRate',
+    'bitsPerSample',
+    'fileFormat',
+    'codec',
+    'fileSize',
+    'lyrics',
+];
+
+const clearRefreshableMetadata = (track: Track): Track => {
+    const next = { ...track };
+    for (const field of refreshableMetadataFields) {
+        delete next[field];
+    }
+    return next;
 };
 
 async function parseMetadataBuffer(
@@ -82,6 +107,33 @@ export function useAudioMetadata(isAuthenticated: boolean, queueState: any, sett
     const imageCacheRef = useRef<Map<string, string>>(new Map());
     const blobCacheRef = useRef<Map<string, string>>(new Map());
     const metadataParserModeRef = useRef<Map<string, boolean>>(new Map());
+
+    async function clearTrackCachedMetadata(track: Track) {
+        const trackId = String(track.id);
+        metadataCacheRef.current.delete(trackId);
+
+        const imageUrl = imageCacheRef.current.get(trackId);
+        if (imageUrl?.startsWith('blob:')) URL.revokeObjectURL(imageUrl);
+        imageCacheRef.current.delete(trackId);
+
+        try {
+            await Promise.all([
+                removeCachedMetadataForTrack(trackId),
+                removeCover(trackId),
+            ]);
+        } catch (e) {
+            console.warn('[Metadata] Failed to clear cached metadata', e);
+        }
+
+        setCurrentTrack((prev: Track | null) => (
+            prev && String(prev.id) === trackId ? clearRefreshableMetadata(prev) : prev
+        ));
+        setQueue((prevQ: Track[] | undefined) => Array.isArray(prevQ)
+            ? prevQ.map((t: Track) => String(t.id) === trackId ? clearRefreshableMetadata(t) : t)
+            : prevQ);
+        setMetadataVersion(v => v + 1);
+        window.dispatchEvent(new CustomEvent('sonic_metadata_updated', { detail: trackId }));
+    }
 
     async function extractMetadata(track: Track) {
         const trackId = String(track.id);
@@ -178,7 +230,6 @@ export function useAudioMetadata(isAuthenticated: boolean, queueState: any, sett
 
                     parsedBufferLength = buffer.byteLength;
 
-                    // eslint-disable-next-line @typescript-eslint/no-explicit-any
                     const fileInfo: MetadataFileInfo = { size: fileSize };
                     if (track.fileName) fileInfo.path = track.fileName;
                     if (!ext) {
@@ -228,7 +279,6 @@ export function useAudioMetadata(isAuthenticated: boolean, queueState: any, sett
                         offset += c.length;
                     }
 
-                    // eslint-disable-next-line @typescript-eslint/no-explicit-any
                     const fileInfo: MetadataFileInfo = { size: fileSize };
                     if (track.fileName) fileInfo.path = track.fileName;
                     if (!ext) {
@@ -329,6 +379,12 @@ export function useAudioMetadata(isAuthenticated: boolean, queueState: any, sett
         }
     }
 
+    async function refreshTrackMetadataFromDrive(track: Track) {
+        if (track.sourceType === 'LOCAL') return;
+        await clearTrackCachedMetadata(track);
+        await extractMetadata(clearRefreshableMetadata(track));
+    }
+
     useEffect(() => {
         if (currentTrack) {
             const trackId = String(currentTrack.id);
@@ -352,6 +408,8 @@ export function useAudioMetadata(isAuthenticated: boolean, queueState: any, sett
 
     return {
         extractMetadata,
+        clearTrackCachedMetadata,
+        refreshTrackMetadataFromDrive,
         metadataCacheRef,
         imageCacheRef,
         blobCacheRef,

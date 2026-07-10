@@ -523,15 +523,32 @@ export function useAudioPlayback(
     }
   }, [audioRef, bufferVolumeNodeRef, configStorageKey]);
 
-  const getTrackAudioUrl = useCallback(async (track: Track) => {
+  const getTrackAudioUrl = useCallback(async (track: Track, forceReloadFromDrive = false) => {
     return loadTrackAudioUrl({
       track,
       blobCache: blobCacheRef.current,
       blobLoadingPromises: blobLoadingPromisesRef.current,
       driveToken,
       fetchDriveToken,
+      forceReloadFromDrive,
     });
   }, [blobCacheRef, driveToken, fetchDriveToken]);
+
+  const clearTrackRuntimeCaches = useCallback((trackId: string) => {
+    const objectUrl = blobCacheRef.current.get(trackId);
+    if (objectUrl) {
+      URL.revokeObjectURL(objectUrl);
+      blobCacheRef.current.delete(trackId);
+    }
+    blobLoadingPromisesRef.current.delete(trackId);
+    precalculatedQueueBuffersRef.current.delete(trackId);
+    loudnessGainCacheRef.current.delete(trackId);
+    inFlightRef.current.delete(trackId);
+
+    if (precalculatedNextBufferRef.current?.trackId === trackId) {
+      precalculatedNextBufferRef.current = null;
+    }
+  }, [blobCacheRef]);
 
   const resetPlayCountTracking = useCallback((sessionId: symbol | null) => {
     playCountSessionRef.current = sessionId;
@@ -1276,21 +1293,25 @@ export function useAudioPlayback(
     setIsPlaying(true);
   };
 
-  // eslint-disable-next-line @typescript-eslint/no-unused-vars, @typescript-eslint/no-explicit-any
+  // eslint-disable-next-line @typescript-eslint/no-explicit-any
   const playTrack = async (startingTrack: Track | null, currentQueue?: Track[], autoPlay = true, ..._args: any[]) => {
     if (!precalculateOnIdleRef.current) {
       initializeAudioContext();
     }
     if (!startingTrack) return;
+    const playbackOptions = (_args[0] || {}) as { forceReloadFromDrive?: boolean };
+    const forceReloadFromDrive = Boolean(playbackOptions.forceReloadFromDrive && startingTrack.sourceType !== 'LOCAL');
+    const startingTrackId = String(startingTrack.id);
 
     console.log(`\n--- [Audio] playTrack STARTED ---`);
     console.log(`[Audio] Requested Track ID: ${startingTrack.id}, Title: ${startingTrack.title}`);
     console.log(`[Audio] AutoPlay: ${autoPlay}, precalculateOnIdle: ${precalculateOnIdleRef.current}`);
+    console.log(`[Audio] Force reload from Drive: ${forceReloadFromDrive}`);
 
     // Spam guard: prevent rapid repeated calls for the SAME track
     const now = performance.now();
     const lastCall = playTrackSpamGuardRef.current;
-    if (lastCall) {
+    if (lastCall && !forceReloadFromDrive) {
       const elapsed = now - lastCall.timestamp;
       // Same track clicked again within 300ms → skip (prevents double-click spam)
       if (lastCall.trackId === String(startingTrack.id) && elapsed < 300) {
@@ -1302,6 +1323,9 @@ export function useAudioPlayback(
     if (!currentQueue) currentQueue = [startingTrack];
     setCurrentTrack(startingTrack);
     setQueue(currentQueue);
+    if (forceReloadFromDrive) {
+      clearTrackRuntimeCaches(startingTrackId);
+    }
     const trackWindow = getAdjacentTrackWindow(startingTrack.id, currentQueue, {
       wrap: queueEndMode === 'repeat',
     });
@@ -1363,12 +1387,15 @@ export function useAudioPlayback(
 
             try {
               console.log(`[Audio] Fetching audio URL...`);
-              slowPathAudioUrl = await getTrackAudioUrl(startingTrack);
+              slowPathAudioUrl = await getTrackAudioUrl(startingTrack, forceReloadFromDrive);
               if (!slowPathAudioUrl) {
                 console.warn(`[Audio] Empty audio URL returned.`);
                 setIsPlaying(false);
                 clearTrackLoading();
                 return;
+              }
+              if (forceReloadFromDrive) {
+                void metadataState.refreshTrackMetadataFromDrive?.(startingTrack);
               }
               console.log(`[Audio] URL fetched successfully: ${slowPathAudioUrl.substring(0, 50)}...`);
             } catch (e) {
@@ -1501,12 +1528,15 @@ export function useAudioPlayback(
       let audioUrl: string;
       try {
         console.log(`[Audio] Fetching audio URL for streaming...`);
-        audioUrl = await getTrackAudioUrl(startingTrack);
+        audioUrl = await getTrackAudioUrl(startingTrack, forceReloadFromDrive);
         if (!audioUrl) {
           console.warn(`[Audio] Empty audio URL returned in streaming path.`);
           setIsPlaying(false);
           clearTrackLoading();
           return;
+        }
+        if (forceReloadFromDrive) {
+          void metadataState.refreshTrackMetadataFromDrive?.(startingTrack);
         }
         console.log(`[Audio] Streaming URL fetched: ${audioUrl.substring(0, 50)}...`);
       } catch (e) {
@@ -1561,6 +1591,20 @@ export function useAudioPlayback(
     );
 
 
+  };
+
+  const reloadCurrentTrackFromDrive = async () => {
+    const activeTrack = currentTrackSnapshotRef.current;
+    if (!activeTrack || activeTrack.sourceType === 'LOCAL') return;
+
+    const currentQueue = queueSnapshotRef.current?.length ? queueSnapshotRef.current : [activeTrack];
+    await metadataState.clearTrackCachedMetadata?.(activeTrack);
+    await playTrackRef.current?.(
+      activeTrack,
+      currentQueue,
+      isPlayingSnapshotRef.current,
+      { forceReloadFromDrive: true }
+    );
   };
 
 
@@ -1876,6 +1920,7 @@ export function useAudioPlayback(
     precalculateEntireQueue,
     cancelQueuePrecalculate,
     retryFailedQueuePrecalculate,
+    reloadCurrentTrackFromDrive,
     playTrack,
     playNext,
     playPrevious,
