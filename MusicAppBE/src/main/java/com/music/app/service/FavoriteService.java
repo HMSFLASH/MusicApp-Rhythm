@@ -3,9 +3,7 @@ package com.music.app.service;
 import com.music.app.dto.MusicItemDto;
 import com.music.app.exception.AppException;
 import com.music.app.exception.ErrorCode;
-import com.music.app.model.Favorite;
 import com.music.app.model.MusicLibrary;
-import com.music.app.model.User;
 import com.music.app.repository.FavoriteRepository;
 import com.music.app.repository.MusicLibraryRepository;
 import com.music.app.repository.UserRepository;
@@ -14,6 +12,7 @@ import org.springframework.stereotype.Service;
 import org.springframework.transaction.annotation.Transactional;
 
 import java.util.List;
+import java.util.UUID;
 import java.util.stream.Collectors;
 
 @Service
@@ -37,13 +36,13 @@ public class FavoriteService {
             return;
         }
 
-        User user = userRepository.findById(userId)
+        userRepository.findById(userId)
                 .orElseThrow(() -> new AppException(ErrorCode.USER_NOT_EXISTED));
                 
         MusicLibrary lib = musicLibraryRepository.findByIdAndUserId(trackId, userId)
                 .orElseThrow(() -> new AppException(ErrorCode.NOT_FOUND));
 
-        favoriteRepository.save(Favorite.builder().user(user).musicLibrary(lib).build());
+        favoriteRepository.insertIgnore(UUID.randomUUID().toString(), userId, lib.getId());
     }
 
     @Transactional
