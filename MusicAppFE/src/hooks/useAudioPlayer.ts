@@ -12,12 +12,17 @@ export { EQ_PRESETS, STYLISTIC_PRESETS } from './audioTypes';
 const FLAC_WASM_TRACKS_STORAGE_KEY = 'SONIC_FLAC_WASM_TRACKS_V1';
 const LEGACY_METADATA_TRACKS_STORAGE_KEY = 'SONIC_LEGACY_METADATA_TRACKS_V1';
 
-export function useAudioPlayer(isAuthenticated: boolean, driveToken?: string, fetchDriveToken?: () => Promise<string>) {
+export function useAudioPlayer(
+  isAuthenticated: boolean,
+  isAuthResolved = true,
+  driveToken?: string,
+  fetchDriveToken?: () => Promise<string>
+) {
   const savedState = useMemo(() => getInitialState(isAuthenticated), [isAuthenticated]);
   const [flacWasmOverrides, setFlacWasmOverrides] = useState<Record<string, boolean>>({});
   const [legacyMetadataOverrides, setLegacyMetadataOverrides] = useState<Record<string, boolean>>({});
 
-  const queueState = useAudioQueue(savedState, isAuthenticated);
+  const queueState = useAudioQueue(savedState, isAuthenticated, isAuthResolved);
   const effectsState = useAudioEffectsState(savedState);
   useEffect(() => {
     let cancelled = false;

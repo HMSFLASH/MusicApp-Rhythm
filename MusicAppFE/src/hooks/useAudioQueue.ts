@@ -12,9 +12,39 @@ type SavedAudioQueueState = Partial<{
   cycleQueues: boolean;
 }>;
 
+type SavedPlaybackState = {
+  currentTrack: Track | null;
+  queue: Track[];
+};
+
 const isTrackAllowedByLibrary = (track: Track, validIds: Set<string>) => (
   track.sourceType === 'LOCAL' || validIds.has(String(track.id))
 );
+
+const sanitizeRestorableTrack = (track: Track) => {
+  const sanitized = { ...track };
+  delete sanitized.localFile;
+  if (sanitized.imageUrl?.startsWith('blob:')) sanitized.imageUrl = '';
+  return sanitized;
+};
+
+const sanitizePlaybackState = (currentTrack: Track | null, queue: Track[]): SavedPlaybackState => {
+  const restorableQueue = queue
+    .filter((track) => track.sourceType !== 'LOCAL')
+    .map(sanitizeRestorableTrack);
+
+  let restorableCurrentTrack: Track | null = null;
+  if (currentTrack && currentTrack.sourceType !== 'LOCAL') {
+    restorableCurrentTrack = sanitizeRestorableTrack(currentTrack);
+  } else if (restorableQueue.length > 0) {
+    restorableCurrentTrack = restorableQueue[0];
+  }
+
+  return {
+    currentTrack: restorableCurrentTrack,
+    queue: restorableQueue,
+  };
+};
 
 const filterUpcomingQueues = (
   queues: Track[][],
@@ -23,7 +53,11 @@ const filterUpcomingQueues = (
   .map((candidateQueue) => candidateQueue.filter(predicate))
   .filter((candidateQueue) => candidateQueue.length > 0);
 
-export function useAudioQueue(savedState: SavedAudioQueueState, isAuthenticated: boolean) {
+export function useAudioQueue(
+  savedState: SavedAudioQueueState,
+  isAuthenticated: boolean,
+  isAuthResolved = true
+) {
   const [currentTrack, setCurrentTrack] = useState<Track | null>(null);
   const [queue, setQueue] = useState<Track[]>([]);
   const [loaded, setLoaded] = useState(false);
@@ -37,6 +71,8 @@ export function useAudioQueue(savedState: SavedAudioQueueState, isAuthenticated:
 
   useEffect(() => {
     let cancelled = false;
+
+    if (!isAuthResolved) return;
 
     if (!isAuthenticated) {
       void db.remove(PLAYBACK_STORAGE_KEY).finally(() => {
@@ -56,7 +92,7 @@ export function useAudioQueue(savedState: SavedAudioQueueState, isAuthenticated:
     void Promise.resolve()
       .then(() => {
         if (!cancelled) setLoaded(false);
-        return db.get<{currentTrack: Track | null, queue: Track[]}>(PLAYBACK_STORAGE_KEY);
+        return db.get<SavedPlaybackState>(PLAYBACK_STORAGE_KEY);
       })
       .then(saved => {
         if (cancelled) return;
@@ -89,13 +125,13 @@ export function useAudioQueue(savedState: SavedAudioQueueState, isAuthenticated:
     return () => {
       cancelled = true;
     };
-  }, [isAuthenticated]);
+  }, [isAuthenticated, isAuthResolved]);
 
   useEffect(() => {
-    if (loaded && isAuthenticated) {
-      db.set(PLAYBACK_STORAGE_KEY, { currentTrack, queue });
+    if (loaded && isAuthenticated && isAuthResolved) {
+      db.set(PLAYBACK_STORAGE_KEY, sanitizePlaybackState(currentTrack, queue));
     }
-  }, [currentTrack, queue, loaded, isAuthenticated]);
+  }, [currentTrack, queue, loaded, isAuthenticated, isAuthResolved]);
 
   useEffect(() => {
     const handleMusicDeleted = (e: Event) => {

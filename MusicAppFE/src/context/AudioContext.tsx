@@ -10,8 +10,8 @@ interface AudioContextType {
 const AudioContext = createContext<AudioContextType | undefined>(undefined);
 
 export function AudioProvider({ children }: { children: ReactNode }) {
-  const { isAuthenticated, driveToken, fetchDriveToken } = useAuth();
-  const playerState = useAudioPlayer(isAuthenticated, driveToken, fetchDriveToken);
+  const { isAuthenticated, isAuthResolved, driveToken, fetchDriveToken } = useAuth();
+  const playerState = useAudioPlayer(isAuthenticated, isAuthResolved, driveToken, fetchDriveToken);
 
   return (
     <AudioContext.Provider value={{ playerState }}>
