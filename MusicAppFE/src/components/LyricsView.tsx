@@ -75,7 +75,7 @@ export function LyricsView({ lyrics, currentTime, onSeek }: LyricsViewProps) {
   return (
     <div 
       ref={containerRef} 
-      className="flex-1 w-full h-full flex flex-col gap-6 overflow-y-auto overflow-x-hidden scroll-smooth pt-8 pb-[50%] relative mask-image-fade scrollbar-thin scrollbar-thumb-white/20 scrollbar-track-transparent hover:scrollbar-thumb-white/40"
+      className="flex-1 w-full h-full flex flex-col gap-6 overflow-y-auto overflow-x-hidden scroll-smooth pt-8 pb-8 relative mask-image-fade scrollbar-thin scrollbar-thumb-white/20 scrollbar-track-transparent hover:scrollbar-thumb-white/40"
       style={{ WebkitMaskImage: 'linear-gradient(to bottom, transparent, black 10%, black 90%, transparent)' }}
     >
       {parsedLyrics.lines.map((line, idx) => {
