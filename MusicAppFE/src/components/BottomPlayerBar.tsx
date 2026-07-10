@@ -1,4 +1,4 @@
-import { useRef, useEffect, useState } from 'react';
+import { useRef, useEffect, useState, useCallback } from 'react';
 import { useNavigate, useLocation } from 'react-router-dom';
 import { useGlobalAudio } from '../context/AudioContext';
 import { useAuth } from '../context/AuthContext';
@@ -87,6 +87,56 @@ export function BottomPlayerBar() {
   const [showQueue, setShowQueue] = useState(false);
   const [isFavorite, setIsFavorite] = useState(false);
   const queueRef = useRef<HTMLDivElement>(null);
+  const progressBarRef = useRef<HTMLDivElement>(null);
+  const [isDraggingProgress, setIsDraggingProgress] = useState(false);
+  const [dragProgressPercent, setDragProgressPercent] = useState(0);
+
+  const handleProgressMove = useCallback((e: PointerEvent) => {
+    if (!isDraggingProgress || !progressBarRef.current) return;
+    const rect = progressBarRef.current.getBoundingClientRect();
+    let newX = e.clientX - rect.left;
+    newX = Math.max(0, Math.min(newX, rect.width));
+    setDragProgressPercent(newX / rect.width);
+  }, [isDraggingProgress]);
+
+  const handleProgressUp = useCallback((e: PointerEvent) => {
+    if (isDraggingProgress && progressBarRef.current && duration) {
+       const rect = progressBarRef.current.getBoundingClientRect();
+       let newX = e.clientX - rect.left;
+       newX = Math.max(0, Math.min(newX, rect.width));
+       seek((newX / rect.width) * duration);
+    }
+    setIsDraggingProgress(false);
+  }, [isDraggingProgress, duration, seek]);
+
+  useEffect(() => {
+    if (isDraggingProgress) {
+      window.addEventListener('pointermove', handleProgressMove);
+      window.addEventListener('pointerup', handleProgressUp);
+    } else {
+      window.removeEventListener('pointermove', handleProgressMove);
+      window.removeEventListener('pointerup', handleProgressUp);
+    }
+    return () => {
+      window.removeEventListener('pointermove', handleProgressMove);
+      window.removeEventListener('pointerup', handleProgressUp);
+    };
+  }, [isDraggingProgress, handleProgressMove, handleProgressUp]);
+
+  const handleProgressPointerDown = (e: React.PointerEvent) => {
+    if (!duration) return;
+    e.preventDefault();
+    setIsDraggingProgress(true);
+    if (progressBarRef.current) {
+        const rect = progressBarRef.current.getBoundingClientRect();
+        let newX = e.clientX - rect.left;
+        newX = Math.max(0, Math.min(newX, rect.width));
+        setDragProgressPercent(newX / rect.width);
+    }
+  };
+
+  const displayTime = isDraggingProgress && duration ? dragProgressPercent * duration : currentTime;
+  const displayPercent = duration ? (displayTime / duration) * 100 : 0;
 
   useEffect(() => {
     if (currentTrack?.id && isAuthenticated && currentTrack.sourceType !== 'LOCAL') {
@@ -264,22 +314,22 @@ export function BottomPlayerBar() {
           </div>
         </div>
         
-        <div className="hidden md:flex w-full items-center gap-2 font-mono text-[10px] text-white/50">
-          <span className="min-w-[30px] text-right">{formatTime(currentTime)}</span>
-          <div className="flex-1 relative flex items-center group h-3 cursor-pointer" onClick={(e) => {
-            const rect = e.currentTarget.getBoundingClientRect();
-            const percent = (e.clientX - rect.left) / rect.width;
-            if (duration) seek(percent * duration);
-          }}>
+        <div className="hidden md:flex w-full items-center gap-2 font-mono text-[10px] text-white/50 select-none">
+          <span className="min-w-[30px] text-right">{formatTime(displayTime)}</span>
+          <div 
+            ref={progressBarRef}
+            className="flex-1 relative flex items-center group h-3 cursor-pointer touch-none" 
+            onPointerDown={handleProgressPointerDown}
+          >
             <div className="absolute inset-x-0 h-1 bg-white/20 rounded-full overflow-hidden">
               <div 
                 className="h-full bg-primary group-hover:bg-[#00E5FF] transition-colors"
-                style={{ width: `${duration ? (currentTime / duration) * 100 : 0}%` }}
+                style={{ width: `${displayPercent}%` }}
               />
             </div>
             <div 
-              className="absolute h-3 w-3 bg-white rounded-full opacity-0 group-hover:opacity-100 shadow flex items-center justify-center"
-              style={{ left: `calc(${duration ? (currentTime / duration) * 100 : 0}% - 6px)` }}
+              className={`absolute h-3 w-3 bg-white rounded-full shadow flex items-center justify-center transition-opacity ${isDraggingProgress ? 'opacity-100' : 'opacity-0 group-hover:opacity-100'}`}
+              style={{ left: `calc(${displayPercent}% - 6px)` }}
             />
           </div>
           <span className="min-w-[30px] text-left">{formatTime(duration)}</span>
