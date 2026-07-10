@@ -36,6 +36,10 @@ public class MusicService {
     private EntityManager entityManager;
 
     public MusicItemDto toDto(MusicLibrary lib) {
+        String imageUrl = lib.getImageUrl();
+        if (imageUrl != null && imageUrl.startsWith("data:image/")) {
+            imageUrl = "/api/music/" + lib.getId() + "/image";
+        }
         return MusicItemDto.builder()
                 .id(lib.getId().toString())
                 .name(lib.getName())
@@ -43,7 +47,7 @@ public class MusicService {
                 .artist(lib.getArtist())
                 .album(lib.getAlbum())
                 .genre(lib.getGenre())
-                .imageUrl(lib.getImageUrl())
+                .imageUrl(imageUrl)
                 .lyrics(lib.getLyrics())
                 .durationSeconds(lib.getDurationSeconds())
                 .sourceType(lib.getSourceType())
@@ -70,7 +74,7 @@ public class MusicService {
             lib.setAlbum(dto.getAlbum());
         if (dto.getGenre() != null)
             lib.setGenre(dto.getGenre());
-        if (dto.getImageUrl() != null)
+        if (dto.getImageUrl() != null && !dto.getImageUrl().startsWith("/api/music/"))
             lib.setImageUrl(dto.getImageUrl());
         if (dto.getLyrics() != null)
             lib.setLyrics(dto.getLyrics());
@@ -364,6 +368,12 @@ public class MusicService {
             log.error("Failed to obtain Google Drive access token", exception);
             throw new AppException(ErrorCode.UNCATEGORIZED_EXCEPTION, "Failed to connect to Google Drive");
         }
+    }
+
+    public String getMusicImage(String id) {
+        return musicLibraryRepository.findById(id)
+                .map(MusicLibrary::getImageUrl)
+                .orElse(null);
     }
 
 }

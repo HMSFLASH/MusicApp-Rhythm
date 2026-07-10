@@ -40,6 +40,7 @@ public class SecurityConfig {
                         "/api/auth/forgot-password",
                         "/api/auth/reset-password",
                         "/api/auth/csrf",
+                        "/api/music/*/image",
                         "/oauth2/**",
                         "/login/oauth2/**",
                         "/v3/api-docs/**",

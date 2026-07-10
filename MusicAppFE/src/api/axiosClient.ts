@@ -24,15 +24,34 @@ const processQueue = (error: unknown) => {
   failedQueue = [];
 };
 
+const transformResponse = (data: any): any => {
+  if (Array.isArray(data)) {
+    return data.map(transformResponse);
+  }
+  if (data !== null && typeof data === 'object') {
+    const newData = { ...data };
+    for (const key in newData) {
+      if (key === 'imageUrl' && typeof newData[key] === 'string' && newData[key].startsWith('/api/')) {
+        newData[key] = BACKEND_URL + newData[key];
+      } else {
+        newData[key] = transformResponse(newData[key]);
+      }
+    }
+    return newData;
+  }
+  return data;
+};
+
 axiosClient.interceptors.response.use(
   (response) => {
     if (response.data && response.data.code !== undefined) {
       if (response.data.code === 1000) {
-        return response.data.result !== undefined ? response.data.result : response.data;
+        let result = response.data.result !== undefined ? response.data.result : response.data;
+        return transformResponse(result);
       }
       return Promise.reject(new Error(response.data.message || 'Lỗi hệ thống'));
     }
-    return response.data;
+    return transformResponse(response.data);
   },
   async (error) => {
     const originalRequest = error.config;
