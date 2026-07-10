@@ -7,7 +7,6 @@ import { useLibrary } from '../context/LibraryContext';
 import { LyricsView } from '../components/LyricsView';
 import { useNavigate } from 'react-router-dom';
 import { useTranslation } from 'react-i18next';
-import { axiosClient } from '../api/axiosClient';
 import { useConfirm } from '../context/ConfirmContext';
 import { getAudioExtension } from '../hooks/audioMime';
 

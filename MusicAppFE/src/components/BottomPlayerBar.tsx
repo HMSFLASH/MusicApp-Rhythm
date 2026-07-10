@@ -5,7 +5,6 @@ import { useAuth } from '../context/AuthContext';
 import { useLibrary } from '../context/LibraryContext';
 import { Play, Pause, SkipForward, SkipBack, Cloud, Disc, Heart, Shuffle, Repeat, Repeat1, Square, PauseCircle, ListX, ListPlus, Maximize2, Info, ListMusic, Volume2, VolumeX, X, ArrowRight, Loader2 } from 'lucide-react';
 import { HorizontalSlider } from './HorizontalSlider';
-import { axiosClient } from '../api/axiosClient';
 import { useTranslation } from 'react-i18next';
 
 const formatTime = (time: number) => {

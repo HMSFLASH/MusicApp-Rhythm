@@ -39,6 +39,14 @@ import { loadTrackAudioUrl } from './audioTrackLoader';
 import { getAudioExtension } from './audioMime';
 import { decodeFlacToAudioBuffer } from './flacDecoder';
 
+const getQueueMembershipKey = (tracks: Track[]) => (
+  tracks
+    .map((track) => String(track.id))
+    .sort()
+    .map((id) => `${id.length}:${id}`)
+    .join('|')
+);
+
 export function useAudioPlayback(
   isAuthenticated: boolean,
   // eslint-disable-next-line @typescript-eslint/no-explicit-any
@@ -131,6 +139,7 @@ export function useAudioPlayback(
   const isPlayingSnapshotRef = useRef<boolean>(false);
   const currentTrackSnapshotRef = useRef<Track | null>(currentTrack ?? null);
   const queueSnapshotRef = useRef<Track[]>(queue ?? []);
+  const queueMembershipKeyRef = useRef<string>(getQueueMembershipKey(queue ?? []));
   const upcomingQueuesSnapshotRef = useRef<Track[][]>(upcomingQueues ?? []);
   const usingBufferPlaybackRef = useRef<boolean>(false);
   const playTrackSpamGuardRef = useRef<{ trackId: string; timestamp: number } | null>(null);
@@ -733,6 +742,12 @@ export function useAudioPlayback(
   useEffect(() => {
     const currentQueue = queue ?? [];
     queueSnapshotRef.current = currentQueue;
+
+    const queueMembershipKey = getQueueMembershipKey(currentQueue);
+    const hasQueueMembershipChanged = queueMembershipKeyRef.current !== queueMembershipKey;
+    queueMembershipKeyRef.current = queueMembershipKey;
+
+    if (!hasQueueMembershipChanged) return;
 
     if (!fullQueuePrecalculateCacheRef.current && !queuePrecalculateSessionRef.current) return;
 
