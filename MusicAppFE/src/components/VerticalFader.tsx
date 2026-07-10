@@ -27,46 +27,70 @@ export function VerticalFader({
   const range = max - min;
   const percentage = ((value - min) / range) * 100;
 
-  const handlePointerMove = useCallback((e: PointerEvent) => {
+  const handleMove = useCallback((clientY: number) => {
     if (!isDragging || !trackRef.current) return;
     
     const rect = trackRef.current.getBoundingClientRect();
-    // Y is relative to the top, so we invert it for bottom-up calculation
-    let newY = e.clientY - rect.top;
+    let newY = clientY - rect.top;
     
-    // Clamp
     newY = Math.max(0, Math.min(newY, rect.height));
     
     const pct = 1 - (newY / rect.height);
     const newValue = min + (pct * range);
     
-    // Round to nearest integer for typical EQ
     onChange(Math.round(newValue));
   }, [isDragging, min, range, onChange]);
 
-  const handlePointerUp = useCallback(() => {
+  const handlePointerMove = useCallback((e: PointerEvent) => {
+    handleMove(e.clientY);
+  }, [handleMove]);
+
+  const handleTouchMove = useCallback((e: TouchEvent) => {
+    if (e.cancelable) e.preventDefault();
+    if (e.touches.length > 0) {
+      handleMove(e.touches[0].clientY);
+    }
+  }, [handleMove]);
+
+  const handleEnd = useCallback(() => {
     setIsDragging(false);
   }, []);
 
   useEffect(() => {
     if (isDragging) {
       window.addEventListener('pointermove', handlePointerMove);
-      window.addEventListener('pointerup', handlePointerUp);
+      window.addEventListener('pointerup', handleEnd);
+      window.addEventListener('touchmove', handleTouchMove, { passive: false });
+      window.addEventListener('touchend', handleEnd);
+      window.addEventListener('touchcancel', handleEnd);
     } else {
       window.removeEventListener('pointermove', handlePointerMove);
-      window.removeEventListener('pointerup', handlePointerUp);
+      window.removeEventListener('pointerup', handleEnd);
+      window.removeEventListener('touchmove', handleTouchMove);
+      window.removeEventListener('touchend', handleEnd);
+      window.removeEventListener('touchcancel', handleEnd);
     }
     return () => {
       window.removeEventListener('pointermove', handlePointerMove);
-      window.removeEventListener('pointerup', handlePointerUp);
+      window.removeEventListener('pointerup', handleEnd);
+      window.removeEventListener('touchmove', handleTouchMove);
+      window.removeEventListener('touchend', handleEnd);
+      window.removeEventListener('touchcancel', handleEnd);
     };
-  }, [isDragging, handlePointerMove, handlePointerUp]);
+  }, [isDragging, handlePointerMove, handleTouchMove, handleEnd]);
 
-  const handlePointerDown = (e: React.PointerEvent) => {
+  const handlePointerDown = (e: React.PointerEvent<HTMLDivElement>) => {
     e.preventDefault();
+    e.currentTarget.setPointerCapture(e.pointerId);
     setIsDragging(true);
-    // Trigger immediate move to jump to clicked position
-    handlePointerMove(e.nativeEvent);
+    handleMove(e.clientY);
+  };
+
+  const handleTouchStart = (e: React.TouchEvent<HTMLDivElement>) => {
+    if (e.touches.length === 1) {
+      setIsDragging(true);
+      handleMove(e.touches[0].clientY);
+    }
   };
 
   const handleEditClick = () => {
@@ -129,6 +153,7 @@ export function VerticalFader({
       <div 
         ref={trackRef}
         onPointerDown={handlePointerDown}
+        onTouchStart={handleTouchStart}
         className="relative h-48 w-full flex justify-center cursor-pointer touch-none"
       >
         {/* Background dark track */}

@@ -15,6 +15,7 @@ export function EqRack() {
   const { playerState } = useGlobalAudio();
   const { t } = useTranslation();
   const [showPresetMenu, setShowPresetMenu] = useState(false);
+  const [openFilterDropdown, setOpenFilterDropdown] = useState<string | null>(null);
 
   type ModalState =
     | { type: 'save' }
@@ -107,7 +108,7 @@ export function EqRack() {
                             <span className="text-[10px] text-white/80">({preset.bands.length} {t('studio.eq.bands', 'bands')})</span>
                           </button>
 
-                          <div className="flex items-center gap-1 opacity-0 group-hover:opacity-100 transition-opacity">
+                          <div className="flex items-center gap-1 opacity-100 lg:opacity-30 group-hover:opacity-100 transition-opacity">
                             <button aria-label="Action"
                               onClick={(e) => {
                                 e.stopPropagation();
@@ -191,14 +192,13 @@ export function EqRack() {
 
           {playerState.eqBands.map((band) => (
             <div key={band.id} className="flex flex-col items-center gap-3 group">
-              {isEditablePreset && (
-                <button aria-label="Action"
-                  onClick={() => playerState.removeCustomEqBand(band.id)}
-                  className="w-6 h-6 rounded-full bg-red-500/10 text-red-400 flex items-center justify-center opacity-0 group-hover:opacity-100 transition-opacity hover:bg-red-500/30"
-                >
+              {isEditablePreset && <button aria-label="Action"
+                    onClick={() => playerState.removeCustomEqBand(band.id)}
+                    className="w-6 h-6 rounded-full bg-red-500/10 text-red-400 flex items-center justify-center opacity-100 lg:opacity-30 group-hover:opacity-100 transition-opacity hover:bg-red-500/30"
+                  >
                   <X size={12} />
                 </button>
-              )}
+              }
 
               <VerticalFader
                 value={band.gain}
@@ -223,28 +223,41 @@ export function EqRack() {
 
               {playerState.eqPresetName === 'PARAMETRIC' ? (
                 <div className="flex flex-col items-center gap-1 mt-2 border-t border-white/5 pt-2">
-                  <div className="group/filter relative">
-                    <button aria-label="Action" className="bg-transparent text-[9px] text-white/80 uppercase font-bold outline-none border border-white/10 rounded px-1 py-0.5 cursor-pointer hover:bg-white/10 hover:text-white transition-colors w-[32px] text-center shadow-sm">
+                  <div className="relative">
+                    <button 
+                      aria-label="Action" 
+                      onClick={() => setOpenFilterDropdown(openFilterDropdown === band.id ? null : band.id)}
+                      className="bg-transparent text-[9px] text-white/80 uppercase font-bold outline-none border border-white/10 rounded px-1 py-0.5 cursor-pointer hover:bg-white/10 hover:text-white transition-colors w-[32px] text-center shadow-sm"
+                    >
                       {band.type === 'lowpass' ? 'LP' : band.type === 'highpass' ? 'HP' : band.type === 'bandpass' ? 'BP' : band.type === 'lowshelf' ? 'LS' : band.type === 'highshelf' ? 'HS' : 'PK'}
                     </button>
-                    <div className="absolute bottom-full left-1/2 -translate-x-1/2 mb-1 hidden group-hover/filter:flex flex-col bg-[#1a1a1a] border border-white/10 rounded shadow-2xl z-[100] overflow-hidden min-w-[40px]">
-                      {([
-                        { value: 'peaking', label: 'PK' },
-                        { value: 'lowpass', label: 'LP' },
-                        { value: 'highpass', label: 'HP' },
-                        { value: 'bandpass', label: 'BP' },
-                        { value: 'lowshelf', label: 'LS' },
-                        { value: 'highshelf', label: 'HS' }
-                      ] satisfies Array<{ value: BiquadFilterType; label: string }>).map(t => (
-                        <div
-                          key={t.value}
-                          onClick={(e) => { e.stopPropagation(); playerState.updateEqBandType(band.id, t.value); }}
-                          className={`px-3 py-1.5 text-[9px] font-bold cursor-pointer transition-colors text-center ${band.type === t.value || (!band.type && t.value === 'peaking') ? 'bg-primary/20 text-primary' : 'text-white/80 hover:bg-white/10 hover:text-white'}`}
-                        >
-                          {t.label}
+                    {openFilterDropdown === band.id && (
+                      <>
+                        <div className="fixed inset-0 z-40" onClick={() => setOpenFilterDropdown(null)} />
+                        <div className="absolute bottom-full left-1/2 -translate-x-1/2 mb-1 flex flex-col bg-[#1a1a1a] border border-white/10 rounded shadow-2xl z-[100] overflow-hidden min-w-[40px]">
+                          {([
+                            { value: 'peaking', label: 'PK' },
+                            { value: 'lowpass', label: 'LP' },
+                            { value: 'highpass', label: 'HP' },
+                            { value: 'bandpass', label: 'BP' },
+                            { value: 'lowshelf', label: 'LS' },
+                            { value: 'highshelf', label: 'HS' }
+                          ] satisfies Array<{ value: BiquadFilterType; label: string }>).map(t => (
+                            <div
+                              key={t.value}
+                              onClick={(e) => { 
+                                e.stopPropagation(); 
+                                playerState.updateEqBandType(band.id, t.value); 
+                                setOpenFilterDropdown(null);
+                              }}
+                              className={`px-3 py-1.5 text-[9px] font-bold cursor-pointer transition-colors text-center ${band.type === t.value || (!band.type && t.value === 'peaking') ? 'bg-[#00E5FF]/20 text-[#00E5FF]' : 'text-white/80 hover:bg-white/10 hover:text-white'}`}
+                            >
+                              {t.label}
+                            </div>
+                          ))}
                         </div>
-                      ))}
-                    </div>
+                      </>
+                    )}
                   </div>
 
                   <span className="text-[10px] text-white/80 uppercase tracking-widest font-sans mt-1">Q-Fact</span>

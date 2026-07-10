@@ -38,11 +38,11 @@ export function HorizontalSlider({
       : 50 + (value / max) * 50
     : ((value - min) / range) * 100;
 
-  const handlePointerMove = useCallback((e: PointerEvent) => {
+  const handleMove = useCallback((clientX: number) => {
     if (!isDragging || !trackRef.current) return;
     
     const rect = trackRef.current.getBoundingClientRect();
-    let newX = e.clientX - rect.left;
+    let newX = clientX - rect.left;
     newX = Math.max(0, Math.min(newX, rect.width));
     
     const pct = newX / rect.width;
@@ -62,28 +62,56 @@ export function HorizontalSlider({
     onChange(newValue);
   }, [isDragging, min, max, range, onChange, step]);
 
-  const handlePointerUp = useCallback(() => {
+  const handlePointerMove = useCallback((e: PointerEvent) => {
+    handleMove(e.clientX);
+  }, [handleMove]);
+
+  const handleTouchMove = useCallback((e: TouchEvent) => {
+    if (e.cancelable) e.preventDefault();
+    if (e.touches.length > 0) {
+      handleMove(e.touches[0].clientX);
+    }
+  }, [handleMove]);
+
+  const handleEnd = useCallback(() => {
     setIsDragging(false);
   }, []);
 
   useEffect(() => {
     if (isDragging) {
       window.addEventListener('pointermove', handlePointerMove);
-      window.addEventListener('pointerup', handlePointerUp);
+      window.addEventListener('pointerup', handleEnd);
+      window.addEventListener('touchmove', handleTouchMove, { passive: false });
+      window.addEventListener('touchend', handleEnd);
+      window.addEventListener('touchcancel', handleEnd);
     } else {
       window.removeEventListener('pointermove', handlePointerMove);
-      window.removeEventListener('pointerup', handlePointerUp);
+      window.removeEventListener('pointerup', handleEnd);
+      window.removeEventListener('touchmove', handleTouchMove);
+      window.removeEventListener('touchend', handleEnd);
+      window.removeEventListener('touchcancel', handleEnd);
     }
     return () => {
       window.removeEventListener('pointermove', handlePointerMove);
-      window.removeEventListener('pointerup', handlePointerUp);
+      window.removeEventListener('pointerup', handleEnd);
+      window.removeEventListener('touchmove', handleTouchMove);
+      window.removeEventListener('touchend', handleEnd);
+      window.removeEventListener('touchcancel', handleEnd);
     };
-  }, [isDragging, handlePointerMove, handlePointerUp]);
+  }, [isDragging, handlePointerMove, handleTouchMove, handleEnd]);
 
-  const handlePointerDown = (e: React.PointerEvent) => {
+  const handlePointerDown = (e: React.PointerEvent<HTMLDivElement>) => {
     e.preventDefault();
+    e.currentTarget.setPointerCapture(e.pointerId);
     setIsDragging(true);
-    handlePointerMove(e.nativeEvent);
+    handleMove(e.clientX);
+  };
+
+  const handleTouchStart = (e: React.TouchEvent<HTMLDivElement>) => {
+    if (e.touches.length === 1) {
+      setIsDragging(true);
+      handleMove(e.touches[0].clientX);
+    }
   };
 
   const handleEditClick = () => {
@@ -168,6 +196,7 @@ export function HorizontalSlider({
       <div 
         ref={trackRef}
         onPointerDown={handlePointerDown}
+        onTouchStart={handleTouchStart}
         className="relative h-6 w-full flex items-center cursor-pointer touch-none"
       >
         {/* Background dark track */}
