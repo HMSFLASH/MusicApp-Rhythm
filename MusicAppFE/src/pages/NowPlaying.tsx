@@ -22,7 +22,7 @@ export function NowPlaying() {
   const confirm = useConfirm();
   const { isAuthenticated } = useAuth();
   const { playerState } = useGlobalAudio();
-  const { deleteTrack } = useLibrary();
+  const { deleteTrack, favorites, toggleFavorite: libraryToggleFavorite } = useLibrary();
   const navigate = useNavigate();
   const {
     isPlaying, isLoadingTrack, currentTrack, currentTime, duration,
@@ -49,32 +49,13 @@ export function NowPlaying() {
     }
   }, [currentTrack]);
 
-  const [isFavorite, setIsFavorite] = useState(false);
-
-  useEffect(() => {
-    if (currentTrack?.id && isAuthenticated && currentTrack.sourceType !== 'LOCAL') {
-      axiosClient.get(`/api/favorites/check/${currentTrack.id}`)
-        // eslint-disable-next-line @typescript-eslint/no-explicit-any
-        .then((res: any) => setIsFavorite(res === true || res.data === true))
-        .catch(() => setIsFavorite(false));
-    } else {
-      // eslint-disable-next-line react-hooks/set-state-in-effect
-      setIsFavorite(false);
-    }
-  }, [currentTrack?.id, currentTrack?.sourceType, isAuthenticated]);
+  const isFavorite = currentTrack && isAuthenticated && currentTrack.sourceType !== 'LOCAL'
+    ? favorites.some(f => f.id === currentTrack.id)
+    : false;
 
   const toggleFavorite = () => {
     if (!currentTrack?.id || !isAuthenticated || currentTrack.sourceType === 'LOCAL') return;
-
-    if (isFavorite) {
-      axiosClient.delete(`/api/favorites/${currentTrack.id}`)
-        .then(() => setIsFavorite(false))
-        .catch(console.error);
-    } else {
-      axiosClient.post(`/api/favorites/${currentTrack.id}`)
-        .then(() => setIsFavorite(true))
-        .catch(console.error);
-    }
+    void libraryToggleFavorite(currentTrack);
   };
 
 

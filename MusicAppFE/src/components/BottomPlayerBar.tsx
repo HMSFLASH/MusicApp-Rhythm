@@ -2,6 +2,7 @@ import { useRef, useEffect, useState, useCallback } from 'react';
 import { useNavigate, useLocation } from 'react-router-dom';
 import { useGlobalAudio } from '../context/AudioContext';
 import { useAuth } from '../context/AuthContext';
+import { useLibrary } from '../context/LibraryContext';
 import { Play, Pause, SkipForward, SkipBack, Cloud, Disc, Heart, Shuffle, Repeat, Repeat1, Square, PauseCircle, ListX, ListPlus, Maximize2, Info, ListMusic, Volume2, VolumeX, X, ArrowRight, Loader2 } from 'lucide-react';
 import { HorizontalSlider } from './HorizontalSlider';
 import { axiosClient } from '../api/axiosClient';
@@ -19,6 +20,7 @@ export function BottomPlayerBar() {
   const location = useLocation();
   const { isAuthenticated } = useAuth();
   const { playerState } = useGlobalAudio();
+  const { favorites, toggleFavorite: libraryToggleFavorite } = useLibrary();
   const { 
     currentTrack, isPlaying, isLoadingTrack, currentTime, duration, 
     togglePlay, seek, playNext, playPrevious,
@@ -85,7 +87,6 @@ export function BottomPlayerBar() {
 
   const [showMetadata, setShowMetadata] = useState(false);
   const [showQueue, setShowQueue] = useState(false);
-  const [isFavorite, setIsFavorite] = useState(false);
   const queueRef = useRef<HTMLDivElement>(null);
   const progressBarRef = useRef<HTMLDivElement>(null);
   const [isDraggingProgress, setIsDraggingProgress] = useState(false);
@@ -138,31 +139,13 @@ export function BottomPlayerBar() {
   const displayTime = isDraggingProgress && duration ? dragProgressPercent * duration : currentTime;
   const displayPercent = duration ? (displayTime / duration) * 100 : 0;
 
-  useEffect(() => {
-    if (currentTrack?.id && isAuthenticated && currentTrack.sourceType !== 'LOCAL') {
-      axiosClient.get(`/api/favorites/check/${currentTrack.id}`)
-        // eslint-disable-next-line @typescript-eslint/no-explicit-any
-        .then((res: any) => setIsFavorite(res === true || res.data === true))
-        .catch(() => setIsFavorite(false));
-    } else {
-      // eslint-disable-next-line react-hooks/set-state-in-effect
-      setIsFavorite(false);
-    }
-  // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [currentTrack?.id, isAuthenticated]);
+  const isFavorite = currentTrack && isAuthenticated && currentTrack.sourceType !== 'LOCAL'
+    ? favorites.some(f => f.id === currentTrack.id)
+    : false;
 
   const toggleFavorite = () => {
     if (!currentTrack?.id || !isAuthenticated || currentTrack.sourceType === 'LOCAL') return;
-    
-    if (isFavorite) {
-      axiosClient.delete(`/api/favorites/${currentTrack.id}`)
-        .then(() => setIsFavorite(false))
-        .catch(console.error);
-    } else {
-      axiosClient.post(`/api/favorites/${currentTrack.id}`)
-        .then(() => setIsFavorite(true))
-        .catch(console.error);
-    }
+    void libraryToggleFavorite(currentTrack);
   };
 
   useEffect(() => {
