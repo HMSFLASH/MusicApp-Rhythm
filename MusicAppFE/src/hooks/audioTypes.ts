@@ -126,6 +126,7 @@ export type CustomEqPreset = {
   name: string;
   bands: EqBand[];
   isCustomOrigin?: boolean;
+  presetMode?: 'custom' | 'parametric';
   preampGain?: number;
   bassGain?: number;
   trebleGain?: number;

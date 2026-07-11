@@ -1,4 +1,5 @@
 import React, { useRef, useEffect, useState, useCallback } from 'react';
+import { formatNumberInput, parseDecimalInput } from './NumberInput';
 
 interface HorizontalSliderProps {
   value: number;
@@ -115,7 +116,7 @@ export function HorizontalSlider({
   };
 
   const handleEditClick = () => {
-    setInputValue(value.toString());
+    setInputValue(formatNumberInput(value));
     setIsEditing(true);
   };
 
@@ -128,13 +129,13 @@ export function HorizontalSlider({
 
   const handleInputBlur = () => {
     setIsEditing(false);
-    const parsed = parseFloat(inputValue);
-    if (!isNaN(parsed)) {
+    const parsed = parseDecimalInput(inputValue);
+    if (parsed !== null) {
       let newValue = Math.max(min, Math.min(parsed, max));
       if (step > 0) {
         newValue = Math.round(newValue / step) * step;
       }
-      newValue = Number(newValue.toFixed(5));
+      newValue = Number(formatNumberInput(newValue));
       onChange(newValue);
     }
   };
@@ -161,7 +162,7 @@ export function HorizontalSlider({
     fillWidth = isPositive ? percentage - zeroPct : zeroPct - percentage;
   }
 
-  const formattedValue = unit === 'dB' && value > 0 ? `+${value}` : value;
+  const formattedValue = unit === 'dB' && value > 0 ? `+${formatNumberInput(value)}` : formatNumberInput(value);
 
   return (
     <div className="flex flex-col gap-2 w-full select-none group">
@@ -174,7 +175,7 @@ export function HorizontalSlider({
                 ref={inputRef}
                 type="text"
                 value={inputValue}
-                onChange={(e) => setInputValue(e.target.value)}
+                onChange={(e) => setInputValue(e.target.value.replace(/,/g, '.'))}
                 onBlur={handleInputBlur}
                 onKeyDown={handleKeyDown}
                 className="w-14 bg-black/50 text-white text-xs font-mono text-right border border-white/20 rounded outline-none h-5 px-1"

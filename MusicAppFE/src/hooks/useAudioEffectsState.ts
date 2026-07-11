@@ -54,6 +54,11 @@ const createEqBands = (frequencies: number[], gains?: number[]): EqBand[] =>
 
 const clampPreampGain = (value: number) => clamp(value, -12, 6);
 
+const hasParametricBandSettings = (bands: EqBand[]) =>
+  bands.some((band) => (
+    (band.type || 'peaking') !== 'peaking' || band.channel !== 'L+R' || band.q !== 1.41
+  ));
+
 export function useAudioEffectsState(savedState: SavedAudioEffectsState = {}) {
   const savedStylisticPreset = STYLISTIC_PRESETS[savedState.eqPresetName as keyof typeof STYLISTIC_PRESETS];
   const [eqPresetName, setEqPresetName] = useState<string>(savedState.eqPresetName || '10_BANDS');
@@ -157,10 +162,20 @@ export function useAudioEffectsState(savedState: SavedAudioEffectsState = {}) {
   const setParametricPreset = useCallback(() => setEqPresetName('PARAMETRIC'), []);
   const saveCustomPreset = useCallback((name: string) => {
     setCustomEqPresets(prev => {
-      const newPreset = {
+      const currentPreset = prev.find(p => p.name === eqPresetName);
+      const presetMode: CustomEqPreset['presetMode'] = eqPresetName === 'PARAMETRIC'
+        || currentPreset?.presetMode === 'parametric'
+        || (currentPreset?.isCustomOrigin && hasParametricBandSettings(currentPreset.bands))
+        || hasParametricBandSettings(eqBands)
+          ? 'parametric'
+          : eqPresetName === 'CUSTOM' || currentPreset?.presetMode === 'custom'
+            ? 'custom'
+            : undefined;
+      const newPreset: CustomEqPreset = {
         name,
         bands: eqBands.map(band => ({ ...band })),
-        isCustomOrigin: eqPresetName === 'CUSTOM' || eqPresetName === 'PARAMETRIC',
+        isCustomOrigin: presetMode === 'custom' || presetMode === 'parametric',
+        presetMode,
         preampGain,
         bassGain,
         trebleGain

@@ -2,14 +2,25 @@ import { useState } from 'react';
 import { Plus, ChevronDown, X, Edit2, Trash2 } from 'lucide-react';
 import { VerticalFader } from '../VerticalFader';
 import { EQ_PRESETS, STYLISTIC_PRESETS } from '../../hooks/useAudioPlayer';
+import type { CustomEqPreset } from '../../hooks/audioTypes';
 import { useGlobalAudio } from '../../context/AudioContext';
 import { useTranslation } from 'react-i18next';
 import { EffectPowerButton } from './AudioEffectPanel';
+import { NumberInput } from '../NumberInput';
 
 const formatFreq = (f: number) => {
   if (f >= 1000) return (f / 1000) + 'k';
   return f.toString();
 };
+
+const presetHasParametricBandSettings = (preset?: CustomEqPreset) =>
+  preset?.bands.some(band => (
+    (band.type || 'peaking') !== 'peaking' || band.channel !== 'L+R' || band.q !== 1.41
+  ));
+
+const isSavedParametricPreset = (preset?: CustomEqPreset) =>
+  preset?.presetMode === 'parametric'
+  || (preset?.isCustomOrigin && presetHasParametricBandSettings(preset));
 
 export function EqRack() {
   const { playerState } = useGlobalAudio();
@@ -37,7 +48,14 @@ export function EqRack() {
     setModalState(null);
   };
 
-  const isEditablePreset = playerState.eqPresetName === 'CUSTOM' || playerState.eqPresetName === 'PARAMETRIC' || !!playerState.customEqPresets.find(p => p.name === playerState.eqPresetName)?.isCustomOrigin;
+  const currentSavedPreset = playerState.customEqPresets.find(p => p.name === playerState.eqPresetName);
+  const isParametricPreset = playerState.eqPresetName === 'PARAMETRIC'
+    || isSavedParametricPreset(currentSavedPreset);
+  const isEditablePreset = playerState.eqPresetName === 'CUSTOM'
+    || playerState.eqPresetName === 'PARAMETRIC'
+    || currentSavedPreset?.isCustomOrigin
+    || currentSavedPreset?.presetMode === 'custom'
+    || currentSavedPreset?.presetMode === 'parametric';
 
   return (
     <div className="bg-[#0a0a0a] rounded-2xl border border-white/5 shadow-2xl flex flex-col overflow-hidden w-full">
@@ -105,7 +123,11 @@ export function EqRack() {
                             className="flex-1 text-left text-white/80 text-sm flex items-center justify-between mr-2"
                           >
                             <span className="truncate max-w-[100px]">{preset.name}</span>
-                            <span className="text-[10px] text-white/80">({preset.bands.length} {t('studio.eq.bands', 'bands')})</span>
+                            <span className="text-[10px] text-white/80">
+                              {isSavedParametricPreset(preset)
+                                ? '(Parametric)'
+                                : `(${preset.bands.length} ${t('studio.eq.bands', 'bands')})`}
+                            </span>
                           </button>
 
                           <div className="flex items-center gap-1 opacity-100 lg:opacity-30 group-hover:opacity-100 transition-opacity">
@@ -212,16 +234,19 @@ export function EqRack() {
               {isEditablePreset ? (
                 <div className="flex flex-col items-center gap-1 mt-1">
                   <span className="text-[10px] text-white/80 uppercase tracking-widest font-sans">Freq</span>
-                  <input
-                    type="number"
+                  <NumberInput
                     value={band.frequency}
-                    onChange={(e) => playerState.updateEqBandFreq(band.id, Number(e.target.value))}
+                    min={20}
+                    max={20000}
+                    step={0.1}
+                    onChange={(value) => playerState.updateEqBandFreq(band.id, value)}
+                    ariaLabel="Band frequency"
                     className="w-14 bg-transparent border-b border-white/20 text-center text-xs text-white/70 font-mono outline-none focus:border-[#00E5FF] pb-1"
                   />
                 </div>
               ) : null}
 
-              {playerState.eqPresetName === 'PARAMETRIC' ? (
+              {isParametricPreset ? (
                 <div className="flex flex-col items-center gap-1 mt-2 border-t border-white/5 pt-2">
                   <div className="relative">
                     <button 
@@ -261,13 +286,13 @@ export function EqRack() {
                   </div>
 
                   <span className="text-[10px] text-white/80 uppercase tracking-widest font-sans mt-1">Q-Fact</span>
-                  <input
-                    type="number"
-                    step="0.1"
-                    min="0.1"
-                    max="18"
+                  <NumberInput
+                    step={0.1}
+                    min={0.1}
+                    max={18}
                     value={band.q}
-                    onChange={(e) => playerState.updateEqBandQ(band.id, Number(e.target.value))}
+                    onChange={(value) => playerState.updateEqBandQ(band.id, value)}
+                    ariaLabel="Band Q factor"
                     className="w-14 bg-transparent border-b border-white/20 text-center text-xs text-[#00f5ff] font-mono outline-none focus:border-[#00E5FF] pb-1"
                   />
 

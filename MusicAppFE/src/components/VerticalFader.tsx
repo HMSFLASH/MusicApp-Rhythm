@@ -1,4 +1,5 @@
 import React, { useRef, useEffect, useState, useCallback } from 'react';
+import { formatNumberInput, parseDecimalInput } from './NumberInput';
 
 interface VerticalFaderProps {
   value: number;
@@ -94,7 +95,7 @@ export function VerticalFader({
   };
 
   const handleEditClick = () => {
-    setInputValue(value.toString());
+    setInputValue(formatNumberInput(value));
     setIsEditing(true);
   };
 
@@ -107,9 +108,10 @@ export function VerticalFader({
 
   const handleInputBlur = () => {
     setIsEditing(false);
-    const parsed = parseFloat(inputValue);
-    if (!isNaN(parsed)) {
-      onChange(Math.max(min, Math.min(parsed, max)));
+    const parsed = parseDecimalInput(inputValue);
+    if (parsed !== null) {
+      const nextValue = Math.max(min, Math.min(parsed, max));
+      onChange(Number(formatNumberInput(nextValue)));
     }
   };
 
@@ -134,7 +136,7 @@ export function VerticalFader({
             ref={inputRef}
             type="text"
             value={inputValue}
-            onChange={(e) => setInputValue(e.target.value)}
+            onChange={(e) => setInputValue(e.target.value.replace(/,/g, '.'))}
             onBlur={handleInputBlur}
             onKeyDown={handleKeyDown}
             className="w-10 bg-black/50 text-white text-[9px] font-mono text-center border border-[#00E5FF]/50 rounded outline-none h-4"
@@ -144,7 +146,7 @@ export function VerticalFader({
             onClick={handleEditClick}
             className="text-[9px] font-mono text-white/50 cursor-pointer hover:text-white transition-colors"
           >
-            {value > 0 ? `+${value}` : (value < 0 ? value : '0')}
+            {value > 0 ? `+${formatNumberInput(value)}` : (value < 0 ? formatNumberInput(value) : '0')}
           </div>
         )}
       </div>
