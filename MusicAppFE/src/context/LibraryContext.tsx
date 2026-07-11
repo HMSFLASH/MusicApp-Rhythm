@@ -72,12 +72,27 @@ const parseTrack = (d: BackendTrack): Track => ({
   lyrics: d.lyrics
 });
 
+const isBackendMusicImageUrl = (imageUrl?: string) => {
+  if (!imageUrl) return false;
+
+  try {
+    const url = new URL(imageUrl, window.location.origin);
+    return /^\/api\/music\/[^/]+\/image$/.test(url.pathname);
+  } catch {
+    return /\/api\/music\/[^/]+\/image(?:$|[?#])/.test(imageUrl);
+  }
+};
+
 const mergeCachedMetadata = async (track: Track): Promise<Track> => {
   const cached = await getCachedMetadataForTrack(track);
   const idbCover = await getCover(String(track.id));
-  if (!cached && !idbCover) return track;
+  if (!cached && !idbCover && !isBackendMusicImageUrl(track.imageUrl)) return track;
 
   const merged = { ...track };
+  if (isBackendMusicImageUrl(merged.imageUrl)) {
+    merged.imageUrl = '';
+  }
+
   if (cached) {
     for (const field of metadataFields) {
       const currentValue = merged[field];
@@ -98,7 +113,7 @@ const mergeCachedMetadata = async (track: Track): Promise<Track> => {
 const enrichTracksWithCachedMetadata = (items: Track[]) => Promise.all(items.map(mergeCachedMetadata));
 
 const sanitizeTrackForLibraryCache = (track: Track): Track => {
-  if (!track.imageUrl?.startsWith('blob:')) return track;
+  if (!track.imageUrl?.startsWith('blob:') && !isBackendMusicImageUrl(track.imageUrl)) return track;
   return { ...track, imageUrl: '' };
 };
 

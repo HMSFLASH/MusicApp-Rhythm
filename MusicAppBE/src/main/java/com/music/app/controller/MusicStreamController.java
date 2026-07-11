@@ -62,10 +62,6 @@ public class MusicStreamController {
             Principal principal) {
         
         try {
-            if (!fileId.matches("\\d+")) {
-                return ResponseEntity.status(HttpStatus.NOT_FOUND).build();
-            }
-
             String driveFileIdToUse;
             String fileName = null;
             if (!(principal instanceof JwtAuthenticationToken)) {

@@ -42,6 +42,8 @@ public class MusicService {
         String imageUrl = lib.getImageUrl();
         if (imageUrl != null && imageUrl.startsWith("data:image/")) {
             imageUrl = "/api/music/" + lib.getId() + "/image";
+        } else if (isMusicImageEndpoint(imageUrl)) {
+            imageUrl = null;
         }
         return MusicItemDto.builder()
                 .id(lib.getId().toString())
@@ -57,6 +59,20 @@ public class MusicService {
                 .driveFileId(lib.getDriveFileId())
                 .playCount(lib.getPlayCount() == null ? 0L : lib.getPlayCount())
                 .build();
+    }
+
+    private boolean isMusicImageEndpoint(String imageUrl) {
+        if (imageUrl == null || imageUrl.isBlank()) {
+            return false;
+        }
+
+        String normalized = imageUrl;
+        int apiIndex = normalized.indexOf("/api/music/");
+        if (apiIndex >= 0) {
+            normalized = normalized.substring(apiIndex);
+        }
+
+        return normalized.matches("/api/music/[^/]+/image");
     }
 
     public List<MusicItemDto> listMusic(String userId) {

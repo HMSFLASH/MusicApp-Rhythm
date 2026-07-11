@@ -47,6 +47,25 @@ const getQueueMembershipKey = (tracks: Track[]) => (
     .join('|')
 );
 
+const getMusicImageTrackId = (src: string) => {
+  if (!src) return null;
+
+  try {
+    const url = new URL(src, window.location.origin);
+    const match = url.pathname.match(/^\/api\/music\/([^/]+)\/image$/);
+    return match ? decodeURIComponent(match[1]) : null;
+  } catch {
+    const match = src.match(/\/api\/music\/([^/]+)\/image(?:$|[?#])/);
+    return match ? decodeURIComponent(match[1]) : null;
+  }
+};
+
+const withoutBackendImageUrl = (track: Track): Track => {
+  if (!track.imageUrl || !getMusicImageTrackId(track.imageUrl)) return track;
+  const { imageUrl: _imageUrl, ...rest } = track;
+  return rest;
+};
+
 export function useAudioPlayback(
   isAuthenticated: boolean,
   // eslint-disable-next-line @typescript-eslint/no-explicit-any
@@ -148,6 +167,7 @@ export function useAudioPlayback(
   const playCountedSessionRef = useRef<symbol | null>(null);
   const listenedSecondsRef = useRef<number>(0);
   const lastListenTickRef = useRef<number | null>(null);
+  const autoDriveReloadAtRef = useRef<Map<string, number>>(new Map());
 
   const clearTrackLoading = useCallback(() => {
     setIsLoadingTrack(false);
@@ -1597,15 +1617,39 @@ export function useAudioPlayback(
     const activeTrack = currentTrackSnapshotRef.current;
     if (!activeTrack || activeTrack.sourceType === 'LOCAL') return;
 
-    const currentQueue = queueSnapshotRef.current?.length ? queueSnapshotRef.current : [activeTrack];
-    await metadataState.clearTrackCachedMetadata?.(activeTrack);
+    const sanitizedTrack = withoutBackendImageUrl(activeTrack);
+    const currentQueue = (queueSnapshotRef.current?.length ? queueSnapshotRef.current : [activeTrack])
+      .map(withoutBackendImageUrl);
+    await metadataState.clearTrackCachedMetadata?.(sanitizedTrack);
     await playTrackRef.current?.(
-      activeTrack,
+      sanitizedTrack,
       currentQueue,
       isPlayingSnapshotRef.current,
       { forceReloadFromDrive: true }
     );
   };
+
+  useEffect(() => {
+    const handleImageLoadError = (event: Event) => {
+      const target = event.target;
+      if (!(target instanceof HTMLImageElement)) return;
+
+      const failedTrackId = getMusicImageTrackId(target.currentSrc || target.src);
+      const activeTrack = currentTrackSnapshotRef.current;
+      if (!failedTrackId || !activeTrack || String(activeTrack.id) !== failedTrackId) return;
+
+      const now = Date.now();
+      const lastReloadAt = autoDriveReloadAtRef.current.get(failedTrackId) || 0;
+      if (now - lastReloadAt < 15000) return;
+      autoDriveReloadAtRef.current.set(failedTrackId, now);
+
+      console.warn(`[Audio] Cover image failed for ${failedTrackId}; reloading current track from Drive.`);
+      void reloadCurrentTrackFromDrive();
+    };
+
+    window.addEventListener('error', handleImageLoadError, true);
+    return () => window.removeEventListener('error', handleImageLoadError, true);
+  }, []);
 
 
   const playNext = useCallback(() => {
