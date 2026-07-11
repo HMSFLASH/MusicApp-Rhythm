@@ -110,13 +110,9 @@ public class PlaylistService {
         Playlist p = playlistRepository.findByIdAndUserId(id, userId)
                 .orElseThrow(() -> new AppException(ErrorCode.NOT_FOUND));
 
-        if (!trackId.matches("\\d+")) {
-            throw new AppException(ErrorCode.NOT_FOUND);
-        }
-        MusicLibrary lib = musicLibraryRepository.findByIdAndUserId(trackId, userId).orElse(null);
-        if (lib == null) {
-            throw new AppException(ErrorCode.NOT_FOUND);
-        }
+        MusicLibrary lib = musicLibraryRepository.findByIdAndUserId(trackId, userId)
+                .or(() -> musicLibraryRepository.findByDriveFileIdAndUserId(trackId, userId))
+                .orElseThrow(() -> new AppException(ErrorCode.NOT_FOUND));
 
         final String finalLibId = lib.getId();
         if (playlistItemRepository.existsByPlaylistIdAndMusicLibraryId(id, finalLibId)) {
@@ -135,7 +131,7 @@ public class PlaylistService {
         playlistRepository.findByIdAndUserId(id, userId)
                 .orElseThrow(() -> new AppException(ErrorCode.NOT_FOUND));
 
-        if (trackId.matches("\\d+")) {
+        if (playlistItemRepository.existsByPlaylistIdAndMusicLibraryId(id, trackId)) {
             playlistItemRepository.deleteByPlaylistIdAndMusicLibraryId(id, trackId);
         } else {
             playlistItemRepository.deleteByPlaylistIdAndDriveFileId(id, trackId);
