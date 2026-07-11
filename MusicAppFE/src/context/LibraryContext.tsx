@@ -4,8 +4,8 @@ import { useAuth } from './AuthContext';
 import type { Track } from '../hooks/useAudioPlayer';
 import { db } from '../lib/db';
 import { removeCachedAudio } from '../utils/mediaCache';
-import { getCover } from '../utils/idb';
-import { getCachedMetadataForTrack } from '../utils/metadataCache';
+import { getCover, removeCover } from '../utils/idb';
+import { getCachedMetadataForTrack, removeCachedMetadataForTrack } from '../utils/metadataCache';
 
 interface LibraryContextType {
   tracks: Track[];
@@ -337,7 +337,12 @@ export function LibraryProvider({ children }: { children: ReactNode }) {
     if (track.sourceType === 'LOCAL') return;
     try {
       await axiosClient.delete(`/api/music/${track.id}`);
-      if (track.driveFileId) void removeCachedAudio(`drive:${track.driveFileId}`);
+      const trackId = String(track.id);
+      void Promise.all([
+        removeCachedMetadataForTrack(trackId),
+        removeCover(trackId),
+        ...(track.driveFileId ? [removeCachedAudio(`drive:${track.driveFileId}`)] : []),
+      ]);
       setTracks(prev => {
         const next = prev.filter(t => t.id !== track.id);
         void saveTrackListCache('sonic_library_tracks', next);
