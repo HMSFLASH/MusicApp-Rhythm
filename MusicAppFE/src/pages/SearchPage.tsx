@@ -1,17 +1,19 @@
 import { useState, useRef, useEffect } from 'react';
 import { useNavigate } from 'react-router-dom';
-import { Search, Plus, Users, Music, Disc, X, Check, Play, Cloud, ListPlus } from 'lucide-react';
+import { Search, Plus, Users, Music, Disc, X, Check, Play, Cloud, ListPlus, Trash2 } from 'lucide-react';
 import { useGlobalAudio } from '../context/AudioContext';
 import { useAuth } from '../context/AuthContext';
 import { AddToPlaylistModal } from '../components/AddToPlaylistModal';
 import type { Track } from '../hooks/useAudioPlayer';
 import { useLibrary } from '../context/LibraryContext';
+import { useConfirm } from '../context/ConfirmContext';
 
 export function SearchPage() {
   const navigate = useNavigate();
+  const confirm = useConfirm();
   const { isAuthenticated } = useAuth();
   const { playerState } = useGlobalAudio();
-  const { tracks: allTracks } = useLibrary();
+  const { tracks: allTracks, deleteTrack } = useLibrary();
   const [searchQuery, setSearchQuery] = useState('');
   const [trackToPlaylist, setTrackToPlaylist] = useState<Track | null>(null);
   const [searchResults, setSearchResults] = useState<Track[]>([]);
@@ -106,6 +108,30 @@ export function SearchPage() {
         ...filterSelections,
         [filterLabel]: [...currentSelected, value]
       });
+    }
+  };
+
+  const handleDeleteTrack = async (track: Track, e: React.MouseEvent) => {
+    e.stopPropagation();
+    const trackName = track.title || track.fileName;
+    const isConfirmed = await confirm({
+      title: 'Xóa bài hát',
+      description: `Bạn có chắc chắn muốn xóa bài hát "${trackName}" khỏi thư viện?`,
+      confirmText: 'Xóa',
+      confirmColor: 'bg-red-500/20 text-red-400 hover:bg-red-500/30 border-red-500/30'
+    });
+
+    if (!isConfirmed) return;
+
+    const isConfirmed2 = await confirm({
+      title: 'Xác nhận xóa vĩnh viễn',
+      description: `Hành động này sẽ xóa vĩnh viễn bài hát "${trackName}" từ Google Drive của bạn và không thể hoàn tác. Bạn vẫn muốn tiếp tục?`,
+      confirmText: 'Xóa vĩnh viễn',
+      confirmColor: 'bg-red-600 text-white hover:bg-red-700 border-red-600'
+    });
+
+    if (isConfirmed2) {
+      await deleteTrack(track);
     }
   };
 
@@ -312,6 +338,15 @@ export function SearchPage() {
                         >
                           <ListPlus size={16} />
                         </button>
+                        {track.sourceType !== 'LOCAL' && (
+                          <button
+                            onClick={(e) => handleDeleteTrack(track, e)}
+                            className="p-1.5 text-white/40 hover:text-red-300 hover:bg-red-500/10 rounded-full transition-colors"
+                            title="Delete"
+                          >
+                            <Trash2 size={16} />
+                          </button>
+                        )}
                       </div>
                     </div>
                   ))}
