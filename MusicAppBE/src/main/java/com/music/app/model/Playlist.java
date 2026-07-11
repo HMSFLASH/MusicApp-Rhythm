@@ -25,8 +25,6 @@ public class Playlist {
     @Column(nullable = false)
     private String name;
 
-    private String description;
-
     @Column(name = "image_url", columnDefinition = "TEXT")
     private String imageUrl;
 
