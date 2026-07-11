@@ -118,7 +118,6 @@ public class BackupService {
                 for (PlaylistDto pDto : backupData.getPlaylists()) {
                     Playlist playlist = Playlist.builder()
                             .name(pDto.getName())
-                            .description(pDto.getDescription())
                             .imageUrl(pDto.getImageUrl())
                             .user(user)
                             .build();

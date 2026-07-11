@@ -10,7 +10,6 @@ interface CreatePlaylistModalProps {
 
 export function CreatePlaylistModal({ isOpen, onClose, onSuccess }: CreatePlaylistModalProps) {
   const [name, setName] = useState('');
-  const [description, setDescription] = useState('');
   const [loading, setLoading] = useState(false);
   const [error, setError] = useState('');
 
@@ -28,12 +27,10 @@ export function CreatePlaylistModal({ isOpen, onClose, onSuccess }: CreatePlayli
 
     try {
       await axiosClient.post('/api/playlists', {
-        name: name.trim(),
-        description: description.trim()
+        name: name.trim()
       });
 
       setName('');
-      setDescription('');
       onSuccess();
       onClose();
     // eslint-disable-next-line @typescript-eslint/no-explicit-any
@@ -80,20 +77,6 @@ export function CreatePlaylistModal({ isOpen, onClose, onSuccess }: CreatePlayli
               className="w-full bg-background border border-white/10 rounded-lg p-3 text-white placeholder-white/30 focus:outline-none focus:border-primary focus:ring-1 focus:ring-primary transition-all"
               autoFocus
               maxLength={100}
-            />
-          </div>
-
-          <div className="flex flex-col gap-2">
-            <label htmlFor="description" className="text-sm font-medium text-white/80">
-              Description (optional)
-            </label>
-            <textarea
-              id="description"
-              value={description}
-              onChange={(e) => setDescription(e.target.value)}
-              placeholder="A collection of my favorite tracks..."
-              className="w-full bg-background border border-white/10 rounded-lg p-3 text-white placeholder-white/30 focus:outline-none focus:border-primary focus:ring-1 focus:ring-primary transition-all resize-none h-24"
-              maxLength={255}
             />
           </div>
 

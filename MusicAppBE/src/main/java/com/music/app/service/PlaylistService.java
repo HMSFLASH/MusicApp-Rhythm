@@ -53,7 +53,6 @@ public class PlaylistService {
         return PlaylistDto.builder()
                 .id(p.getId())
                 .name(p.getName())
-                .description(p.getDescription())
                 .imageUrl(p.getImageUrl())
                 .trackCount(p.getTrackCount() != null ? p.getTrackCount() : 0)
                 .createdAt(p.getCreatedAt())
@@ -79,7 +78,6 @@ public class PlaylistService {
 
         Playlist playlist = Playlist.builder()
                 .name(req.getName())
-                .description(req.getDescription())
                 .imageUrl(req.getImageUrl())
                 .user(user)
                 .build();
@@ -95,8 +93,6 @@ public class PlaylistService {
 
         if (req.getName() != null)
             p.setName(req.getName());
-        if (req.getDescription() != null)
-            p.setDescription(req.getDescription());
         if (req.getImageUrl() != null)
             p.setImageUrl(req.getImageUrl());
         return toDto(playlistRepository.save(p), false);
