@@ -1,10 +1,13 @@
 import { useRef, useEffect, useCallback } from 'react';
 import {
+  applyCustomDynamicsCompressorSettings,
   applyMasterLimiterCompressorState,
   applyMasterLimiterState,
+  createCustomDynamicsCompressorNode,
   createOversampledSoftClipperNode,
   generateImpulseResponse,
   getStereoSimilarity,
+  loadCustomDynamicsCompressorWorklet,
   loadOversampledSoftClipperWorklet,
   pseudoStereoWetGain,
   REVERB_WET_HIGHPASS_HZ,
@@ -88,7 +91,10 @@ export function useAudioContext(effectsState: any) {
   const bassNodeRef = useRef<BiquadFilterNode | null>(null);
   const trebleNodeRef = useRef<BiquadFilterNode | null>(null);
   const compressorNodeRef = useRef<DynamicsCompressorNode | null>(null);
+  const customCompressorNodeRef = useRef<AudioWorkletNode | null>(null);
   const compMakeupNodeRef = useRef<GainNode | null>(null);
+  const customCompressorReadyRef = useRef(false);
+  const customCompressorLoadingRef = useRef<Promise<boolean> | null>(null);
   
   const convolverNodeRef = useRef<ConvolverNode | null>(null);
   const dryGainRef = useRef<GainNode | null>(null);
@@ -135,6 +141,21 @@ export function useAudioContext(effectsState: any) {
     });
   }, [useOversample]);
 
+  const ensureCustomDynamicsCompressorWorklet = useCallback((ctx: BaseAudioContext) => {
+    if (customCompressorReadyRef.current || customCompressorLoadingRef.current) return;
+
+    customCompressorLoadingRef.current = loadCustomDynamicsCompressorWorklet(ctx).then((ready) => {
+      customCompressorReadyRef.current = ready;
+      customCompressorLoadingRef.current = null;
+
+      if (ready && sourceNodeRef.current && fxEnabledRef.current?.comp && compRatio < 1) {
+        window.setTimeout(() => initializeAudioContextRef.current?.(), 0);
+      }
+
+      return ready;
+    });
+  }, [compRatio]);
+
   const startStereoNearMonoAnalysis = useCallback((sourceNode: AudioNode, basePseudoAmount: number) => {
     if (!audioContextRef.current || !pseudoDelayRef.current || !haasWetGainRef.current || basePseudoAmount <= 0) return;
 
@@ -177,7 +198,7 @@ export function useAudioContext(effectsState: any) {
   const applyCompressorParams = useCallback((compressor: DynamicsCompressorNode, makeup: GainNode) => {
     if (fxEnabled.comp) {
       compressor.threshold.value = compThreshold;
-      compressor.ratio.value = compRatio;
+      compressor.ratio.value = Math.max(1, compRatio);
       compressor.knee.value = compKnee;
       compressor.attack.value = compressorAttackSeconds(compAttack, compRmsSize);
       compressor.release.value = msToAudioSeconds(compRelease);
@@ -191,6 +212,15 @@ export function useAudioContext(effectsState: any) {
       makeup.gain.value = 1;
     }
   }, [compAttack, compKnee, compMakeupGain, compRatio, compRelease, compRmsSize, compThreshold, fxEnabled.comp]);
+
+  const customCompressorSettings = useCallback(() => ({
+    threshold: compThreshold,
+    ratio: compRatio,
+    knee: compKnee,
+    attack: compressorAttackSeconds(compAttack, compRmsSize),
+    release: msToAudioSeconds(compRelease),
+    rmsSize: msToAudioSeconds(compRmsSize),
+  }), [compAttack, compKnee, compRatio, compRelease, compRmsSize, compThreshold]);
 
   const setTrackLoudnessGain = useCallback((gain: number) => {
     const nextGain = Number.isFinite(gain) && gain > 0 ? gain : 1;
@@ -226,6 +256,7 @@ export function useAudioContext(effectsState: any) {
     master: currentGraphActivity.master,
     limiter: currentGraphActivity.limiter,
     useOversample: currentGraphActivity.limiter ? Boolean(useOversample) : null,
+    compMode: currentGraphActivity.comp ? (compRatio < 1 ? 'custom' : 'native') : null,
   });
 
   useEffect(() => () => {
@@ -332,6 +363,7 @@ export function useAudioContext(effectsState: any) {
     disconnectNode(bassNodeRef.current);
     disconnectNode(trebleNodeRef.current);
     disconnectNode(compressorNodeRef.current);
+    disconnectNode(customCompressorNodeRef.current);
     disconnectNode(compMakeupNodeRef.current);
     disconnectNode(dryGainRef.current);
     disconnectNode(wetGainRef.current);
@@ -446,12 +478,27 @@ export function useAudioContext(effectsState: any) {
 
     // 4. Compressor
     if (activity.comp) {
-      if (!compressorNodeRef.current) compressorNodeRef.current = ctx.createDynamicsCompressor();
       if (!compMakeupNodeRef.current) compMakeupNodeRef.current = ctx.createGain();
+      compMakeupNodeRef.current.gain.value = Math.pow(10, compMakeupGain / 20);
 
-      applyCompressorParams(compressorNodeRef.current, compMakeupNodeRef.current);
-      currentNode.connect(compressorNodeRef.current);
-      compressorNodeRef.current.connect(compMakeupNodeRef.current);
+      if (compRatio < 1) {
+        ensureCustomDynamicsCompressorWorklet(ctx);
+
+        if (customCompressorReadyRef.current) {
+          customCompressorNodeRef.current = createCustomDynamicsCompressorNode(ctx, customCompressorSettings());
+          currentNode.connect(customCompressorNodeRef.current);
+          customCompressorNodeRef.current.connect(compMakeupNodeRef.current);
+        } else {
+          currentNode.connect(compMakeupNodeRef.current);
+        }
+      } else {
+        if (!compressorNodeRef.current) compressorNodeRef.current = ctx.createDynamicsCompressor();
+
+        applyCompressorParams(compressorNodeRef.current, compMakeupNodeRef.current);
+        currentNode.connect(compressorNodeRef.current);
+        compressorNodeRef.current.connect(compMakeupNodeRef.current);
+      }
+
       currentNode = compMakeupNodeRef.current;
     }
 
@@ -645,7 +692,10 @@ export function useAudioContext(effectsState: any) {
     applyCompressorParams,
     bassGain,
     compMakeupGain,
+    compRatio,
+    customCompressorSettings,
     eqBands,
+    ensureCustomDynamicsCompressorWorklet,
     startStereoNearMonoAnalysis,
     stopStereoNearMonoAnalysis,
     fxEnabled.comp,
@@ -724,7 +774,11 @@ export function useAudioContext(effectsState: any) {
     if (compressorNodeRef.current && compMakeupNodeRef.current) {
       applyCompressorParams(compressorNodeRef.current, compMakeupNodeRef.current);
     }
-  }, [applyCompressorParams]);
+    if (customCompressorNodeRef.current && compMakeupNodeRef.current) {
+      applyCustomDynamicsCompressorSettings(customCompressorNodeRef.current, customCompressorSettings());
+      compMakeupNodeRef.current.gain.value = fxEnabled.comp ? Math.pow(10, compMakeupGain / 20) : 1;
+    }
+  }, [applyCompressorParams, compMakeupGain, customCompressorSettings, fxEnabled.comp]);
 
   useEffect(() => {
     if (dryGainRef.current && wetGainRef.current && reverbPreDelayRef.current) {
@@ -842,6 +896,7 @@ export function useAudioContext(effectsState: any) {
     bassNodeRef,
     trebleNodeRef,
     compressorNodeRef,
+    customCompressorNodeRef,
     compMakeupNodeRef,
     convolverNodeRef,
     dryGainRef,

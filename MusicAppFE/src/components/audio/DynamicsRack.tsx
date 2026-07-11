@@ -58,7 +58,7 @@ export function DynamicsRack() {
             />
             <HorizontalSlider
               value={playerState.compRatio}
-              min={1}
+              min={0.1}
               max={20}
               step={0.1}
               onChange={playerState.updateCompRatio}

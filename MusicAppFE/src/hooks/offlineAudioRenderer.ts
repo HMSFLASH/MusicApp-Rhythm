@@ -7,11 +7,13 @@ import {
 } from './audioMath';
 import {
   configureMasterLimiter,
+  createCustomDynamicsCompressorNode,
   connectStereoWidthMatrix,
   createOversampledSoftClipperNode,
   createSoftClipCurve,
   generateImpulseResponse,
   isAudioBufferNearMono,
+  loadCustomDynamicsCompressorWorklet,
   loadOversampledSoftClipperWorklet,
   REVERB_WET_HIGHPASS_HZ,
   REVERB_WET_LOWPASS_HZ,
@@ -206,18 +208,35 @@ export const renderOfflineAudio = async ({
   }
 
   if (activity.comp) {
-    const comp = offlineCtx.createDynamicsCompressor();
-    comp.threshold.value = compThreshold;
-    comp.ratio.value = compRatio;
-    comp.knee.value = compKnee;
-    comp.attack.value = compressorAttackSeconds(compAttack, compRmsSize);
-    comp.release.value = msToAudioSeconds(compRelease);
-
     const makeup = offlineCtx.createGain();
     makeup.gain.value = Math.pow(10, compMakeupGain / 20);
 
-    currentNode.connect(comp);
-    comp.connect(makeup);
+    if (compRatio < 1 && await loadCustomDynamicsCompressorWorklet(offlineCtx)) {
+      const comp = createCustomDynamicsCompressorNode(offlineCtx, {
+        threshold: compThreshold,
+        ratio: compRatio,
+        knee: compKnee,
+        attack: compressorAttackSeconds(compAttack, compRmsSize),
+        release: msToAudioSeconds(compRelease),
+        rmsSize: msToAudioSeconds(compRmsSize),
+      });
+
+      currentNode.connect(comp);
+      comp.connect(makeup);
+    } else if (compRatio >= 1) {
+      const comp = offlineCtx.createDynamicsCompressor();
+      comp.threshold.value = compThreshold;
+      comp.ratio.value = compRatio;
+      comp.knee.value = compKnee;
+      comp.attack.value = compressorAttackSeconds(compAttack, compRmsSize);
+      comp.release.value = msToAudioSeconds(compRelease);
+
+      currentNode.connect(comp);
+      comp.connect(makeup);
+    } else {
+      currentNode.connect(makeup);
+    }
+
     currentNode = makeup;
   }
 

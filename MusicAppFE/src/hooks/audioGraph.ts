@@ -14,12 +14,14 @@ export const HAAS_WET_GAIN_MAX = 0.14;
 export const NEAR_MONO_CORRELATION_THRESHOLD = 0.985;
 export const NEAR_MONO_SIDE_RATIO_THRESHOLD = 0.12;
 export const OVERSAMPLED_SOFT_CLIPPER_WORKLET_URL = '/audio/oversampled-soft-clipper-worklet.js';
+export const CUSTOM_DYNAMICS_COMPRESSOR_WORKLET_URL = '/audio/custom-dynamics-compressor-worklet.js';
 export const SOFT_CLIP_CURVE_POINTS = 65536;
 export const SOFT_CLIP_THRESHOLD = 0.86;
 export const SOFT_CLIP_SHAPE = 1.2;
 export const SOFT_CLIP_CEILING = 0.985;
 
 const loadedSoftClipperWorkletContexts = new WeakSet<BaseAudioContext>();
+const loadedDynamicsCompressorWorkletContexts = new WeakSet<BaseAudioContext>();
 
 export const normalizedReverbMix = (reverbMix: number) => clamp((Number(reverbMix) || 0) / 100, 0, 1);
 
@@ -153,6 +155,54 @@ export const createOversampledSoftClipperNode = (ctx: BaseAudioContext) =>
     channelCountMode: 'max',
     channelInterpretation: 'speakers',
   });
+
+export type CustomDynamicsCompressorSettings = {
+  threshold: number;
+  ratio: number;
+  knee: number;
+  attack: number;
+  release: number;
+  rmsSize: number;
+};
+
+export const loadCustomDynamicsCompressorWorklet = async (ctx: BaseAudioContext) => {
+  if (!('audioWorklet' in ctx) || !ctx.audioWorklet) return false;
+  if (loadedDynamicsCompressorWorkletContexts.has(ctx)) return true;
+
+  try {
+    await ctx.audioWorklet.addModule(CUSTOM_DYNAMICS_COMPRESSOR_WORKLET_URL);
+    loadedDynamicsCompressorWorkletContexts.add(ctx);
+    return true;
+  } catch (error) {
+    console.warn('[Audio] Custom dynamics compressor unavailable.', error);
+    return false;
+  }
+};
+
+export const applyCustomDynamicsCompressorSettings = (
+  node: AudioWorkletNode,
+  settings: CustomDynamicsCompressorSettings
+) => {
+  node.parameters.get('threshold')!.value = settings.threshold;
+  node.parameters.get('ratio')!.value = settings.ratio;
+  node.parameters.get('knee')!.value = settings.knee;
+  node.parameters.get('attack')!.value = settings.attack;
+  node.parameters.get('release')!.value = settings.release;
+  node.parameters.get('rmsSize')!.value = settings.rmsSize;
+};
+
+export const createCustomDynamicsCompressorNode = (
+  ctx: BaseAudioContext,
+  settings: CustomDynamicsCompressorSettings
+) => new AudioWorkletNode(ctx, 'custom-dynamics-compressor', {
+  numberOfInputs: 1,
+  numberOfOutputs: 1,
+  outputChannelCount: [2],
+  channelCount: 2,
+  channelCountMode: 'max',
+  channelInterpretation: 'speakers',
+  parameterData: settings,
+});
 
 const MASTER_LIMITER_RAMP_SECONDS = 0.08;
 
