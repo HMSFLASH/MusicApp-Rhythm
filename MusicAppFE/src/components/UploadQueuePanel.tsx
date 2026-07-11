@@ -13,6 +13,44 @@ export function UploadQueuePanel() {
   const errorCount = uploadTasks.filter(task => task.status === 'error').length;
   const completedCount = successCount + errorCount;
   const progressPercent = uploadTasks.length > 0 ? Math.round((completedCount / uploadTasks.length) * 100) : 0;
+  const directTasks = uploadTasks.filter(task => task.mode === 'direct');
+  const serverTasks = uploadTasks.filter(task => task.mode === 'server');
+
+  const renderTask = (task: typeof uploadTasks[number]) => (
+    <div key={task.id} className="flex items-center justify-between p-2.5 rounded-lg hover:bg-white/5 transition-colors group">
+      <div className="flex flex-col truncate pr-3">
+        <span className="text-sm text-white font-medium truncate">{task.file.name}</span>
+        <span className="text-xs text-white/40 flex items-center gap-1">
+          {task.status === 'pending' && <span className="text-white/40">{t('uploadQueue.waiting', 'Waiting...')}</span>}
+          {task.status === 'uploading' && <span className="text-blue-400 flex items-center gap-1"><div className="w-2 h-2 rounded-full border border-blue-400 border-t-transparent animate-spin"/> {t('uploadQueue.uploading', 'Uploading...')}</span>}
+          {task.status === 'success' && <span className="text-green-400 flex items-center gap-1"><CheckCircle2 size={13} />{t('uploadQueue.success', 'Success')}</span>}
+          {task.status === 'skipped' && <span className="text-yellow-400">{t('uploadQueue.skipped', 'Skipped (Duplicate)')}</span>}
+          {task.status === 'error' && <span className="text-red-400 flex items-center gap-1"><AlertCircle size={13} />{t('uploadQueue.failed', 'Failed')}</span>}
+        </span>
+      </div>
+      {task.status === 'error' && (
+        <button onClick={() => retryTask(task.id)} className="text-xs px-2 py-1 bg-red-500/20 text-red-400 rounded hover:bg-red-500/30 transition-colors shrink-0 flex items-center gap-1">
+          <RotateCcw size={12} />
+          {t('uploadQueue.retry', 'Retry')}
+        </button>
+      )}
+    </div>
+  );
+
+  const renderSection = (title: string, tasks: typeof uploadTasks) => {
+    if (tasks.length === 0) return null;
+
+    return (
+      <div className="flex flex-col gap-1">
+        {(directTasks.length > 0 && serverTasks.length > 0) && (
+          <div className="px-2.5 pb-1 pt-2 text-[11px] font-semibold uppercase tracking-wide text-white/35">
+            {title}
+          </div>
+        )}
+        {tasks.map(renderTask)}
+      </div>
+    );
+  };
 
   if (!isQueueOpen) {
     return (
@@ -61,26 +99,8 @@ export function UploadQueuePanel() {
         </div>
       </div>
       <div className="max-h-80 overflow-y-auto p-2 flex flex-col gap-1">
-        {uploadTasks.map(task => (
-          <div key={task.id} className="flex items-center justify-between p-2.5 rounded-lg hover:bg-white/5 transition-colors group">
-            <div className="flex flex-col truncate pr-3">
-              <span className="text-sm text-white font-medium truncate">{task.file.name}</span>
-              <span className="text-xs text-white/40 flex items-center gap-1">
-                {task.status === 'pending' && <span className="text-white/40">{t('uploadQueue.waiting', 'Waiting...')}</span>}
-                {task.status === 'uploading' && <span className="text-blue-400 flex items-center gap-1"><div className="w-2 h-2 rounded-full border border-blue-400 border-t-transparent animate-spin"/> {t('uploadQueue.uploading', 'Uploading...')}</span>}
-                {task.status === 'success' && <span className="text-green-400 flex items-center gap-1"><CheckCircle2 size={13} />{t('uploadQueue.success', 'Success')}</span>}
-                {task.status === 'skipped' && <span className="text-yellow-400">{t('uploadQueue.skipped', 'Skipped (Duplicate)')}</span>}
-                {task.status === 'error' && <span className="text-red-400 flex items-center gap-1"><AlertCircle size={13} />{t('uploadQueue.failed', 'Failed')}</span>}
-              </span>
-            </div>
-            {task.status === 'error' && (
-              <button onClick={() => retryTask(task.id)} className="text-xs px-2 py-1 bg-red-500/20 text-red-400 rounded hover:bg-red-500/30 transition-colors shrink-0 flex items-center gap-1">
-                <RotateCcw size={12} />
-                {t('uploadQueue.retry', 'Retry')}
-              </button>
-            )}
-          </div>
-        ))}
+        {renderSection(t('uploadQueue.directQueue', 'Direct to Drive'), directTasks)}
+        {renderSection(t('uploadQueue.serverQueue', 'Via Backend'), serverTasks)}
       </div>
     </div>
   );

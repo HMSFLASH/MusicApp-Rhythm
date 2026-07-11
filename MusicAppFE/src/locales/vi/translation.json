@@ -124,6 +124,8 @@
     "clearDone": "Xóa Đã Xong",
     "openQueue": "Mở hàng đợi tải lên",
     "minimize": "Thu nhỏ hàng đợi tải lên",
+    "directQueue": "Tải thẳng lên Drive",
+    "serverQueue": "Qua backend",
     "waiting": "Đang đợi...",
     "uploading": "Đang tải lên...",
     "success": "Thành công",

@@ -124,6 +124,8 @@
     "clearDone": "Clear Done",
     "openQueue": "Open upload queue",
     "minimize": "Minimize upload queue",
+    "directQueue": "Direct to Drive",
+    "serverQueue": "Via Backend",
     "waiting": "Waiting...",
     "uploading": "Uploading...",
     "success": "Success",

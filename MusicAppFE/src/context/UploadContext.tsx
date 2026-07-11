@@ -48,6 +48,7 @@ const getAudioMimeType = (file: File) => {
 };
 
 const stripExtension = (fileName: string) => fileName.replace(/\.[^/.]+$/, '');
+const DIRECT_UPLOAD_CONCURRENCY = 4;
 
 const escapeDriveQueryValue = (value: string) =>
   value.replace(/\\/g, '\\\\').replace(/'/g, "\\'");
@@ -124,7 +125,8 @@ async function uploadFileDirectlyToDrive(file: File, session: DriveUploadSession
 export function UploadProvider({ children }: { children: ReactNode }) {
   const [uploadTasks, setUploadTasks] = useState<UploadTask[]>([]);
   const uploadQueueRef = useRef<UploadTask[]>([]);
-  const isProcessingRef = useRef(false);
+  const isServerProcessingRef = useRef(false);
+  const directActiveCountRef = useRef(0);
   const autoClearTimerRef = useRef<ReturnType<typeof setTimeout> | null>(null);
   const [isQueueOpen, setIsQueueOpen] = useState(false);
 
@@ -172,112 +174,141 @@ export function UploadProvider({ children }: { children: ReactNode }) {
     });
   };
 
-  const processQueue = async () => {
-    if (isProcessingRef.current) return;
-    isProcessingRef.current = true;
+  const uploadServerTask = async (file: File) => {
+    const formData = new FormData();
+    formData.append('file', file);
+
+    // Parse metadata with a timeout to prevent hanging.
+    try {
+      const musicMetadata = await import('music-metadata');
+      const parseBufferFn = musicMetadata.parseBuffer;
+      if (!parseBufferFn) throw new Error('parseBuffer not found');
+
+      const arrayBuffer = await file.arrayBuffer();
+      const buffer = new Uint8Array(arrayBuffer);
+      const metadata = await Promise.race([
+        parseBufferFn(buffer, getAudioMimeType(file), { duration: false }),
+        new Promise<never>((_, reject) => setTimeout(() => reject(new Error('Metadata parse timeout (15s)')), 15000))
+      ]);
+
+      if (metadata.common.title) formData.append('title', metadata.common.title);
+      if (metadata.common.artist) formData.append('artist', metadata.common.artist);
+      if (metadata.common.album) formData.append('album', metadata.common.album);
+      if (metadata.common.genre && metadata.common.genre.length > 0) formData.append('genre', metadata.common.genre[0]);
+      if (metadata.common.picture && metadata.common.picture.length > 0) {
+        const pic = metadata.common.picture[0];
+        // Limit cover art size to 500KB to avoid bloating the request.
+        if (pic.data.byteLength < 500 * 1024) {
+          const bytes = new Uint8Array(pic.data);
+          const chunkSize = 8192;
+          let binary = '';
+          for (let i = 0; i < bytes.length; i += chunkSize) {
+            const chunk = bytes.subarray(i, Math.min(i + chunkSize, bytes.length));
+            binary += String.fromCharCode(...chunk);
+          }
+          const base64String = btoa(binary);
+          formData.append('imageUrl', `data:${pic.format};base64,${base64String}`);
+        }
+      }
+
+      let extractedLyrics = '';
+      if (metadata.common.lyrics && metadata.common.lyrics.length > 0) {
+        // eslint-disable-next-line @typescript-eslint/no-explicit-any
+        extractedLyrics = metadata.common.lyrics.map((l: any) => typeof l === 'string' ? l : (l.text || JSON.stringify(l))).join('\n\n');
+      }
+      if (!extractedLyrics && metadata.native) {
+        for (const tagType in metadata.native) {
+          const tags = metadata.native[tagType];
+          if (Array.isArray(tags)) {
+            // eslint-disable-next-line @typescript-eslint/no-explicit-any
+            const lyricTag = tags.find((t: any) => t.id === 'USLT' || t.id === 'SYLT' || t.id === 'LYRICS' || t.id === 'WM/Lyrics');
+            if (lyricTag && lyricTag.value) {
+              const lyricValue = lyricTag.value as string | { text?: string };
+              extractedLyrics = typeof lyricValue === 'string' ? lyricValue : (lyricValue.text || JSON.stringify(lyricValue));
+              break;
+            }
+          }
+        }
+      }
+      if (extractedLyrics) {
+        formData.append('lyrics', extractedLyrics);
+      }
+    } catch (err) {
+      console.warn(`[Upload] Metadata parse skipped for ${file.name}:`, err);
+    }
+
+    await axiosClient.post('/api/music/upload', formData, {
+      headers: { 'Content-Type': 'multipart/form-data' },
+      timeout: 5 * 60 * 1000, // 5 minutes timeout for large files
+    });
+  };
+
+  const finishTask = (taskId: string, status: UploadTask['status']) => {
+    const currentIndex = uploadQueueRef.current.findIndex(t => t.id === taskId);
+    if (currentIndex !== -1) {
+      uploadQueueRef.current[currentIndex].status = status;
+    }
+    setUploadTasks([...uploadQueueRef.current]);
+    if (status === 'success') {
+      window.dispatchEvent(new CustomEvent('music-uploaded'));
+    }
+    scheduleAutoClearFinishedTasks();
+  };
+
+  const processServerQueue = async () => {
+    if (isServerProcessingRef.current) return;
+    isServerProcessingRef.current = true;
 
     try {
-      while (uploadQueueRef.current.some(t => t.status === 'pending')) {
-        const taskIndex = uploadQueueRef.current.findIndex(t => t.status === 'pending');
+      while (uploadQueueRef.current.some(t => t.mode === 'server' && t.status === 'pending')) {
+        const taskIndex = uploadQueueRef.current.findIndex(t => t.mode === 'server' && t.status === 'pending');
         if (taskIndex === -1) break;
-        
-        const nextTask = uploadQueueRef.current[taskIndex];
-        const taskId = nextTask.id;
-        const file = nextTask.file;
-        
+
+        const task = uploadQueueRef.current[taskIndex];
         uploadQueueRef.current[taskIndex].status = 'uploading';
         setUploadTasks([...uploadQueueRef.current]);
 
         try {
-          if (nextTask.mode === 'direct') {
-            await uploadDirectTask(file);
-          } else {
-            const formData = new FormData();
-            formData.append('file', file);
-
-            // Parse metadata with a timeout to prevent hanging
-            try {
-              const musicMetadata = await import('music-metadata');
-              const parseBufferFn = musicMetadata.parseBuffer;
-              if (!parseBufferFn) throw new Error('parseBuffer not found');
-
-              const arrayBuffer = await file.arrayBuffer();
-              const buffer = new Uint8Array(arrayBuffer);
-              const metadata = await Promise.race([
-                parseBufferFn(buffer, getAudioMimeType(file), { duration: false }),
-                new Promise<never>((_, reject) => setTimeout(() => reject(new Error('Metadata parse timeout (15s)')), 15000))
-              ]);
-
-              if (metadata.common.title) formData.append('title', metadata.common.title);
-              if (metadata.common.artist) formData.append('artist', metadata.common.artist);
-              if (metadata.common.album) formData.append('album', metadata.common.album);
-              if (metadata.common.genre && metadata.common.genre.length > 0) formData.append('genre', metadata.common.genre[0]);
-              if (metadata.common.picture && metadata.common.picture.length > 0) {
-                const pic = metadata.common.picture[0];
-                // Limit cover art size to 500KB to avoid bloating the request
-                if (pic.data.byteLength < 500 * 1024) {
-                  const bytes = new Uint8Array(pic.data);
-                  const chunkSize = 8192;
-                  let binary = '';
-                  for (let i = 0; i < bytes.length; i += chunkSize) {
-                    const chunk = bytes.subarray(i, Math.min(i + chunkSize, bytes.length));
-                    binary += String.fromCharCode(...chunk);
-                  }
-                  const base64String = btoa(binary);
-                  formData.append('imageUrl', `data:${pic.format};base64,${base64String}`);
-                }
-              }
-                let extractedLyrics = '';
-                if (metadata.common.lyrics && metadata.common.lyrics.length > 0) {
-                    // eslint-disable-next-line @typescript-eslint/no-explicit-any
-                    extractedLyrics = metadata.common.lyrics.map((l: any) => typeof l === 'string' ? l : (l.text || JSON.stringify(l))).join('\n\n');
-                }
-                if (!extractedLyrics && metadata.native) {
-                    for (const tagType in metadata.native) {
-                        const tags = metadata.native[tagType];
-                        if (Array.isArray(tags)) {
-                            // eslint-disable-next-line @typescript-eslint/no-explicit-any
-                            const lyricTag = tags.find((t: any) => t.id === 'USLT' || t.id === 'SYLT' || t.id === 'LYRICS' || t.id === 'WM/Lyrics');
-                            if (lyricTag && lyricTag.value) {
-                                const lyricValue = lyricTag.value as string | { text?: string };
-                                extractedLyrics = typeof lyricValue === 'string' ? lyricValue : (lyricValue.text || JSON.stringify(lyricValue));
-                                break;
-                            }
-                        }
-                    }
-                }
-                if (extractedLyrics) {
-                    formData.append('lyrics', extractedLyrics);
-                }
-            } catch (err) {
-              console.warn(`[Upload] Metadata parse skipped for ${file.name}:`, err);
-            }
-
-            await axiosClient.post('/api/music/upload', formData, {
-              headers: { 'Content-Type': 'multipart/form-data' },
-              timeout: 5 * 60 * 1000, // 5 minutes timeout for large files
-            });
-          }
-          const currentIndex = uploadQueueRef.current.findIndex(t => t.id === taskId);
-          if (currentIndex !== -1) {
-            uploadQueueRef.current[currentIndex].status = 'success';
-          }
-          window.dispatchEvent(new CustomEvent('music-uploaded'));
+          await uploadServerTask(task.file);
+          finishTask(task.id, 'success');
         } catch (e) {
-          console.error(`Error uploading ${file.name}:`, e);
-          const currentIndex = uploadQueueRef.current.findIndex(t => t.id === taskId);
-          if (currentIndex !== -1) {
-            uploadQueueRef.current[currentIndex].status = 'error';
-          }
+          console.error(`Error uploading ${task.file.name}:`, e);
+          finishTask(task.id, 'error');
         }
-        setUploadTasks([...uploadQueueRef.current]);
-        scheduleAutoClearFinishedTasks();
       }
     } finally {
-      // ALWAYS reset processing flag, even if an unexpected error occurs
-      isProcessingRef.current = false;
+      isServerProcessingRef.current = false;
       scheduleAutoClearFinishedTasks();
     }
+  };
+
+  const processDirectQueue = () => {
+    while (directActiveCountRef.current < DIRECT_UPLOAD_CONCURRENCY) {
+      const taskIndex = uploadQueueRef.current.findIndex(t => t.mode === 'direct' && t.status === 'pending');
+      if (taskIndex === -1) break;
+
+      const task = uploadQueueRef.current[taskIndex];
+      uploadQueueRef.current[taskIndex].status = 'uploading';
+      directActiveCountRef.current += 1;
+      setUploadTasks([...uploadQueueRef.current]);
+
+      void uploadDirectTask(task.file)
+        .then(() => finishTask(task.id, 'success'))
+        .catch((e) => {
+          console.error(`Error uploading ${task.file.name}:`, e);
+          finishTask(task.id, 'error');
+        })
+        .finally(() => {
+          directActiveCountRef.current = Math.max(0, directActiveCountRef.current - 1);
+          processDirectQueue();
+          scheduleAutoClearFinishedTasks();
+        });
+    }
+  };
+
+  const processUploadQueues = () => {
+    void processServerQueue();
+    processDirectQueue();
   };
 
   const queueFiles = (pendingFiles: File[], skippedFiles: File[]) => {
@@ -299,7 +330,7 @@ export function UploadProvider({ children }: { children: ReactNode }) {
     setUploadTasks([...uploadQueueRef.current]);
     setIsQueueOpen(true);
     scheduleAutoClearFinishedTasks();
-    processQueue();
+    processUploadQueues();
   };
 
   const queueDirectFiles = (pendingFiles: File[], skippedFiles: File[]) => {
@@ -321,7 +352,7 @@ export function UploadProvider({ children }: { children: ReactNode }) {
     setUploadTasks([...uploadQueueRef.current]);
     setIsQueueOpen(true);
     scheduleAutoClearFinishedTasks();
-    processQueue();
+    processUploadQueues();
   };
 
   const retryTask = (id: string) => {
@@ -330,7 +361,7 @@ export function UploadProvider({ children }: { children: ReactNode }) {
     if (taskIndex !== -1) {
       uploadQueueRef.current[taskIndex].status = 'pending';
       setUploadTasks([...uploadQueueRef.current]);
-      processQueue();
+      processUploadQueues();
     }
   };
 
