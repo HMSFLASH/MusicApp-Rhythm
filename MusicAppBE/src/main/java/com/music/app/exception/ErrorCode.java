@@ -16,7 +16,8 @@ public enum ErrorCode {
     DRIVE_NOT_LINKED(2001, "Google Drive not linked", HttpStatus.BAD_REQUEST),
     BACKUP_NOT_FOUND(2002, "No backup found on Drive", HttpStatus.NOT_FOUND),
     BACKUP_FAILED(2003, "Backup to Google Drive failed", HttpStatus.INTERNAL_SERVER_ERROR),
-    RESTORE_FAILED(2004, "Restore from Google Drive failed", HttpStatus.INTERNAL_SERVER_ERROR);
+    RESTORE_FAILED(2004, "Restore from Google Drive failed", HttpStatus.INTERNAL_SERVER_ERROR),
+    UPLOAD_QUEUE_FULL(3001, "Upload queue is full", HttpStatus.TOO_MANY_REQUESTS);
 
     private final int code;
     private final String message;

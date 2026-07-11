@@ -9,18 +9,15 @@ import { useLibrary } from '../context/LibraryContext';
 export function LibraryPage() {
   const navigate = useNavigate();
   const { playerState } = useGlobalAudio();
-  const { queueFiles, uploadTasks } = useUploadQueue();
+  const { queueFiles, queueDirectFiles, uploadTasks } = useUploadQueue();
   const { tracks, favorites, syncLibrary, isLoading } = useLibrary();
 
-  const handleUpload = (e: React.ChangeEvent<HTMLInputElement>) => {
-    if (!e.target.files || e.target.files.length === 0) return;
-    const files = Array.from(e.target.files);
-
+  const getUploadSelection = (files: File[]) => {
     const pendingFiles: File[] = [];
     const skippedFiles: File[] = [];
 
     for (const f of files) {
-      const isDuplicate = 
+      const isDuplicate =
         tracks.some(t => t.fileName === f.name) ||
         uploadTasks.some(t => t.file.name === f.name && t.status !== 'error') ||
         pendingFiles.some(p => p.name === f.name);
@@ -32,8 +29,25 @@ export function LibraryPage() {
       }
     }
 
+    return { pendingFiles, skippedFiles };
+  };
+
+  const handleUpload = (e: React.ChangeEvent<HTMLInputElement>) => {
+    if (!e.target.files || e.target.files.length === 0) return;
+    const files = Array.from(e.target.files);
+    const { pendingFiles, skippedFiles } = getUploadSelection(files);
+
     queueFiles(pendingFiles, skippedFiles);
     e.target.value = ''; // clear input
+  };
+
+  const handleDirectUpload = (e: React.ChangeEvent<HTMLInputElement>) => {
+    if (!e.target.files || e.target.files.length === 0) return;
+    const files = Array.from(e.target.files);
+    const { pendingFiles, skippedFiles } = getUploadSelection(files);
+
+    queueDirectFiles(pendingFiles, skippedFiles);
+    e.target.value = '';
   };
 
   useEffect(() => {
@@ -76,12 +90,29 @@ export function LibraryPage() {
             multiple
             onChange={handleUpload}
           />
+          <input
+            type="file"
+            accept="audio/*"
+            id="drive-direct-upload"
+            className="hidden"
+            multiple
+            onChange={handleDirectUpload}
+          />
           <label
             htmlFor="drive-upload"
             className="flex items-center gap-2 px-4 py-2 rounded-xl border border-white/10 hover:border-white/20 bg-white/5 hover:bg-white/10 cursor-pointer transition-colors"
+            title="Upload through backend metadata scan"
           >
             <CloudUpload size={16} className="text-blue-400" />
             <span className="text-sm font-medium">Upload to Drive</span>
+          </label>
+          <label
+            htmlFor="drive-direct-upload"
+            className="flex items-center gap-2 px-4 py-2 rounded-xl border border-emerald-400/20 hover:border-emerald-400/40 bg-emerald-400/10 hover:bg-emerald-400/15 cursor-pointer transition-colors"
+            title="Upload directly to Drive and skip backend metadata/lyrics parsing"
+          >
+            <Cloud size={16} className="text-emerald-300" />
+            <span className="text-sm font-medium text-emerald-50">Direct to Drive</span>
           </label>
 
         </div>

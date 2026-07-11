@@ -71,6 +71,10 @@ public class GoogleDriveService {
     @Value("${google.drive.folder-name:MusicApp}")
     private String folderName;
 
+    public String getFolderName() {
+        return folderName;
+    }
+
     private String determineMimeType(String fileName) {
         if (fileName == null) return "audio/mpeg";
         String lower = fileName.toLowerCase();
@@ -162,6 +166,13 @@ public class GoogleDriveService {
                 .execute();
 
         return result.getFiles();
+    }
+
+    public File getFileMetadata(String fileId, String refreshToken) throws Exception {
+        Drive drive = getDrive(refreshToken);
+        return drive.files().get(fileId)
+                .setFields("id, name, mimeType, trashed")
+                .execute();
     }
 
     public void deleteFile(String fileId, String refreshToken) throws Exception {

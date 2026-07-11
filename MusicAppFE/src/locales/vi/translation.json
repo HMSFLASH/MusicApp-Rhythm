@@ -122,6 +122,8 @@
   "uploadQueue": {
     "title": "Hàng đợi tải lên",
     "clearDone": "Xóa Đã Xong",
+    "openQueue": "Mở hàng đợi tải lên",
+    "minimize": "Thu nhỏ hàng đợi tải lên",
     "waiting": "Đang đợi...",
     "uploading": "Đang tải lên...",
     "success": "Thành công",

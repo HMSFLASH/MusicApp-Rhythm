@@ -122,6 +122,8 @@
   "uploadQueue": {
     "title": "Upload Queue",
     "clearDone": "Clear Done",
+    "openQueue": "Open upload queue",
+    "minimize": "Minimize upload queue",
     "waiting": "Waiting...",
     "uploading": "Uploading...",
     "success": "Success",

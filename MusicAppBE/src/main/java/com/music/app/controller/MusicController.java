@@ -2,6 +2,7 @@ package com.music.app.controller;
 
 import com.music.app.dto.MusicItemDto;
 import com.music.app.dto.ApiResponse;
+import com.music.app.dto.RegisterDriveUploadRequest;
 import com.music.app.service.MusicService;
 import com.music.app.util.SecurityUtils;
 import lombok.RequiredArgsConstructor;
@@ -88,6 +89,24 @@ public class MusicController {
         String userId = SecurityUtils.extractUserId(principal);
         return ApiResponse.<Map<String, String>>builder()
                 .result(Map.of("accessToken", musicService.getDriveToken(userId)))
+                .build();
+    }
+
+    @GetMapping("/drive-upload-session")
+    public ApiResponse<Map<String, String>> getDriveUploadSession(Principal principal) {
+        String userId = SecurityUtils.extractUserId(principal);
+        return ApiResponse.<Map<String, String>>builder()
+                .result(musicService.getDriveUploadSession(userId))
+                .build();
+    }
+
+    @PostMapping("/direct-upload/register")
+    public ApiResponse<MusicItemDto> registerDirectDriveUpload(
+            @RequestBody RegisterDriveUploadRequest request,
+            Principal principal) {
+        String userId = SecurityUtils.extractUserId(principal);
+        return ApiResponse.<MusicItemDto>builder()
+                .result(musicService.registerDirectDriveUpload(request, userId))
                 .build();
     }
 

@@ -2,6 +2,7 @@ package com.music.app.service;
 
 import com.google.api.services.drive.model.File;
 import com.music.app.dto.MusicItemDto;
+import com.music.app.dto.RegisterDriveUploadRequest;
 import com.music.app.exception.AppException;
 import com.music.app.exception.ErrorCode;
 import com.music.app.model.MusicLibrary;
@@ -21,6 +22,7 @@ import org.jaudiotagger.tag.Tag;
 import org.jaudiotagger.tag.FieldKey;
 import java.io.FileInputStream;
 import java.util.List;
+import java.util.Map;
 import java.util.stream.Collectors;
 
 @Service
@@ -31,6 +33,7 @@ public class MusicService {
     private final MusicLibraryRepository musicLibraryRepository;
     private final GoogleDriveService googleDriveService;
     private final UserRepository userRepository;
+    private final UploadQueueService uploadQueueService;
 
     @PersistenceContext
     private EntityManager entityManager;
@@ -166,6 +169,11 @@ public class MusicService {
     }
 
     public MusicItemDto uploadToDrive(MultipartFile file, String title, String artist, String album, String genre,
+            String imageUrl, String lyrics, String userId) {
+        return uploadQueueService.run(() -> uploadToDriveNow(file, title, artist, album, genre, imageUrl, lyrics, userId));
+    }
+
+    private MusicItemDto uploadToDriveNow(MultipartFile file, String title, String artist, String album, String genre,
             String imageUrl, String lyrics, String userId) {
         try {
             if (file.isEmpty() || file.getOriginalFilename() == null
@@ -352,6 +360,80 @@ public class MusicService {
         return lower.endsWith(".mp3") || lower.endsWith(".m4a") || lower.endsWith(".flac")
                 || lower.endsWith(".wav") || lower.endsWith(".ogg") || lower.endsWith(".opus")
                 || lower.endsWith(".aac") || lower.endsWith(".wma");
+    }
+
+    public MusicItemDto registerDirectDriveUpload(RegisterDriveUploadRequest request, String userId) {
+        if (request == null || request.getDriveFileId() == null || request.getDriveFileId().isBlank()) {
+            throw new AppException(ErrorCode.NOT_FOUND, "Drive file id is required");
+        }
+
+        User user = userRepository.findById(userId)
+                .orElseThrow(() -> new AppException(ErrorCode.USER_NOT_EXISTED));
+
+        if (user.getRefreshToken() == null) {
+            throw new AppException(ErrorCode.FORBIDDEN, "User Google Drive not linked");
+        }
+
+        try {
+            File driveFile = googleDriveService.getFileMetadata(request.getDriveFileId(), user.getRefreshToken());
+            if (driveFile == null || Boolean.TRUE.equals(driveFile.getTrashed())) {
+                throw new AppException(ErrorCode.NOT_FOUND, "Drive file not found");
+            }
+
+            String fileName = firstNonBlank(request.getFileName(), driveFile.getName(), "Unknown Audio");
+            if (!isSupportedAudioFile(fileName)) {
+                throw new AppException(ErrorCode.NOT_FOUND, "A supported audio file is required");
+            }
+
+            boolean exists = musicLibraryRepository.findByUserId(userId).stream()
+                    .anyMatch(lib -> request.getDriveFileId().equals(lib.getDriveFileId()) || fileName.equals(lib.getName()));
+            if (exists) {
+                throw new AppException(ErrorCode.UNCATEGORIZED_EXCEPTION, "File already exists in library");
+            }
+
+            MusicLibrary lib = MusicLibrary.builder()
+                    .name(fileName)
+                    .sourceType("DRIVE")
+                    .driveFileId(request.getDriveFileId())
+                    .title(firstNonBlank(request.getTitle(), stripExtension(fileName)))
+                    .artist(request.getArtist())
+                    .album(request.getAlbum())
+                    .genre(request.getGenre())
+                    .imageUrl(request.getImageUrl())
+                    .durationSeconds(request.getDurationSeconds())
+                    .user(user)
+                    .build();
+
+            return toDto(musicLibraryRepository.save(lib));
+        } catch (AppException exception) {
+            throw exception;
+        } catch (Exception exception) {
+            log.error("Failed to register direct Drive upload", exception);
+            throw new AppException(ErrorCode.UNCATEGORIZED_EXCEPTION, "Failed to register Drive upload");
+        }
+    }
+
+    public Map<String, String> getDriveUploadSession(String userId) {
+        return Map.of(
+                "accessToken", getDriveToken(userId),
+                "folderName", googleDriveService.getFolderName());
+    }
+
+    private String firstNonBlank(String... values) {
+        for (String value : values) {
+            if (value != null && !value.isBlank()) {
+                return value;
+            }
+        }
+        return null;
+    }
+
+    private String stripExtension(String fileName) {
+        int dotIndex = fileName.lastIndexOf('.');
+        if (dotIndex <= 0) {
+            return fileName;
+        }
+        return fileName.substring(0, dotIndex);
     }
 
     public String getDriveToken(String userId) {
