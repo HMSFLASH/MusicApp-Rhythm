@@ -50,6 +50,7 @@ export function DynamicsRack() {
               value={playerState.compThreshold}
               min={-100}
               max={0}
+              step={0.1}
               onChange={playerState.updateCompThreshold}
               label={t('studio.dynamics.threshold', 'Threshold')}
               color="#ff0055"
@@ -59,6 +60,7 @@ export function DynamicsRack() {
               value={playerState.compRatio}
               min={1}
               max={20}
+              step={0.1}
               onChange={playerState.updateCompRatio}
               label={t('studio.dynamics.ratio', 'Ratio')}
               color="#ff0055"
@@ -71,6 +73,7 @@ export function DynamicsRack() {
               value={playerState.compKnee}
               min={0}
               max={40}
+              step={0.1}
               onChange={playerState.updateCompKnee}
               label={t('studio.dynamics.knee', 'Knee')}
               color="#ff9900"
@@ -83,6 +86,7 @@ export function DynamicsRack() {
               value={playerState.compAttack}
               min={0}
               max={1000}
+              step={0.1}
               onChange={playerState.updateCompAttack}
               label={t('studio.dynamics.attack', 'Attack')}
               color="#00f5ff"
@@ -92,6 +96,7 @@ export function DynamicsRack() {
               value={playerState.compRelease}
               min={0}
               max={1000}
+              step={0.1}
               onChange={playerState.updateCompRelease}
               label={t('studio.dynamics.release', 'Release')}
               color="#00f5ff"
@@ -104,6 +109,7 @@ export function DynamicsRack() {
               value={playerState.compRmsSize}
               min={1}
               max={250}
+              step={0.1}
               onChange={playerState.updateCompRmsSize}
               label={t('studio.dynamics.rmsSize', 'RMS Size')}
               color="#a855f7"
