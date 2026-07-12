@@ -1576,18 +1576,14 @@ export function useAudioPlayback(
         console.log(`[Audio] Streaming URL fetched: ${audioUrl.substring(0, 50)}...`);
 
         const startingTrackId = String(startingTrack.id);
-        const cachedMetadata = metadataState.metadataCacheRef?.current?.get(startingTrackId);
-        const hasKnownCover = Boolean(
-          startingTrack.imageUrl ||
-          cachedMetadata?.imageUrl ||
-          metadataState.imageCacheRef?.current?.has(startingTrackId)
-        );
+        const hasKnownCover = Boolean(metadataState.imageCacheRef?.current?.has(startingTrackId));
         if (
           startingTrack.sourceType === 'DRIVE' &&
           !hasKnownCover &&
           !audioCoverFallbackTrackIdsRef.current.has(startingTrackId)
         ) {
           audioCoverFallbackTrackIdsRef.current.add(startingTrackId);
+          console.log(`[Audio] Triggering legacy cover fallback for ${startingTrackId} after streaming blob load.`);
           void metadataState.refreshMissingTrackCover?.(withoutBackendImageUrl(startingTrack));
         }
       } catch (e) {

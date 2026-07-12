@@ -49,6 +49,56 @@ const getAudioMimeType = (file: File) => {
 
 const stripExtension = (fileName: string) => fileName.replace(/\.[^/.]+$/, '');
 const DIRECT_UPLOAD_CONCURRENCY = 4;
+const MAX_BACKEND_COVER_BYTES = 2 * 1024 * 1024;
+
+const bytesToBase64 = (bytes: Uint8Array) => {
+  const chunkSize = 8192;
+  let binary = '';
+  for (let i = 0; i < bytes.length; i += chunkSize) {
+    const chunk = bytes.subarray(i, Math.min(i + chunkSize, bytes.length));
+    binary += String.fromCharCode(...chunk);
+  }
+  return btoa(binary);
+};
+
+async function extractUploadMetadata(file: File) {
+  try {
+    const musicMetadata = await import('music-metadata');
+    const parseBufferFn = musicMetadata.parseBuffer;
+    if (!parseBufferFn) throw new Error('parseBuffer not found');
+
+    const arrayBuffer = await file.arrayBuffer();
+    const buffer = new Uint8Array(arrayBuffer);
+    const metadata = await Promise.race([
+      parseBufferFn(buffer, getAudioMimeType(file), { duration: false }),
+      new Promise<never>((_, reject) => setTimeout(() => reject(new Error('Metadata parse timeout (15s)')), 15000))
+    ]);
+
+    const extracted: Record<string, string> = {};
+    if (metadata.common.title) extracted.title = metadata.common.title;
+    if (metadata.common.artist) extracted.artist = metadata.common.artist;
+    if (metadata.common.album) extracted.album = metadata.common.album;
+    if (metadata.common.genre && metadata.common.genre.length > 0) extracted.genre = metadata.common.genre[0];
+
+    if (metadata.common.picture && metadata.common.picture.length > 0) {
+      const pic = metadata.common.picture[0];
+      if (pic.data.byteLength <= MAX_BACKEND_COVER_BYTES) {
+        const format = pic.format?.startsWith('image/') ? pic.format : `image/${pic.format || 'jpeg'}`;
+        extracted.imageUrl = `data:${format};base64,${bytesToBase64(new Uint8Array(pic.data))}`;
+      }
+    }
+
+    if (metadata.common.lyrics && metadata.common.lyrics.length > 0) {
+      // eslint-disable-next-line @typescript-eslint/no-explicit-any
+      extracted.lyrics = metadata.common.lyrics.map((l: any) => typeof l === 'string' ? l : (l.text || JSON.stringify(l))).join('\n\n');
+    }
+
+    return extracted;
+  } catch (error) {
+    console.warn('[Upload] Metadata extraction skipped', error);
+    return {};
+  }
+}
 
 const escapeDriveQueryValue = (value: string) =>
   value.replace(/\\/g, '\\\\').replace(/'/g, "\\'");
@@ -165,12 +215,18 @@ export function UploadProvider({ children }: { children: ReactNode }) {
 
   const uploadDirectTask = async (file: File) => {
     const session = await axiosClient.get('/api/music/drive-upload-session') as DriveUploadSession;
+    const extractedMetadata = await extractUploadMetadata(file);
     const driveFile = await uploadFileDirectlyToDrive(file, session);
 
     await axiosClient.post('/api/music/direct-upload/register', {
       driveFileId: driveFile.id,
       fileName: driveFile.name || file.name,
-      title: stripExtension(driveFile.name || file.name)
+      title: extractedMetadata.title || stripExtension(driveFile.name || file.name),
+      artist: extractedMetadata.artist,
+      album: extractedMetadata.album,
+      genre: extractedMetadata.genre,
+      imageUrl: extractedMetadata.imageUrl,
+      lyrics: extractedMetadata.lyrics
     });
   };
 
@@ -197,17 +253,9 @@ export function UploadProvider({ children }: { children: ReactNode }) {
       if (metadata.common.genre && metadata.common.genre.length > 0) formData.append('genre', metadata.common.genre[0]);
       if (metadata.common.picture && metadata.common.picture.length > 0) {
         const pic = metadata.common.picture[0];
-        // Limit cover art size to 500KB to avoid bloating the request.
-        if (pic.data.byteLength < 500 * 1024) {
-          const bytes = new Uint8Array(pic.data);
-          const chunkSize = 8192;
-          let binary = '';
-          for (let i = 0; i < bytes.length; i += chunkSize) {
-            const chunk = bytes.subarray(i, Math.min(i + chunkSize, bytes.length));
-            binary += String.fromCharCode(...chunk);
-          }
-          const base64String = btoa(binary);
-          formData.append('imageUrl', `data:${pic.format};base64,${base64String}`);
+        if (pic.data.byteLength <= MAX_BACKEND_COVER_BYTES) {
+          const format = pic.format?.startsWith('image/') ? pic.format : `image/${pic.format || 'jpeg'}`;
+          formData.append('imageUrl', `data:${format};base64,${bytesToBase64(new Uint8Array(pic.data))}`);
         }
       }
 

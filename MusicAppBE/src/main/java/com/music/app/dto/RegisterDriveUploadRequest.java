@@ -11,5 +11,6 @@ public class RegisterDriveUploadRequest {
     private String album;
     private String genre;
     private String imageUrl;
+    private String lyrics;
     private Long durationSeconds;
 }

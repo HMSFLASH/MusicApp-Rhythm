@@ -21,6 +21,7 @@ import org.jaudiotagger.audio.AudioFileIO;
 import org.jaudiotagger.tag.Tag;
 import org.jaudiotagger.tag.FieldKey;
 import java.io.FileInputStream;
+import java.util.Base64;
 import java.util.List;
 import java.util.Map;
 import java.util.stream.Collectors;
@@ -37,6 +38,29 @@ public class MusicService {
 
     @PersistenceContext
     private EntityManager entityManager;
+
+    private String extractArtworkDataUrl(Tag tag) {
+        if (tag == null) {
+            return null;
+        }
+
+        try {
+            org.jaudiotagger.tag.images.Artwork artwork = tag.getFirstArtwork();
+            if (artwork == null || artwork.getBinaryData() == null || artwork.getBinaryData().length == 0) {
+                return null;
+            }
+
+            String mimeType = artwork.getMimeType();
+            if (mimeType == null || mimeType.isBlank() || !mimeType.startsWith("image/")) {
+                mimeType = "image/jpeg";
+            }
+
+            return "data:" + mimeType + ";base64," + Base64.getEncoder().encodeToString(artwork.getBinaryData());
+        } catch (Exception e) {
+            log.warn("Failed to extract artwork from audio tag", e);
+            return null;
+        }
+    }
 
     public MusicItemDto toDto(MusicLibrary lib) {
         String imageUrl = lib.getImageUrl();
@@ -273,6 +297,8 @@ public class MusicService {
                                 album = tag.getFirst(FieldKey.ALBUM);
                             if (genre == null || genre.isBlank())
                                 genre = tag.getFirst(FieldKey.GENRE);
+                            if (imageUrl == null || imageUrl.isBlank())
+                                imageUrl = extractArtworkDataUrl(tag);
 
                             String tagLyrics = tag.getFirst(FieldKey.LYRICS);
                             if (tagLyrics == null || tagLyrics.isBlank()) {
@@ -416,6 +442,7 @@ public class MusicService {
                     .album(request.getAlbum())
                     .genre(request.getGenre())
                     .imageUrl(request.getImageUrl())
+                    .lyrics(request.getLyrics())
                     .durationSeconds(request.getDurationSeconds())
                     .user(user)
                     .build();
@@ -510,6 +537,7 @@ public class MusicService {
                 String album = null;
                 String genre = null;
                 String lyrics = null;
+                String imageUrl = null;
 
                 if (originalFilename.toLowerCase().endsWith(".opus")) {
                     org.gagravarr.opus.OpusFile opusFile = new org.gagravarr.opus.OpusFile(tempFile);
@@ -547,6 +575,7 @@ public class MusicService {
                         artist = tag.getFirst(FieldKey.ARTIST);
                         album = tag.getFirst(FieldKey.ALBUM);
                         genre = tag.getFirst(FieldKey.GENRE);
+                        imageUrl = extractArtworkDataUrl(tag);
 
                         String tagLyrics = tag.getFirst(FieldKey.LYRICS);
                         if (tagLyrics == null || tagLyrics.isBlank()) {
@@ -591,6 +620,7 @@ public class MusicService {
                 if (album != null && !album.isBlank()) lib.setAlbum(album);
                 if (genre != null && !genre.isBlank()) lib.setGenre(genre);
                 if (lyrics != null && !lyrics.isBlank()) lib.setLyrics(lyrics);
+                if (imageUrl != null && !imageUrl.isBlank()) lib.setImageUrl(imageUrl);
 
             } finally {
                 tempFile.delete();
