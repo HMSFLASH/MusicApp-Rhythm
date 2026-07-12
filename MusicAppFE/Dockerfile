@@ -10,11 +10,9 @@ COPY . .
 RUN npm run build
 
 # Production stage
-FROM nginx:alpine
+FROM nginx:alpine-slim
 
 COPY --from=builder /app/dist /usr/share/nginx/html
-COPY docker-env.sh /docker-entrypoint.d/40-runtime-env.sh
-RUN chmod +x /docker-entrypoint.d/40-runtime-env.sh
 
 EXPOSE 80
 CMD ["nginx", "-g", "daemon off;"]

@@ -29,18 +29,21 @@ function getDB(): Promise<IDBDatabase> {
   return dbPromise;
 }
 
-export async function saveCover(trackId: string, data: Uint8Array, mimeType: string): Promise<void> {
+export async function saveCover(trackId: string, data: Uint8Array, mimeType: string): Promise<boolean> {
   try {
     const db = await getDB();
-    return new Promise((resolve, reject) => {
+    return await new Promise((resolve, reject) => {
       const tx = db.transaction(STORE_NAME, 'readwrite');
       const store = tx.objectStore(STORE_NAME);
       const request = store.put({ id: trackId, data, mimeType });
-      request.onsuccess = () => resolve();
+      tx.oncomplete = () => resolve(true);
+      tx.onerror = () => reject(tx.error || request.error);
+      tx.onabort = () => reject(tx.error || new Error('Cover save transaction aborted'));
       request.onerror = () => reject(request.error);
     });
   } catch (e) {
     console.error('Failed to save cover to IndexedDB', e);
+    return false;
   }
 }
 

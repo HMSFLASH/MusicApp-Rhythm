@@ -38,6 +38,8 @@ import {
 import { loadTrackAudioUrl } from './audioTrackLoader';
 import { getAudioExtension } from './audioMime';
 import { decodeFlacToAudioBuffer } from './flacDecoder';
+import { saveCover } from '../utils/idb';
+import { BACKEND_URL } from '../config/env';
 
 const getQueueMembershipKey = (tracks: Track[]) => (
   tracks
@@ -168,6 +170,8 @@ export function useAudioPlayback(
   const listenedSecondsRef = useRef<number>(0);
   const lastListenTickRef = useRef<number | null>(null);
   const autoDriveReloadAtRef = useRef<Map<string, number>>(new Map());
+  const audioCoverFallbackTrackIdsRef = useRef<Set<string>>(new Set());
+  const persistedBackendImageIdsRef = useRef<Set<string>>(new Set());
 
   const clearTrackLoading = useCallback(() => {
     setIsLoadingTrack(false);
@@ -1570,6 +1574,22 @@ export function useAudioPlayback(
           void metadataState.refreshTrackMetadataFromDrive?.(startingTrack);
         }
         console.log(`[Audio] Streaming URL fetched: ${audioUrl.substring(0, 50)}...`);
+
+        const startingTrackId = String(startingTrack.id);
+        const cachedMetadata = metadataState.metadataCacheRef?.current?.get(startingTrackId);
+        const hasKnownCover = Boolean(
+          startingTrack.imageUrl ||
+          cachedMetadata?.imageUrl ||
+          metadataState.imageCacheRef?.current?.has(startingTrackId)
+        );
+        if (
+          startingTrack.sourceType === 'DRIVE' &&
+          !hasKnownCover &&
+          !audioCoverFallbackTrackIdsRef.current.has(startingTrackId)
+        ) {
+          audioCoverFallbackTrackIdsRef.current.add(startingTrackId);
+          void metadataState.refreshMissingTrackCover?.(withoutBackendImageUrl(startingTrack));
+        }
       } catch (e) {
         console.error("[Audio] Failed to prepare track for playback", e);
         setIsPlaying(false);
@@ -1641,6 +1661,43 @@ export function useAudioPlayback(
   };
 
   useEffect(() => {
+    const persistLoadedBackendImage = async (trackId: string, src: string) => {
+      try {
+        const fetchUrl = new URL(src, BACKEND_URL || window.location.origin).toString();
+        const response = await fetch(fetchUrl, { credentials: 'include' });
+        if (!response.ok) throw new Error(`HTTP ${response.status}`);
+
+        const blob = await response.blob();
+        if (!blob.type.startsWith('image/')) {
+          persistedBackendImageIdsRef.current.delete(trackId);
+          return;
+        }
+
+        const stored = await saveCover(trackId, new Uint8Array(await blob.arrayBuffer()), blob.type);
+        if (stored) {
+          persistedBackendImageIdsRef.current.add(trackId);
+          console.log(`[Audio] Saved backend cover image for ${trackId} to IndexedDB.`);
+        } else {
+          persistedBackendImageIdsRef.current.delete(trackId);
+        }
+      } catch (error) {
+        persistedBackendImageIdsRef.current.delete(trackId);
+        console.warn(`[Audio] Failed to save backend cover image for ${trackId} to IndexedDB`, error);
+      }
+    };
+
+    const handleImageLoad = (event: Event) => {
+      const target = event.target;
+      if (!(target instanceof HTMLImageElement)) return;
+
+      const src = target.currentSrc || target.src;
+      const loadedTrackId = getMusicImageTrackId(src);
+      if (!loadedTrackId || persistedBackendImageIdsRef.current.has(loadedTrackId)) return;
+
+      persistedBackendImageIdsRef.current.add(loadedTrackId);
+      void persistLoadedBackendImage(loadedTrackId, src);
+    };
+
     const handleImageLoadError = (event: Event) => {
       const target = event.target;
       if (!(target instanceof HTMLImageElement)) return;
@@ -1658,8 +1715,12 @@ export function useAudioPlayback(
       void metadataState.refreshMissingTrackCover?.(withoutBackendImageUrl(activeTrack));
     };
 
+    window.addEventListener('load', handleImageLoad, true);
     window.addEventListener('error', handleImageLoadError, true);
-    return () => window.removeEventListener('error', handleImageLoadError, true);
+    return () => {
+      window.removeEventListener('load', handleImageLoad, true);
+      window.removeEventListener('error', handleImageLoadError, true);
+    };
   }, []);
 
 

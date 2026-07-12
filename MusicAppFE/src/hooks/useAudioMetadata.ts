@@ -205,7 +205,9 @@ export function useAudioMetadata(isAuthenticated: boolean, queueState: any, sett
 
                         const hasCover = !!parsed.imageUrl || !!track.imageUrl;
                         const coverChecked = (lsData as any).coverChecked;
-                        if (hasCover || coverChecked) {
+                        const coverStored = (lsData as any).coverStored;
+                        const coverMissing = (lsData as any).coverMissing;
+                        if (hasCover || coverMissing || (coverChecked && coverStored && idbCover)) {
                             return; // SKIP EXTRACTION!
                         }
                     }
@@ -222,6 +224,8 @@ export function useAudioMetadata(isAuthenticated: boolean, queueState: any, sett
 
         const cachePayload: Partial<Track> = {};
         const up: Partial<Track> = {};
+        let extractedPicture = false;
+        let extractedCoverStored = false;
 
         try {
             let metadata: ParsedAudioMetadata;
@@ -394,6 +398,7 @@ export function useAudioMetadata(isAuthenticated: boolean, queueState: any, sett
             }
 
             if (metadata.common.picture?.length) {
+                extractedPicture = true;
                 console.log(`[useAudioMetadata] Found ${metadata.common.picture.length} pictures`);
                 const pic = metadata.common.picture.reduce((prev, current) => (prev.data.length > current.data.length) ? prev : current);
                 const pictureData = pic.data as Uint8Array;
@@ -406,12 +411,25 @@ export function useAudioMetadata(isAuthenticated: boolean, queueState: any, sett
                 imageCacheRef.current.set(trackId, imgUrl);
 
                 if (track.sourceType !== 'LOCAL') {
-                    await saveCover(trackId, new Uint8Array(pictureData), mime);
+                    extractedCoverStored = await saveCover(trackId, new Uint8Array(pictureData), mime);
+                    if (extractedCoverStored) {
+                        (cachePayload as any).coverStored = true;
+                        console.log(`[Metadata] Saved parsed cover image for ${trackId} to IndexedDB.`);
+                    } else {
+                        console.warn(`[Metadata] Cover for ${trackId} was parsed but could not be saved to IndexedDB`);
+                    }
                 }
             }
 
             // Always mark as cached so we don't infinitely retry
-            const updatedCachePayload = { ...cachePayload, coverChecked: true };
+            if (!extractedPicture) {
+                (cachePayload as any).coverMissing = true;
+            }
+            const shouldMarkCoverChecked = !extractedPicture || track.sourceType === 'LOCAL' || extractedCoverStored;
+            const updatedCachePayload = {
+                ...cachePayload,
+                ...(shouldMarkCoverChecked ? { coverChecked: true } : {}),
+            };
             metadataCacheRef.current.set(trackId, updatedCachePayload);
             if (track.sourceType !== 'LOCAL') {
                 await db.set(lsKey, updatedCachePayload);
@@ -520,6 +538,8 @@ export function useAudioMetadata(isAuthenticated: boolean, queueState: any, sett
         const currentCached = metadataCacheRef.current.get(trackId) || {};
         const retryPayload = { ...currentCached };
         delete (retryPayload as any).coverChecked;
+        delete (retryPayload as any).coverStored;
+        delete (retryPayload as any).coverMissing;
         metadataCacheRef.current.set(trackId, retryPayload);
 
         const lsKey = getMetadataCacheKey(trackId);
@@ -528,6 +548,8 @@ export function useAudioMetadata(isAuthenticated: boolean, queueState: any, sett
             if (lsData) {
                 const nextLsData = { ...lsData };
                 delete (nextLsData as any).coverChecked;
+                delete (nextLsData as any).coverStored;
+                delete (nextLsData as any).coverMissing;
                 await db.set(lsKey, nextLsData);
             }
         } catch (err) {
