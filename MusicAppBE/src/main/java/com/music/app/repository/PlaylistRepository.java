@@ -12,6 +12,9 @@ import java.util.Optional;
 @Repository
 public interface PlaylistRepository extends JpaRepository<Playlist, String> {
     List<Playlist> findByUserIdOrderByCreatedAtDesc(String userId);
+
+    @Query("SELECT DISTINCT p FROM Playlist p LEFT JOIN FETCH p.items i LEFT JOIN FETCH i.musicLibrary WHERE p.user.id = :userId ORDER BY p.createdAt DESC")
+    List<Playlist> findByUserIdWithItemsOrderByCreatedAtDesc(@Param("userId") String userId);
     
     Optional<Playlist> findByIdAndUserId(String id, String userId);
 

@@ -11,6 +11,8 @@ import java.io.IOException;
 import org.springframework.http.HttpStatus;
 import org.springframework.web.bind.MethodArgumentNotValidException;
 import org.springframework.http.converter.HttpMessageNotReadableException;
+import org.springframework.web.HttpRequestMethodNotSupportedException;
+import org.springframework.web.servlet.resource.NoResourceFoundException;
 
 import lombok.extern.slf4j.Slf4j;
 
@@ -58,5 +60,21 @@ public class GlobalExceptionHandler {
         apiResponse.setCode(HttpStatus.BAD_REQUEST.value());
         apiResponse.setMessage("Invalid request");
         return ResponseEntity.badRequest().body(apiResponse);
+    }
+
+    @ExceptionHandler(value = HttpRequestMethodNotSupportedException.class)
+    public ResponseEntity<ApiResponse<Void>> handlingMethodNotAllowed(HttpRequestMethodNotSupportedException exception) {
+        ApiResponse<Void> apiResponse = new ApiResponse<>();
+        apiResponse.setCode(HttpStatus.METHOD_NOT_ALLOWED.value());
+        apiResponse.setMessage(exception.getMessage());
+        return ResponseEntity.status(HttpStatus.METHOD_NOT_ALLOWED).body(apiResponse);
+    }
+
+    @ExceptionHandler(value = NoResourceFoundException.class)
+    public ResponseEntity<ApiResponse<Void>> handlingNoResourceFound(NoResourceFoundException exception) {
+        ApiResponse<Void> apiResponse = new ApiResponse<>();
+        apiResponse.setCode(HttpStatus.NOT_FOUND.value());
+        apiResponse.setMessage(exception.getMessage());
+        return ResponseEntity.status(HttpStatus.NOT_FOUND).body(apiResponse);
     }
 }

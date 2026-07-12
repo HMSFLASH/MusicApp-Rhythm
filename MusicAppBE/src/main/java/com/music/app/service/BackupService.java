@@ -53,11 +53,11 @@ public class BackupService {
         }
 
         try {
-            List<Playlist> playlists = playlistRepository.findByUserIdOrderByCreatedAtDesc(userId);
+            List<Playlist> playlists = playlistRepository.findByUserIdWithItemsOrderByCreatedAtDesc(userId);
             List<PlaylistDto> playlistDtos = playlists.stream().map(p -> playlistService.toDto(p, true))
                     .collect(Collectors.toList());
 
-            List<Favorite> favorites = favoriteRepository.findByUserId(userId);
+            List<Favorite> favorites = favoriteRepository.findByUserIdWithMusicLibrary(userId);
             List<MusicItemDto> favoriteDtos = new java.util.ArrayList<>();
             for (Favorite f : favorites) {
                 try {
