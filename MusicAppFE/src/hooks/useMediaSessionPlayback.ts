@@ -30,6 +30,7 @@ export function useMediaSessionPlayback({
 }: UseMediaSessionPlaybackOptions) {
   const mediaSessionAnchorRef = useRef<HTMLAudioElement | null>(null);
   const mediaSessionAnchorUrlRef = useRef<string | null>(null);
+  const lastPositionStateRef = useRef<{ duration: number; playbackRate: number; position: number } | null>(null);
   const playRef = useRef(onPlay);
   const pauseRef = useRef(onPause);
   const previousTrackRef = useRef(onPreviousTrack);
@@ -103,21 +104,36 @@ export function useMediaSessionPlayback({
   useEffect(() => {
     if ('mediaSession' in navigator) {
       navigator.mediaSession.playbackState = isPlaying ? 'playing' : 'paused';
-      if (duration > 0 && !Number.isNaN(duration)) {
+      if (Number.isFinite(duration) && duration > 0) {
+        const safePlaybackRate = Number.isFinite(playbackRate) && playbackRate > 0 ? playbackRate : 1;
+        const safePosition = Number.isFinite(currentTime)
+          ? Math.min(Math.max(currentTime, 0), duration)
+          : 0;
+        const lastPositionState = lastPositionStateRef.current;
+        const shouldUpdatePositionState = !lastPositionState
+          || lastPositionState.duration !== duration
+          || lastPositionState.playbackRate !== safePlaybackRate
+          || Math.abs(lastPositionState.position - safePosition) >= 0.25;
+
+        if (!shouldUpdatePositionState) return;
+
         try {
           navigator.mediaSession.setPositionState({
             duration,
-            playbackRate,
-            position: currentTime
+            playbackRate: safePlaybackRate,
+            position: safePosition
           });
+          lastPositionStateRef.current = {
+            duration,
+            playbackRate: safePlaybackRate,
+            position: safePosition
+          };
         } catch {
           // Some browsers reject position updates while metadata is incomplete.
         }
       }
     }
-  // Keep this aligned with the old update cadence; currentTime is updated elsewhere.
-  // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [isPlaying, playbackRate, duration]);
+  }, [isPlaying, playbackRate, duration, currentTime]);
 
   useEffect(() => {
     if ('mediaSession' in navigator) {

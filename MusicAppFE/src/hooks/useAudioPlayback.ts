@@ -1341,6 +1341,15 @@ export function useAudioPlayback(
     }
     playTrackSpamGuardRef.current = { trackId: String(startingTrack.id), timestamp: now };
     if (!currentQueue) currentQueue = [startingTrack];
+
+    const initialDuration = Number.isFinite(startingTrack.durationSeconds)
+      ? Math.max(0, startingTrack.durationSeconds || 0)
+      : 0;
+    setCurrentTime(0);
+    currentTimeSnapshotRef.current = 0;
+    setDuration(initialDuration);
+    bufferPausedTimeRef.current = 0;
+
     setCurrentTrack(startingTrack);
     setQueue(currentQueue);
     if (forceReloadFromDrive) {
