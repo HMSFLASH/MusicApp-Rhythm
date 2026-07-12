@@ -1,4 +1,5 @@
 import { useMemo, useState } from 'react';
+import { createPortal } from 'react-dom';
 import { Plus, ChevronDown, X, Edit2, Trash2, Info } from 'lucide-react';
 import { VerticalFader } from '../VerticalFader';
 import { EQ_PRESETS, STYLISTIC_PRESETS } from '../../hooks/useAudioPlayer';
@@ -8,6 +9,8 @@ import { useTranslation } from 'react-i18next';
 import { EffectPowerButton } from './AudioEffectPanel';
 import { NumberInput } from '../NumberInput';
 import { createEqResponseChartData, type EqResponsePoint } from '../../hooks/audioEqResponse';
+
+import type { FitResult } from '../../utils/eqFitting';
 
 const formatFreq = (f: number) => {
   if (f >= 1000) return (f / 1000) + 'k';
@@ -66,16 +69,52 @@ const eqPointColor = (channel: EqBand['channel']) => {
 function EqResponseModal({
   bands,
   enabled,
+  preampGain = 0,
+  bassGain = 0,
+  trebleGain = 0,
+  eqResponseData,
+  effectsEnabled,
   onClose,
 }: {
   bands: EqBand[];
   enabled: boolean;
+  preampGain?: number;
+  bassGain?: number;
+  trebleGain?: number;
+  eqResponseData?: FitResult | null;
+  effectsEnabled?: { eq?: boolean; tone?: boolean; preamp?: boolean };
   onClose: () => void;
 }) {
-  const chartData = useMemo(() => createEqResponseChartData(bands, enabled), [bands, enabled]);
+  const chartData = useMemo(() => {
+    const eqEnabled = effectsEnabled?.eq ?? enabled;
+    const toneEnabled = effectsEnabled?.tone ?? enabled;
+    const userPreampEnabled = effectsEnabled?.preamp ?? enabled;
+    const autoPreampGain = eqEnabled && eqResponseData ? eqResponseData.autoPreamp : 0;
+    const chartPreampGain = (userPreampEnabled ? preampGain : 0) + autoPreampGain;
+    // If interpolation is on, use the 31 fitted bands to compute the exact total response!
+    const effectiveBands = (eqEnabled && eqResponseData) ? eqResponseData.fittedBands : bands;
+    // createEqResponseChartData already simulates the biquads and adds preamp, bass, treble!
+    const data = createEqResponseChartData(effectiveBands, eqEnabled, chartPreampGain, bassGain, trebleGain, {
+      eq: eqEnabled,
+      tone: toneEnabled,
+      preamp: Math.abs(chartPreampGain) > 0.001,
+    });
 
-  return (
-    <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/80 backdrop-blur-sm p-4">
+    // Just add the PCHIP target curve for visual reference if interpolated
+    if (eqEnabled && eqResponseData) {
+      data.bandCurves.push({
+        id: 'target-curve',
+        label: 'Target Spline',
+        channel: 'L+R',
+        color: '#fcd34d', // Amber color for target curve
+        points: eqResponseData.gridFreqs.map((frequency, i) => ({ frequency, db: eqResponseData.targetCurve[i] }))
+      });
+    }
+    return data;
+  }, [bands, enabled, preampGain, bassGain, trebleGain, eqResponseData, effectsEnabled]);
+
+  const modalContent = (
+    <div className="fixed inset-0 z-[100] flex items-center justify-center bg-black/80 backdrop-blur-sm p-4">
       <div className="bg-[#0b0b0b] border border-white/10 rounded-xl shadow-2xl w-full max-w-5xl max-h-[calc(100dvh-2rem)] overflow-hidden flex flex-col">
         <div className="flex items-center justify-between px-4 py-3 border-b border-white/10 bg-white/[0.03]">
           <div className="flex items-baseline gap-3 min-w-0">
@@ -92,10 +131,10 @@ function EqResponseModal({
         </div>
 
         <div className="p-4 overflow-y-auto">
-          <div className="w-full overflow-x-auto">
+          <div className="w-full">
             <svg
               viewBox={`0 0 ${GRAPH_WIDTH} ${GRAPH_HEIGHT}`}
-              className="min-w-[520px] sm:min-w-[700px] w-full h-auto"
+              className="w-full h-auto"
               role="img"
               aria-label="EQ frequency response from 20 Hz to 20 kHz"
             >
@@ -223,6 +262,9 @@ function EqResponseModal({
             ) : (
               <span className="inline-flex items-center gap-1.5"><span className="w-3 h-0.5 bg-cyan-300" />Total</span>
             )}
+            {enabled && eqResponseData && (
+              <span className="inline-flex items-center gap-1.5"><span className="w-3 h-0.5 bg-amber-300" />Target</span>
+            )}
             <span className="inline-flex items-center gap-1.5"><span className="w-3 h-0.5 bg-white/25" />Bands</span>
             <span className="font-mono normal-case text-white/40">dB</span>
           </div>
@@ -230,6 +272,8 @@ function EqResponseModal({
       </div>
     </div>
   );
+
+  return createPortal(modalContent, document.body);
 }
 
 export function EqRack() {
@@ -438,135 +482,160 @@ export function EqRack() {
           style={{ minWidth: eqRackMinWidth }}
         >
 
-          <div className={`flex items-end gap-x-4 transition-opacity duration-300 ${playerState.fxEnabled.eq ? 'opacity-100' : 'opacity-30 pointer-events-none'}`}>
+          <div className={`flex items-end gap-x-4 transition-opacity duration-300 relative z-0 ${playerState.fxEnabled.eq ? 'opacity-100' : 'opacity-30 pointer-events-none'}`}>
 
-          {playerState.eqBands.map((band) => (
-            <div
-              key={band.id}
-              className="flex flex-col items-center gap-3 group"
-              style={{ flex: `0 0 ${bandColumnWidth}px`, width: bandColumnWidth }}
-            >
-              {isEditablePreset && <button aria-label="Action"
-                    onClick={() => playerState.removeCustomEqBand(band.id)}
-                    className="w-6 h-6 rounded-full bg-red-500/10 text-red-400 flex items-center justify-center opacity-100 lg:opacity-30 group-hover:opacity-100 transition-opacity hover:bg-red-500/30"
-                  >
+            {playerState.eqBands.map((band) => (
+              <div
+                key={band.id}
+                className="flex flex-col items-center gap-3 group"
+                style={{ flex: `0 0 ${bandColumnWidth}px`, width: bandColumnWidth }}
+              >
+                {isEditablePreset && <button aria-label="Action"
+                  onClick={() => playerState.removeCustomEqBand(band.id)}
+                  className="w-6 h-6 rounded-full bg-red-500/10 text-red-400 flex items-center justify-center opacity-100 lg:opacity-30 group-hover:opacity-100 transition-opacity hover:bg-red-500/30"
+                >
                   <X size={12} />
                 </button>
-              }
+                }
 
-              <VerticalFader
-                value={band.gain}
-                min={-15}
-                max={15}
-                onChange={(v) => playerState.updateEqGain(band.id, v)}
-                label={isEditablePreset ? '' : formatFreq(band.frequency)}
-                trackColor={playerState.fxEnabled.eq ? (band.channel === 'L' ? '#3b82f6' : band.channel === 'R' ? '#ef4444' : '#00E5FF') : '#444444'}
-              />
+                <VerticalFader
+                  value={band.gain}
+                  min={-15}
+                  max={15}
+                  onChange={(v) => playerState.updateEqGain(band.id, v)}
+                  label={isEditablePreset ? '' : formatFreq(band.frequency)}
+                  trackColor={playerState.fxEnabled.eq ? (band.channel === 'L' ? '#3b82f6' : band.channel === 'R' ? '#ef4444' : '#00E5FF') : '#444444'}
+                />
 
-              {isEditablePreset ? (
-                <div className="flex w-full flex-col items-center gap-1 mt-1">
-                  <span className="text-[9px] text-white/65 uppercase font-sans">Hz</span>
-                  <NumberInput
-                    value={band.frequency}
-                    min={20}
-                    max={20000}
-                    step={0.1}
-                    onChange={(value) => playerState.updateEqBandFreq(band.id, value)}
-                    ariaLabel="Band frequency"
-                    className="w-full bg-transparent border-b border-white/20 text-center text-[11px] text-white/70 font-mono outline-none focus:border-[#00E5FF] pb-1"
-                  />
-                </div>
-              ) : null}
-
-              {isParametricPreset ? (
-                <div className="flex w-full flex-col items-center gap-1 mt-2 border-t border-white/5 pt-2">
-                  <div className="relative">
-                    <button 
-                      aria-label="Action" 
-                      onClick={() => setOpenFilterDropdown(openFilterDropdown === band.id ? null : band.id)}
-                      className="bg-transparent text-[9px] text-white/80 uppercase font-bold outline-none border border-white/10 rounded px-1 py-0.5 cursor-pointer hover:bg-white/10 hover:text-white transition-colors w-[32px] text-center shadow-sm"
-                    >
-                      {band.type === 'lowpass' ? 'LP' : band.type === 'highpass' ? 'HP' : band.type === 'bandpass' ? 'BP' : band.type === 'lowshelf' ? 'LS' : band.type === 'highshelf' ? 'HS' : 'PK'}
-                    </button>
-                    {openFilterDropdown === band.id && (
-                      <>
-                        <div className="fixed inset-0 z-40" onClick={() => setOpenFilterDropdown(null)} />
-                        <div className="absolute bottom-full left-1/2 -translate-x-1/2 mb-1 flex flex-col bg-[#1a1a1a] border border-white/10 rounded shadow-2xl z-[100] overflow-hidden min-w-[40px]">
-                          {([
-                            { value: 'peaking', label: 'PK' },
-                            { value: 'lowpass', label: 'LP' },
-                            { value: 'highpass', label: 'HP' },
-                            { value: 'bandpass', label: 'BP' },
-                            { value: 'lowshelf', label: 'LS' },
-                            { value: 'highshelf', label: 'HS' }
-                          ] satisfies Array<{ value: BiquadFilterType; label: string }>).map(t => (
-                            <div
-                              key={t.value}
-                              onClick={(e) => { 
-                                e.stopPropagation(); 
-                                playerState.updateEqBandType(band.id, t.value); 
-                                setOpenFilterDropdown(null);
-                              }}
-                              className={`px-3 py-1.5 text-[9px] font-bold cursor-pointer transition-colors text-center ${band.type === t.value || (!band.type && t.value === 'peaking') ? 'bg-[#00E5FF]/20 text-[#00E5FF]' : 'text-white/80 hover:bg-white/10 hover:text-white'}`}
-                            >
-                              {t.label}
-                            </div>
-                          ))}
-                        </div>
-                      </>
-                    )}
+                {isEditablePreset ? (
+                  <div className="flex w-full flex-col items-center gap-1 mt-1">
+                    <span className="text-[9px] text-white/65 uppercase font-sans">Hz</span>
+                    <NumberInput
+                      value={band.frequency}
+                      min={20}
+                      max={20000}
+                      step={0.1}
+                      onChange={(value) => playerState.updateEqBandFreq(band.id, value)}
+                      ariaLabel="Band frequency"
+                      className="w-full bg-transparent border-b border-white/20 text-center text-[11px] text-white/70 font-mono outline-none focus:border-[#00E5FF] pb-1"
+                    />
                   </div>
+                ) : null}
 
-                  <span className="text-[9px] text-white/65 uppercase font-sans mt-1">Q</span>
-                  <NumberInput
-                    step={0.1}
-                    min={0.1}
-                    max={18}
-                    value={band.q}
-                    onChange={(value) => playerState.updateEqBandQ(band.id, value)}
-                    ariaLabel="Band Q factor"
-                    className="w-full bg-transparent border-b border-white/20 text-center text-[11px] text-[#00f5ff] font-mono outline-none focus:border-[#00E5FF] pb-1"
-                  />
+                {isParametricPreset ? (
+                  <div className="flex w-full flex-col items-center gap-1 mt-2 border-t border-white/5 pt-2">
+                    <div className="relative">
+                      <button
+                        aria-label="Action"
+                        onClick={() => setOpenFilterDropdown(openFilterDropdown === band.id ? null : band.id)}
+                        className="bg-transparent text-[9px] text-white/80 uppercase font-bold outline-none border border-white/10 rounded px-1 py-0.5 cursor-pointer hover:bg-white/10 hover:text-white transition-colors w-[32px] text-center shadow-sm"
+                      >
+                        {band.type === 'lowpass' ? 'LP' : band.type === 'highpass' ? 'HP' : band.type === 'bandpass' ? 'BP' : band.type === 'lowshelf' ? 'LS' : band.type === 'highshelf' ? 'HS' : 'PK'}
+                      </button>
+                      {openFilterDropdown === band.id && (
+                        <>
+                          <div className="fixed inset-0 z-40" onClick={() => setOpenFilterDropdown(null)} />
+                          <div className="absolute bottom-full left-1/2 -translate-x-1/2 mb-1 flex flex-col bg-[#1a1a1a] border border-white/10 rounded shadow-2xl z-[100] overflow-hidden min-w-[40px]">
+                            {([
+                              { value: 'peaking', label: 'PK' },
+                              { value: 'lowpass', label: 'LP' },
+                              { value: 'highpass', label: 'HP' },
+                              { value: 'bandpass', label: 'BP' },
+                              { value: 'lowshelf', label: 'LS' },
+                              { value: 'highshelf', label: 'HS' }
+                            ] satisfies Array<{ value: BiquadFilterType; label: string }>).map(t => (
+                              <div
+                                key={t.value}
+                                onClick={(e) => {
+                                  e.stopPropagation();
+                                  playerState.updateEqBandType(band.id, t.value);
+                                  setOpenFilterDropdown(null);
+                                }}
+                                className={`px-3 py-1.5 text-[9px] font-bold cursor-pointer transition-colors text-center ${band.type === t.value || (!band.type && t.value === 'peaking') ? 'bg-[#00E5FF]/20 text-[#00E5FF]' : 'text-white/80 hover:bg-white/10 hover:text-white'}`}
+                              >
+                                {t.label}
+                              </div>
+                            ))}
+                          </div>
+                        </>
+                      )}
+                    </div>
 
-                  <div className="grid w-full grid-cols-3 gap-0.5 mt-2 p-0.5 bg-white/5 rounded-md border border-white/10">
-                    <button aria-label="Action"
-                      onClick={() => playerState.updateEqBandChannel(band.id, 'L+R')}
-                      className={`text-[9px] font-bold py-0.5 rounded transition-colors ${band.channel === 'L+R' ? 'bg-[#00E5FF] text-black' : 'text-white/80 hover:text-white'}`}
-                    >
-                      M
-                    </button>
-                    <button aria-label="Action"
-                      onClick={() => playerState.updateEqBandChannel(band.id, 'L')}
-                      className={`text-[9px] font-bold py-0.5 rounded transition-colors ${band.channel === 'L' ? 'bg-blue-500 text-white' : 'text-white/80 hover:text-white'}`}
-                    >
-                      L
-                    </button>
-                    <button aria-label="Action"
-                      onClick={() => playerState.updateEqBandChannel(band.id, 'R')}
-                      className={`text-[9px] font-bold py-0.5 rounded transition-colors ${band.channel === 'R' ? 'bg-red-500 text-white' : 'text-white/80 hover:text-white'}`}
-                    >
-                      R
-                    </button>
+                    <span className="text-[9px] text-white/65 uppercase font-sans mt-1">Q</span>
+                    <NumberInput
+                      step={0.1}
+                      min={0.1}
+                      max={18}
+                      value={band.q}
+                      onChange={(value) => playerState.updateEqBandQ(band.id, value)}
+                      ariaLabel="Band Q factor"
+                      className="w-full bg-transparent border-b border-white/20 text-center text-[11px] text-[#00f5ff] font-mono outline-none focus:border-[#00E5FF] pb-1"
+                    />
+
+                    <div className="grid w-full grid-cols-3 gap-0.5 mt-2 p-0.5 bg-white/5 rounded-md border border-white/10">
+                      <button aria-label="Action"
+                        onClick={() => playerState.updateEqBandChannel(band.id, 'L+R')}
+                        className={`text-[9px] font-bold py-0.5 rounded transition-colors ${band.channel === 'L+R' ? 'bg-[#00E5FF] text-black' : 'text-white/80 hover:text-white'}`}
+                      >
+                        M
+                      </button>
+                      <button aria-label="Action"
+                        onClick={() => playerState.updateEqBandChannel(band.id, 'L')}
+                        className={`text-[9px] font-bold py-0.5 rounded transition-colors ${band.channel === 'L' ? 'bg-blue-500 text-white' : 'text-white/80 hover:text-white'}`}
+                      >
+                        L
+                      </button>
+                      <button aria-label="Action"
+                        onClick={() => playerState.updateEqBandChannel(band.id, 'R')}
+                        className={`text-[9px] font-bold py-0.5 rounded transition-colors ${band.channel === 'R' ? 'bg-red-500 text-white' : 'text-white/80 hover:text-white'}`}
+                      >
+                        R
+                      </button>
+                    </div>
                   </div>
-                </div>
-              ) : null}
-            </div>
-          ))}
+                ) : null}
+              </div>
+            ))}
           </div>
         </div>
       </div>
+
+      {!isParametricPreset && (
+        <div className="flex justify-center pt-2 pb-6">
+          <label className="flex items-center gap-3 cursor-pointer group">
+            <div className="relative">
+              <input
+                type="checkbox"
+                className="sr-only"
+                checked={playerState.fxEnabled.interpolate || false}
+                onChange={() => playerState.toggleFx('interpolate')}
+              />
+              <div className={`block w-9 h-5 rounded-full transition-colors duration-300 ${playerState.fxEnabled.interpolate ? 'bg-[#00E5FF]/40 border border-[#00E5FF]/50' : 'bg-white/10 border border-white/10 group-hover:bg-white/20'}`}></div>
+              <div className={`absolute left-0.5 top-0.5 w-4 h-4 rounded-full transition-transform duration-300 ${playerState.fxEnabled.interpolate ? 'translate-x-4 bg-[#00E5FF] shadow-[0_0_8px_rgba(0,229,255,0.8)]' : 'bg-white/60 group-hover:bg-white/80'}`}></div>
+            </div>
+            <span className={`text-xs font-medium transition-colors ${playerState.fxEnabled.interpolate ? 'text-[#00E5FF]' : 'text-white/50 group-hover:text-white/80'}`}>
+              {t('studio.eq.interpolate', 'Smooth EQ (Parametric Mode)')}
+            </span>
+          </label>
+        </div>
+      )}
 
       {showEqInfo && (
         <EqResponseModal
           bands={playerState.eqBands}
           enabled={playerState.fxEnabled.eq}
+          preampGain={playerState.preampGain}
+          bassGain={playerState.bassGain}
+          trebleGain={playerState.trebleGain}
+          eqResponseData={playerState.fxEnabled.interpolate ? playerState.eqResponseData : null}
+          effectsEnabled={playerState.fxEnabled}
           onClose={() => setShowEqInfo(false)}
         />
       )}
 
       {/* Custom Modal for Presets */}
-      {modalState && (
-        <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/80 backdrop-blur-sm p-4">
+      {modalState && createPortal(
+        <div className="fixed inset-0 z-[100] flex items-center justify-center bg-black/80 backdrop-blur-sm p-4">
           <div className="bg-[#111] border border-white/10 rounded-xl p-6 w-full max-w-sm shadow-2xl flex flex-col gap-4">
             <h2 className="text-white/80 font-bold text-lg">
               {modalState.type === 'save' && t('studio.eq.savePreset', "Lưu Preset")}
@@ -602,15 +671,16 @@ export function EqRack() {
               <button aria-label="Action"
                 onClick={handleModalSubmit}
                 className={`px-4 py-2 rounded-lg text-sm font-bold transition-colors ${modalState.type === 'delete'
-                    ? 'bg-red-500/20 text-red-500 hover:bg-red-500/30'
-                    : 'bg-[#00E5FF]/20 text-[#00E5FF] hover:bg-[#00E5FF]/30'
+                  ? 'bg-red-500/20 text-red-500 hover:bg-red-500/30'
+                  : 'bg-[#00E5FF]/20 text-[#00E5FF] hover:bg-[#00E5FF]/30'
                   }`}
               >
                 {modalState.type === 'delete' ? 'Delete' : t('studio.eq.save', 'Lưu')}
               </button>
             </div>
           </div>
-        </div>
+        </div>,
+        document.body
       )}
     </div>
   );

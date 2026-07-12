@@ -20,6 +20,7 @@ import {
   reverbPreDelaySeconds,
   reverbWetGain,
 } from './audioGraph';
+import { processGraphicEqBands } from '../utils/eqFitting';
 import {
   calculateAutoPostFxTrimDb,
   calculateNormalizedTrackGain,
@@ -63,15 +64,30 @@ export const renderOfflineAudio = async ({
     panValue,
     loudnessNormalization,
   } = params;
+
+  let autoPreamp = 0;
+  let processedEqBands = eqBands;
+  if (enabled.interpolate) {
+    const result = processGraphicEqBands(eqBands, sampleRate, true);
+    processedEqBands = result.fittedBands;
+    autoPreamp = result.autoPreamp;
+  }
+
+  const totalPreampGain = (enabled.preamp ? (preampGain || 0) : 0) + autoPreamp;
+  const enabledWithAutoPreamp = {
+    ...enabled,
+    preamp: Boolean(enabled.preamp) || Math.abs(autoPreamp) > 0.001,
+  };
+
   const activity = getAudioFxActivity({
-    preampGain,
-    eqBands,
+    preampGain: totalPreampGain,
+    eqBands: processedEqBands,
     bassGain,
     trebleGain,
     reverbMix,
     stereoWidth,
     panValue,
-  }, enabled);
+  }, enabledWithAutoPreamp);
 
   if (!activity.any && !loudnessNormalization) {
     return audioBuffer;
@@ -79,13 +95,13 @@ export const renderOfflineAudio = async ({
 
   const postFxTrimDb = activity.any
     ? calculateAutoPostFxTrimDb({
-      preampGain,
-      eqBands,
+      preampGain: totalPreampGain,
+      eqBands: processedEqBands,
       bassGain,
       trebleGain,
       reverbMix,
       stereoWidth,
-    }, enabled)
+    }, enabledWithAutoPreamp)
     : 0;
 
   const offlineCtx = new OfflineAudioContext(2, length, sampleRate);
@@ -99,13 +115,13 @@ export const renderOfflineAudio = async ({
   if (!activity.any && loudnessNormalization) {
     const trackGain = offlineCtx.createGain();
     const downstreamGainDb = INPUT_HEADROOM_DB + calculateAutoPostFxTrimDb({
-      preampGain,
-      eqBands,
+      preampGain: totalPreampGain,
+      eqBands: processedEqBands,
       bassGain,
       trebleGain,
       reverbMix,
       stereoWidth,
-    }, enabled);
+    }, enabledWithAutoPreamp);
     trackGain.gain.value =
       calculateNormalizedTrackGain(audioBuffer, downstreamGainDb) *
       dbToGain(downstreamGainDb);
@@ -129,12 +145,12 @@ export const renderOfflineAudio = async ({
 
   if (activity.preamp) {
     const preamp = offlineCtx.createGain();
-    preamp.gain.value = Math.pow(10, preampGain / 20);
+    preamp.gain.value = dbToGain(totalPreampGain);
     currentNode.connect(preamp);
     currentNode = preamp;
   }
 
-  const activeEqBands = activity.eq && eqBands ? eqBands.filter(isActiveEqBand) : [];
+  const activeEqBands = activity.eq && processedEqBands ? processedEqBands.filter(isActiveEqBand) : [];
   if (activeEqBands.length > 0) {
     const filters = activeEqBands.map((band) => {
       const filter = offlineCtx.createBiquadFilter();

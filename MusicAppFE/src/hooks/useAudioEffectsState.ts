@@ -3,7 +3,7 @@ import { COMPRESSOR_DEFAULTS, COMPRESSOR_RESET_SETTINGS, EQ_PRESETS, STYLISTIC_P
 import type { EqBand, CustomEqPreset } from './audioTypes';
 import { clamp, STEREO_WIDTH_MAX_PERCENT } from './audioMath';
 
-type FxKey = 'eq' | 'tone' | 'comp' | 'reverb' | 'master' | 'preamp' | 'limiter' | 'stereo';
+type FxKey = 'eq' | 'tone' | 'comp' | 'reverb' | 'master' | 'preamp' | 'limiter' | 'stereo' | 'interpolate';
 type FxEnabledState = Record<FxKey, boolean>;
 
 type SavedAudioEffectsState = Partial<{
@@ -39,32 +39,85 @@ const DEFAULT_FX_ENABLED: FxEnabledState = {
   master: true,
   preamp: true,
   limiter: true,
-  stereo: true
+  stereo: true,
+  interpolate: false
 };
 
 const DEFAULT_PARAMETRIC_Q = 1.41;
 const MIN_EQ_Q = 0.1;
 const MAX_EQ_Q = 18;
 
+function bandwidthToQ(bwOctaves: number) {
+  const R = Math.pow(2, bwOctaves);
+  return Math.sqrt(R) / (R - 1);
+}
+
+function asymmetryQFactor(asymmetry: number) {
+  if (asymmetry <= 2.0) return 1.0;
+  if (asymmetry >= 4.0) return 0.65;
+  const t = (asymmetry - 2.0) / 2.0;
+  return 1.0 + t * (0.65 - 1.0);
+}
+
 const calculateGraphicEqQ = (frequencies: number[], index: number) => {
-  const frequency = frequencies[index];
-  const previousFrequency = frequencies[index - 1];
-  const nextFrequency = frequencies[index + 1];
+  const minFreq = 20;
+  const maxFreq = 20000; // Safe upper bound for UI
+  const fc = clamp(frequencies[index], minFreq, maxFreq);
+  if (!fc) return DEFAULT_PARAMETRIC_Q;
 
-  if (!frequency || (!previousFrequency && !nextFrequency)) return DEFAULT_PARAMETRIC_Q;
+  let fPrev = frequencies[index - 1];
+  let fNext = frequencies[index + 1];
 
-  const lowerBoundary = previousFrequency
-    ? Math.sqrt(previousFrequency * frequency)
-    : frequency / Math.sqrt(nextFrequency / frequency);
-  const upperBoundary = nextFrequency
-    ? Math.sqrt(frequency * nextFrequency)
-    : frequency * Math.sqrt(frequency / previousFrequency);
-  const bandwidthOctaves = Math.log2(upperBoundary / lowerBoundary);
-  const bandwidthRatio = Math.pow(2, bandwidthOctaves);
-  const q = Math.sqrt(bandwidthRatio) / (bandwidthRatio - 1);
+  if (!fPrev && !fNext) return DEFAULT_PARAMETRIC_Q;
+
+  // 0. Minimum spacing check
+  if (fNext && fNext / fc < 1.03) return DEFAULT_PARAMETRIC_Q;
+  if (fPrev && fc / fPrev < 1.03) return DEFAULT_PARAMETRIC_Q;
+
+  // 1. Mirror log spacing for boundaries
+  if (!fPrev && fNext) {
+    fPrev = (fc * fc) / fNext;
+  }
+  if (!fNext && fPrev) {
+    fNext = (fc * fc) / fPrev;
+  }
+
+  // 2. Geometric boundaries
+  let fL = Math.sqrt(fPrev * fc);
+  let fH = Math.sqrt(fc * fNext);
+
+  // 3. Clamp into audible range
+  fL = clamp(fL, minFreq, maxFreq);
+  fH = clamp(fH, minFreq, maxFreq);
+
+  // Fallback if clamp or bad custom input ruins the boundaries
+  if (!(fL < fc && fc < fH)) {
+    return DEFAULT_PARAMETRIC_Q;
+  }
+
+  // 4. Calculate bandwidth
+  const leftBW = Math.log2(fc / fL);
+  const rightBW = Math.log2(fH / fc);
+  let totalBW = leftBW + rightBW;
+
+  const minBW = 1 / 24; // 1/24 octave
+  totalBW = Math.max(totalBW, minBW);
+
+  // Custom Smooth Factor (1.0 = default)
+  totalBW *= 1.0;
+
+  let q = bandwidthToQ(totalBW);
 
   if (!Number.isFinite(q)) return DEFAULT_PARAMETRIC_Q;
-  return Math.round(clamp(q, MIN_EQ_Q, MAX_EQ_Q) * 100) / 100;
+
+  // 5. Asymmetry Protection (Soft Transition)
+  const asymmetry = Math.max(leftBW, rightBW) / Math.max(0.001, Math.min(leftBW, rightBW));
+  q *= asymmetryQFactor(asymmetry);
+
+  // Smooth EQ Clamping
+  const minQ = 0.5;
+  const maxQ = 6;
+  return Math.round(clamp(q, minQ, maxQ) * 100) / 100;
 };
 
 const createEqBands = (frequencies: number[], gains?: number[]): EqBand[] =>
@@ -141,13 +194,25 @@ export function useAudioEffectsState(savedState: SavedAudioEffectsState = {}) {
   const [precalculateOnIdle, setPrecalculateOnIdle] = useState<boolean>(savedState.precalculateOnIdle ?? false);
   const [fullQueueCacheEnabled, setFullQueueCacheEnabled] = useState<boolean>(savedState.fullQueueCacheEnabled ?? false);
 
-  const initialFxEnabled: FxEnabledState = { ...DEFAULT_FX_ENABLED, ...savedState.fxEnabled };
+  const initialFxEnabled: FxEnabledState = {
+    ...DEFAULT_FX_ENABLED,
+    ...savedState.fxEnabled,
+    ...(initialPresetIsParametric ? { interpolate: false } : {}),
+  };
   const [fxEnabled, setFxEnabled] = useState<FxEnabledState>(initialFxEnabled);
   const fxEnabledRef = useRef(initialFxEnabled);
 
   const toggleFx = useCallback((key: FxKey) => {
     setFxEnabled((prev) => {
       const next = { ...prev, [key]: !prev[key] };
+      fxEnabledRef.current = next;
+      return next;
+    });
+  }, []);
+  const disableInterpolation = useCallback(() => {
+    setFxEnabled((prev) => {
+      if (!prev.interpolate) return prev;
+      const next = { ...prev, interpolate: false };
       fxEnabledRef.current = next;
       return next;
     });
@@ -214,7 +279,10 @@ export function useAudioEffectsState(savedState: SavedAudioEffectsState = {}) {
     setEqPresetName('CUSTOM');
     setEqBands(prev => applyGraphicEqQ(prev));
   }, []);
-  const setParametricPreset = useCallback(() => setEqPresetName('PARAMETRIC'), []);
+  const setParametricPreset = useCallback(() => {
+    disableInterpolation();
+    setEqPresetName('PARAMETRIC');
+  }, [disableInterpolation]);
   const saveCustomPreset = useCallback((name: string) => {
     setCustomEqPresets(prev => {
       const currentPreset = prev.find(p => p.name === eqPresetName);
@@ -251,6 +319,7 @@ export function useAudioEffectsState(savedState: SavedAudioEffectsState = {}) {
       if (preset) {
         const isParametricPreset = preset.presetMode === 'parametric'
           || Boolean(preset.isCustomOrigin && hasParametricBandSettings(preset.bands));
+        if (isParametricPreset) disableInterpolation();
         setEqBands(isParametricPreset
           ? preset.bands.map(band => ({ ...band }))
           : applyGraphicEqQ(preset.bands));
@@ -260,7 +329,7 @@ export function useAudioEffectsState(savedState: SavedAudioEffectsState = {}) {
       }
       return prev;
     });
-  }, [setPreampGain]);
+  }, [disableInterpolation, setPreampGain]);
   const renameCustomPreset = useCallback((oldName: string, newName: string) => {
     setCustomEqPresets(prev => {
       if (prev.some(p => p.name === newName)) return prev;
@@ -282,7 +351,7 @@ export function useAudioEffectsState(savedState: SavedAudioEffectsState = {}) {
     const nextBands = prev.map(b => b.id === id ? { ...b, frequency: val } : b);
     return isCurrentParametricEq() ? nextBands : applyGraphicEqQ(nextBands);
   }), [isCurrentParametricEq]);
-  const updateEqBandQ = useCallback((id: string, val: number) => setEqBands(prev => prev.map(b => b.id === id ? { ...b, q: val } : b)), []);
+  const updateEqBandQ = useCallback((id: string, val: number) => setEqBands(prev => prev.map(b => b.id === id ? { ...b, q: clamp(val, MIN_EQ_Q, MAX_EQ_Q) } : b)), []);
   const updateEqBandChannel = useCallback((id: string, val: EqBand['channel']) => setEqBands(prev => prev.map(b => b.id === id ? { ...b, channel: val } : b)), []);
   const updateEqBandType = useCallback((id: string, val: BiquadFilterType) => setEqBands(prev => prev.map(b => b.id === id ? { ...b, type: val } : b)), []);
 

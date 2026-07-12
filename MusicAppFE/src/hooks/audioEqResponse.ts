@@ -174,10 +174,29 @@ const bandColor = (channel: EqBand['channel']) => {
 
 export const createEqResponseChartData = (
   eqBands: EqBand[],
-  enabled = true
+  enabled = true,
+  preampGain = 0,
+  bassGain = 0,
+  trebleGain = 0,
+  enabledFlags?: { eq?: boolean; tone?: boolean; preamp?: boolean }
 ): EqResponseChartData => {
   const frequencies = createLogFrequencies();
-  const activeBands = enabled ? eqBands.filter(isAudibleBand) : [];
+  const eqEnabled = enabledFlags?.eq ?? enabled;
+  const toneEnabled = enabledFlags?.tone ?? enabled;
+  const preampEnabled = enabledFlags?.preamp ?? enabled;
+  const toneBands: EqBand[] = [];
+  if (toneEnabled) {
+    if (Math.abs(bassGain) > 0.001) {
+      toneBands.push({ id: 'tone-bass', type: 'lowshelf', frequency: 150, q: 1, gain: bassGain, channel: 'L+R' });
+    }
+    if (Math.abs(trebleGain) > 0.001) {
+      toneBands.push({ id: 'tone-treble', type: 'highshelf', frequency: 4000, q: 1, gain: trebleGain, channel: 'L+R' });
+    }
+  }
+  const activeBands = [
+    ...(eqEnabled ? eqBands.filter(isAudibleBand) : []),
+    ...toneBands,
+  ];
   const curves = activeBands.map((band) => ({
     band,
     coefficients: createBiquadCoefficients(band),
@@ -188,7 +207,7 @@ export const createEqResponseChartData = (
       .filter(({ band }) => band.channel !== 'R')
       .reduce((current, { coefficients }) => current * getMagnitudeAtFrequency(coefficients, frequency), 1);
 
-    return { frequency, db: linearToDb(gain) };
+    return { frequency, db: linearToDb(gain) + (preampEnabled ? preampGain : 0) };
   });
 
   const right = frequencies.map((frequency) => {
@@ -196,7 +215,7 @@ export const createEqResponseChartData = (
       .filter(({ band }) => band.channel !== 'L')
       .reduce((current, { coefficients }) => current * getMagnitudeAtFrequency(coefficients, frequency), 1);
 
-    return { frequency, db: linearToDb(gain) };
+    return { frequency, db: linearToDb(gain) + (preampEnabled ? preampGain : 0) };
   });
 
   const total = frequencies.map((frequency, index) => ({
@@ -211,7 +230,7 @@ export const createEqResponseChartData = (
     color: bandColor(band.channel),
     points: frequencies.map((frequency) => ({
       frequency,
-      db: linearToDb(getMagnitudeAtFrequency(coefficients, frequency)),
+      db: linearToDb(getMagnitudeAtFrequency(coefficients, frequency)) + (band.id.startsWith('tone-') ? 0 : 0),
     })),
   }));
 

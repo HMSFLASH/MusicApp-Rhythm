@@ -21,7 +21,7 @@ export type AudioRenderParams = {
 };
 
 export type FxEnabledFlags = Partial<Record<
-  'preamp' | 'eq' | 'tone' | 'comp' | 'reverb' | 'stereo' | 'master' | 'limiter',
+  'preamp' | 'eq' | 'tone' | 'comp' | 'reverb' | 'stereo' | 'master' | 'limiter' | 'interpolate',
   boolean
 >>;
 
@@ -38,6 +38,7 @@ export const createRenderSignature = (
     stereo: Boolean(enabled.stereo),
     master: Boolean(enabled.master),
     limiter: Boolean(enabled.limiter),
+    interpolate: Boolean(enabled.interpolate),
   },
   preampGain: params.preampGain,
   eqBands: Array.isArray(params.eqBands)

@@ -1,4 +1,4 @@
-import { useRef, useEffect, useCallback } from 'react';
+import { useRef, useEffect, useCallback, useState } from 'react';
 import {
   applyCustomDynamicsCompressorSettings,
   applyMasterLimiterCompressorState,
@@ -29,6 +29,8 @@ import {
   dbToGain,
 } from './audioLoudness';
 import { getAudioFxActivity } from './audioFxActivity';
+import { processGraphicEqBands } from '../utils/eqFitting';
+import React from 'react';
 
 export {
   configureLoudnessNormalization,
@@ -46,7 +48,8 @@ const disconnectNode = (node: AudioNode | null) => {
 
 // eslint-disable-next-line @typescript-eslint/no-explicit-any
 export function useAudioContext(effectsState: any) {
-  const { eqBands, preampGain, bassGain, trebleGain, compThreshold, compRatio, compKnee, compAttack, compRelease, compRmsSize, compMakeupGain, panValue, stereoWidth, reverbMix, reverbTime, useOversample, loudnessNormalization, fxEnabled, audioIsStereo = true, } = effectsState;
+  const { eqBands: rawEqBands, preampGain, bassGain, trebleGain, compThreshold, compRatio, compKnee, compAttack, compRelease, compRmsSize, compMakeupGain, panValue, stereoWidth, reverbMix, reverbTime, useOversample, loudnessNormalization, fxEnabled, audioIsStereo = true, } = effectsState;
+  const [audioSampleRate, setAudioSampleRate] = useState(44100);
 
   // Audio Context and Core Nodes
 
@@ -69,11 +72,24 @@ export function useAudioContext(effectsState: any) {
   // eslint-disable-next-line @typescript-eslint/no-explicit-any
   const fxEnabledRef = useRef<any>(effectsState?.fxEnabled || {});
   useEffect(() => { fxEnabledRef.current = effectsState?.fxEnabled; }, [effectsState?.fxEnabled]);
-  
+
   const audioContextRef = useRef<AudioContext | null>(null);
   const sourceNodeRef = useRef<MediaElementAudioSourceNode | null>(null);
   const bufferSourceRef = useRef<AudioBufferSourceNode | null>(null);
   const bufferVolumeNodeRef = useRef<GainNode | null>(null);
+
+  const { eqBands, autoPreamp, eqResponseData } = React.useMemo(() => {
+    if (fxEnabled?.interpolate) {
+      const result = processGraphicEqBands(rawEqBands, audioSampleRate, true); // qualityMode = true
+      return { eqBands: result.fittedBands, autoPreamp: result.autoPreamp, eqResponseData: result };
+    }
+    return { eqBands: rawEqBands, autoPreamp: 0, eqResponseData: null };
+  }, [rawEqBands, fxEnabled?.interpolate, audioSampleRate]);
+  const effectivePreampGain = (fxEnabled?.preamp ? (preampGain || 0) : 0) + autoPreamp;
+  const effectiveFxEnabled = React.useMemo(() => ({
+    ...(fxEnabled || {}),
+    preamp: Boolean(fxEnabled?.preamp) || Math.abs(autoPreamp) > 0.001,
+  }), [autoPreamp, fxEnabled]);
 
   // FX Nodes
   const eqNodesRef = useRef<BiquadFilterNode[]>([]);
@@ -97,7 +113,7 @@ export function useAudioContext(effectsState: any) {
   const compMakeupNodeRef = useRef<GainNode | null>(null);
   const customCompressorReadyRef = useRef(false);
   const customCompressorLoadingRef = useRef<Promise<boolean> | null>(null);
-  
+
   const convolverNodeRef = useRef<ConvolverNode | null>(null);
   const dryGainRef = useRef<GainNode | null>(null);
   const wetGainRef = useRef<GainNode | null>(null);
@@ -236,14 +252,14 @@ export function useAudioContext(effectsState: any) {
   }, []);
 
   const currentGraphActivity = getAudioFxActivity({
-    preampGain,
+    preampGain: effectivePreampGain,
     eqBands,
     bassGain,
     trebleGain,
     reverbMix,
     stereoWidth,
     panValue,
-  }, effectsState?.fxEnabled || {});
+  }, effectiveFxEnabled);
 
   const graphStructureKey = JSON.stringify({
     loudnessNormalization: Boolean(loudnessNormalization),
@@ -278,37 +294,37 @@ export function useAudioContext(effectsState: any) {
         2
       );
       irBufferRef.current = newIrBuffer;
-      
+
       if (convolverNodeRef.current && reverbHighpassRef.current && reverbPreDelayRef.current && wetGainRef.current) {
         const ctx = audioContextRef.current;
         const now = ctx.currentTime;
-        
+
         // Save old nodes
         const oldConvolver = convolverNodeRef.current;
-        const oldWetGain = ctx.createGain(); 
-        
+        const oldWetGain = ctx.createGain();
+
         // Re-route old convolver through temporary fade-out gain
         oldConvolver.disconnect();
         oldConvolver.connect(oldWetGain);
         oldWetGain.connect(reverbHighpassRef.current);
         oldWetGain.gain.setValueAtTime(1, now);
         oldWetGain.gain.setTargetAtTime(0, now, 0.015);
-        
+
         // Setup new convolver
         const newConvolver = ctx.createConvolver();
         newConvolver.buffer = newIrBuffer;
-        
+
         const newConvolverGain = ctx.createGain();
         newConvolverGain.gain.setValueAtTime(0, now);
         newConvolverGain.gain.setTargetAtTime(1, now, 0.015);
-        
+
         reverbPreDelayRef.current.connect(newConvolver);
         newConvolver.connect(newConvolverGain);
         newConvolverGain.connect(reverbHighpassRef.current);
-        
+
         // Update ref
         convolverNodeRef.current = newConvolver;
-        
+
         // Cleanup old nodes
         setTimeout(() => {
           try {
@@ -317,8 +333,8 @@ export function useAudioContext(effectsState: any) {
             newConvolverGain.disconnect();
             // Connect new convolver directly to highpass once fade is done
             if (convolverNodeRef.current === newConvolver && reverbHighpassRef.current) {
-                newConvolver.disconnect();
-                newConvolver.connect(reverbHighpassRef.current);
+              newConvolver.disconnect();
+              newConvolver.connect(reverbHighpassRef.current);
             }
           } catch (err) {
             console.error('Failed to cleanup reverb crossfade', err);
@@ -346,6 +362,9 @@ export function useAudioContext(effectsState: any) {
       }
     }
     const ctx = audioContextRef.current;
+    if (audioSampleRate !== ctx.sampleRate) {
+      setAudioSampleRate(ctx.sampleRate);
+    }
     if (!irBufferRef.current) {
       irBufferRef.current = generateImpulseResponse(ctx, clamp(reverbTime || 2, 0.1, 10), 2);
     }
@@ -356,7 +375,7 @@ export function useAudioContext(effectsState: any) {
     }
 
     if (!sourceNodeRef.current) return;
-    
+
     // Disconnect everything first to rebuild graph. Every call is wrapped
     // because browsers may throw if a node was already disconnected.
     stopStereoNearMonoAnalysis();
@@ -404,15 +423,19 @@ export function useAudioContext(effectsState: any) {
 
     let currentNode: AudioNode = sourceNodeRef.current;
     const enabled = fxEnabledRef.current || {};
+    const enabledWithAutoPreamp = {
+      ...enabled,
+      preamp: Boolean(enabled.preamp) || Math.abs(autoPreamp) > 0.001,
+    };
     const activity = getAudioFxActivity({
-      preampGain,
+      preampGain: effectivePreampGain,
       eqBands,
       bassGain,
       trebleGain,
       reverbMix,
       stereoWidth,
       panValue,
-    }, enabled);
+    }, enabledWithAutoPreamp);
 
     const connectStage = <T extends AudioNode>(node: T) => {
       currentNode.connect(node);
@@ -437,7 +460,9 @@ export function useAudioContext(effectsState: any) {
     // 1.5 Preamp
     if (activity.preamp) {
       if (!preampNodeRef.current) preampNodeRef.current = ctx.createGain();
-      preampNodeRef.current.gain.value = Math.pow(10, preampGain / 20);
+      const now = ctx.currentTime;
+      preampNodeRef.current.gain.cancelScheduledValues(now);
+      preampNodeRef.current.gain.setTargetAtTime(dbToGain(effectivePreampGain), now, 0.015);
       connectStage(preampNodeRef.current);
     }
 
@@ -450,9 +475,13 @@ export function useAudioContext(effectsState: any) {
       eqBands.forEach((band: any, i: number) => {
         const filter = eqNodesRef.current[i];
         filter.type = band.type || 'peaking';
-        filter.frequency.value = band.frequency;
-        filter.Q.value = band.q;
-        filter.gain.value = band.gain;
+        const now = ctx.currentTime;
+        filter.frequency.cancelScheduledValues(now);
+        filter.frequency.setTargetAtTime(band.frequency, now, 0.015);
+        filter.Q.cancelScheduledValues(now);
+        filter.Q.setTargetAtTime(band.q, now, 0.015);
+        filter.gain.cancelScheduledValues(now);
+        filter.gain.setTargetAtTime(band.gain, now, 0.015);
       });
 
       const hasChannelSpecificBands = eqBands.some((band: { channel?: string }) =>
@@ -548,7 +577,7 @@ export function useAudioContext(effectsState: any) {
     }
 
     const stereoDetectionNode = currentNode;
-    
+
     // 5. Reverb
     if (activity.reverb) {
       if (!convolverNodeRef.current) convolverNodeRef.current = ctx.createConvolver();
@@ -678,13 +707,13 @@ export function useAudioContext(effectsState: any) {
         headroomRecoverRef.current = ctx.createGain();
       }
       headroomRecoverRef.current.gain.value = dbToGain(calculateAutoPostFxTrimDb({
-        preampGain,
+        preampGain: effectivePreampGain,
         eqBands,
         bassGain,
         trebleGain,
         reverbMix,
         stereoWidth,
-      }, enabled) || BASE_POST_FX_TRIM_DB);
+      }, enabledWithAutoPreamp) || BASE_POST_FX_TRIM_DB);
       connectStage(headroomRecoverRef.current);
     }
 
@@ -725,20 +754,22 @@ export function useAudioContext(effectsState: any) {
     } else {
       softClipWaveShaperRef.current = null;
     }
-    
+
     currentNode.connect(ctx.destination);
     if (audioContextRef.current && audioContextRef.current.state === 'suspended') {
       audioContextRef.current.resume();
     }
 
 
-  // eslint-disable-next-line react-hooks/exhaustive-deps
+    // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [
     applyCompressorParams,
+    audioSampleRate,
     bassGain,
     compMakeupGain,
     compRatio,
     customCompressorSettings,
+    effectivePreampGain,
     eqBands,
     ensureCustomDynamicsCompressorWorklet,
     startStereoNearMonoAnalysis,
@@ -754,7 +785,6 @@ export function useAudioContext(effectsState: any) {
     audioIsStereo,
     loudnessNormalization,
     panValue,
-    preampGain,
     reverbMix,
     reverbTime,
     stereoWidth,
@@ -768,8 +798,8 @@ export function useAudioContext(effectsState: any) {
   useEffect(() => {
     if (!sourceNodeRef.current) return;
     initializeAudioContext();
-  // Rebuild only when graph shape changes. Parameter changes below update existing nodes.
-  // eslint-disable-next-line react-hooks/exhaustive-deps
+    // Rebuild only when graph shape changes. Parameter changes below update existing nodes.
+    // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [graphStructureKey]);
 
   useEffect(() => {
@@ -781,20 +811,20 @@ export function useAudioContext(effectsState: any) {
   useEffect(() => {
     if (!headroomRecoverRef.current) return;
     headroomRecoverRef.current.gain.value = dbToGain(calculateAutoPostFxTrimDb({
-      preampGain,
+      preampGain: effectivePreampGain,
       eqBands,
       bassGain,
       trebleGain,
       reverbMix,
       stereoWidth,
-    }, fxEnabled) || BASE_POST_FX_TRIM_DB);
-  }, [bassGain, eqBands, fxEnabled, preampGain, reverbMix, stereoWidth, trebleGain]);
+    }, effectiveFxEnabled) || BASE_POST_FX_TRIM_DB);
+  }, [bassGain, effectiveFxEnabled, effectivePreampGain, eqBands, reverbMix, stereoWidth, trebleGain]);
 
   useEffect(() => {
     if (preampNodeRef.current) {
-      preampNodeRef.current.gain.value = fxEnabled.preamp ? Math.pow(10, preampGain / 20) : 1;
+      preampNodeRef.current.gain.value = Math.abs(effectivePreampGain) > 0.001 ? dbToGain(effectivePreampGain) : 1;
     }
-  }, [preampGain, fxEnabled.preamp]);
+  }, [effectivePreampGain]);
 
   useEffect(() => {
     if (bassNodeRef.current) bassNodeRef.current.gain.value = fxEnabled.tone ? bassGain : 0;
@@ -852,7 +882,7 @@ export function useAudioContext(effectsState: any) {
       const pseudoAmount = !audioIsStereo ? basePseudoAmount : 0;
       const targetDelay = 0.006 + 0.007 * basePseudoAmount;
       const targetGain = pseudoStereoWetGain(pseudoAmount);
-      
+
       if (audioContextRef.current) {
         pseudoDelayRef.current.delayTime.setTargetAtTime(targetDelay, audioContextRef.current.currentTime, 0.02);
         haasWetGainRef.current.gain.setTargetAtTime(targetGain, audioContextRef.current.currentTime, 0.02);
@@ -871,8 +901,8 @@ export function useAudioContext(effectsState: any) {
 
   const prevLimiterDepsRef = useRef({ limiter: fxEnabled.limiter, oversample: useOversample });
   useEffect(() => {
-    const isChanged = prevLimiterDepsRef.current.limiter !== fxEnabled.limiter || 
-                      prevLimiterDepsRef.current.oversample !== useOversample;
+    const isChanged = prevLimiterDepsRef.current.limiter !== fxEnabled.limiter ||
+      prevLimiterDepsRef.current.oversample !== useOversample;
     if (!isChanged) return;
     prevLimiterDepsRef.current = { limiter: fxEnabled.limiter, oversample: useOversample };
 
@@ -947,6 +977,7 @@ export function useAudioContext(effectsState: any) {
     dryGainRef,
     wetGainRef,
     reverbPreDelayRef,
-    initializeAudioContext
+    initializeAudioContext,
+    eqResponseData
   };
 }

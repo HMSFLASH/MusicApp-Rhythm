@@ -48,6 +48,7 @@ export function useAudioEngine(
     getTrackImage: (id: string) => metadataState.imageCacheRef.current.get(id),
     refreshTrackMetadataFromDrive: metadataState.refreshTrackMetadataFromDrive,
     reloadMetadataFromBackend: metadataState.reloadMetadataFromBackend,
-    metadataVersion: metadataState.metadataVersion
+    metadataVersion: metadataState.metadataVersion,
+    eqResponseData: contextState.eqResponseData,
   };
 }
