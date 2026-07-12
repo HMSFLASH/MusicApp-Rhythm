@@ -1,4 +1,4 @@
-import { useEffect, useRef, useMemo, useState } from 'react';
+import { useCallback, useEffect, useRef, useMemo, useState } from 'react';
 
 interface LyricsViewProps {
   lyrics: string;
@@ -19,6 +19,7 @@ export function LyricsView({ lyrics, currentTime, onSeek }: LyricsViewProps) {
   const previousActiveIndexRef = useRef(-1);
   const lastSeekTimeRef = useRef(0);
   const isAutoScrollingRef = useRef(false);
+  const layoutScrollTimeoutRef = useRef<ReturnType<typeof setTimeout> | null>(null);
 
   const handleUserInteraction = () => {
     if (isAutoScrollingRef.current) return;
@@ -77,6 +78,24 @@ export function LyricsView({ lyrics, currentTime, onSeek }: LyricsViewProps) {
     if (scrollTimeoutRef.current) clearTimeout(scrollTimeoutRef.current);
   }, [lyrics]);
 
+  const scrollToActiveLine = useCallback((behavior: ScrollBehavior) => {
+    if (!containerRef.current) return;
+    const container = containerRef.current;
+    const activeEl = container.querySelector(`[data-index="${activeIndex}"]`) as HTMLElement | null;
+    if (!activeEl) return;
+
+    const targetTop = Math.max(
+      0,
+      activeEl.offsetTop - (container.clientHeight / 2) + (activeEl.clientHeight / 2)
+    );
+    isAutoScrollingRef.current = true;
+    container.scrollTo({ top: targetTop, behavior });
+    if (autoScrollTimeoutRef.current) clearTimeout(autoScrollTimeoutRef.current);
+    autoScrollTimeoutRef.current = setTimeout(() => {
+      isAutoScrollingRef.current = false;
+    }, behavior === 'smooth' ? 500 : 80);
+  }, [activeIndex]);
+
   useEffect(() => {
     if (isUserScrolling || !parsedLyrics.isSynced || activeIndex === -1 || !containerRef.current) {
       previousActiveIndexRef.current = activeIndex;
@@ -94,24 +113,47 @@ export function LyricsView({ lyrics, currentTime, onSeek }: LyricsViewProps) {
     const distance = Math.abs(container.scrollTop - targetTop);
     const indexJump = Math.abs(activeIndex - previousActiveIndexRef.current);
     const recentlySeeked = performance.now() - lastSeekTimeRef.current < 700;
-    const behavior: ScrollBehavior = indexJump > 3 || recentlySeeked || distance > container.clientHeight
-      ? 'auto'
-      : 'smooth';
+    const shouldJump = indexJump > 3 || recentlySeeked || distance > container.clientHeight;
+    const behavior: ScrollBehavior = shouldJump ? 'auto' : 'smooth';
 
-    isAutoScrollingRef.current = true;
-    container.scrollTo({ top: targetTop, behavior });
-    if (autoScrollTimeoutRef.current) clearTimeout(autoScrollTimeoutRef.current);
-    autoScrollTimeoutRef.current = setTimeout(() => {
-      isAutoScrollingRef.current = false;
-    }, behavior === 'smooth' ? 500 : 80);
+    scrollToActiveLine(behavior);
+
+    if (layoutScrollTimeoutRef.current) clearTimeout(layoutScrollTimeoutRef.current);
+    if (shouldJump) {
+      layoutScrollTimeoutRef.current = setTimeout(() => {
+        if (!isUserScrolling) scrollToActiveLine('auto');
+      }, 550);
+    }
 
     previousActiveIndexRef.current = activeIndex;
-  }, [activeIndex, parsedLyrics.isSynced, isUserScrolling]);
+  }, [activeIndex, parsedLyrics.isSynced, isUserScrolling, scrollToActiveLine]);
+
+  useEffect(() => {
+    const container = containerRef.current;
+    if (!container || !parsedLyrics.isSynced || activeIndex === -1 || isUserScrolling || typeof ResizeObserver === 'undefined') {
+      return;
+    }
+
+    let frameId: number | null = null;
+    const observer = new ResizeObserver(() => {
+      if (frameId !== null) cancelAnimationFrame(frameId);
+      frameId = requestAnimationFrame(() => {
+        if (!isUserScrolling) scrollToActiveLine('auto');
+      });
+    });
+
+    observer.observe(container);
+    return () => {
+      observer.disconnect();
+      if (frameId !== null) cancelAnimationFrame(frameId);
+    };
+  }, [activeIndex, parsedLyrics.isSynced, isUserScrolling, scrollToActiveLine]);
 
   useEffect(() => {
     return () => {
       if (scrollTimeoutRef.current) clearTimeout(scrollTimeoutRef.current);
       if (autoScrollTimeoutRef.current) clearTimeout(autoScrollTimeoutRef.current);
+      if (layoutScrollTimeoutRef.current) clearTimeout(layoutScrollTimeoutRef.current);
     };
   }, []);
 
