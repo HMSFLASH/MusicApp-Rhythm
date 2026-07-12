@@ -271,9 +271,13 @@ export function UploadProvider({ children }: { children: ReactNode }) {
         try {
           await uploadServerTask(task.file);
           finishTask(task.id, 'success');
-        } catch (e) {
+        } catch (e: any) {
           console.error(`Error uploading ${task.file.name}:`, e);
-          finishTask(task.id, 'error');
+          if (e?.message === 'File already exists in library' || e?.response?.data?.message === 'File already exists in library' || e?.response?.status === 409) {
+            finishTask(task.id, 'skipped');
+          } else {
+            finishTask(task.id, 'error');
+          }
         }
       }
     } finally {
@@ -294,9 +298,13 @@ export function UploadProvider({ children }: { children: ReactNode }) {
 
       void uploadDirectTask(task.file)
         .then(() => finishTask(task.id, 'success'))
-        .catch((e) => {
+        .catch((e: any) => {
           console.error(`Error uploading ${task.file.name}:`, e);
-          finishTask(task.id, 'error');
+          if (e?.message === 'File already exists in library' || e?.response?.data?.message === 'File already exists in library' || e?.response?.status === 409) {
+            finishTask(task.id, 'skipped');
+          } else {
+            finishTask(task.id, 'error');
+          }
         })
         .finally(() => {
           directActiveCountRef.current = Math.max(0, directActiveCountRef.current - 1);

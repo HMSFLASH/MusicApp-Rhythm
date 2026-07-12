@@ -17,7 +17,8 @@ public enum ErrorCode {
     BACKUP_NOT_FOUND(2002, "No backup found on Drive", HttpStatus.NOT_FOUND),
     BACKUP_FAILED(2003, "Backup to Google Drive failed", HttpStatus.INTERNAL_SERVER_ERROR),
     RESTORE_FAILED(2004, "Restore from Google Drive failed", HttpStatus.INTERNAL_SERVER_ERROR),
-    UPLOAD_QUEUE_FULL(3001, "Upload queue is full", HttpStatus.TOO_MANY_REQUESTS);
+    UPLOAD_QUEUE_FULL(3001, "Upload queue is full", HttpStatus.TOO_MANY_REQUESTS),
+    DUPLICATE_FILE(3002, "File already exists in library", HttpStatus.CONFLICT);
 
     private final int code;
     private final String message;

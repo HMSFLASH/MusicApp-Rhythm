@@ -209,7 +209,7 @@ public class MusicService {
             boolean exists = musicLibraryRepository.findByUserId(userId).stream()
                     .anyMatch(lib -> originalFilename.equals(lib.getName()));
             if (exists) {
-                throw new AppException(ErrorCode.UNCATEGORIZED_EXCEPTION, "File already exists in library");
+                throw new AppException(ErrorCode.DUPLICATE_FILE, "File already exists in library");
             }
 
             // Extract metadata via jaudiotagger
@@ -404,7 +404,7 @@ public class MusicService {
             boolean exists = musicLibraryRepository.findByUserId(userId).stream()
                     .anyMatch(lib -> request.getDriveFileId().equals(lib.getDriveFileId()) || fileName.equals(lib.getName()));
             if (exists) {
-                throw new AppException(ErrorCode.UNCATEGORIZED_EXCEPTION, "File already exists in library");
+                throw new AppException(ErrorCode.DUPLICATE_FILE, "File already exists in library");
             }
 
             MusicLibrary lib = MusicLibrary.builder()
