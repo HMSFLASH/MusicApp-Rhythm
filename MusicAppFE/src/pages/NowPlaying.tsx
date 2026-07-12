@@ -34,19 +34,9 @@ export function NowPlaying() {
     hasNext, hasPrevious
   } = playerState;
   const currentArtwork = currentTrack ? (currentTrack.imageUrl || playerState.getTrackImage(currentTrack.id)) : '';
-
-  useEffect(() => {
-    if (currentTrack) {
-      const el = document.getElementById('nowplaying-current-track');
-      const container = document.getElementById('nowplaying-queue-container');
-      if (el && container) {
-        container.scrollTo({
-          top: el.offsetTop - container.clientHeight / 2 + el.clientHeight / 2,
-          behavior: 'smooth'
-        });
-      }
-    }
-  }, [currentTrack]);
+  const pageScrollRef = useRef<HTMLDivElement>(null);
+  const queueContainerRef = useRef<HTMLDivElement>(null);
+  const activeQueueTrackRef = useRef<HTMLDivElement>(null);
 
   const isFavorite = currentTrack && isAuthenticated && currentTrack.sourceType !== 'LOCAL'
     ? favorites.some(f => f.id === currentTrack.id)
@@ -61,6 +51,46 @@ export function NowPlaying() {
   // F8 scroll effect state
   const [cdSize, setCdSize] = useState(288);
   const [cdOpacity, setCdOpacity] = useState(1);
+
+  const scrollDiscIntoView = useCallback(() => {
+    const page = pageScrollRef.current;
+    page?.scrollTo({ top: 0, behavior: 'auto' });
+    page?.closest('main')?.scrollTo({ top: 0, behavior: 'auto' });
+    setCdSize(288);
+    setCdOpacity(1);
+  }, []);
+
+  useEffect(() => {
+    scrollDiscIntoView();
+    window.addEventListener('rhythm:show-now-playing-disc', scrollDiscIntoView);
+    return () => window.removeEventListener('rhythm:show-now-playing-disc', scrollDiscIntoView);
+  }, [scrollDiscIntoView]);
+
+  useEffect(() => {
+    if (!currentTrack) return;
+
+    const frame = requestAnimationFrame(() => {
+      const el = activeQueueTrackRef.current;
+      const container = queueContainerRef.current;
+      if (!el || !container) return;
+
+      const page = pageScrollRef.current;
+      const isDesktopLayout = window.matchMedia('(min-width: 1024px)').matches;
+
+      if (!isDesktopLayout && page) {
+        const queueRect = container.getBoundingClientRect();
+        const isQueueVisible = queueRect.top < window.innerHeight && queueRect.bottom > 0;
+        if (!isQueueVisible) return;
+      }
+
+      container.scrollTo({
+        top: el.offsetTop - container.clientHeight / 2 + el.clientHeight / 2,
+        behavior: 'smooth'
+      });
+    });
+
+    return () => cancelAnimationFrame(frame);
+  }, [currentTrack?.id, playerState.queue.length]);
 
   // Smooth GPU-accelerated JS animation
   const discRef1 = useRef<HTMLDivElement>(null);
@@ -259,7 +289,7 @@ export function NowPlaying() {
   }
 
   return (
-    <div className="h-full overflow-y-auto w-full no-scrollbar" onScroll={handleScroll}>
+    <div ref={pageScrollRef} className="h-full overflow-y-auto w-full no-scrollbar" onScroll={handleScroll}>
       <div className="flex flex-col lg:flex-row items-start justify-center max-w-6xl 2xl:max-w-[1400px] 3xl:max-w-[1600px] 4k:max-w-[2000px] mx-auto w-full gap-8 md:gap-12 py-4 md:py-8 pb-28 md:pb-32">
 
         {/* Left Side: Player */}
@@ -768,12 +798,13 @@ export function NowPlaying() {
               </div>
             </div>
 
-            <div id="nowplaying-queue-container" className="flex flex-col gap-3 overflow-y-auto pr-2 relative flex-1">
+            <div ref={queueContainerRef} id="nowplaying-queue-container" className="flex flex-col gap-3 overflow-y-auto pr-2 relative flex-1">
               {playerState.queue.map((track) => {
                 const isActive = String(currentTrack?.id) === String(track.id);
                 return (
                   <div
                     key={track.id}
+                    ref={isActive ? activeQueueTrackRef : undefined}
                     id={isActive ? 'nowplaying-current-track' : undefined}
                     onClick={() => playerState.playTrack(track, playerState.queue)}
                     className={`flex items-center gap-3 sm:gap-4 p-3 rounded-xl cursor-pointer transition-colors shadow-sm ${isActive ? 'bg-primary/20 border border-primary/30' : 'bg-white/5 hover:bg-white/10 border border-white/5'

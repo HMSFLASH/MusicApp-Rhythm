@@ -154,6 +154,10 @@ export function Layout() {
     { name: t('nav.audioStudio', 'Audio Studio'), path: '/studio', icon: <SlidersHorizontal size={20} /> }
   ];
 
+  const showNowPlayingDisc = () => {
+    window.dispatchEvent(new Event('rhythm:show-now-playing-disc'));
+  };
+
   return (
     <div className="flex flex-col h-[100dvh] overflow-hidden bg-background">
       {/* Main App Area */}
@@ -169,7 +173,14 @@ export function Layout() {
         {/* Sidebar */}
         <aside className={`w-[min(18rem,85vw)] bg-surface border-r border-white/5 flex flex-col flex-shrink-0 transition-transform duration-300 fixed inset-y-0 left-0 z-[60] md:relative md:w-64 md:translate-x-0 ${isMobileMenuOpen ? 'translate-x-0' : '-translate-x-full'}`}>
           <div className="p-6 flex items-center justify-between">
-            <Link to="/" onClick={() => setIsMobileMenuOpen(false)} className="hover:opacity-80 transition-opacity">
+            <Link
+              to="/"
+              onClick={() => {
+                setIsMobileMenuOpen(false);
+                showNowPlayingDisc();
+              }}
+              className="hover:opacity-80 transition-opacity"
+            >
               <h1 className="text-2xl font-bold font-sans text-white tracking-tight flex items-center gap-2">
                 <svg width="28" height="28" viewBox="0 0 24 24" fill="none" xmlns="http://www.w3.org/2000/svg" className="text-primary">
                   <rect x="3" y="9" width="4" height="12" rx="2" fill="currentColor" className="animate-pulse" style={{ animationDelay: '0ms' }} />
@@ -199,6 +210,9 @@ export function Layout() {
                     <NavLink
                       key={item.path}
                       to={item.path}
+                      onClick={() => {
+                        if (item.path === '/') showNowPlayingDisc();
+                      }}
                       className={({ isActive }) =>
                         `flex items-center gap-3 px-3 py-2.5 rounded-lg transition-colors ${(isActive && item.path !== '/library') || isLibraryChild
                           ? 'bg-primary/10 text-primary font-medium'
@@ -385,7 +399,7 @@ export function Layout() {
             <button onClick={() => setIsMobileMenuOpen(true)} className="text-white hover:text-primary transition-colors" aria-label="Open menu">
               <Menu size={24} />
             </button>
-            <Link to="/" className="hover:opacity-80 transition-opacity">
+            <Link to="/" onClick={showNowPlayingDisc} className="hover:opacity-80 transition-opacity">
               <h1 className="text-xl font-bold font-sans text-white tracking-tight flex items-center gap-2">
                 <svg width="24" height="24" viewBox="0 0 24 24" fill="none" xmlns="http://www.w3.org/2000/svg" className="text-primary">
                   <rect x="3" y="9" width="4" height="12" rx="2" fill="currentColor" className="animate-pulse" style={{ animationDelay: '0ms' }} />

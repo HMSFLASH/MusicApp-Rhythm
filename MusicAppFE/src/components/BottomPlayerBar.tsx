@@ -41,6 +41,11 @@ export function BottomPlayerBar() {
   } = playerState;
   const currentArtwork = currentTrack ? (currentTrack.imageUrl || playerState.getTrackImage(currentTrack.id)) : '';
 
+  const openNowPlaying = () => {
+    window.dispatchEvent(new Event('rhythm:show-now-playing-disc'));
+    navigate('/');
+  };
+
   const discRef = useRef<HTMLDivElement>(null);
   const animationRef = useRef<Animation | null>(null);
   const animationKeyRef = useRef('');
@@ -225,7 +230,7 @@ export function BottomPlayerBar() {
     <div className="h-16 md:h-20 bg-surface border-t border-white/5 px-2 sm:px-3 md:px-6 grid grid-cols-[minmax(0,1fr)_auto_auto] md:flex items-center gap-2 md:gap-4 md:justify-between select-none shadow-[0_-10px_40px_rgba(0,0,0,0.3)] z-50">
       
       {/* Left: Track Info */}
-      <div className="flex items-center min-w-0 md:flex-1 w-full md:max-w-xs gap-2 md:gap-3 cursor-pointer md:cursor-auto" onClick={() => { if (window.innerWidth < 768) navigate('/'); }}>
+      <div className="flex items-center min-w-0 md:flex-1 w-full md:max-w-xs gap-2 md:gap-3 cursor-pointer md:cursor-auto" onClick={() => { if (window.innerWidth < 768) openNowPlaying(); }}>
         <div className={`w-10 h-10 md:w-12 md:h-12 rounded-md bg-background border border-white/10 flex items-center justify-center overflow-hidden shrink-0`}>
           {currentArtwork ? (
             <img src={currentArtwork} alt="Album Art" className="w-full h-full object-cover" />
@@ -384,7 +389,7 @@ export function BottomPlayerBar() {
           buttonClassName="h-9 w-9 rounded-full bg-white/5 text-white/70 hover:bg-white/10 hover:text-white flex items-center justify-center transition-colors"
           menuClassName="w-56"
           actions={[
-            { label: t('nav.nowPlaying', 'Now Playing'), icon: <Maximize2 size={14} />, onSelect: () => navigate('/') },
+            { label: t('nav.nowPlaying', 'Now Playing'), icon: <Maximize2 size={14} />, onSelect: openNowPlaying },
             ...(currentTrack.sourceType === 'DRIVE'
               ? [{
                   label: t('bottomPlayer.reloadFromDrive', 'Reload from Drive'),
@@ -429,7 +434,7 @@ export function BottomPlayerBar() {
 
       {/* Right: Extra Controls */}
       <div className="hidden md:flex items-center justify-end w-1/4 min-w-[200px] gap-4 text-white/50">
-        <button onClick={() => navigate('/')} className="hover:text-white transition-colors" aria-label="Now Playing">
+        <button onClick={openNowPlaying} className="hover:text-white transition-colors" aria-label="Now Playing">
           <Maximize2 size={16} />
         </button>
         {currentTrack.sourceType === 'DRIVE' && (
