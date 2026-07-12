@@ -153,6 +153,7 @@ export interface Track {
   codec?: string;
   fileSize?: number;
   lyrics?: string;
+  coverChecked?: boolean;
 }
 
 export type SongEndMode = 'stop' | 'preload' | 'next' | 'repeat_one';

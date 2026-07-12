@@ -2,6 +2,7 @@ import { useRef, useEffect, useState } from 'react';
 import type { Track } from './audioTypes';
 import { getCover, removeCover, saveCover } from '../utils/idb';
 import { db } from '../lib/db';
+import { axiosClient } from '../api/axiosClient';
 import { BACKEND_URL } from '../config/env';
 import { parseLocalAudioMetadata } from '../utils/localAudioFiles';
 import { getAudioMimeType, shouldUseLegacyMetadataParser } from './audioMime';
@@ -57,7 +58,6 @@ const refreshableMetadataFields: Array<keyof Track> = [
     'fileFormat',
     'codec',
     'fileSize',
-    'lyrics',
 ];
 
 const clearRefreshableMetadata = (track: Track): Track => {
@@ -137,7 +137,8 @@ export function useAudioMetadata(isAuthenticated: boolean, queueState: any, sett
 
     async function extractMetadata(track: Track) {
         const trackId = String(track.id);
-        if (metadataCacheRef.current.has(trackId)) return;
+        const existing = metadataCacheRef.current.get(trackId);
+        if (existing?.pending) return;
         if (track.sourceType !== 'LOCAL' && !isAuthenticated) return;
         const useLegacyMetadataParser = shouldUseLegacyMetadataParser(track, legacyMetadataOverrides);
 
@@ -176,7 +177,12 @@ export function useAudioMetadata(isAuthenticated: boolean, queueState: any, sett
                         // eslint-disable-next-line @typescript-eslint/no-explicit-any
                         setQueue((prevQ: any) => prevQ?.map ? prevQ.map((t: any) => String(t.id) === trackId ? { ...t, ...parsed } : t) : prevQ);
                         window.dispatchEvent(new CustomEvent('sonic_metadata_updated', { detail: trackId }));
-                        return; // SKIP EXTRACTION!
+
+                        const hasCover = !!parsed.imageUrl || !!track.imageUrl;
+                        const coverChecked = (lsData as any).coverChecked;
+                        if (hasCover || coverChecked) {
+                            return; // SKIP EXTRACTION!
+                        }
                     }
                 } catch (e) {
                     console.warn('[Metadata] Failed to load cache from storage', e);
@@ -186,7 +192,8 @@ export function useAudioMetadata(isAuthenticated: boolean, queueState: any, sett
         // --- END CACHE READ LAYER ---
 
         // Mark as pending to prevent concurrent extractions
-        metadataCacheRef.current.set(trackId, { pending: true });
+        const currentCached = metadataCacheRef.current.get(trackId) || {};
+        metadataCacheRef.current.set(trackId, { ...currentCached, pending: true });
 
         const cachePayload: Partial<Track> = {};
         const up: Partial<Track> = {};
@@ -358,9 +365,25 @@ export function useAudioMetadata(isAuthenticated: boolean, queueState: any, sett
             }
 
             // Always mark as cached so we don't infinitely retry
-            metadataCacheRef.current.set(trackId, cachePayload);
+            const updatedCachePayload = { ...cachePayload, coverChecked: true };
+            metadataCacheRef.current.set(trackId, updatedCachePayload);
             if (track.sourceType !== 'LOCAL') {
-                await db.set(lsKey, cachePayload);
+                await db.set(lsKey, updatedCachePayload);
+
+                if (isAuthenticated) {
+                    try {
+                        await axiosClient.put(`/api/music/${trackId}/metadata`, {
+                            title: cachePayload.title,
+                            artist: cachePayload.artist,
+                            album: cachePayload.album,
+                            genre: cachePayload.genre,
+                            lyrics: cachePayload.lyrics,
+                            durationSeconds: cachePayload.durationSeconds
+                        });
+                    } catch (apiErr) {
+                        console.warn('[Metadata] Failed to save extracted metadata to backend', apiErr);
+                    }
+                }
             }
             setMetadataVersion(v => v + 1);
 
@@ -374,8 +397,53 @@ export function useAudioMetadata(isAuthenticated: boolean, queueState: any, sett
         } catch (e) {
             console.warn('[Metadata] Failed to extract for', track.fileName, e);
             // Mark as failed in cache to prevent infinite retries
-            metadataCacheRef.current.set(trackId, {});
+            const currentCached = metadataCacheRef.current.get(trackId) || {};
+            const updatedCache = { ...currentCached, coverChecked: true };
+            delete (updatedCache as any).pending;
+            metadataCacheRef.current.set(trackId, updatedCache);
+            if (track.sourceType !== 'LOCAL') {
+                try {
+                    const lsData = await getCachedMetadataForTrack(track) || {};
+                    await db.set(lsKey, { ...lsData, coverChecked: true });
+                } catch (err) {
+                    console.warn('[Metadata] Failed to save error status to cache', err);
+                }
+            }
             setMetadataVersion(v => v + 1);
+        }
+    }
+
+    async function reloadMetadataFromBackend(track: Track) {
+        if (track.sourceType === 'LOCAL') return;
+        const trackId = String(track.id);
+
+        try {
+            const response = await axiosClient.post(`/api/music/${trackId}/reload-metadata`) as { result?: any } | any;
+            const updatedTrack = response?.result || response;
+            if (updatedTrack) {
+                const cachePayload: Partial<Track> = {
+                    title: updatedTrack.title,
+                    artist: updatedTrack.artist,
+                    album: updatedTrack.album,
+                    genre: updatedTrack.genre,
+                    lyrics: updatedTrack.lyrics,
+                    durationSeconds: updatedTrack.durationSeconds,
+                    coverChecked: true
+                };
+
+                metadataCacheRef.current.set(trackId, cachePayload);
+                const lsKey = getMetadataCacheKey(trackId);
+                await db.set(lsKey, cachePayload);
+
+                setCurrentTrack((prev: any) => prev && String(prev.id) === trackId ? { ...prev, ...cachePayload } : prev);
+                setQueue((prevQ: any) => prevQ?.map ? prevQ.map((t: any) => String(t.id) === trackId ? { ...t, ...cachePayload } : t) : prevQ);
+                setMetadataVersion(v => v + 1);
+
+                window.dispatchEvent(new CustomEvent('sonic_metadata_updated', { detail: trackId }));
+                window.dispatchEvent(new CustomEvent('music-uploaded'));
+            }
+        } catch (err) {
+            console.error('[Metadata] Failed to reload metadata from backend:', err);
         }
     }
 
@@ -400,8 +468,14 @@ export function useAudioMetadata(isAuthenticated: boolean, queueState: any, sett
             }
         }
 
-        if (currentTrack && !metadataCacheRef.current.has(String(currentTrack.id))) {
-            void extractMetadata(currentTrack);
+        if (currentTrack) {
+            const trackId = String(currentTrack.id);
+            const cached = metadataCacheRef.current.get(trackId);
+            const hasCover = !!cached?.imageUrl || !!currentTrack.imageUrl;
+            const coverChecked = cached?.coverChecked;
+            if (!cached || (!hasCover && !coverChecked)) {
+                void extractMetadata(currentTrack);
+            }
         }
         // eslint-disable-next-line react-hooks/exhaustive-deps
     }, [currentTrack, legacyMetadataOverrides]);
@@ -410,6 +484,7 @@ export function useAudioMetadata(isAuthenticated: boolean, queueState: any, sett
         extractMetadata,
         clearTrackCachedMetadata,
         refreshTrackMetadataFromDrive,
+        reloadMetadataFromBackend,
         metadataCacheRef,
         imageCacheRef,
         blobCacheRef,

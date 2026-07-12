@@ -474,4 +474,133 @@ public class MusicService {
                 .orElse(null);
     }
 
+    @org.springframework.transaction.annotation.Transactional
+    public MusicItemDto reloadMetadataFromDrive(String id, String userId) {
+        MusicLibrary lib = musicLibraryRepository.findByIdAndUserId(id, userId)
+                .orElseThrow(() -> new AppException(ErrorCode.NOT_FOUND));
+
+        if (!"DRIVE".equals(lib.getSourceType()) || lib.getDriveFileId() == null) {
+            throw new AppException(ErrorCode.NOT_FOUND, "Not a Google Drive track");
+        }
+
+        try {
+            String refreshToken = lib.getUser().getRefreshToken();
+            if (refreshToken == null) {
+                throw new AppException(ErrorCode.FORBIDDEN, "User Google Drive not linked");
+            }
+
+            // Download file stream from Google Drive
+            java.io.InputStream is = googleDriveService.streamFile(lib.getDriveFileId(), null, refreshToken).getInputStream();
+            if (is == null) {
+                throw new AppException(ErrorCode.NOT_FOUND, "Drive file could not be downloaded");
+            }
+
+            // Write to a temp file to parse metadata
+            String originalFilename = lib.getName();
+            String ext = ".tmp";
+            if (originalFilename.lastIndexOf(".") != -1) {
+                ext = originalFilename.substring(originalFilename.lastIndexOf("."));
+            }
+            java.io.File tempFile = java.io.File.createTempFile("musicapp_reload_", ext);
+            try {
+                java.nio.file.Files.copy(is, tempFile.toPath(), java.nio.file.StandardCopyOption.REPLACE_EXISTING);
+
+                String title = null;
+                String artist = null;
+                String album = null;
+                String genre = null;
+                String lyrics = null;
+
+                if (originalFilename.toLowerCase().endsWith(".opus")) {
+                    org.gagravarr.opus.OpusFile opusFile = new org.gagravarr.opus.OpusFile(tempFile);
+                    org.gagravarr.opus.OpusTags tags = opusFile.getTags();
+                    if (tags != null) {
+                        title = tags.getTitle();
+                        artist = tags.getArtist();
+                        album = tags.getAlbum();
+                        genre = tags.getGenre();
+
+                        java.util.List<String> lyricsList = tags.getComments("LYRICS");
+                        if (lyricsList == null || lyricsList.isEmpty())
+                            lyricsList = tags.getComments("UNSYNCEDLYRICS");
+                        if (lyricsList == null || lyricsList.isEmpty())
+                            lyricsList = tags.getComments("UNSYNCED LYRICS");
+                        if (lyricsList == null || lyricsList.isEmpty()) {
+                            java.util.Map<String, java.util.List<String>> allComments = tags.getAllComments();
+                            for (java.util.Map.Entry<String, java.util.List<String>> entry : allComments.entrySet()) {
+                                String keyId = entry.getKey().toUpperCase();
+                                if (keyId.contains("LYRICS") || keyId.equals("USLT") || keyId.equals("SYLT")) {
+                                    lyricsList = entry.getValue();
+                                    break;
+                                }
+                            }
+                        }
+                        if (lyricsList != null && !lyricsList.isEmpty()) {
+                            lyrics = lyricsList.get(0);
+                        }
+                    }
+                } else {
+                    AudioFile audioFile = AudioFileIO.read(tempFile);
+                    Tag tag = audioFile.getTag();
+                    if (tag != null) {
+                        title = tag.getFirst(FieldKey.TITLE);
+                        artist = tag.getFirst(FieldKey.ARTIST);
+                        album = tag.getFirst(FieldKey.ALBUM);
+                        genre = tag.getFirst(FieldKey.GENRE);
+
+                        String tagLyrics = tag.getFirst(FieldKey.LYRICS);
+                        if (tagLyrics == null || tagLyrics.isBlank()) {
+                            try { tagLyrics = tag.getFirst("UNSYNCEDLYRICS"); } catch (Exception ex) {}
+                        }
+                        if (tagLyrics == null || tagLyrics.isBlank()) {
+                            try { tagLyrics = tag.getFirst("UNSYNCED LYRICS"); } catch (Exception ex) {}
+                        }
+                        if (tagLyrics == null || tagLyrics.isBlank()) {
+                            try { tagLyrics = tag.getFirst("USLT"); } catch (Exception ex) {}
+                        }
+                        if (tagLyrics == null || tagLyrics.isBlank()) {
+                            try { tagLyrics = tag.getFirst("SYLT"); } catch (Exception ex) {}
+                        }
+
+                        if (tagLyrics == null || tagLyrics.isBlank()) {
+                            java.util.Iterator<org.jaudiotagger.tag.TagField> fields = tag.getFields();
+                            while (fields.hasNext()) {
+                                org.jaudiotagger.tag.TagField field = fields.next();
+                                String tagId = field.getId();
+                                String content = field.toString();
+
+                                if (content != null && content.contains("\n") && content.length() > 20) {
+                                    tagLyrics = content;
+                                    if (tagLyrics.contains("=\"")) {
+                                        tagLyrics = tagLyrics.substring(tagLyrics.indexOf("=\"") + 2);
+                                        if (tagLyrics.endsWith("\""))
+                                            tagLyrics = tagLyrics.substring(0, tagLyrics.length() - 1);
+                                    }
+                                }
+                            }
+                        }
+
+                        if (tagLyrics != null && !tagLyrics.isBlank()) {
+                            lyrics = tagLyrics;
+                        }
+                    }
+                }
+
+                if (title != null && !title.isBlank()) lib.setTitle(title);
+                if (artist != null && !artist.isBlank()) lib.setArtist(artist);
+                if (album != null && !album.isBlank()) lib.setAlbum(album);
+                if (genre != null && !genre.isBlank()) lib.setGenre(genre);
+                if (lyrics != null && !lyrics.isBlank()) lib.setLyrics(lyrics);
+
+            } finally {
+                tempFile.delete();
+            }
+
+            return toDto(musicLibraryRepository.save(lib));
+        } catch (Exception e) {
+            log.error("Failed to reload metadata from Drive for track {}", id, e);
+            throw new AppException(ErrorCode.UNCATEGORIZED_EXCEPTION, "Failed to reload metadata from Drive");
+        }
+    }
+
 }

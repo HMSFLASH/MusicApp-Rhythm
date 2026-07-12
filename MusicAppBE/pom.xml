@@ -10,7 +10,7 @@
 	</parent>
 	<groupId>com.music.app</groupId>
 	<artifactId>MusicApp</artifactId>
-	<version>1.2.0.1</version>
+	<version>1.2.1.0</version>
 	<name>MusicApp</name>
 	<description>Music Application</description>
 	<url/>

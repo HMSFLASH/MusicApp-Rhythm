@@ -439,6 +439,20 @@ export function NowPlaying() {
                       {currentTrack.sourceType !== 'LOCAL' && (
                         <button
                           onClick={async () => {
+                            setShowMenu(false);
+                            if (playerState.reloadMetadataFromBackend) {
+                              await playerState.reloadMetadataFromBackend(currentTrack);
+                            }
+                          }}
+                          className="w-full flex items-center gap-3 px-4 py-3 text-sm text-white/80 hover:bg-white/5 transition-colors border-b border-white/5"
+                        >
+                          <Music size={16} />
+                          <span>{t('nowPlaying.reloadLyrics')}</span>
+                        </button>
+                      )}
+                      {currentTrack.sourceType !== 'LOCAL' && (
+                        <button
+                          onClick={async () => {
                             const isConfirmed = await confirm({
                               title: 'Xóa bài hát',
                               description: `Bạn có chắc chắn muốn xóa bài hát "${currentTrack.title || currentTrack.fileName}" khỏi thư viện?`,

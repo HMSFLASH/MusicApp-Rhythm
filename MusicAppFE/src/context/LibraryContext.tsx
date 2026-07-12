@@ -89,7 +89,7 @@ const mergeCachedMetadata = async (track: Track): Promise<Track> => {
   if (!cached && !idbCover && !isBackendMusicImageUrl(track.imageUrl)) return track;
 
   const merged = { ...track };
-  if (isBackendMusicImageUrl(merged.imageUrl)) {
+  if (isBackendMusicImageUrl(merged.imageUrl) && idbCover) {
     merged.imageUrl = '';
   }
 
