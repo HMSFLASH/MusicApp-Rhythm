@@ -229,10 +229,10 @@ export function NowPlaying() {
 
   const handleProgressUp = useCallback((e: PointerEvent) => {
     if (isDraggingProgress && progressBarRef.current && duration) {
-       const rect = progressBarRef.current.getBoundingClientRect();
-       let newX = e.clientX - rect.left;
-       newX = Math.max(0, Math.min(newX, rect.width));
-       seek((newX / rect.width) * duration);
+      const rect = progressBarRef.current.getBoundingClientRect();
+      let newX = e.clientX - rect.left;
+      newX = Math.max(0, Math.min(newX, rect.width));
+      seek((newX / rect.width) * duration);
     }
     setIsDraggingProgress(false);
   }, [isDraggingProgress, duration, seek]);
@@ -256,10 +256,10 @@ export function NowPlaying() {
     e.preventDefault();
     setIsDraggingProgress(true);
     if (progressBarRef.current) {
-        const rect = progressBarRef.current.getBoundingClientRect();
-        let newX = e.clientX - rect.left;
-        newX = Math.max(0, Math.min(newX, rect.width));
-        setDragProgressPercent(newX / rect.width);
+      const rect = progressBarRef.current.getBoundingClientRect();
+      let newX = e.clientX - rect.left;
+      newX = Math.max(0, Math.min(newX, rect.width));
+      setDragProgressPercent(newX / rect.width);
     }
   };
 
@@ -362,7 +362,7 @@ export function NowPlaying() {
             {/* Top Action Bar */}
             <div className="flex items-center justify-between px-2 mb-8 text-white/60">
               {currentTrack.sourceType !== 'LOCAL' ? (
-                <button 
+                <button
                   onClick={toggleFavorite}
                   className={`
                     ${isFavorite ? 'text-primary drop-shadow-[0_0_12px_var(--tw-colors-primary)] scale-110' : 'text-white/40 hover:text-white'} 
@@ -376,9 +376,9 @@ export function NowPlaying() {
               ) : (
                 <div className="w-10 h-10"></div>
               )}
-              
+
               {hasLyrics && (
-                <button 
+                <button
                   onClick={() => setShowLyrics(!showLyrics)}
                   className={`transition-all p-2 rounded-full ${showLyrics ? 'text-primary bg-primary/20 shadow-[0_0_12px_var(--tw-colors-primary)]' : 'hover:bg-white/10 hover:text-white'}`}
                   title={showLyrics ? 'Show Disc' : t('nowPlaying.viewLyrics')}
@@ -388,7 +388,7 @@ export function NowPlaying() {
               )}
 
               <button onClick={() => setShowMetadata(true)} className="hover:text-white transition-colors p-2 rounded-full hover:bg-white/10"><Info size={24} /></button>
-              
+
               {/* More Options (...) Button */}
               <div className="relative" ref={menuRef}>
                 <button
@@ -398,119 +398,116 @@ export function NowPlaying() {
                   <MoreHorizontal size={24} />
                 </button>
                 {showMenu && (
-                    <div className="absolute bottom-full left-1/2 -translate-x-1/2 mb-3 w-72 max-w-[calc(100vw_-_2rem)] bg-[#1e1e1e] border border-white/10 rounded-2xl shadow-2xl overflow-hidden z-50">
-                      <div className="px-4 py-3 border-b border-white/10">
-                        <p className="text-xs text-white/40 font-medium uppercase tracking-wider">{t('nowPlaying.options')}</p>
-                      </div>
-                      {/* Tempo Control */}
-                      <div className="px-4 py-4 border-b border-white/5">
-                        <div className="flex items-center justify-between mb-3">
-                          <div className="flex items-center gap-2 text-white">
-                            <Gauge size={16} className="text-primary" />
-                            <span className="text-sm font-semibold">{t('nowPlaying.playbackSpeed')}</span>
-                          </div>
-                          <button
-                            onClick={togglePreservesPitch}
-                            className={`text-[10px] font-mono px-2 py-1 rounded-full border transition-all ${preservesPitch
-                              ? 'bg-primary/20 text-primary border-primary/50'
-                              : 'bg-white/10 text-white/50 border-white/20'
-                              }`}
-                          >
-                            {preservesPitch ? t('nowPlaying.preservePitch') : t('nowPlaying.vinyl')}
-                          </button>
+                  <div className="absolute bottom-full left-1/2 -translate-x-1/2 mb-3 w-72 max-w-[calc(100vw_-_2rem)] bg-[#1e1e1e] border border-white/10 rounded-2xl shadow-2xl overflow-hidden z-50">
+                    {/* Tempo Control */}
+                    <div className="px-4 py-4 border-b border-white/5">
+                      <div className="flex items-center justify-between mb-3">
+                        <div className="flex items-center gap-2 text-white">
+                          <Gauge size={16} className="text-primary" />
+                          <span className="text-sm font-semibold">{t('nowPlaying.playbackSpeed')}</span>
                         </div>
-                        <HorizontalSlider
-                          value={playbackRate}
-                          min={0.5}
-                          max={2.0}
-                          step={0.05}
-                          onChange={updatePlaybackRate}
-                          label={t('nowPlaying.tempo')}
-                          color="#00f5ff"
-                          unit="x"
-                        />
+                        <button
+                          onClick={togglePreservesPitch}
+                          className={`text-[10px] font-mono px-2 py-1 rounded-full border transition-all ${preservesPitch
+                            ? 'bg-primary/20 text-primary border-primary/50'
+                            : 'bg-white/10 text-white/50 border-white/20'
+                            }`}
+                        >
+                          {preservesPitch ? t('nowPlaying.preservePitch') : t('nowPlaying.vinyl')}
+                        </button>
                       </div>
-                      {getAudioExtension(currentTrack.fileName) === 'flac' && (
-                        <button
-                          onClick={() => {
-                            playerState.toggleFlacWasmForTrack(currentTrack);
-                            setShowMenu(false);
-                          }}
-                          className="w-full flex items-center gap-3 px-4 py-3 text-sm text-white/80 hover:bg-white/5 transition-colors border-b border-white/5"
-                        >
-                          <Cpu size={16} className={playerState.isFlacWasmEnabled(currentTrack) ? 'text-primary' : ''} />
-                          <span>{playerState.isFlacWasmEnabled(currentTrack) ? 'Use Normal FLAC' : 'Use FLAC WASM'}</span>
-                        </button>
-                      )}
-                      {currentTrack && (
-                        <button
-                          onClick={() => {
-                            playerState.toggleLegacyMetadataForTrack(currentTrack);
-                            setShowMenu(false);
-                          }}
-                          className="w-full flex items-center gap-3 px-4 py-3 text-sm text-white/80 hover:bg-white/5 transition-colors border-b border-white/5"
-                        >
-                          <Tags size={16} className={playerState.isLegacyMetadataEnabled(currentTrack) ? 'text-primary' : ''} />
-                          <span>{playerState.isLegacyMetadataEnabled(currentTrack) ? 'Use New Metadata Parser' : 'Use Legacy Metadata Parser'}</span>
-                        </button>
-                      )}
-                      {currentTrack.sourceType !== 'LOCAL' && (
-                        <button
-                          onClick={async () => {
-                            setShowMenu(false);
-                            await playerState.reloadCurrentTrackFromDrive();
-                          }}
-                          className="w-full flex items-center gap-3 px-4 py-3 text-sm text-white/80 hover:bg-white/5 transition-colors border-b border-white/5"
-                        >
-                          <RefreshCw size={16} />
-                          <span>{t('nowPlaying.reloadFromDrive')}</span>
-                        </button>
-                      )}
-                      {currentTrack.sourceType !== 'LOCAL' && (
-                        <button
-                          onClick={async () => {
-                            setShowMenu(false);
-                            if (playerState.reloadMetadataFromBackend) {
-                              await playerState.reloadMetadataFromBackend(currentTrack);
-                            }
-                          }}
-                          className="w-full flex items-center gap-3 px-4 py-3 text-sm text-white/80 hover:bg-white/5 transition-colors border-b border-white/5"
-                        >
-                          <Music size={16} />
-                          <span>{t('nowPlaying.reloadLyrics')}</span>
-                        </button>
-                      )}
-                      {currentTrack.sourceType !== 'LOCAL' && (
-                        <button
-                          onClick={async () => {
-                            const isConfirmed = await confirm({
-                              title: 'Xóa bài hát',
-                              description: `Bạn có chắc chắn muốn xóa bài hát "${currentTrack.title || currentTrack.fileName}" khỏi thư viện?`,
-                              confirmText: 'Xóa',
-                              confirmColor: 'bg-red-500/20 text-red-400 hover:bg-red-500/30 border-red-500/30'
-                            });
-                            if (isConfirmed) {
-                              const isConfirmed2 = await confirm({
-                                title: 'Xác nhận xóa vĩnh viễn',
-                                description: `Hành động này sẽ xóa vĩnh viễn bài hát "${currentTrack.title || currentTrack.fileName}" từ Google Drive của bạn và không thể hoàn tác. Bạn vẫn muốn tiếp tục?`,
-                                confirmText: 'Xóa vĩnh viễn',
-                                confirmColor: 'bg-red-600 text-white hover:bg-red-700 border-red-600'
-                              });
-                              if (isConfirmed2) {
-                                setShowMenu(false);
-                                await deleteTrack(currentTrack);
-                              }
-                            }
-                          }}
-                          className="w-full flex items-center gap-3 px-4 py-3 text-sm text-red-400 hover:bg-white/5 hover:text-red-300 transition-colors border-t border-white/5"
-                        >
-                          <Trash2 size={16} />
-                          <span>Delete from Library</span>
-                        </button>
-                      )}
+                      <HorizontalSlider
+                        value={playbackRate}
+                        min={0.5}
+                        max={2.0}
+                        step={0.05}
+                        onChange={updatePlaybackRate}
+                        label={t('nowPlaying.tempo')}
+                        color="#00f5ff"
+                        unit="x"
+                      />
                     </div>
-                  )}
-                </div>
+                    {getAudioExtension(currentTrack.fileName) === 'flac' && (
+                      <button
+                        onClick={() => {
+                          playerState.toggleFlacWasmForTrack(currentTrack);
+                          setShowMenu(false);
+                        }}
+                        className="w-full flex items-center gap-3 px-4 py-3 text-sm text-white/80 hover:bg-white/5 transition-colors border-b border-white/5"
+                      >
+                        <Cpu size={16} className={playerState.isFlacWasmEnabled(currentTrack) ? 'text-primary' : ''} />
+                        <span>{playerState.isFlacWasmEnabled(currentTrack) ? 'Use Normal FLAC' : 'Use FLAC WASM'}</span>
+                      </button>
+                    )}
+                    {currentTrack && (
+                      <button
+                        onClick={() => {
+                          playerState.toggleLegacyMetadataForTrack(currentTrack);
+                          setShowMenu(false);
+                        }}
+                        className="w-full flex items-center gap-3 px-4 py-3 text-sm text-white/80 hover:bg-white/5 transition-colors border-b border-white/5"
+                      >
+                        <Tags size={16} className={playerState.isLegacyMetadataEnabled(currentTrack) ? 'text-primary' : ''} />
+                        <span>{playerState.isLegacyMetadataEnabled(currentTrack) ? 'Use New Metadata Parser' : 'Use Legacy Metadata Parser'}</span>
+                      </button>
+                    )}
+                    {currentTrack.sourceType !== 'LOCAL' && (
+                      <button
+                        onClick={async () => {
+                          setShowMenu(false);
+                          await playerState.reloadCurrentTrackFromDrive();
+                        }}
+                        className="w-full flex items-center gap-3 px-4 py-3 text-sm text-white/80 hover:bg-white/5 transition-colors border-b border-white/5"
+                      >
+                        <RefreshCw size={16} />
+                        <span>{t('nowPlaying.reloadFromDrive')}</span>
+                      </button>
+                    )}
+                    {currentTrack.sourceType !== 'LOCAL' && (
+                      <button
+                        onClick={async () => {
+                          setShowMenu(false);
+                          if (playerState.reloadMetadataFromBackend) {
+                            await playerState.reloadMetadataFromBackend(currentTrack);
+                          }
+                        }}
+                        className="w-full flex items-center gap-3 px-4 py-3 text-sm text-white/80 hover:bg-white/5 transition-colors border-b border-white/5"
+                      >
+                        <Music size={16} />
+                        <span>{t('nowPlaying.reloadLyrics')}</span>
+                      </button>
+                    )}
+                    {currentTrack.sourceType !== 'LOCAL' && (
+                      <button
+                        onClick={async () => {
+                          const isConfirmed = await confirm({
+                            title: 'Xóa bài hát',
+                            description: `Bạn có chắc chắn muốn xóa bài hát "${currentTrack.title || currentTrack.fileName}" khỏi thư viện?`,
+                            confirmText: 'Xóa',
+                            confirmColor: 'bg-red-500/20 text-red-400 hover:bg-red-500/30 border-red-500/30'
+                          });
+                          if (isConfirmed) {
+                            const isConfirmed2 = await confirm({
+                              title: 'Xác nhận xóa vĩnh viễn',
+                              description: `Hành động này sẽ xóa vĩnh viễn bài hát "${currentTrack.title || currentTrack.fileName}" từ Google Drive của bạn và không thể hoàn tác. Bạn vẫn muốn tiếp tục?`,
+                              confirmText: 'Xóa vĩnh viễn',
+                              confirmColor: 'bg-red-600 text-white hover:bg-red-700 border-red-600'
+                            });
+                            if (isConfirmed2) {
+                              setShowMenu(false);
+                              await deleteTrack(currentTrack);
+                            }
+                          }
+                        }}
+                        className="w-full flex items-center gap-3 px-4 py-3 text-sm text-red-400 hover:bg-white/5 hover:text-red-300 transition-colors border-t border-white/5"
+                      >
+                        <Trash2 size={16} />
+                        <span>Delete from Library</span>
+                      </button>
+                    )}
+                  </div>
+                )}
+              </div>
 
               <div className="relative flex items-center gap-2" ref={repeatRef}>
                 {repeatMode === 'simple' ? (
@@ -698,9 +695,9 @@ export function NowPlaying() {
 
             <div className="flex items-center gap-4 font-mono text-sm font-bold text-white/90 mb-8 select-none">
               <span className="min-w-[40px] text-right">{formatTime(displayTime)}</span>
-              <div 
+              <div
                 ref={progressBarRef}
-                className="flex-1 relative flex items-center group h-6 cursor-pointer touch-none" 
+                className="flex-1 relative flex items-center group h-6 cursor-pointer touch-none"
                 onPointerDown={handleProgressPointerDown}
               >
                 <div className="absolute inset-x-0 h-1.5 bg-white/20 rounded-full overflow-hidden">
