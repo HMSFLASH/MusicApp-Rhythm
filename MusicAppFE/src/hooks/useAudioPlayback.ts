@@ -1654,8 +1654,8 @@ export function useAudioPlayback(
       if (now - lastReloadAt < 15000) return;
       autoDriveReloadAtRef.current.set(failedTrackId, now);
 
-      console.warn(`[Audio] Cover image failed for ${failedTrackId}; reloading current track from Drive.`);
-      void reloadCurrentTrackFromDrive();
+      console.warn(`[Audio] Cover image failed for ${failedTrackId}; trying legacy cover fallback before backend metadata reload.`);
+      void metadataState.refreshMissingTrackCover?.(withoutBackendImageUrl(activeTrack));
     };
 
     window.addEventListener('error', handleImageLoadError, true);

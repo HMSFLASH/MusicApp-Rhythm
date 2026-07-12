@@ -44,6 +44,14 @@ type MetadataFileInfo = {
     mimeType?: string;
 };
 
+type ExtractMetadataOptions = {
+    ignoreCache?: boolean;
+    useLegacyMetadataParser?: boolean;
+    maxMetadataBytes?: number;
+};
+
+const LEGACY_COVER_FALLBACK_BYTES = 1024 * 1024;
+
 const refreshableMetadataFields: Array<keyof Track> = [
     'title',
     'artist',
@@ -66,6 +74,23 @@ const clearRefreshableMetadata = (track: Track): Track => {
         delete next[field];
     }
     return next;
+};
+
+const isBackendMusicImageUrl = (imageUrl?: string) => {
+    if (!imageUrl) return false;
+
+    try {
+        const url = new URL(imageUrl, window.location.origin);
+        return /^\/api\/music\/[^/]+\/image$/.test(url.pathname);
+    } catch {
+        return /\/api\/music\/[^/]+\/image(?:$|[?#])/.test(imageUrl);
+    }
+};
+
+const withoutBackendImageUrl = (track: Track): Track => {
+    if (!isBackendMusicImageUrl(track.imageUrl)) return track;
+    const { imageUrl: _imageUrl, ...rest } = track;
+    return rest;
 };
 
 async function parseMetadataBuffer(
@@ -135,16 +160,16 @@ export function useAudioMetadata(isAuthenticated: boolean, queueState: any, sett
         window.dispatchEvent(new CustomEvent('sonic_metadata_updated', { detail: trackId }));
     }
 
-    async function extractMetadata(track: Track) {
+    async function extractMetadata(track: Track, options: ExtractMetadataOptions = {}) {
         const trackId = String(track.id);
         const existing = metadataCacheRef.current.get(trackId);
         if (existing?.pending) return;
         if (track.sourceType !== 'LOCAL' && !isAuthenticated) return;
-        const useLegacyMetadataParser = shouldUseLegacyMetadataParser(track, legacyMetadataOverrides);
+        const useLegacyMetadataParser = options.useLegacyMetadataParser ?? shouldUseLegacyMetadataParser(track, legacyMetadataOverrides);
 
         // --- CACHE READ LAYER ---
         const lsKey = getMetadataCacheKey(trackId);
-        if (track.sourceType !== 'LOCAL') {
+        if (track.sourceType !== 'LOCAL' && !options.ignoreCache) {
             const lsData = await getCachedMetadataForTrack(track);
             const idbCover = await getCover(trackId);
             const cachedCoverUpdate: Partial<Track> = {};
@@ -205,17 +230,32 @@ export function useAudioMetadata(isAuthenticated: boolean, queueState: any, sett
             let trueFileSize = 0;
 
             if (track.sourceType === 'LOCAL' && track.localFile) {
-                const localMetadata = await parseLocalAudioMetadata(track.localFile, track.fileName, {
-                    useLegacyMetadataParser,
-                });
-                metadata = localMetadata.metadata as ParsedAudioMetadata;
+                if (options.maxMetadataBytes && track.localFile.size > options.maxMetadataBytes) {
+                    const buffer = new Uint8Array(await track.localFile.slice(0, options.maxMetadataBytes).arrayBuffer());
+                    metadata = await parseMetadataBuffer(
+                        buffer,
+                        {
+                            size: track.localFile.size,
+                            path: track.fileName,
+                            mimeType: getAudioMimeType(track.fileName, track.localFile.type),
+                        },
+                        getAudioMimeType(track.fileName, track.localFile.type),
+                        useLegacyMetadataParser,
+                    );
+                    parsedBufferLength = buffer.byteLength;
+                } else {
+                    const localMetadata = await parseLocalAudioMetadata(track.localFile, track.fileName, {
+                        useLegacyMetadataParser,
+                    });
+                    metadata = localMetadata.metadata as ParsedAudioMetadata;
+                    parsedBufferLength = localMetadata.parsedBufferLength;
+                }
 
                 if (track.localFile.size > 0) {
                     up.fileSize = track.localFile.size;
                     cachePayload.fileSize = track.localFile.size;
                     trueFileSize = track.localFile.size;
                 }
-                parsedBufferLength = localMetadata.parsedBufferLength;
             } else {
                 const ext = track.fileName?.split('.').pop()?.toLowerCase();
 
@@ -235,7 +275,10 @@ export function useAudioMetadata(isAuthenticated: boolean, queueState: any, sett
                         trueFileSize = fileSize;
                     }
 
-                    parsedBufferLength = buffer.byteLength;
+                    const parseBuffer = options.maxMetadataBytes && buffer.byteLength > options.maxMetadataBytes
+                        ? buffer.slice(0, options.maxMetadataBytes)
+                        : buffer;
+                    parsedBufferLength = parseBuffer.byteLength;
 
                     const fileInfo: MetadataFileInfo = { size: fileSize };
                     if (track.fileName) fileInfo.path = track.fileName;
@@ -244,7 +287,7 @@ export function useAudioMetadata(isAuthenticated: boolean, queueState: any, sett
                     }
 
                     metadata = await parseMetadataBuffer(
-                        buffer,
+                        parseBuffer,
                         fileInfo,
                         getAudioMimeType(track.fileName, fetchedMimeType),
                         useLegacyMetadataParser,
@@ -264,7 +307,7 @@ export function useAudioMetadata(isAuthenticated: boolean, queueState: any, sett
                         cachePayload.fileSize = fileSize;
                         trueFileSize = fileSize;
                     }
-                    const maxMetadataSize = fileSize > 15 * 1024 * 1024 ? 5 * 1024 * 1024 : 3 * 1024 * 1024;
+                    const maxMetadataSize = options.maxMetadataBytes ?? (fileSize > 15 * 1024 * 1024 ? 5 * 1024 * 1024 : 3 * 1024 * 1024);
 
                     const reader = response.body!.getReader();
                     const chunks: Uint8Array[] = [];
@@ -279,12 +322,15 @@ export function useAudioMetadata(isAuthenticated: boolean, queueState: any, sett
                     controller.abort();
 
                     const buffer = new Uint8Array(totalLength);
-                    parsedBufferLength = buffer.byteLength;
                     let offset = 0;
                     for (const c of chunks) {
                         buffer.set(c, offset);
                         offset += c.length;
                     }
+                    const parseBuffer = options.maxMetadataBytes && buffer.byteLength > options.maxMetadataBytes
+                        ? buffer.slice(0, options.maxMetadataBytes)
+                        : buffer;
+                    parsedBufferLength = parseBuffer.byteLength;
 
                     const fileInfo: MetadataFileInfo = { size: fileSize };
                     if (track.fileName) fileInfo.path = track.fileName;
@@ -293,7 +339,7 @@ export function useAudioMetadata(isAuthenticated: boolean, queueState: any, sett
                     }
 
                     metadata = await parseMetadataBuffer(
-                        buffer,
+                        parseBuffer,
                         fileInfo,
                         getAudioMimeType(track.fileName, fetchedMimeType),
                         useLegacyMetadataParser,
@@ -414,7 +460,7 @@ export function useAudioMetadata(isAuthenticated: boolean, queueState: any, sett
     }
 
     async function reloadMetadataFromBackend(track: Track) {
-        if (track.sourceType === 'LOCAL') return;
+        if (track.sourceType === 'LOCAL') return null;
         const trackId = String(track.id);
 
         try {
@@ -426,6 +472,7 @@ export function useAudioMetadata(isAuthenticated: boolean, queueState: any, sett
                     artist: updatedTrack.artist,
                     album: updatedTrack.album,
                     genre: updatedTrack.genre,
+                    imageUrl: updatedTrack.imageUrl,
                     lyrics: updatedTrack.lyrics,
                     durationSeconds: updatedTrack.durationSeconds,
                     coverChecked: true
@@ -441,16 +488,61 @@ export function useAudioMetadata(isAuthenticated: boolean, queueState: any, sett
 
                 window.dispatchEvent(new CustomEvent('sonic_metadata_updated', { detail: trackId }));
                 window.dispatchEvent(new CustomEvent('music-uploaded'));
+                return updatedTrack;
             }
         } catch (err) {
             console.error('[Metadata] Failed to reload metadata from backend:', err);
         }
+        return null;
     }
 
     async function refreshTrackMetadataFromDrive(track: Track) {
         if (track.sourceType === 'LOCAL') return;
         await clearTrackCachedMetadata(track);
         await extractMetadata(clearRefreshableMetadata(track));
+    }
+
+    async function refreshMissingTrackCover(track: Track) {
+        const trackId = String(track.id);
+
+        setCurrentTrack((prev: Track | null) => (
+            prev && String(prev.id) === trackId ? withoutBackendImageUrl(prev) : prev
+        ));
+        setQueue((prevQ: Track[] | undefined) => Array.isArray(prevQ)
+            ? prevQ.map((t: Track) => String(t.id) === trackId ? withoutBackendImageUrl(t) : t)
+            : prevQ);
+
+        if (track.sourceType === 'LOCAL') {
+            await extractMetadata(withoutBackendImageUrl(track), { ignoreCache: true });
+            return;
+        }
+
+        const currentCached = metadataCacheRef.current.get(trackId) || {};
+        const retryPayload = { ...currentCached };
+        delete (retryPayload as any).coverChecked;
+        metadataCacheRef.current.set(trackId, retryPayload);
+
+        const lsKey = getMetadataCacheKey(trackId);
+        try {
+            const lsData = await getCachedMetadataForTrack(track);
+            if (lsData) {
+                const nextLsData = { ...lsData };
+                delete (nextLsData as any).coverChecked;
+                await db.set(lsKey, nextLsData);
+            }
+        } catch (err) {
+            console.warn('[Metadata] Failed to reset cover retry cache', err);
+        }
+
+        await extractMetadata(withoutBackendImageUrl(track), {
+            ignoreCache: true,
+            useLegacyMetadataParser: true,
+            maxMetadataBytes: LEGACY_COVER_FALLBACK_BYTES,
+        });
+
+        if (imageCacheRef.current.has(trackId)) return;
+
+        await reloadMetadataFromBackend(withoutBackendImageUrl(track));
     }
 
     useEffect(() => {
@@ -484,6 +576,7 @@ export function useAudioMetadata(isAuthenticated: boolean, queueState: any, sett
         extractMetadata,
         clearTrackCachedMetadata,
         refreshTrackMetadataFromDrive,
+        refreshMissingTrackCover,
         reloadMetadataFromBackend,
         metadataCacheRef,
         imageCacheRef,
