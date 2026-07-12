@@ -42,12 +42,37 @@ const DEFAULT_FX_ENABLED: FxEnabledState = {
   stereo: true
 };
 
+const DEFAULT_PARAMETRIC_Q = 1.41;
+const MIN_EQ_Q = 0.1;
+const MAX_EQ_Q = 18;
+
+const calculateGraphicEqQ = (frequencies: number[], index: number) => {
+  const frequency = frequencies[index];
+  const previousFrequency = frequencies[index - 1];
+  const nextFrequency = frequencies[index + 1];
+
+  if (!frequency || (!previousFrequency && !nextFrequency)) return DEFAULT_PARAMETRIC_Q;
+
+  const lowerBoundary = previousFrequency
+    ? Math.sqrt(previousFrequency * frequency)
+    : frequency / Math.sqrt(nextFrequency / frequency);
+  const upperBoundary = nextFrequency
+    ? Math.sqrt(frequency * nextFrequency)
+    : frequency * Math.sqrt(frequency / previousFrequency);
+  const bandwidthOctaves = Math.log2(upperBoundary / lowerBoundary);
+  const bandwidthRatio = Math.pow(2, bandwidthOctaves);
+  const q = Math.sqrt(bandwidthRatio) / (bandwidthRatio - 1);
+
+  if (!Number.isFinite(q)) return DEFAULT_PARAMETRIC_Q;
+  return Math.round(clamp(q, MIN_EQ_Q, MAX_EQ_Q) * 100) / 100;
+};
+
 const createEqBands = (frequencies: number[], gains?: number[]): EqBand[] =>
   frequencies.map((freq, i) => ({
     id: `band_${i}`,
     frequency: freq,
     gain: gains?.[i] ?? 0,
-    q: 1.41,
+    q: calculateGraphicEqQ(frequencies, i),
     channel: 'L+R',
     type: 'peaking'
   }));
@@ -56,16 +81,36 @@ const clampPreampGain = (value: number) => clamp(value, -12, 6);
 
 const hasParametricBandSettings = (bands: EqBand[]) =>
   bands.some((band) => (
-    (band.type || 'peaking') !== 'peaking' || band.channel !== 'L+R' || band.q !== 1.41
+    (band.type || 'peaking') !== 'peaking' || band.channel !== 'L+R'
   ));
+
+const applyGraphicEqQ = (bands: EqBand[]) => {
+  const sortedBands = [...bands].sort((a, b) => a.frequency - b.frequency);
+  const frequencies = sortedBands.map((band) => band.frequency);
+
+  return sortedBands.map((band, index) => ({
+    ...band,
+    q: calculateGraphicEqQ(frequencies, index),
+    channel: 'L+R' as const,
+    type: 'peaking' as BiquadFilterType,
+  }));
+};
 
 export function useAudioEffectsState(savedState: SavedAudioEffectsState = {}) {
   const savedStylisticPreset = STYLISTIC_PRESETS[savedState.eqPresetName as keyof typeof STYLISTIC_PRESETS];
+  const savedCustomPreset = savedState.customEqPresets?.find(p => p.name === savedState.eqPresetName);
+  const initialPresetIsParametric = savedState.eqPresetName === 'PARAMETRIC'
+    || savedCustomPreset?.presetMode === 'parametric'
+    || Boolean(savedCustomPreset?.isCustomOrigin && hasParametricBandSettings(savedCustomPreset.bands));
   const [eqPresetName, setEqPresetName] = useState<string>(savedState.eqPresetName || '10_BANDS');
   const [eqBands, setEqBands] = useState<EqBand[]>(() => {
     const initialBands = savedStylisticPreset
       ? createEqBands(savedStylisticPreset.eqBands, savedStylisticPreset.gains)
-      : savedState.eqBands || createEqBands(EQ_PRESETS['10_BANDS']);
+      : savedState.eqBands
+        ? initialPresetIsParametric
+          ? savedState.eqBands
+          : applyGraphicEqQ(savedState.eqBands)
+        : createEqBands(EQ_PRESETS['10_BANDS']);
     return [...initialBands].sort((a, b) => a.frequency - b.frequency);
   });
   const [customEqPresets, setCustomEqPresets] = useState<CustomEqPreset[]>(savedState.customEqPresets || []);
@@ -158,7 +203,17 @@ export function useAudioEffectsState(savedState: SavedAudioEffectsState = {}) {
     }
   }, [setPreampGain]);
 
-  const setCustomPreset = useCallback(() => setEqPresetName('CUSTOM'), []);
+  const isCurrentParametricEq = useCallback(() => {
+    const currentPreset = customEqPresets.find(p => p.name === eqPresetName);
+    return eqPresetName === 'PARAMETRIC'
+      || currentPreset?.presetMode === 'parametric'
+      || Boolean(currentPreset?.isCustomOrigin && hasParametricBandSettings(currentPreset.bands));
+  }, [customEqPresets, eqPresetName]);
+
+  const setCustomPreset = useCallback(() => {
+    setEqPresetName('CUSTOM');
+    setEqBands(prev => applyGraphicEqQ(prev));
+  }, []);
   const setParametricPreset = useCallback(() => setEqPresetName('PARAMETRIC'), []);
   const saveCustomPreset = useCallback((name: string) => {
     setCustomEqPresets(prev => {
@@ -194,7 +249,11 @@ export function useAudioEffectsState(savedState: SavedAudioEffectsState = {}) {
     setCustomEqPresets(prev => {
       const preset = prev.find(p => p.name === name);
       if (preset) {
-        setEqBands(preset.bands.map(band => ({ ...band })));
+        const isParametricPreset = preset.presetMode === 'parametric'
+          || Boolean(preset.isCustomOrigin && hasParametricBandSettings(preset.bands));
+        setEqBands(isParametricPreset
+          ? preset.bands.map(band => ({ ...band }))
+          : applyGraphicEqQ(preset.bands));
         if (typeof preset.preampGain === 'number') setPreampGain(preset.preampGain);
         if (typeof preset.bassGain === 'number') setBassGain(preset.bassGain);
         if (typeof preset.trebleGain === 'number') setTrebleGain(preset.trebleGain);
@@ -210,10 +269,19 @@ export function useAudioEffectsState(savedState: SavedAudioEffectsState = {}) {
   }, []);
   const deleteCustomPreset = useCallback((name: string) => setCustomEqPresets(prev => prev.filter(p => p.name !== name)), []);
 
-  const addCustomEqBand = useCallback((freq?: number) => setEqBands(prev => [...prev, { id: `band_${Date.now()}`, frequency: freq || 1000, gain: 0, q: 1.41, channel: 'L+R', type: 'peaking' }]), []);
-  const removeCustomEqBand = useCallback((id: string) => setEqBands(prev => prev.filter(b => b.id !== id)), []);
+  const addCustomEqBand = useCallback((freq?: number) => setEqBands(prev => {
+    const nextBands = [...prev, { id: `band_${Date.now()}`, frequency: freq || 1000, gain: 0, q: DEFAULT_PARAMETRIC_Q, channel: 'L+R' as const, type: 'peaking' as BiquadFilterType }];
+    return isCurrentParametricEq() ? nextBands : applyGraphicEqQ(nextBands);
+  }), [isCurrentParametricEq]);
+  const removeCustomEqBand = useCallback((id: string) => setEqBands(prev => {
+    const nextBands = prev.filter(b => b.id !== id);
+    return isCurrentParametricEq() ? nextBands : applyGraphicEqQ(nextBands);
+  }), [isCurrentParametricEq]);
   const updateEqGain = useCallback((id: string, val: number) => setEqBands(prev => prev.map(b => b.id === id ? { ...b, gain: val } : b)), []);
-  const updateEqBandFreq = useCallback((id: string, val: number) => setEqBands(prev => prev.map(b => b.id === id ? { ...b, frequency: val } : b)), []);
+  const updateEqBandFreq = useCallback((id: string, val: number) => setEqBands(prev => {
+    const nextBands = prev.map(b => b.id === id ? { ...b, frequency: val } : b);
+    return isCurrentParametricEq() ? nextBands : applyGraphicEqQ(nextBands);
+  }), [isCurrentParametricEq]);
   const updateEqBandQ = useCallback((id: string, val: number) => setEqBands(prev => prev.map(b => b.id === id ? { ...b, q: val } : b)), []);
   const updateEqBandChannel = useCallback((id: string, val: EqBand['channel']) => setEqBands(prev => prev.map(b => b.id === id ? { ...b, channel: val } : b)), []);
   const updateEqBandType = useCallback((id: string, val: BiquadFilterType) => setEqBands(prev => prev.map(b => b.id === id ? { ...b, type: val } : b)), []);

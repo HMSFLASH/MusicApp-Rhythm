@@ -77,6 +77,8 @@ export function useAudioContext(effectsState: any) {
 
   // FX Nodes
   const eqNodesRef = useRef<BiquadFilterNode[]>([]);
+  const eqSplitterRef = useRef<ChannelSplitterNode | null>(null);
+  const eqMergerRef = useRef<ChannelMergerNode | null>(null);
   const limiterNodeRef = useRef<DynamicsCompressorNode | null>(null);
   const softClipNodeRef = useRef<AudioNode | null>(null);
   const softClipWaveShaperRef = useRef<WaveShaperNode | null>(null);
@@ -248,6 +250,9 @@ export function useAudioContext(effectsState: any) {
     preamp: currentGraphActivity.preamp,
     eq: currentGraphActivity.eq,
     eqBandCount: currentGraphActivity.eq && Array.isArray(eqBands) ? eqBands.length : 0,
+    eqRouting: currentGraphActivity.eq && Array.isArray(eqBands)
+      ? eqBands.map((band: { channel?: string }) => band.channel || 'L+R').join('|')
+      : null,
     tone: currentGraphActivity.tone,
     comp: currentGraphActivity.comp,
     reverb: currentGraphActivity.reverb,
@@ -360,6 +365,8 @@ export function useAudioContext(effectsState: any) {
     disconnectNode(headroomDropRef.current);
     disconnectNode(preampNodeRef.current);
     eqNodesRef.current.forEach(disconnectNode);
+    disconnectNode(eqSplitterRef.current);
+    disconnectNode(eqMergerRef.current);
     disconnectNode(bassNodeRef.current);
     disconnectNode(trebleNodeRef.current);
     disconnectNode(compressorNodeRef.current);
@@ -448,12 +455,50 @@ export function useAudioContext(effectsState: any) {
         filter.gain.value = band.gain;
       });
 
-      let prevEq = currentNode;
-      eqNodesRef.current.forEach(filter => {
-        prevEq.connect(filter);
-        prevEq = filter;
-      });
-      currentNode = prevEq;
+      const hasChannelSpecificBands = eqBands.some((band: { channel?: string }) =>
+        band.channel === 'L' || band.channel === 'R'
+      );
+
+      if (hasChannelSpecificBands) {
+        if (!eqSplitterRef.current) eqSplitterRef.current = ctx.createChannelSplitter(2);
+        if (!eqMergerRef.current) eqMergerRef.current = ctx.createChannelMerger(2);
+
+        const stereoFilters = eqNodesRef.current.filter((_, i) => (eqBands[i].channel || 'L+R') === 'L+R');
+        const leftFilters = eqNodesRef.current.filter((_, i) => eqBands[i].channel === 'L');
+        const rightFilters = eqNodesRef.current.filter((_, i) => eqBands[i].channel === 'R');
+
+        let prevEq = currentNode;
+        stereoFilters.forEach(filter => {
+          prevEq.connect(filter);
+          prevEq = filter;
+        });
+        prevEq.connect(eqSplitterRef.current);
+
+        let leftNode: AudioNode = eqSplitterRef.current;
+        leftFilters.forEach((filter, index) => {
+          if (index === 0) eqSplitterRef.current!.connect(filter, 0, 0);
+          else leftFilters[index - 1].connect(filter);
+          leftNode = filter;
+        });
+
+        let rightNode: AudioNode = eqSplitterRef.current;
+        rightFilters.forEach((filter, index) => {
+          if (index === 0) eqSplitterRef.current!.connect(filter, 1, 0);
+          else rightFilters[index - 1].connect(filter);
+          rightNode = filter;
+        });
+
+        leftNode.connect(eqMergerRef.current, leftNode === eqSplitterRef.current ? 0 : 0, 0);
+        rightNode.connect(eqMergerRef.current, rightNode === eqSplitterRef.current ? 1 : 0, 1);
+        currentNode = eqMergerRef.current;
+      } else {
+        let prevEq = currentNode;
+        eqNodesRef.current.forEach(filter => {
+          prevEq.connect(filter);
+          prevEq = filter;
+        });
+        currentNode = prevEq;
+      }
     }
 
     // 3. Tone

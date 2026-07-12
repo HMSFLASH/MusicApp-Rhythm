@@ -1,12 +1,13 @@
-import { useState } from 'react';
-import { Plus, ChevronDown, X, Edit2, Trash2 } from 'lucide-react';
+import { useMemo, useState } from 'react';
+import { Plus, ChevronDown, X, Edit2, Trash2, Info } from 'lucide-react';
 import { VerticalFader } from '../VerticalFader';
 import { EQ_PRESETS, STYLISTIC_PRESETS } from '../../hooks/useAudioPlayer';
-import type { CustomEqPreset } from '../../hooks/audioTypes';
+import type { CustomEqPreset, EqBand } from '../../hooks/audioTypes';
 import { useGlobalAudio } from '../../context/AudioContext';
 import { useTranslation } from 'react-i18next';
 import { EffectPowerButton } from './AudioEffectPanel';
 import { NumberInput } from '../NumberInput';
+import { createEqResponseChartData, type EqResponsePoint } from '../../hooks/audioEqResponse';
 
 const formatFreq = (f: number) => {
   if (f >= 1000) return (f / 1000) + 'k';
@@ -15,18 +16,228 @@ const formatFreq = (f: number) => {
 
 const presetHasParametricBandSettings = (preset?: CustomEqPreset) =>
   preset?.bands.some(band => (
-    (band.type || 'peaking') !== 'peaking' || band.channel !== 'L+R' || band.q !== 1.41
+    (band.type || 'peaking') !== 'peaking' || band.channel !== 'L+R'
   ));
 
 const isSavedParametricPreset = (preset?: CustomEqPreset) =>
   preset?.presetMode === 'parametric'
   || (preset?.isCustomOrigin && presetHasParametricBandSettings(preset));
 
+const GRAPH_WIDTH = 760;
+const GRAPH_HEIGHT = 320;
+const GRAPH_PADDING = { top: 22, right: 20, bottom: 38, left: 48 };
+const GRAPH_MIN_FREQ = 20;
+const GRAPH_MAX_FREQ = 20000;
+const GRAPH_MIN_DB = -24;
+const GRAPH_MAX_DB = 24;
+const GRAPH_FREQ_TICKS = [20, 50, 100, 200, 500, 1000, 2000, 5000, 10000, 20000];
+const GRAPH_DB_TICKS = [-24, -12, 0, 12, 24];
+
+const graphInnerWidth = GRAPH_WIDTH - GRAPH_PADDING.left - GRAPH_PADDING.right;
+const graphInnerHeight = GRAPH_HEIGHT - GRAPH_PADDING.top - GRAPH_PADDING.bottom;
+
+const formatGraphFreq = (frequency: number) => {
+  if (frequency >= 1000) return `${frequency / 1000}k`;
+  return String(frequency);
+};
+
+const getGraphX = (frequency: number) => {
+  const ratio = Math.log10(frequency / GRAPH_MIN_FREQ) / Math.log10(GRAPH_MAX_FREQ / GRAPH_MIN_FREQ);
+  return GRAPH_PADDING.left + ratio * graphInnerWidth;
+};
+
+const getGraphY = (db: number) => {
+  const clamped = Math.max(GRAPH_MIN_DB, Math.min(GRAPH_MAX_DB, db));
+  const ratio = (GRAPH_MAX_DB - clamped) / (GRAPH_MAX_DB - GRAPH_MIN_DB);
+  return GRAPH_PADDING.top + ratio * graphInnerHeight;
+};
+
+const responsePath = (points: EqResponsePoint[]) =>
+  points
+    .map((point, index) => `${index === 0 ? 'M' : 'L'} ${getGraphX(point.frequency).toFixed(2)} ${getGraphY(point.db).toFixed(2)}`)
+    .join(' ');
+
+const eqPointColor = (channel: EqBand['channel']) => {
+  if (channel === 'L') return '#60a5fa';
+  if (channel === 'R') return '#f87171';
+  return '#22d3ee';
+};
+
+function EqResponseModal({
+  bands,
+  enabled,
+  onClose,
+}: {
+  bands: EqBand[];
+  enabled: boolean;
+  onClose: () => void;
+}) {
+  const chartData = useMemo(() => createEqResponseChartData(bands, enabled), [bands, enabled]);
+
+  return (
+    <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/80 backdrop-blur-sm p-4">
+      <div className="bg-[#0b0b0b] border border-white/10 rounded-xl shadow-2xl w-full max-w-5xl overflow-hidden">
+        <div className="flex items-center justify-between px-4 py-3 border-b border-white/10 bg-white/[0.03]">
+          <div className="flex items-baseline gap-3 min-w-0">
+            <h2 className="text-white font-bold text-sm uppercase tracking-widest">EQ Response</h2>
+            <span className="text-white/50 text-xs font-mono">{enabled ? '20 Hz - 20 kHz' : 'Bypassed'}</span>
+          </div>
+          <button
+            aria-label="Close EQ response"
+            onClick={onClose}
+            className="w-8 h-8 rounded-md text-white/70 hover:text-white hover:bg-white/10 flex items-center justify-center transition-colors"
+          >
+            <X size={18} />
+          </button>
+        </div>
+
+        <div className="p-4">
+          <div className="w-full overflow-x-auto">
+            <svg
+              viewBox={`0 0 ${GRAPH_WIDTH} ${GRAPH_HEIGHT}`}
+              className="min-w-[700px] w-full h-auto"
+              role="img"
+              aria-label="EQ frequency response from 20 Hz to 20 kHz"
+            >
+              <rect
+                x={GRAPH_PADDING.left}
+                y={GRAPH_PADDING.top}
+                width={graphInnerWidth}
+                height={graphInnerHeight}
+                rx="6"
+                fill="#050505"
+                stroke="rgba(255,255,255,0.08)"
+              />
+
+              {GRAPH_FREQ_TICKS.map((frequency) => {
+                const x = getGraphX(frequency);
+                return (
+                  <g key={frequency}>
+                    <line
+                      x1={x}
+                      y1={GRAPH_PADDING.top}
+                      x2={x}
+                      y2={GRAPH_PADDING.top + graphInnerHeight}
+                      stroke="rgba(255,255,255,0.08)"
+                      strokeWidth="1"
+                    />
+                    <text
+                      x={x}
+                      y={GRAPH_HEIGHT - 13}
+                      textAnchor="middle"
+                      fill="rgba(255,255,255,0.5)"
+                      fontSize="10"
+                      fontFamily="monospace"
+                    >
+                      {formatGraphFreq(frequency)}
+                    </text>
+                  </g>
+                );
+              })}
+
+              {GRAPH_DB_TICKS.map((db) => {
+                const y = getGraphY(db);
+                return (
+                  <g key={db}>
+                    <line
+                      x1={GRAPH_PADDING.left}
+                      y1={y}
+                      x2={GRAPH_PADDING.left + graphInnerWidth}
+                      y2={y}
+                      stroke={db === 0 ? 'rgba(255,255,255,0.28)' : 'rgba(255,255,255,0.08)'}
+                      strokeWidth={db === 0 ? '1.5' : '1'}
+                    />
+                    <text
+                      x={GRAPH_PADDING.left - 9}
+                      y={y + 3}
+                      textAnchor="end"
+                      fill="rgba(255,255,255,0.5)"
+                      fontSize="10"
+                      fontFamily="monospace"
+                    >
+                      {db > 0 ? `+${db}` : db}
+                    </text>
+                  </g>
+                );
+              })}
+
+              {chartData.bandCurves.map((curve) => (
+                <path
+                  key={curve.id}
+                  d={responsePath(curve.points)}
+                  fill="none"
+                  stroke={curve.color}
+                  strokeWidth="1.1"
+                  strokeOpacity="0.22"
+                  vectorEffect="non-scaling-stroke"
+                />
+              ))}
+
+              {chartData.hasStereoDifference ? (
+                <>
+                  <path
+                    d={responsePath(chartData.left)}
+                    fill="none"
+                    stroke="#60a5fa"
+                    strokeWidth="3"
+                    vectorEffect="non-scaling-stroke"
+                  />
+                  <path
+                    d={responsePath(chartData.right)}
+                    fill="none"
+                    stroke="#f87171"
+                    strokeWidth="3"
+                    vectorEffect="non-scaling-stroke"
+                  />
+                </>
+              ) : (
+                <path
+                  d={responsePath(chartData.total)}
+                  fill="none"
+                  stroke="#22d3ee"
+                  strokeWidth="3"
+                  vectorEffect="non-scaling-stroke"
+                />
+              )}
+
+              {enabled && bands.map((band) => (
+                <circle
+                  key={band.id}
+                  cx={getGraphX(Math.max(GRAPH_MIN_FREQ, Math.min(GRAPH_MAX_FREQ, band.frequency)))}
+                  cy={getGraphY(band.gain)}
+                  r="3.8"
+                  fill={eqPointColor(band.channel)}
+                  stroke="#050505"
+                  strokeWidth="1.4"
+                />
+              ))}
+            </svg>
+          </div>
+
+          <div className="flex flex-wrap items-center gap-3 px-1 pt-3 text-[10px] uppercase tracking-widest text-white/55">
+            {chartData.hasStereoDifference ? (
+              <>
+                <span className="inline-flex items-center gap-1.5"><span className="w-3 h-0.5 bg-blue-400" />L</span>
+                <span className="inline-flex items-center gap-1.5"><span className="w-3 h-0.5 bg-red-400" />R</span>
+              </>
+            ) : (
+              <span className="inline-flex items-center gap-1.5"><span className="w-3 h-0.5 bg-cyan-300" />Total</span>
+            )}
+            <span className="inline-flex items-center gap-1.5"><span className="w-3 h-0.5 bg-white/25" />Bands</span>
+            <span className="font-mono normal-case text-white/40">dB</span>
+          </div>
+        </div>
+      </div>
+    </div>
+  );
+}
+
 export function EqRack() {
   const { playerState } = useGlobalAudio();
   const { t } = useTranslation();
   const [showPresetMenu, setShowPresetMenu] = useState(false);
   const [openFilterDropdown, setOpenFilterDropdown] = useState<string | null>(null);
+  const [showEqInfo, setShowEqInfo] = useState(false);
 
   type ModalState =
     | { type: 'save' }
@@ -186,6 +397,14 @@ export function EqRack() {
         </div>
 
         <div className="flex items-center justify-end w-full md:w-auto gap-2">
+          <button
+            aria-label="EQ response"
+            title="EQ response"
+            onClick={() => setShowEqInfo(true)}
+            className="w-8 h-8 rounded-md bg-white/5 text-white/70 hover:text-white hover:bg-white/10 border border-white/10 flex items-center justify-center transition-colors"
+          >
+            <Info size={16} />
+          </button>
           <button aria-label="Action"
             onClick={() => {
               setModalInput("");
@@ -323,6 +542,14 @@ export function EqRack() {
           </div>
         </div>
       </div>
+
+      {showEqInfo && (
+        <EqResponseModal
+          bands={playerState.eqBands}
+          enabled={playerState.fxEnabled.eq}
+          onClose={() => setShowEqInfo(false)}
+        />
+      )}
 
       {/* Custom Modal for Presets */}
       {modalState && (
