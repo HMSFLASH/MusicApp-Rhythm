@@ -137,13 +137,18 @@ public class GoogleDriveService {
         createRequest.getMediaHttpUploader()
                 .setDirectUploadEnabled(false)
                 .setProgressListener(uploader -> {
-                    switch (uploader.getUploadState()) {
-                        case INITIATION_STARTED -> log.info("Drive upload initiation started");
-                        case INITIATION_COMPLETE -> log.info("Drive upload initiation complete");
-                        case MEDIA_IN_PROGRESS -> log.info("Drive upload progress: {}", 
+                    com.google.api.client.googleapis.media.MediaHttpUploader.UploadState state = uploader.getUploadState();
+                    if (state == com.google.api.client.googleapis.media.MediaHttpUploader.UploadState.INITIATION_STARTED) {
+                        log.info("Drive upload initiation started");
+                    } else if (state == com.google.api.client.googleapis.media.MediaHttpUploader.UploadState.INITIATION_COMPLETE) {
+                        log.info("Drive upload initiation complete");
+                    } else if (state == com.google.api.client.googleapis.media.MediaHttpUploader.UploadState.MEDIA_IN_PROGRESS) {
+                        log.info("Drive upload progress: {}", 
                                 String.format("%.1f%%", uploader.getProgress() * 100));
-                        case MEDIA_COMPLETE -> log.info("Drive upload complete");
-                        case NOT_STARTED -> log.info("Drive upload not started");
+                    } else if (state == com.google.api.client.googleapis.media.MediaHttpUploader.UploadState.MEDIA_COMPLETE) {
+                        log.info("Drive upload complete");
+                    } else if (state == com.google.api.client.googleapis.media.MediaHttpUploader.UploadState.NOT_STARTED) {
+                        log.info("Drive upload not started");
                     }
                 });
 
