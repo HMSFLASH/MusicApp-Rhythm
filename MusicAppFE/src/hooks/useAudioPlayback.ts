@@ -1341,6 +1341,8 @@ export function useAudioPlayback(
     }
     playTrackSpamGuardRef.current = { trackId: String(startingTrack.id), timestamp: now };
     if (!currentQueue) currentQueue = [startingTrack];
+    currentTrackSnapshotRef.current = startingTrack;
+    queueSnapshotRef.current = currentQueue;
 
     const initialDuration = Number.isFinite(startingTrack.durationSeconds)
       ? Math.max(0, startingTrack.durationSeconds || 0)
@@ -1662,7 +1664,9 @@ export function useAudioPlayback(
 
 
   const playNext = useCallback(() => {
-    if (!currentTrack || queue.length === 0) return;
+    const activeTrack = currentTrackSnapshotRef.current ?? currentTrack ?? null;
+    const activeQueue = queueSnapshotRef.current?.length ? queueSnapshotRef.current : queue;
+    if (!activeTrack || activeQueue.length === 0) return;
 
     // Read current precalculate state from ref to avoid stale closure
     const isPrecalc = precalculateOnIdleRef.current;
@@ -1703,52 +1707,53 @@ export function useAudioPlayback(
     const latestPlayTrack = playTrackRef.current;
     if (!latestPlayTrack) return;
 
-    const idx = getCurrentTrackIndex(currentTrack, queue);
-    if (idx !== -1 && idx < queue.length - 1) {
-      latestPlayTrack(queue[idx + 1], queue, !isPreload);
-    } else if (queueEndMode === 'repeat' && idx === queue.length - 1) {
+    const idx = getCurrentTrackIndex(activeTrack, activeQueue);
+    if (idx !== -1 && idx < activeQueue.length - 1) {
+      latestPlayTrack(activeQueue[idx + 1], activeQueue, !isPreload);
+    } else if (queueEndMode === 'repeat' && idx === activeQueue.length - 1) {
       if (isShuffleState) {
         // eslint-disable-next-line prefer-const
-        let newQueue = [...queue];
+        let newQueue = [...activeQueue];
         for (let i = newQueue.length - 1; i > 0; i--) {
           const j = Math.floor(Math.random() * (i + 1));
           [newQueue[i], newQueue[j]] = [newQueue[j], newQueue[i]];
         }
         latestPlayTrack(newQueue[0], newQueue, !isPreload);
       } else {
-        latestPlayTrack(queue[0], queue, !isPreload);
+        latestPlayTrack(activeQueue[0], activeQueue, !isPreload);
       }
-    } else if (queueEndMode === 'next' && idx === queue.length - 1) {
-      if (upcomingQueues.length > 0) {
-        const nextQ = upcomingQueues[0];
-        // eslint-disable-next-line @typescript-eslint/no-explicit-any
-        setUpcomingQueues((prev: any) => {
-          const rest = prev.slice(1);
-          if (cycleQueues) return [...rest, queue];
-          return rest;
-        });
+    } else if (queueEndMode === 'next' && idx === activeQueue.length - 1) {
+      const activeUpcomingQueues = upcomingQueuesSnapshotRef.current ?? upcomingQueues ?? [];
+      if (activeUpcomingQueues.length > 0) {
+        const nextQ = activeUpcomingQueues[0];
+        const rest = activeUpcomingQueues.slice(1);
+        const nextUpcomingQueues = cycleQueues ? [...rest, activeQueue] : rest;
+        upcomingQueuesSnapshotRef.current = nextUpcomingQueues;
+        setUpcomingQueues(nextUpcomingQueues);
         latestPlayTrack(nextQ[0], nextQ, !isPreload);
       } else if (cycleQueues) {
-        latestPlayTrack(queue[0], queue, !isPreload);
+        latestPlayTrack(activeQueue[0], activeQueue, !isPreload);
       } else {
         setIsPlaying(false);
       }
     } else {
       setIsPlaying(false);
     }
-  }, [currentTrack, queue, songEndMode, queueEndMode, isShuffleState, upcomingQueues, cycleQueues, resetPlayCountTracking]);
+  }, [currentTrack, queue, songEndMode, queueEndMode, isShuffleState, upcomingQueues, cycleQueues, resetPlayCountTracking, setUpcomingQueues]);
 
 
   const playPrevious = useCallback(() => {
-    if (!currentTrack || queue.length === 0) return;
+    const activeTrack = currentTrackSnapshotRef.current ?? currentTrack ?? null;
+    const activeQueue = queueSnapshotRef.current?.length ? queueSnapshotRef.current : queue;
+    if (!activeTrack || activeQueue.length === 0) return;
     // Use playTrackRef to always call the latest playTrack (avoids stale closure)
     const latestPlayTrack = playTrackRef.current;
     if (!latestPlayTrack) return;
-    const idx = getCurrentTrackIndex(currentTrack, queue);
+    const idx = getCurrentTrackIndex(activeTrack, activeQueue);
     if (idx > 0) {
-      latestPlayTrack(queue[idx - 1], queue);
-    } else if (idx === 0 && queueEndMode === 'repeat' && queue.length > 1) {
-      latestPlayTrack(queue[queue.length - 1], queue);
+      latestPlayTrack(activeQueue[idx - 1], activeQueue);
+    } else if (idx === 0 && queueEndMode === 'repeat' && activeQueue.length > 1) {
+      latestPlayTrack(activeQueue[activeQueue.length - 1], activeQueue);
     }
   }, [currentTrack, queue, queueEndMode]);
 
