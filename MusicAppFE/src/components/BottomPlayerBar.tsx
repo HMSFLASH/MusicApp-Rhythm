@@ -174,11 +174,52 @@ export function BottomPlayerBar() {
     }
   };
 
+  const cycleSongEndMode = () => {
+    if (songEndMode === 'next') setSongEndMode('repeat_one');
+    else if (songEndMode === 'repeat_one') setSongEndMode('preload');
+    else if (songEndMode === 'preload') setSongEndMode('stop');
+    else setSongEndMode('next');
+  };
+
+  const cycleQueueEndMode = () => {
+    if (queueEndMode === 'repeat') setQueueEndMode('next');
+    else if (queueEndMode === 'next') setQueueEndMode('stop');
+    else setQueueEndMode('repeat');
+  };
+
   const mobileRepeatLabel = songEndMode === 'repeat_one'
     ? t('bottomPlayer.repeatSong', 'Repeat Song')
     : queueEndMode === 'repeat'
       ? t('bottomPlayer.repeatQueue', 'Repeat Queue')
       : t('bottomPlayer.repeatOff', 'Repeat: Off');
+
+  const mobileSongEndLabel = songEndMode === 'next'
+    ? t('bottomPlayer.songNext', 'Song: Next')
+    : songEndMode === 'repeat_one'
+      ? t('bottomPlayer.songRepeat', 'Song: Repeat')
+      : songEndMode === 'preload'
+        ? t('bottomPlayer.songPreload', 'Song: Preload & Stop')
+        : t('bottomPlayer.songStop', 'Song: Stop');
+
+  const mobileQueueEndLabel = queueEndMode === 'repeat'
+    ? t('bottomPlayer.queueRepeat', 'Queue: Repeat')
+    : queueEndMode === 'next'
+      ? t('bottomPlayer.queueNext', 'Queue: Next')
+      : t('bottomPlayer.queueStop', 'Queue: Stop');
+
+  const mobileSongEndIcon = songEndMode === 'repeat_one'
+    ? <Repeat1 size={14} />
+    : songEndMode === 'stop'
+      ? <Square size={14} />
+      : songEndMode === 'preload'
+        ? <PauseCircle size={14} />
+        : <ArrowRight size={14} />;
+
+  const mobileQueueEndIcon = queueEndMode === 'repeat'
+    ? <Repeat size={14} />
+    : queueEndMode === 'next'
+      ? <ListPlus size={14} />
+      : <ListX size={14} />;
 
   return (
     <div className="h-16 md:h-20 bg-surface border-t border-white/5 px-3 md:px-6 flex items-center justify-between select-none shadow-[0_-10px_40px_rgba(0,0,0,0.3)] z-50">
@@ -359,11 +400,24 @@ export function BottomPlayerBar() {
               icon: <Shuffle size={14} />,
               onSelect: () => setIsShuffle(prev => !prev),
             },
-            {
-              label: mobileRepeatLabel,
-              icon: songEndMode === 'repeat_one' ? <Repeat1 size={14} /> : <Repeat size={14} />,
-              onSelect: cycleSimpleRepeatMode,
-            },
+            ...(repeatMode === 'simple'
+              ? [{
+                  label: mobileRepeatLabel,
+                  icon: songEndMode === 'repeat_one' ? <Repeat1 size={14} /> : <Repeat size={14} />,
+                  onSelect: cycleSimpleRepeatMode,
+                }]
+              : [
+                  {
+                    label: mobileSongEndLabel,
+                    icon: mobileSongEndIcon,
+                    onSelect: cycleSongEndMode,
+                  },
+                  {
+                    label: mobileQueueEndLabel,
+                    icon: mobileQueueEndIcon,
+                    onSelect: cycleQueueEndMode,
+                  },
+                ]),
             {
               label: volume === 0 ? t('bottomPlayer.unmute', 'Unmute') : t('bottomPlayer.mute', 'Mute'),
               icon: volume === 0 ? <VolumeX size={14} /> : <Volume2 size={14} />,

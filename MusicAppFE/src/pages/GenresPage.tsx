@@ -80,11 +80,17 @@ export function GenresPage() {
             >
               <Play size={14} fill="currentColor" /> Play
             </button>
+            <button
+              onClick={() => shuffleTracks(selectedGenreTracks)}
+              className="px-3 h-8 rounded-full bg-white/10 text-white hover:bg-white hover:text-black flex items-center gap-1.5 transition-all text-sm font-bold"
+              title="Shuffle Genre"
+            >
+              <Shuffle size={14} /> Shuffle
+            </button>
             <ActionMenu
               ariaLabel="More genre actions"
               buttonClassName="h-8 w-8 rounded-full bg-white/10 text-white hover:bg-white hover:text-black flex items-center justify-center transition-all"
               actions={[
-                { label: 'Shuffle', icon: <Shuffle size={14} />, onSelect: () => shuffleTracks(selectedGenreTracks) },
                 { label: 'Add to Queue', icon: <ListPlus size={14} />, onSelect: () => playerState.addToCurrentQueue(selectedGenreTracks) },
                 { label: 'Play Next', icon: <ListMusic size={14} />, onSelect: () => playerState.addToNextQueue(selectedGenreTracks) },
               ]}

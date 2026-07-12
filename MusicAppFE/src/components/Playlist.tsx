@@ -10,6 +10,7 @@ import { useGlobalAudio } from '../context/AudioContext';
 import { db } from '../lib/db';
 import { useLibrary } from '../context/LibraryContext';
 import { useConfirm } from '../context/ConfirmContext';
+import { ActionMenu } from './ActionMenu';
 
 interface PlaylistProps {
   isAuthenticated: boolean;
@@ -390,24 +391,22 @@ export function Playlist({ isAuthenticated, onPlay, currentTrackId }: PlaylistPr
                 >
                   <Shuffle size={14} /> {t('playlist.shuffle')}
                 </button>
-                <button
-                  onClick={() => {
-                    playerState.addToCurrentQueue(selectedPlaylistDetails.tracks);
-                  }}
-                  className="px-3 h-8 rounded-full bg-white/10 text-white hover:bg-white hover:text-black flex items-center gap-1.5 transition-all text-sm font-bold"
-                  title={t('playlist.addToQueueTitle')}
-                >
-                  <ListPlus size={14} /> {t('playlist.addToQueue')}
-                </button>
-                <button
-                  onClick={() => {
-                    playerState.addToNextQueue(selectedPlaylistDetails.tracks);
-                  }}
-                  className="px-3 h-8 rounded-full bg-white/10 text-white hover:bg-white hover:text-black flex items-center gap-1.5 transition-all text-sm font-bold"
-                  title={t('playlist.addToNextQueueTitle')}
-                >
-                  <ListMusic size={14} /> {t('playlist.nextQueue')}
-                </button>
+                <ActionMenu
+                  ariaLabel="More playlist actions"
+                  buttonClassName="h-8 w-8 rounded-full bg-white/10 text-white hover:bg-white hover:text-black flex items-center justify-center transition-all"
+                  actions={[
+                    {
+                      label: t('playlist.addToQueue'),
+                      icon: <ListPlus size={14} />,
+                      onSelect: () => playerState.addToCurrentQueue(selectedPlaylistDetails.tracks),
+                    },
+                    {
+                      label: t('playlist.nextQueue'),
+                      icon: <ListMusic size={14} />,
+                      onSelect: () => playerState.addToNextQueue(selectedPlaylistDetails.tracks),
+                    },
+                  ]}
+                />
               </>
             )}
             <button

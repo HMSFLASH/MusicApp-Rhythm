@@ -84,11 +84,17 @@ export function ArtistsPage() {
             >
               <Play size={14} fill="currentColor" /> Play
             </button>
+            <button
+              onClick={() => shuffleTracks(selectedArtistTracks)}
+              className="px-3 h-8 rounded-full bg-white/10 text-white hover:bg-white hover:text-black flex items-center gap-1.5 transition-all text-sm font-bold"
+              title="Shuffle Artist"
+            >
+              <Shuffle size={14} /> Shuffle
+            </button>
             <ActionMenu
               ariaLabel="More artist actions"
               buttonClassName="h-8 w-8 rounded-full bg-white/10 text-white hover:bg-white hover:text-black flex items-center justify-center transition-all"
               actions={[
-                { label: 'Shuffle', icon: <Shuffle size={14} />, onSelect: () => shuffleTracks(selectedArtistTracks) },
                 { label: 'Add to Queue', icon: <ListPlus size={14} />, onSelect: () => playerState.addToCurrentQueue(selectedArtistTracks) },
                 { label: 'Play Next', icon: <ListMusic size={14} />, onSelect: () => playerState.addToNextQueue(selectedArtistTracks) },
               ]}
