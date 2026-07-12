@@ -6,6 +6,7 @@ import { useLibrary } from '../context/LibraryContext';
 import { Play, Pause, SkipForward, SkipBack, Cloud, Disc, Heart, Shuffle, Repeat, Repeat1, Square, PauseCircle, ListX, ListPlus, Maximize2, Info, ListMusic, Volume2, VolumeX, X, ArrowRight, Loader2, RefreshCw } from 'lucide-react';
 import { HorizontalSlider } from './HorizontalSlider';
 import { useTranslation } from 'react-i18next';
+import { ActionMenu } from './ActionMenu';
 
 const formatTime = (time: number) => {
   const m = Math.floor(time / 60);
@@ -162,6 +163,23 @@ export function BottomPlayerBar() {
     return null; // Don't show if no track is selected or if on the Now Playing page
   }
 
+  const cycleSimpleRepeatMode = () => {
+    if (songEndMode === 'next' && queueEndMode === 'stop') {
+      setQueueEndMode('repeat');
+    } else if (songEndMode === 'next' && queueEndMode === 'repeat') {
+      setSongEndMode('repeat_one');
+    } else {
+      setSongEndMode('next');
+      setQueueEndMode('stop');
+    }
+  };
+
+  const mobileRepeatLabel = songEndMode === 'repeat_one'
+    ? t('bottomPlayer.repeatSong', 'Repeat Song')
+    : queueEndMode === 'repeat'
+      ? t('bottomPlayer.repeatQueue', 'Repeat Queue')
+      : t('bottomPlayer.repeatOff', 'Repeat: Off');
+
   return (
     <div className="h-16 md:h-20 bg-surface border-t border-white/5 px-3 md:px-6 flex items-center justify-between select-none shadow-[0_-10px_40px_rgba(0,0,0,0.3)] z-50">
       
@@ -316,6 +334,43 @@ export function BottomPlayerBar() {
           </div>
           <span className="min-w-[30px] text-left">{formatTime(duration)}</span>
         </div>
+      </div>
+
+      <div className="md:hidden shrink-0">
+        <ActionMenu
+          ariaLabel="More player controls"
+          direction="up"
+          buttonClassName="h-9 w-9 rounded-full bg-white/5 text-white/70 hover:bg-white/10 hover:text-white flex items-center justify-center transition-colors"
+          menuClassName="w-56"
+          actions={[
+            { label: t('nav.nowPlaying', 'Now Playing'), icon: <Maximize2 size={14} />, onSelect: () => navigate('/') },
+            ...(currentTrack.sourceType === 'DRIVE'
+              ? [{
+                  label: t('bottomPlayer.reloadFromDrive', 'Reload from Drive'),
+                  icon: <RefreshCw size={14} className={isLoadingTrack ? 'animate-spin' : ''} />,
+                  disabled: isLoadingTrack,
+                  onSelect: () => void playerState.reloadCurrentTrackFromDrive(),
+                }]
+              : []),
+            { label: t('bottomPlayer.trackMetadata', 'Track Metadata'), icon: <Info size={14} />, onSelect: () => setShowMetadata(true) },
+            { label: t('bottomPlayer.queueTitle', 'Queue'), icon: <ListMusic size={14} />, onSelect: () => navigate('/queue') },
+            {
+              label: isShuffle ? t('bottomPlayer.shuffleOn', 'Shuffle On') : t('bottomPlayer.shuffleOff', 'Shuffle Off'),
+              icon: <Shuffle size={14} />,
+              onSelect: () => setIsShuffle(prev => !prev),
+            },
+            {
+              label: mobileRepeatLabel,
+              icon: songEndMode === 'repeat_one' ? <Repeat1 size={14} /> : <Repeat size={14} />,
+              onSelect: cycleSimpleRepeatMode,
+            },
+            {
+              label: volume === 0 ? t('bottomPlayer.unmute', 'Unmute') : t('bottomPlayer.mute', 'Mute'),
+              icon: volume === 0 ? <VolumeX size={14} /> : <Volume2 size={14} />,
+              onSelect: () => setVolume(volume === 0 ? 1 : 0),
+            },
+          ]}
+        />
       </div>
 
       {/* Right: Extra Controls */}

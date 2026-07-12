@@ -335,6 +335,17 @@ export function Layout() {
                           <Key size={14} /> Đổi mật khẩu
                         </button>
                       )}
+                      {user?.hasPassword !== true && (
+                        <button
+                          onClick={() => {
+                            setIsAvatarMenuOpen(false);
+                            setIsPasswordModalOpen(true);
+                          }}
+                          className="w-full flex items-center gap-3 px-4 py-2 text-sm text-left text-white/80 hover:bg-white/10 hover:text-white"
+                        >
+                          <Key size={14} /> {t('layout.setLocalPassword', 'Set Local Password')}
+                        </button>
+                      )}
                       <button
                         onClick={() => {
                           setIsAvatarMenuOpen(false);
@@ -349,27 +360,6 @@ export function Layout() {
                     </div>
                   </>
                 )}
-                <div className="flex items-center gap-1">
-                  {(!isAuthenticated || user?.hasPassword !== true) && (
-                    <button
-                      onClick={() => setIsPasswordModalOpen(true)}
-                      className="p-2 text-white/40 hover:text-[#00E5FF] hover:bg-[#00E5FF]/10 rounded-md transition-colors"
-                      title={t('layout.setLocalPassword', 'Set Local Password')}
-                      aria-label="Set local password"
-                    >
-                      <Key size={16} />
-                    </button>
-                  )}
-                  <button
-                    onClick={handleLogout}
-                    disabled={isLoggingOut}
-                    className="p-2 text-white/40 hover:text-white hover:bg-white/10 rounded-md transition-colors disabled:opacity-50"
-                    title={t('layout.signOut', 'Sign Out')}
-                    aria-label="Sign out"
-                  >
-                    {isLoggingOut ? <Loader2 size={16} className="animate-spin" /> : <LogOut size={16} />}
-                  </button>
-                </div>
               </div>
             ) : (
               <NavLink

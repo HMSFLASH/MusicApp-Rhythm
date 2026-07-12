@@ -5,6 +5,7 @@ import { useGlobalAudio } from '../context/AudioContext';
 import { useUploadQueue } from '../context/UploadContext';
 
 import { useLibrary } from '../context/LibraryContext';
+import { ActionMenu } from '../components/ActionMenu';
 
 export function LibraryPage() {
   const navigate = useNavigate();
@@ -73,15 +74,6 @@ export function LibraryPage() {
           <p className="text-white/80 text-sm mt-1">{tracks.length} songs across all your collections.</p>
         </div>
         <div className="flex items-center gap-2">
-          <button
-            onClick={() => syncLibrary()}
-            disabled={isLoading}
-            className="flex items-center gap-2 px-4 py-2 rounded-xl border border-white/10 hover:border-white/20 bg-white/5 hover:bg-white/10 transition-colors disabled:opacity-50 text-white/80 hover:text-white"
-            title="Reload library"
-          >
-            <RefreshCw size={16} className={isLoading ? 'animate-spin text-primary' : ''} />
-            <span className="text-sm font-medium hidden md:inline">Reload</span>
-          </button>
           <input
             type="file"
             accept="audio/*"
@@ -106,14 +98,23 @@ export function LibraryPage() {
             <CloudUpload size={16} className="text-blue-400" />
             <span className="text-sm font-medium">Upload to Drive</span>
           </label>
-          <label
-            htmlFor="drive-direct-upload"
-            className="flex items-center gap-2 px-4 py-2 rounded-xl border border-emerald-400/20 hover:border-emerald-400/40 bg-emerald-400/10 hover:bg-emerald-400/15 cursor-pointer transition-colors"
-            title="Upload directly to Drive and skip backend metadata/lyrics parsing"
-          >
-            <Cloud size={16} className="text-emerald-300" />
-            <span className="text-sm font-medium text-emerald-50">Direct to Drive</span>
-          </label>
+          <ActionMenu
+            ariaLabel="More library actions"
+            buttonClassName="h-10 w-10 rounded-xl border border-white/10 bg-white/5 text-white/80 hover:border-white/20 hover:bg-white/10 hover:text-white flex items-center justify-center transition-colors"
+            actions={[
+              {
+                label: isLoading ? 'Reloading' : 'Reload',
+                icon: <RefreshCw size={14} className={isLoading ? 'animate-spin text-primary' : ''} />,
+                disabled: isLoading,
+                onSelect: () => syncLibrary(),
+              },
+              {
+                label: 'Direct to Drive',
+                icon: <Cloud size={14} className="text-emerald-300" />,
+                onSelect: () => document.getElementById('drive-direct-upload')?.click(),
+              },
+            ]}
+          />
 
         </div>
       </div>

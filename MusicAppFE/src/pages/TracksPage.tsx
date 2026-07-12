@@ -8,6 +8,7 @@ import type { Track } from '../hooks/useAudioPlayer';
 import { useLibrary } from '../context/LibraryContext';
 import { useConfirm } from '../context/ConfirmContext';
 import { getAudioExtension } from '../hooks/audioMime';
+import { ActionMenu } from '../components/ActionMenu';
 
 type SortMode = 'default' | 'leastPlayed' | 'mostPlayed';
 
@@ -79,6 +80,42 @@ export function TracksPage() {
       }
       return titleOf(a).localeCompare(titleOf(b));
     });
+
+  const playAllTracks = () => {
+    if (playerState.isShuffle) {
+      const shuffled = [...displayTracks].sort(() => Math.random() - 0.5);
+      playerState.playTrack(shuffled[0], shuffled);
+    } else {
+      playerState.playTrack(displayTracks[0], displayTracks);
+    }
+  };
+
+  const shuffleAllTracks = () => {
+    playerState.setIsShuffle(true);
+    const shuffled = [...displayTracks].sort(() => Math.random() - 0.5);
+    playerState.playTrack(shuffled[0], shuffled);
+  };
+
+  const playAllNext = () => {
+    const currentQueue = playerState.queue;
+    if (currentQueue.length === 0 && !playerState.currentTrack) {
+      playerState.playTrack(displayTracks[0], displayTracks);
+      return;
+    }
+
+    const currentIndex = currentQueue.findIndex(t => t.id === playerState.currentTrack?.id);
+    if (currentIndex !== -1) {
+      const newQueue = [...currentQueue];
+      newQueue.splice(currentIndex + 1, 0, ...displayTracks);
+      playerState.setQueue(newQueue);
+    } else {
+      playerState.setQueue([...currentQueue, ...displayTracks]);
+    }
+  };
+
+  const addAllToQueue = () => {
+    playerState.setQueue([...playerState.queue, ...displayTracks]);
+  };
   
   const totalPages = Math.ceil(displayTracks.length / ITEMS_PER_PAGE);
   const boundedCurrentPage = Math.min(currentPage, Math.max(1, totalPages));
@@ -164,60 +201,21 @@ export function TracksPage() {
               )}
             </div>
             <button
-              onClick={() => {
-                if (playerState.isShuffle) {
-                  const shuffled = [...displayTracks].sort(() => Math.random() - 0.5);
-                  playerState.playTrack(shuffled[0], shuffled);
-                } else {
-                  playerState.playTrack(displayTracks[0], displayTracks);
-                }
-              }}
+              onClick={playAllTracks}
               className="px-4 h-9 rounded-full bg-primary text-black hover:bg-primary/90 flex items-center gap-1.5 transition-all text-sm font-bold shadow-lg shadow-primary/20"
               title="Play All"
             >
               <Play size={15} fill="currentColor" /> Play
             </button>
-            <button
-              onClick={() => {
-                playerState.setIsShuffle(true);
-                const shuffled = [...displayTracks].sort(() => Math.random() - 0.5);
-                playerState.playTrack(shuffled[0], shuffled);
-              }}
-              className="px-4 h-9 rounded-full bg-white/10 text-white hover:bg-white hover:text-black flex items-center gap-1.5 transition-all text-sm font-bold hidden md:flex"
-              title="Shuffle & Play"
-            >
-              <Shuffle size={15} /> Shuffle
-            </button>
-            <button
-              onClick={() => {
-                const currentQueue = playerState.queue;
-                if (currentQueue.length === 0 && !playerState.currentTrack) {
-                  playerState.playTrack(displayTracks[0], displayTracks);
-                } else {
-                  const currentIndex = currentQueue.findIndex(t => t.id === playerState.currentTrack?.id);
-                  if (currentIndex !== -1) {
-                    const newQueue = [...currentQueue];
-                    newQueue.splice(currentIndex + 1, 0, ...displayTracks);
-                    playerState.setQueue(newQueue);
-                  } else {
-                    playerState.setQueue([...currentQueue, ...displayTracks]);
-                  }
-                }
-              }}
-              className="px-4 h-9 rounded-full bg-white/10 text-white hover:bg-white hover:text-black flex items-center gap-1.5 transition-all text-sm font-bold hidden md:flex"
-              title="Play Next"
-            >
-              <ListStart size={15} /> Play Next
-            </button>
-            <button
-              onClick={() => {
-                playerState.setQueue([...playerState.queue, ...displayTracks]);
-              }}
-              className="px-4 h-9 rounded-full bg-white/10 text-white hover:bg-white hover:text-black flex items-center gap-1.5 transition-all text-sm font-bold"
-              title="Add to Queue"
-            >
-              <ListEnd size={15} /> Add to Queue
-            </button>
+            <ActionMenu
+              ariaLabel="More song actions"
+              buttonClassName="h-9 w-9 rounded-full bg-white/10 text-white hover:bg-white hover:text-black flex items-center justify-center transition-all"
+              actions={[
+                { label: 'Shuffle', icon: <Shuffle size={14} />, onSelect: shuffleAllTracks },
+                { label: 'Play Next', icon: <ListStart size={14} />, onSelect: playAllNext },
+                { label: 'Add to Queue', icon: <ListEnd size={14} />, onSelect: addAllToQueue },
+              ]}
+            />
           </div>
         )}
       </div>

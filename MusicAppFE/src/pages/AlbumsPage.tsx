@@ -1,9 +1,10 @@
-import { useMemo, useState, type MouseEvent } from 'react';
+import { useMemo, useState } from 'react';
 import { useNavigate, useLocation } from 'react-router-dom';
 import { ArrowLeft, Album, Cloud, ListMusic, ListPlus, Play, Shuffle } from 'lucide-react';
 import { useGlobalAudio } from '../context/AudioContext';
 import { useLibrary } from '../context/LibraryContext';
 import type { Track } from '../hooks/useAudioPlayer';
+import { ActionMenu } from '../components/ActionMenu';
 
 export function AlbumsPage() {
   const navigate = useNavigate();
@@ -43,12 +44,21 @@ export function AlbumsPage() {
     ? albumGroups.find(album => album.name === selectedAlbum)
     : null;
 
-  const handlePlayAlbum = (album: string, e: MouseEvent) => {
-    e.stopPropagation();
-    const albumTracks = albumGroups.find(group => group.name === album)?.tracks || [];
-    if (albumTracks.length > 0) {
-      playerState.playTrack(albumTracks[0], albumTracks);
+  const playTracks = (tracks: Track[]) => {
+    if (tracks.length === 0) return;
+    if (playerState.isShuffle) {
+      const shuffled = [...tracks].sort(() => Math.random() - 0.5);
+      playerState.playTrack(shuffled[0], shuffled);
+    } else {
+      playerState.playTrack(tracks[0], tracks);
     }
+  };
+
+  const shuffleTracks = (tracks: Track[]) => {
+    if (tracks.length === 0) return;
+    playerState.setIsShuffle(true);
+    const shuffled = [...tracks].sort(() => Math.random() - 0.5);
+    playerState.playTrack(shuffled[0], shuffled);
   };
 
   const handleBack = () => {
@@ -78,50 +88,21 @@ export function AlbumsPage() {
         {selectedAlbumGroup && (
           <div className="flex flex-wrap gap-2 items-center">
             <button
-              onClick={() => {
-                const tracks = selectedAlbumGroup.tracks;
-                if (playerState.isShuffle) {
-                  const shuffled = [...tracks].sort(() => Math.random() - 0.5);
-                  playerState.playTrack(shuffled[0], shuffled);
-                } else {
-                  playerState.playTrack(tracks[0], tracks);
-                }
-              }}
+              onClick={() => playTracks(selectedAlbumGroup.tracks)}
               className="px-3 h-8 rounded-full bg-primary text-black hover:bg-primary/90 flex items-center gap-1.5 transition-all text-sm font-bold shadow-lg shadow-primary/20"
               title="Play Album"
             >
               <Play size={14} fill="currentColor" /> Play
             </button>
-            <button
-              onClick={() => {
-                playerState.setIsShuffle(true);
-                const tracks = selectedAlbumGroup.tracks;
-                const shuffled = [...tracks].sort(() => Math.random() - 0.5);
-                playerState.playTrack(shuffled[0], shuffled);
-              }}
-              className="px-3 h-8 rounded-full bg-white/10 text-white hover:bg-white hover:text-black flex items-center gap-1.5 transition-all text-sm font-bold"
-              title="Shuffle Album"
-            >
-              <Shuffle size={14} /> Shuffle
-            </button>
-            <button
-              onClick={() => {
-                playerState.addToCurrentQueue(selectedAlbumGroup.tracks);
-              }}
-              className="px-3 h-8 rounded-full bg-white/10 text-white hover:bg-white hover:text-black flex items-center gap-1.5 transition-all text-sm font-bold"
-              title="Add to Queue"
-            >
-              <ListPlus size={14} /> Add to Queue
-            </button>
-            <button
-              onClick={() => {
-                playerState.addToNextQueue(selectedAlbumGroup.tracks);
-              }}
-              className="px-3 h-8 rounded-full bg-white/10 text-white hover:bg-white hover:text-black flex items-center gap-1.5 transition-all text-sm font-bold"
-              title="Play Next"
-            >
-              <ListMusic size={14} /> Play Next
-            </button>
+            <ActionMenu
+              ariaLabel="More album actions"
+              buttonClassName="h-8 w-8 rounded-full bg-white/10 text-white hover:bg-white hover:text-black flex items-center justify-center transition-all"
+              actions={[
+                { label: 'Shuffle', icon: <Shuffle size={14} />, onSelect: () => shuffleTracks(selectedAlbumGroup.tracks) },
+                { label: 'Add to Queue', icon: <ListPlus size={14} />, onSelect: () => playerState.addToCurrentQueue(selectedAlbumGroup.tracks) },
+                { label: 'Play Next', icon: <ListMusic size={14} />, onSelect: () => playerState.addToNextQueue(selectedAlbumGroup.tracks) },
+              ]}
+            />
           </div>
         )}
       </div>
@@ -180,24 +161,18 @@ export function AlbumsPage() {
                         <Album size={64} className="text-white" />
                       </div>
                     )}
-                    <div className="absolute inset-0 bg-black/0 group-hover:bg-black/40 transition-all flex items-center justify-center opacity-0 group-hover:opacity-100 hidden lg:flex">
-                      <button onClick={(e) => { e.stopPropagation(); playerState.addToCurrentQueue(album.tracks); }} className="w-10 h-10 bg-white/20 hover:bg-white/40 rounded-full flex items-center justify-center hover:scale-110 shadow-lg transition-transform mx-1" title="Thêm vào hàng chờ hiện tại">
-                        <ListPlus size={16} className="text-white" />
-                      </button>
-                      <button onClick={(e) => handlePlayAlbum(album.name, e)} className="w-12 h-12 bg-[#f59e0b] rounded-full flex items-center justify-center hover:scale-110 shadow-lg transition-transform mx-1" title="Phát album">
-                        <Play size={20} fill="white" className="ml-1 text-white" />
-                      </button>
-                      <button onClick={(e) => { e.stopPropagation(); playerState.addToNextQueue(album.tracks); }} className="w-10 h-10 bg-white/20 hover:bg-white/40 rounded-full flex items-center justify-center hover:scale-110 shadow-lg transition-transform mx-1" title="Thêm vào hàng chờ tiếp theo">
-                        <ListMusic size={16} className="text-white" />
-                      </button>
-                    </div>
                   </div>
-                  <button 
-                    onClick={(e) => handlePlayAlbum(album.name, e)} 
-                    className="lg:hidden absolute bottom-2 right-2 w-10 h-10 bg-[#f59e0b] rounded-full flex items-center justify-center shadow-lg z-10"
-                  >
-                    <Play size={16} fill="white" className="ml-1 text-white" />
-                  </button>
+                  <div className="absolute bottom-2 right-2 z-10">
+                    <ActionMenu
+                      ariaLabel={`Album actions for ${album.name}`}
+                      buttonClassName="h-10 w-10 rounded-full bg-[#f59e0b] text-white hover:scale-105 flex items-center justify-center shadow-lg transition-all"
+                      actions={[
+                        { label: 'Play', icon: <Play size={14} fill="currentColor" />, onSelect: () => playerState.playTrack(album.tracks[0], album.tracks) },
+                        { label: 'Add to Queue', icon: <ListPlus size={14} />, onSelect: () => playerState.addToCurrentQueue(album.tracks) },
+                        { label: 'Play Next', icon: <ListMusic size={14} />, onSelect: () => playerState.addToNextQueue(album.tracks) },
+                      ]}
+                    />
+                  </div>
                 </div>
                 <p className="text-base font-semibold text-white truncate group-hover:text-[#f59e0b] transition-colors">{album.name}</p>
                 <p className="text-sm text-white/40 truncate">{album.tracks.length} songs</p>

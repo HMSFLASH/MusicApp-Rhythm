@@ -1,9 +1,10 @@
-import React, { useState } from 'react';
+import { useState } from 'react';
 import { useNavigate, useLocation } from 'react-router-dom';
 import { ArrowLeft, Mic2, Play, Cloud, ListMusic, ListPlus, Shuffle } from 'lucide-react';
 import { useGlobalAudio } from '../context/AudioContext';
 import { useLibrary } from '../context/LibraryContext';
 import type { Track } from '../hooks/useAudioPlayer';
+import { ActionMenu } from '../components/ActionMenu';
 
 export function ArtistsPage() {
   const navigate = useNavigate();
@@ -31,17 +32,21 @@ export function ArtistsPage() {
     (track.fileName ? (track.fileName.includes(' - ') ? track.fileName.split(' - ')[1].replace(/\.[^/.]+$/, "") : track.fileName.replace(/\.[^/.]+$/, "")) : 'Unknown Title')
   );
 
-  const handlePlayArtist = (artist: string, e: React.MouseEvent) => {
-    e.stopPropagation();
-    const artistTracks = getArtistTracks(artist);
-    if (artistTracks.length > 0) {
-      if (playerState.isShuffle) {
-        const shuffled = [...artistTracks].sort(() => Math.random() - 0.5);
-        playerState.playTrack(shuffled[0], shuffled);
-      } else {
-        playerState.playTrack(artistTracks[0], artistTracks);
-      }
+  const playTracks = (artistTracks: Track[]) => {
+    if (artistTracks.length === 0) return;
+    if (playerState.isShuffle) {
+      const shuffled = [...artistTracks].sort(() => Math.random() - 0.5);
+      playerState.playTrack(shuffled[0], shuffled);
+    } else {
+      playerState.playTrack(artistTracks[0], artistTracks);
     }
+  };
+
+  const shuffleTracks = (artistTracks: Track[]) => {
+    if (artistTracks.length === 0) return;
+    playerState.setIsShuffle(true);
+    const shuffled = [...artistTracks].sort(() => Math.random() - 0.5);
+    playerState.playTrack(shuffled[0], shuffled);
   };
 
   const selectedArtistTracks = selectedArtist ? getArtistTracks(selectedArtist) : [];
@@ -73,44 +78,21 @@ export function ArtistsPage() {
         {selectedArtist && (
           <div className="flex flex-wrap gap-2 items-center">
             <button
-              onClick={() => {
-                if (playerState.isShuffle) {
-                  const shuffled = [...selectedArtistTracks].sort(() => Math.random() - 0.5);
-                  playerState.playTrack(shuffled[0], shuffled);
-                } else {
-                  playerState.playTrack(selectedArtistTracks[0], selectedArtistTracks);
-                }
-              }}
+              onClick={() => playTracks(selectedArtistTracks)}
               className="px-3 h-8 rounded-full bg-[#10b981] text-black hover:bg-[#10b981]/90 flex items-center gap-1.5 transition-all text-sm font-bold shadow-lg shadow-[#10b981]/20"
               title="Play Artist"
             >
               <Play size={14} fill="currentColor" /> Play
             </button>
-            <button
-              onClick={() => {
-                playerState.setIsShuffle(true);
-                const shuffled = [...selectedArtistTracks].sort(() => Math.random() - 0.5);
-                playerState.playTrack(shuffled[0], shuffled);
-              }}
-              className="px-3 h-8 rounded-full bg-white/10 text-white hover:bg-white hover:text-black flex items-center gap-1.5 transition-all text-sm font-bold"
-              title="Shuffle Artist"
-            >
-              <Shuffle size={14} /> Shuffle
-            </button>
-            <button
-              onClick={() => playerState.addToCurrentQueue(selectedArtistTracks)}
-              className="px-3 h-8 rounded-full bg-white/10 text-white hover:bg-white hover:text-black flex items-center gap-1.5 transition-all text-sm font-bold"
-              title="Add to Queue"
-            >
-              <ListPlus size={14} /> Add to Queue
-            </button>
-            <button
-              onClick={() => playerState.addToNextQueue(selectedArtistTracks)}
-              className="px-3 h-8 rounded-full bg-white/10 text-white hover:bg-white hover:text-black flex items-center gap-1.5 transition-all text-sm font-bold"
-              title="Play Next"
-            >
-              <ListMusic size={14} /> Play Next
-            </button>
+            <ActionMenu
+              ariaLabel="More artist actions"
+              buttonClassName="h-8 w-8 rounded-full bg-white/10 text-white hover:bg-white hover:text-black flex items-center justify-center transition-all"
+              actions={[
+                { label: 'Shuffle', icon: <Shuffle size={14} />, onSelect: () => shuffleTracks(selectedArtistTracks) },
+                { label: 'Add to Queue', icon: <ListPlus size={14} />, onSelect: () => playerState.addToCurrentQueue(selectedArtistTracks) },
+                { label: 'Play Next', icon: <ListMusic size={14} />, onSelect: () => playerState.addToNextQueue(selectedArtistTracks) },
+              ]}
+            />
           </div>
         )}
       </div>
@@ -162,23 +144,18 @@ export function ArtistsPage() {
                   style={{ background: `linear-gradient(135deg, hsl(${(i * 37) % 360}, 70%, 25%) 0%, hsl(${(i * 37 + 80) % 360}, 90%, 15%) 100%)` }}>
                   <span className="text-5xl font-bold text-white/50 group-hover:text-white/80 transition-colors">{artist[0]}</span>
                   
-                  <div className="absolute inset-0 bg-black/0 group-hover:bg-black/40 transition-all flex items-center justify-center opacity-0 group-hover:opacity-100 hidden lg:flex">
-                    <button onClick={(e) => { e.stopPropagation(); playerState.addToCurrentQueue(getArtistTracks(artist)); }} className="w-8 h-8 bg-white/20 hover:bg-white/40 rounded-full flex items-center justify-center hover:scale-110 shadow-lg transition-transform mx-1" title="Thêm vào hàng chờ hiện tại">
-                      <ListPlus size={14} className="text-white" />
-                    </button>
-                    <button onClick={(e) => handlePlayArtist(artist, e)} className="w-12 h-12 bg-[#10b981] rounded-full flex items-center justify-center hover:scale-110 shadow-lg transition-transform mx-1" title="Phát">
-                      <Play size={20} fill="white" className="ml-1 text-white" />
-                    </button>
-                    <button onClick={(e) => { e.stopPropagation(); playerState.addToNextQueue(getArtistTracks(artist)); }} className="w-8 h-8 bg-white/20 hover:bg-white/40 rounded-full flex items-center justify-center hover:scale-110 shadow-lg transition-transform mx-1" title="Thêm vào hàng chờ tiếp theo">
-                      <ListMusic size={14} className="text-white" />
-                    </button>
-                  </div>
                 </div>
-                <button onClick={(e) => handlePlayArtist(artist, e)} className="absolute bottom-0 right-0 lg:hidden z-10">
-                  <div className="w-9 h-9 bg-[#10b981] rounded-full flex items-center justify-center shadow-lg border-2 border-[#121212]">
-                    <Play size={14} fill="white" className="ml-0.5 text-white" />
-                  </div>
-                </button>
+                <div className="absolute bottom-0 right-0 z-10">
+                  <ActionMenu
+                    ariaLabel={`Artist actions for ${artist}`}
+                    buttonClassName="h-9 w-9 rounded-full bg-[#10b981] text-white flex items-center justify-center shadow-lg border-2 border-[#121212] hover:scale-105 transition-all"
+                    actions={[
+                      { label: 'Play', icon: <Play size={14} fill="currentColor" />, onSelect: () => playTracks(getArtistTracks(artist)) },
+                      { label: 'Add to Queue', icon: <ListPlus size={14} />, onSelect: () => playerState.addToCurrentQueue(getArtistTracks(artist)) },
+                      { label: 'Play Next', icon: <ListMusic size={14} />, onSelect: () => playerState.addToNextQueue(getArtistTracks(artist)) },
+                    ]}
+                  />
+                </div>
               </div>
               <span className="text-sm font-semibold text-white/80 group-hover:text-white text-center w-full truncate px-2">{artist}</span>
             </div>

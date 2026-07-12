@@ -1,9 +1,10 @@
-import React, { useState } from 'react';
+import { useState } from 'react';
 import { useNavigate } from 'react-router-dom';
 import { ArrowLeft, Music, Play, Cloud, ListMusic, ListPlus, Shuffle } from 'lucide-react';
 import { useGlobalAudio } from '../context/AudioContext';
 import { useLibrary } from '../context/LibraryContext';
 import type { Track } from '../hooks/useAudioPlayer';
+import { ActionMenu } from '../components/ActionMenu';
 
 export function GenresPage() {
   const navigate = useNavigate();
@@ -27,17 +28,21 @@ export function GenresPage() {
     (track.fileName ? (track.fileName.includes(' - ') ? track.fileName.split(' - ')[1].replace(/\.[^/.]+$/, "") : track.fileName.replace(/\.[^/.]+$/, "")) : 'Unknown Title')
   );
 
-  const handlePlayGenre = (genre: string, e: React.MouseEvent) => {
-    e.stopPropagation();
-    const genreTracks = getGenreTracks(genre);
-    if (genreTracks.length > 0) {
-      if (playerState.isShuffle) {
-        const shuffled = [...genreTracks].sort(() => Math.random() - 0.5);
-        playerState.playTrack(shuffled[0], shuffled);
-      } else {
-        playerState.playTrack(genreTracks[0], genreTracks);
-      }
+  const playTracks = (genreTracks: Track[]) => {
+    if (genreTracks.length === 0) return;
+    if (playerState.isShuffle) {
+      const shuffled = [...genreTracks].sort(() => Math.random() - 0.5);
+      playerState.playTrack(shuffled[0], shuffled);
+    } else {
+      playerState.playTrack(genreTracks[0], genreTracks);
     }
+  };
+
+  const shuffleTracks = (genreTracks: Track[]) => {
+    if (genreTracks.length === 0) return;
+    playerState.setIsShuffle(true);
+    const shuffled = [...genreTracks].sort(() => Math.random() - 0.5);
+    playerState.playTrack(shuffled[0], shuffled);
   };
 
   const selectedGenreTracks = selectedGenre ? getGenreTracks(selectedGenre) : [];
@@ -69,44 +74,21 @@ export function GenresPage() {
         {selectedGenre && (
           <div className="flex flex-wrap gap-2 items-center">
             <button
-              onClick={() => {
-                if (playerState.isShuffle) {
-                  const shuffled = [...selectedGenreTracks].sort(() => Math.random() - 0.5);
-                  playerState.playTrack(shuffled[0], shuffled);
-                } else {
-                  playerState.playTrack(selectedGenreTracks[0], selectedGenreTracks);
-                }
-              }}
+              onClick={() => playTracks(selectedGenreTracks)}
               className="px-3 h-8 rounded-full bg-[#ec4899] text-white hover:bg-[#ec4899]/90 flex items-center gap-1.5 transition-all text-sm font-bold shadow-lg shadow-[#ec4899]/20"
               title="Play Genre"
             >
               <Play size={14} fill="currentColor" /> Play
             </button>
-            <button
-              onClick={() => {
-                playerState.setIsShuffle(true);
-                const shuffled = [...selectedGenreTracks].sort(() => Math.random() - 0.5);
-                playerState.playTrack(shuffled[0], shuffled);
-              }}
-              className="px-3 h-8 rounded-full bg-white/10 text-white hover:bg-white hover:text-black flex items-center gap-1.5 transition-all text-sm font-bold"
-              title="Shuffle Genre"
-            >
-              <Shuffle size={14} /> Shuffle
-            </button>
-            <button
-              onClick={() => playerState.addToCurrentQueue(selectedGenreTracks)}
-              className="px-3 h-8 rounded-full bg-white/10 text-white hover:bg-white hover:text-black flex items-center gap-1.5 transition-all text-sm font-bold"
-              title="Add to Queue"
-            >
-              <ListPlus size={14} /> Add to Queue
-            </button>
-            <button
-              onClick={() => playerState.addToNextQueue(selectedGenreTracks)}
-              className="px-3 h-8 rounded-full bg-white/10 text-white hover:bg-white hover:text-black flex items-center gap-1.5 transition-all text-sm font-bold"
-              title="Play Next"
-            >
-              <ListMusic size={14} /> Play Next
-            </button>
+            <ActionMenu
+              ariaLabel="More genre actions"
+              buttonClassName="h-8 w-8 rounded-full bg-white/10 text-white hover:bg-white hover:text-black flex items-center justify-center transition-all"
+              actions={[
+                { label: 'Shuffle', icon: <Shuffle size={14} />, onSelect: () => shuffleTracks(selectedGenreTracks) },
+                { label: 'Add to Queue', icon: <ListPlus size={14} />, onSelect: () => playerState.addToCurrentQueue(selectedGenreTracks) },
+                { label: 'Play Next', icon: <ListMusic size={14} />, onSelect: () => playerState.addToNextQueue(selectedGenreTracks) },
+              ]}
+            />
           </div>
         )}
       </div>
@@ -159,12 +141,14 @@ export function GenresPage() {
             return (
               <div
                 key={i}
-                className="relative overflow-hidden rounded-3xl p-6 cursor-pointer group hover:scale-[1.02] transition-all duration-300 shadow-lg"
+                className="relative rounded-3xl p-6 cursor-pointer group hover:scale-[1.02] transition-all duration-300 shadow-lg"
                 style={{ background: `linear-gradient(135deg, ${color1}, ${color2})`, boxShadow: `0 12px 30px -10px ${color1}88` }}
                 onClick={() => setSelectedGenre(genre)}
               >
-                <div className="absolute -right-4 -bottom-4 opacity-[0.15] group-hover:opacity-[0.25] group-hover:rotate-6 group-hover:scale-110 transition-all duration-500 text-white pointer-events-none">
-                  <Music size={120} />
+                <div className="absolute inset-0 overflow-hidden rounded-3xl pointer-events-none">
+                  <div className="absolute -right-4 -bottom-4 opacity-[0.15] group-hover:opacity-[0.25] group-hover:rotate-6 group-hover:scale-110 transition-all duration-500 text-white">
+                    <Music size={120} />
+                  </div>
                 </div>
 
                 <div className="relative z-10 flex flex-col h-full justify-between gap-6 md:gap-8 pointer-events-none">
@@ -174,12 +158,15 @@ export function GenresPage() {
 
                   <div className="flex items-center justify-between pointer-events-auto">
                     <span className="text-xs md:text-sm font-medium text-white/90 bg-black/20 px-3 py-1 rounded-full backdrop-blur-sm shadow-sm">{count} songs</span>
-                    <button 
-                      onClick={(e) => handlePlayGenre(genre, e)}
-                      className="w-10 h-10 lg:w-12 lg:h-12 rounded-full flex items-center justify-center opacity-100 lg:opacity-0 lg:group-hover:opacity-100 transition-all transform translate-y-0 lg:translate-y-4 lg:group-hover:translate-y-0 shadow-xl bg-white text-black hover:scale-105"
-                    >
-                      <Play size={18} className="ml-1" fill="currentColor" />
-                    </button>
+                    <ActionMenu
+                      ariaLabel={`Genre actions for ${genre}`}
+                      buttonClassName="h-10 w-10 rounded-full bg-white text-black hover:scale-105 flex items-center justify-center shadow-xl transition-all"
+                      actions={[
+                        { label: 'Play', icon: <Play size={14} fill="currentColor" />, onSelect: () => playTracks(getGenreTracks(genre)) },
+                        { label: 'Add to Queue', icon: <ListPlus size={14} />, onSelect: () => playerState.addToCurrentQueue(getGenreTracks(genre)) },
+                        { label: 'Play Next', icon: <ListMusic size={14} />, onSelect: () => playerState.addToNextQueue(getGenreTracks(genre)) },
+                      ]}
+                    />
                   </div>
                 </div>
               </div>
