@@ -470,6 +470,7 @@ export function BottomPlayerBar() {
               <div className="flex-1 overflow-y-auto p-2 no-scrollbar">
                 {queue.map((track, idx) => {
                   const isActive = currentTrack?.id === track.id;
+                  const artwork = track.imageUrl || playerState.getTrackImage?.(track.id);
                   return (
                     <div 
                       key={`${track.id}-${idx}`}
@@ -478,8 +479,8 @@ export function BottomPlayerBar() {
                         isActive ? 'bg-primary/20 border border-primary/30' : 'hover:bg-white/5 border border-transparent'
                       }`}
                     >
-                      <div className="w-10 h-10 rounded-full bg-primary/20 bg-cover bg-center flex-shrink-0" style={{ backgroundImage: track.imageUrl ? `url(${track.imageUrl})` : undefined }}>
-                        {!track.imageUrl && <Disc size={16} className="text-white/30 m-auto mt-3" />}
+                      <div className="w-10 h-10 rounded-full bg-primary/20 bg-cover bg-center flex-shrink-0" style={{ backgroundImage: artwork ? `url(${artwork})` : undefined }}>
+                        {!artwork && <Disc size={16} className="text-white/30 m-auto mt-3" />}
                       </div>
                       <div className="flex-1 min-w-0">
                         <p className={`text-sm font-medium truncate ${isActive ? 'text-primary' : 'text-white'}`}>

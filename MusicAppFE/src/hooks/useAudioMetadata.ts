@@ -215,10 +215,8 @@ export function useAudioMetadata(isAuthenticated: boolean, queueState: any, sett
                         window.dispatchEvent(new CustomEvent('sonic_metadata_updated', { detail: trackId }));
 
                         const hasCover = !!parsed.imageUrl || !!track.imageUrl;
-                        const coverChecked = (lsData as any).coverChecked;
                         const coverStored = (lsData as any).coverStored;
-                        const coverMissing = (lsData as any).coverMissing;
-                        if (hasCover || coverMissing || (coverChecked && coverStored && idbCover)) {
+                        if (hasCover || (coverStored && idbCover)) {
                             return; // SKIP EXTRACTION!
                         }
                     }
@@ -438,11 +436,7 @@ export function useAudioMetadata(isAuthenticated: boolean, queueState: any, sett
                 }
             }
 
-            // Always mark as cached so we don't infinitely retry
-            if (!extractedPicture) {
-                (cachePayload as any).coverMissing = true;
-            }
-            const shouldMarkCoverChecked = !extractedPicture || track.sourceType === 'LOCAL' || extractedCoverStored;
+            const shouldMarkCoverChecked = extractedPicture && (track.sourceType === 'LOCAL' || extractedCoverStored);
             const updatedCachePayload = {
                 ...cachePayload,
                 ...(shouldMarkCoverChecked ? { coverChecked: true } : {}),
@@ -478,15 +472,14 @@ export function useAudioMetadata(isAuthenticated: boolean, queueState: any, sett
             }
         } catch (e) {
             console.warn('[Metadata] Failed to extract for', track.fileName, e);
-            // Mark as failed in cache to prevent infinite retries
             const currentCached = metadataCacheRef.current.get(trackId) || {};
-            const updatedCache = { ...currentCached, coverChecked: true };
+            const updatedCache = { ...currentCached };
             delete (updatedCache as any).pending;
             metadataCacheRef.current.set(trackId, updatedCache);
             if (track.sourceType !== 'LOCAL') {
                 try {
                     const lsData = await getCachedMetadataForTrack(track) || {};
-                    await db.set(lsKey, { ...lsData, coverChecked: true });
+                    await db.set(lsKey, lsData);
                 } catch (err) {
                     console.warn('[Metadata] Failed to save error status to cache', err);
                 }
@@ -605,9 +598,8 @@ export function useAudioMetadata(isAuthenticated: boolean, queueState: any, sett
         if (currentTrack) {
             const trackId = String(currentTrack.id);
             const cached = metadataCacheRef.current.get(trackId);
-            const hasCover = !!cached?.imageUrl || !!currentTrack.imageUrl;
-            const coverChecked = cached?.coverChecked;
-            if (!cached || (!hasCover && !coverChecked)) {
+            const hasCover = !!cached?.imageUrl || !!currentTrack.imageUrl || imageCacheRef.current.has(trackId);
+            if (!cached || !hasCover) {
                 void extractMetadata(currentTrack);
             }
         }

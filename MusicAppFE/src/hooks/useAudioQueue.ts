@@ -1,7 +1,8 @@
-import { useState, useCallback, useEffect } from 'react';
+import { useState, useCallback, useEffect, useRef } from 'react';
 import type { Track, SongEndMode, QueueEndMode } from './audioTypes';
 import { PLAYBACK_STORAGE_KEY } from './audioStorage';
 import { db } from '../lib/db';
+import { getCover } from '../utils/idb';
 
 type SavedAudioQueueState = Partial<{
   isShuffleState: boolean;
@@ -46,6 +47,30 @@ const sanitizePlaybackState = (currentTrack: Track | null, queue: Track[]): Save
   };
 };
 
+const trackNeedsCachedCover = (track?: Track | null) => (
+  Boolean(track && track.sourceType !== 'LOCAL' && !track.imageUrl)
+);
+
+const applyCachedCoverToTracks = (items: Track[], trackId: string, imageUrl: string) => {
+  let changed = false;
+  const next = items.map((track) => {
+    if (String(track.id) !== trackId || track.imageUrl) return track;
+    changed = true;
+    return { ...track, imageUrl };
+  });
+  return changed ? next : items;
+};
+
+const applyCachedCoverToQueueGroups = (queues: Track[][], trackId: string, imageUrl: string) => {
+  let changed = false;
+  const next = queues.map((queue) => {
+    const hydrated = applyCachedCoverToTracks(queue, trackId, imageUrl);
+    if (hydrated !== queue) changed = true;
+    return hydrated;
+  });
+  return changed ? next : queues;
+};
+
 const filterUpcomingQueues = (
   queues: Track[][],
   predicate: (track: Track) => boolean
@@ -68,6 +93,8 @@ export function useAudioQueue(
   const [repeatMode, setRepeatMode] = useState<'simple' | 'advanced'>(savedState.repeatMode ?? 'simple');
   const [upcomingQueues, setUpcomingQueues] = useState<Track[][]>(savedState.upcomingQueues || []);
   const [cycleQueues, setCycleQueues] = useState<boolean>(savedState.cycleQueues || false);
+  const queueCoverObjectUrlsRef = useRef<Map<string, string>>(new Map());
+  const pendingCoverHydrationRef = useRef<Set<string>>(new Set());
 
   useEffect(() => {
     let cancelled = false;
@@ -132,6 +159,69 @@ export function useAudioQueue(
       db.set(PLAYBACK_STORAGE_KEY, sanitizePlaybackState(currentTrack, queue));
     }
   }, [currentTrack, queue, loaded, isAuthenticated, isAuthResolved]);
+
+  useEffect(() => {
+    if (!loaded || !isAuthenticated || !isAuthResolved) return;
+
+    const candidates = [
+      currentTrack,
+      ...queue,
+      ...upcomingQueues.flat(),
+    ].filter(trackNeedsCachedCover) as Track[];
+
+    if (candidates.length === 0) return;
+
+    const uniqueTrackIds = [...new Set(candidates.map((track) => String(track.id)))];
+
+    uniqueTrackIds.forEach((trackId) => {
+      const existingObjectUrl = queueCoverObjectUrlsRef.current.get(trackId);
+      if (existingObjectUrl) {
+        setCurrentTrack(prev => (
+          prev && String(prev.id) === trackId && !prev.imageUrl
+            ? { ...prev, imageUrl: existingObjectUrl }
+            : prev
+        ));
+        setQueue(prev => applyCachedCoverToTracks(prev, trackId, existingObjectUrl));
+        setOriginalQueue(prev => applyCachedCoverToTracks(prev, trackId, existingObjectUrl));
+        setUpcomingQueues(prev => applyCachedCoverToQueueGroups(prev, trackId, existingObjectUrl));
+        return;
+      }
+
+      if (pendingCoverHydrationRef.current.has(trackId)) return;
+      pendingCoverHydrationRef.current.add(trackId);
+
+      void getCover(trackId)
+        .then((cover) => {
+          if (!cover) {
+            console.log(`[AudioQueue] No IndexedDB cover found for queued track ${trackId}.`);
+            return;
+          }
+
+          const imageUrl = URL.createObjectURL(new Blob([new Uint8Array(cover.data)], { type: cover.mimeType }));
+          queueCoverObjectUrlsRef.current.set(trackId, imageUrl);
+          console.log(`[AudioQueue] Hydrated cover for queued track ${trackId} from IndexedDB.`);
+
+          setCurrentTrack(prev => (
+            prev && String(prev.id) === trackId && !prev.imageUrl
+              ? { ...prev, imageUrl }
+              : prev
+          ));
+          setQueue(prev => applyCachedCoverToTracks(prev, trackId, imageUrl));
+          setOriginalQueue(prev => applyCachedCoverToTracks(prev, trackId, imageUrl));
+          setUpcomingQueues(prev => applyCachedCoverToQueueGroups(prev, trackId, imageUrl));
+        })
+        .catch((error) => console.warn(`[AudioQueue] Failed to hydrate cover for queued track ${trackId}`, error))
+        .finally(() => {
+          pendingCoverHydrationRef.current.delete(trackId);
+        });
+    });
+  }, [currentTrack, queue, upcomingQueues, loaded, isAuthenticated, isAuthResolved]);
+
+  useEffect(() => () => {
+    queueCoverObjectUrlsRef.current.forEach((url) => URL.revokeObjectURL(url));
+    queueCoverObjectUrlsRef.current.clear();
+    pendingCoverHydrationRef.current.clear();
+  }, []);
 
   useEffect(() => {
     const handleMusicDeleted = (e: Event) => {

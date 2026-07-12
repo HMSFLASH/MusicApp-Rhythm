@@ -111,8 +111,18 @@ public class MusicController {
     }
 
     @GetMapping("/{id}/image")
-    public ResponseEntity<byte[]> getMusicImage(@PathVariable String id) {
-        String imageUrl = musicService.getMusicImage(id);
+    public ResponseEntity<byte[]> getMusicImage(@PathVariable String id, Principal principal) {
+        String userId = null;
+        if (principal != null) {
+            try {
+                userId = SecurityUtils.extractUserId(principal);
+            } catch (Exception ignored) {
+            }
+        }
+
+        String imageUrl = userId == null
+                ? musicService.getMusicImage(id)
+                : musicService.getMusicImage(id, userId);
         if (imageUrl != null && imageUrl.startsWith("data:image/")) {
             int commaIndex = imageUrl.indexOf(',');
             if (commaIndex != -1) {

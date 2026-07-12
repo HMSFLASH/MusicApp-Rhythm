@@ -4,9 +4,8 @@ import { useAuth } from './AuthContext';
 import type { Track } from '../hooks/useAudioPlayer';
 import { db } from '../lib/db';
 import { removeCachedAudio } from '../utils/mediaCache';
-import { getCover, removeCover, saveCover } from '../utils/idb';
-import { getCachedMetadataForTrack, getMetadataCacheKey, removeCachedMetadataForTrack } from '../utils/metadataCache';
-import { BACKEND_URL } from '../config/env';
+import { getCover, removeCover } from '../utils/idb';
+import { getCachedMetadataForTrack, removeCachedMetadataForTrack } from '../utils/metadataCache';
 
 interface LibraryContextType {
   tracks: Track[];
@@ -84,42 +83,9 @@ const isBackendMusicImageUrl = (imageUrl?: string) => {
   }
 };
 
-const pendingBackendCoverSaves = new Set<string>();
-
-const persistBackendCoverToIdb = async (track: Track) => {
-  const trackId = String(track.id);
-  if (!isBackendMusicImageUrl(track.imageUrl) || pendingBackendCoverSaves.has(trackId)) return;
-
-  pendingBackendCoverSaves.add(trackId);
-  try {
-    const fetchUrl = new URL(track.imageUrl!, BACKEND_URL || window.location.origin).toString();
-    const response = await fetch(fetchUrl, { credentials: 'include' });
-    if (!response.ok) throw new Error(`HTTP ${response.status}`);
-
-    const blob = await response.blob();
-    if (!blob.type.startsWith('image/')) throw new Error(`Unexpected cover MIME type: ${blob.type || 'unknown'}`);
-
-    const stored = await saveCover(trackId, new Uint8Array(await blob.arrayBuffer()), blob.type);
-    if (stored) {
-      const cacheKey = getMetadataCacheKey(trackId);
-      const cached = await getCachedMetadataForTrack(track);
-      await db.set(cacheKey, { ...(cached || {}), coverChecked: true, coverStored: true });
-      console.log(`[Library] Saved backend cover image for ${trackId} to IndexedDB.`);
-      window.dispatchEvent(new CustomEvent('sonic_metadata_updated', { detail: trackId }));
-    }
-  } catch (error) {
-    console.warn(`[Library] Failed to save backend cover image for ${trackId} to IndexedDB`, error);
-  } finally {
-    pendingBackendCoverSaves.delete(trackId);
-  }
-};
-
 const mergeCachedMetadata = async (track: Track): Promise<Track> => {
   const cached = await getCachedMetadataForTrack(track);
   const idbCover = await getCover(String(track.id));
-  if (!idbCover && isBackendMusicImageUrl(track.imageUrl)) {
-    void persistBackendCoverToIdb(track);
-  }
   if (!cached && !idbCover && !isBackendMusicImageUrl(track.imageUrl)) return track;
 
   const merged = { ...track };
