@@ -1,17 +1,19 @@
 import { useMemo, useState } from 'react';
 import { useNavigate, useLocation } from 'react-router-dom';
-import { ArrowLeft, Album, Cloud, ListMusic, ListPlus, Play, Shuffle } from 'lucide-react';
+import { ArrowLeft, Album, Cloud, ListMusic, ListPlus, Play, Shuffle, Heart } from 'lucide-react';
 import { useGlobalAudio } from '../context/AudioContext';
 import { useLibrary } from '../context/LibraryContext';
 import type { Track } from '../hooks/useAudioPlayer';
 import { ActionMenu } from '../components/ActionMenu';
+import { AddToPlaylistModal } from '../components/AddToPlaylistModal';
 
 export function AlbumsPage() {
   const navigate = useNavigate();
   const location = useLocation();
   const { playerState } = useGlobalAudio();
-  const { tracks } = useLibrary();
+  const { tracks, favorites, toggleFavorite } = useLibrary();
   const [selectedAlbum, setSelectedAlbum] = useState<string | null>(location.state?.selectedAlbum || null);
+  const [trackToPlaylist, setTrackToPlaylist] = useState<Track | null>(null);
 
   const getAlbum = (track: Track) => track.album || playerState.getTrackMetadata(track.id)?.album || '';
   const getArtist = (track: Track) => (
@@ -70,33 +72,33 @@ export function AlbumsPage() {
   };
 
   return (
-    <div className="w-full h-full flex flex-col p-4 md:p-8 max-w-6xl mx-auto pb-32 overflow-y-auto">
-      <div className="mb-8 border-b border-white/10 pb-6 flex items-center justify-between flex-wrap gap-4">
-        <div>
-          <h1 className="text-3xl font-bold font-sans text-white tracking-tight flex items-center gap-3">
-            <button onClick={handleBack} className="p-2 hover:bg-white/10 rounded-full transition-colors text-white/50 hover:text-white">
+    <div className="w-full h-full flex flex-col max-w-6xl 2xl:max-w-none mx-auto pb-28 md:pb-32 overflow-y-auto">
+      <div className="mb-6 md:mb-8 border-b border-white/10 pb-4 md:pb-6 flex flex-col sm:flex-row sm:items-center justify-between gap-4">
+        <div className="min-w-0">
+          <h1 className="text-2xl md:text-3xl font-bold font-sans text-white tracking-tight flex items-center gap-2 md:gap-3">
+            <button onClick={handleBack} className="p-2 -ml-2 hover:bg-white/10 rounded-full transition-colors text-white/50 hover:text-white shrink-0">
               <ArrowLeft size={24} />
             </button>
-            {selectedAlbumGroup ? selectedAlbumGroup.name : 'Albums'}
+            <span className="truncate">{selectedAlbumGroup ? selectedAlbumGroup.name : 'Albums'}</span>
           </h1>
-          <p className="text-secondary/60 text-sm font-mono mt-1 ml-12">
+          <p className="text-secondary/60 text-sm font-mono mt-1 sm:ml-12">
             {selectedAlbumGroup
               ? `${selectedAlbumGroup.tracks.length} songs in this album.`
               : `${albumGroups.length} albums in your library.`}
           </p>
         </div>
         {selectedAlbumGroup && (
-          <div className="flex flex-wrap gap-2 items-center">
+          <div className="flex w-full sm:w-auto flex-wrap items-center gap-2 pb-1 sm:pb-0">
             <button
               onClick={() => playTracks(selectedAlbumGroup.tracks)}
-              className="px-3 h-8 rounded-full bg-primary text-black hover:bg-primary/90 flex items-center gap-1.5 transition-all text-sm font-bold shadow-lg shadow-primary/20"
+              className="px-3 h-8 rounded-full bg-primary text-black hover:bg-primary/90 flex items-center gap-1.5 transition-all text-sm font-bold shadow-lg shadow-primary/20 whitespace-nowrap"
               title="Play Album"
             >
               <Play size={14} fill="currentColor" /> Play
             </button>
             <button
               onClick={() => shuffleTracks(selectedAlbumGroup.tracks)}
-              className="px-3 h-8 rounded-full bg-white/10 text-white hover:bg-white hover:text-black flex items-center gap-1.5 transition-all text-sm font-bold"
+              className="px-3 h-8 rounded-full bg-white/10 text-white hover:bg-white hover:text-black flex items-center gap-1.5 transition-all text-sm font-bold whitespace-nowrap"
               title="Shuffle Album"
             >
               <Shuffle size={14} /> Shuffle
@@ -119,12 +121,12 @@ export function AlbumsPage() {
             <div
               key={track.id}
               onClick={() => playerState.playTrack(track, selectedAlbumGroup.tracks)}
-              className={`flex items-center gap-4 p-3 rounded-xl border transition-colors group cursor-pointer ${playerState.currentTrack?.id === track.id
+              className={`flex items-center gap-3 sm:gap-4 p-3 rounded-xl border transition-colors group cursor-pointer ${playerState.currentTrack?.id === track.id
                 ? 'bg-primary/10 border-primary/30'
                 : 'bg-white/[0.02] border-white/5 hover:bg-white/5 hover:border-white/10'
                 }`}
             >
-              <span className="text-xs text-white/20 w-5 text-right md:group-hover:hidden">{idx + 1}</span>
+              <span className="hidden sm:block text-xs text-white/20 w-5 text-right md:group-hover:hidden">{idx + 1}</span>
               <button
                 aria-label="Play track"
                 onClick={(e) => { e.stopPropagation(); playerState.playTrack(track, selectedAlbumGroup.tracks); }}
@@ -139,7 +141,7 @@ export function AlbumsPage() {
                   <ListMusic size={16} className="text-white/40" />
                 )}
               </div>
-              <div className="flex flex-col truncate flex-1">
+              <div className="flex flex-col truncate flex-1 pr-2">
                 <span className={`text-sm font-medium truncate ${playerState.currentTrack?.id === track.id ? 'text-primary' : 'text-white'}`}>
                   {getTitle(track)}
                 </span>
@@ -148,11 +150,27 @@ export function AlbumsPage() {
                   <span className="text-xs text-white/30 truncate">{getArtist(track)}</span>
                 </div>
               </div>
+              <ActionMenu
+                ariaLabel={`Song actions for ${getTitle(track)}`}
+                buttonClassName="p-1.5 text-white/40 hover:text-white hover:bg-white/10 rounded-full transition-colors shrink-0"
+                actions={[
+                  { label: 'Play Next', icon: <ListMusic size={14} />, onSelect: () => playerState.addToNextQueue([track]) },
+                  { label: 'Add to Queue', icon: <ListPlus size={14} />, onSelect: () => playerState.addToCurrentQueue([track]) },
+                  { label: 'Add to Playlist', icon: <ListPlus size={14} />, onSelect: () => setTrackToPlaylist(track) },
+                  ...(track.sourceType !== 'LOCAL'
+                    ? [{
+                        label: favorites.some(f => f.id === track.id) ? 'Remove Favorite' : 'Add to Favorite',
+                        icon: <Heart size={14} fill={favorites.some(f => f.id === track.id) ? "currentColor" : "none"} className={favorites.some(f => f.id === track.id) ? "text-primary" : ""} />,
+                        onSelect: () => void toggleFavorite(track)
+                      }]
+                    : [])
+                ]}
+              />
             </div>
           ))}
         </div>
       ) : albumGroups.length > 0 ? (
-        <div className="grid grid-cols-2 md:grid-cols-3 lg:grid-cols-4 xl:grid-cols-5 gap-4 md:gap-6">
+        <div className="grid grid-cols-2 sm:grid-cols-3 lg:grid-cols-4 xl:grid-cols-5 2xl:grid-cols-6 3xl:grid-cols-8 4k:grid-cols-10 gap-4 md:gap-6">
           {albumGroups.map((album, i) => {
             const track = album.coverTrack;
             return (
@@ -171,6 +189,7 @@ export function AlbumsPage() {
                   <div className="absolute bottom-2 right-2 z-10">
                     <ActionMenu
                       ariaLabel={`Album actions for ${album.name}`}
+                      direction="up"
                       buttonClassName="h-10 w-10 rounded-full bg-[#f59e0b] text-white hover:scale-105 flex items-center justify-center shadow-lg transition-all"
                       actions={[
                         { label: 'Play', icon: <Play size={14} fill="currentColor" />, onSelect: () => playerState.playTrack(album.tracks[0], album.tracks) },
@@ -192,6 +211,12 @@ export function AlbumsPage() {
           <p>No albums found in your library.</p>
         </div>
       )}
+
+      <AddToPlaylistModal
+        isOpen={!!trackToPlaylist}
+        onClose={() => setTrackToPlaylist(null)}
+        track={trackToPlaylist}
+      />
     </div>
   );
 }

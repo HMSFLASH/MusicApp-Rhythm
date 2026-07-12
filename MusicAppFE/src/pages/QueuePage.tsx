@@ -114,7 +114,7 @@ export function QueuePage() {
   };
 
   return (
-    <div className="flex flex-col h-full max-w-7xl mx-auto p-4 md:p-8">
+    <div className="flex flex-col h-full max-w-7xl 2xl:max-w-none mx-auto pb-28 md:pb-32">
       <div className="mb-6 md:mb-8 border-b border-white/10 pb-4 md:pb-6">
         <h1 className="text-2xl md:text-3xl font-bold font-sans text-white tracking-tight">Play Queue</h1>
         <p className="text-secondary/60 text-sm font-mono mt-1">
@@ -145,7 +145,7 @@ export function QueuePage() {
                     setOpenMenuIndex(null);
                     handlePlayTrack(track);
                   }}
-                  className={`group flex items-center gap-4 p-3 rounded-xl transition-all cursor-pointer ${isCurrent
+                  className={`group flex items-center gap-3 sm:gap-4 p-3 rounded-xl transition-all cursor-pointer ${isCurrent
                       ? 'bg-primary/20 border border-primary/30'
                       : 'hover:bg-white/5 border border-transparent'
                     } ${draggedIndex === index ? 'opacity-50' : 'opacity-100'}`}
@@ -154,7 +154,7 @@ export function QueuePage() {
                     <GripVertical size={16} />
                   </div>
 
-                  <div className="w-12 h-12 flex-shrink-0 bg-white/5 rounded-lg overflow-hidden relative flex items-center justify-center">
+                  <div className="w-10 h-10 sm:w-12 sm:h-12 flex-shrink-0 bg-white/5 rounded-lg overflow-hidden relative flex items-center justify-center">
                     {track.imageUrl || playerState.getTrackImage(track.id) ? (
                       <img src={track.imageUrl || playerState.getTrackImage(track.id)} alt="" className="w-full h-full object-cover" />
                     ) : (
@@ -174,10 +174,10 @@ export function QueuePage() {
                   </div>
 
                   <div className="flex-1 min-w-0">
-                    <span className={`block text-base font-medium truncate ${isCurrent ? 'text-primary' : 'text-white'}`}>
+                    <span className={`block text-sm sm:text-base font-medium truncate ${isCurrent ? 'text-primary' : 'text-white'}`}>
                       {track.title || playerState.getTrackMetadata(track.id)?.title || (track.fileName ? (track.fileName.includes(' - ') ? track.fileName.split(' - ')[1].replace(/\.[^/.]+$/, "") : track.fileName.replace(/\.[^/.]+$/, "")) : 'Unknown Title')}
                     </span>
-                    <p className="text-sm text-white/60 truncate">
+                    <p className="text-xs sm:text-sm text-white/60 truncate">
                       {track.artist || playerState.getTrackMetadata(track.id)?.artist || (track.fileName?.includes(' - ') ? track.fileName.split(' - ')[0] : 'Unknown Artist')} {track.album ? `• ${track.album}` : ''}
                     </p>
                   </div>
@@ -195,7 +195,7 @@ export function QueuePage() {
                     </button>
 
                     {openMenuIndex === index && (
-                      <div className="absolute right-0 top-full mt-1 w-40 bg-[#1A1A1A] border border-white/10 rounded-lg shadow-xl overflow-hidden z-50 py-1">
+                      <div className="absolute right-0 top-full mt-1 w-44 max-w-[calc(100vw_-_2rem)] bg-[#1A1A1A] border border-white/10 rounded-lg shadow-xl overflow-hidden z-50 py-1">
                         <button
                           disabled={index === 0}
                           onClick={(e) => moveTrack(e, index, 'top')}
@@ -274,8 +274,8 @@ export function QueuePage() {
             </h2>
             <div className="flex flex-col gap-6">
               {upcomingQueues.map((upQueue, qIndex) => (
-                <div key={qIndex} className="bg-white/5 rounded-xl p-4 border border-white/10">
-                  <div className="flex items-center justify-between mb-3">
+                <div key={qIndex} className="bg-white/5 rounded-xl p-3 sm:p-4 border border-white/10">
+                  <div className="flex items-center justify-between gap-3 mb-3">
                     <h3 className="font-semibold text-white/80">Queue #{qIndex + 1}</h3>
                     <button 
                       aria-label="Remove this queue"
@@ -288,7 +288,7 @@ export function QueuePage() {
                   </div>
                   <div className="flex flex-col gap-2">
                     {upQueue.map((track, tIndex) => (
-                      <div key={`${qIndex}-${track.id}-${tIndex}`} className="flex items-center gap-4 p-2 rounded-lg bg-black/20">
+                      <div key={`${qIndex}-${track.id}-${tIndex}`} className="flex items-center gap-3 sm:gap-4 p-2 rounded-lg bg-black/20">
                         <div className="w-10 h-10 flex-shrink-0 bg-white/5 rounded-md overflow-hidden">
                           {track.imageUrl || playerState.getTrackImage(track.id) ? (
                             <img src={track.imageUrl || playerState.getTrackImage(track.id)} alt="" className="w-full h-full object-cover" />
@@ -317,7 +317,7 @@ export function QueuePage() {
           onClick={() => setInfoTrack(null)}
         >
           <div
-            className="bg-[#1a1a1a] border border-white/10 rounded-2xl w-full max-w-md shadow-2xl overflow-hidden flex flex-col"
+            className="bg-[#1a1a1a] border border-white/10 rounded-2xl w-full max-w-md max-h-[calc(100dvh-2rem)] shadow-2xl overflow-hidden flex flex-col"
             onClick={(e) => e.stopPropagation()}
           >
             <div className="flex items-center justify-between p-5 border-b border-white/5">

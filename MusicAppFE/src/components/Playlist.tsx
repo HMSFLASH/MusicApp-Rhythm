@@ -292,7 +292,7 @@ export function Playlist({ isAuthenticated, onPlay, currentTrackId }: PlaylistPr
   const infoTrackBitsPerSample = infoTrack?.bitsPerSample ?? infoTrackMetadata?.bitsPerSample;
 
   return (
-    <div className="bg-surface rounded-xl p-6 shadow-2xl border border-white/5 flex flex-col h-full">
+    <div className="bg-surface rounded-xl p-3 sm:p-4 md:p-6 shadow-2xl border border-white/5 flex flex-col h-full">
       <CreatePlaylistModal
         isOpen={isCreateModalOpen}
         onClose={() => setIsCreateModalOpen(false)}
@@ -311,7 +311,7 @@ export function Playlist({ isAuthenticated, onPlay, currentTrackId }: PlaylistPr
       />
 
       {/* Header */}
-      <div className="flex flex-col md:flex-row md:items-center justify-between mb-6 gap-4">
+      <div className="flex flex-col md:flex-row md:items-center justify-between mb-5 md:mb-6 gap-4">
         <h2 className="text-xl font-bold font-sans text-white flex items-center gap-2 flex-wrap min-w-0">
           {selectedPlaylistId ? (
             <button
@@ -361,7 +361,7 @@ export function Playlist({ isAuthenticated, onPlay, currentTrackId }: PlaylistPr
         </h2>
 
         {selectedPlaylistId ? (
-          <div className="flex flex-wrap gap-2 items-center">
+          <div className="flex w-full md:w-auto flex-wrap items-center gap-2 pb-1 md:pb-0">
             {selectedPlaylistDetails && selectedPlaylistDetails.tracks && selectedPlaylistDetails.tracks.length > 0 && (
               <>
                 <button
@@ -374,7 +374,7 @@ export function Playlist({ isAuthenticated, onPlay, currentTrackId }: PlaylistPr
                       playerState.playTrack(tracks[0], tracks);
                     }
                   }}
-                  className="px-3 h-8 rounded-full bg-primary text-black hover:bg-primary/90 flex items-center gap-1.5 transition-all text-sm font-bold shadow-lg shadow-primary/20"
+                  className="px-3 h-8 rounded-full bg-primary text-black hover:bg-primary/90 flex items-center gap-1.5 transition-all text-sm font-bold shadow-lg shadow-primary/20 whitespace-nowrap"
                   title={t('playlist.playPlaylist')}
                 >
                   <Play size={14} fill="currentColor" /> {t('playlist.play')}
@@ -386,7 +386,7 @@ export function Playlist({ isAuthenticated, onPlay, currentTrackId }: PlaylistPr
                     const shuffled = [...tracks].sort(() => Math.random() - 0.5);
                     playerState.playTrack(shuffled[0], shuffled);
                   }}
-                  className="px-3 h-8 rounded-full bg-white/10 text-white hover:bg-white hover:text-black flex items-center gap-1.5 transition-all text-sm font-bold"
+                  className="px-3 h-8 rounded-full bg-white/10 text-white hover:bg-white hover:text-black flex items-center gap-1.5 transition-all text-sm font-bold whitespace-nowrap"
                   title={t('playlist.shuffleTitle')}
                 >
                   <Shuffle size={14} /> {t('playlist.shuffle')}
@@ -456,9 +456,9 @@ export function Playlist({ isAuthenticated, onPlay, currentTrackId }: PlaylistPr
               <div
                 key={p.id}
                 onClick={() => setSelectedPlaylistId(p.id)}
-                className="flex items-center justify-between p-3 rounded-lg bg-background/50 border border-white/5 hover:border-white/20 hover:bg-white/5 transition-all cursor-pointer group"
+                className="flex items-center justify-between gap-3 p-3 rounded-lg bg-background/50 border border-white/5 hover:border-white/20 hover:bg-white/5 transition-all cursor-pointer group"
               >
-                <div className="flex items-center gap-4 overflow-hidden">
+                <div className="flex min-w-0 items-center gap-3 sm:gap-4 overflow-hidden">
                   <div className="w-12 h-12 rounded-md bg-white/5 flex items-center justify-center shrink-0">
                     {p.imageUrl ? (
                       <img src={p.imageUrl} alt={p.name} className="w-full h-full object-cover rounded-md" />
@@ -539,12 +539,12 @@ export function Playlist({ isAuthenticated, onPlay, currentTrackId }: PlaylistPr
                   key={track.id}
                   onMouseLeave={() => setOpenMenuId(null)}
                   onClick={() => onPlay(track, selectedPlaylistDetails.tracks)}
-                  className={`flex items-center justify-between p-3 rounded-lg border transition-colors group cursor-pointer ${currentTrackId === track.id
+                  className={`flex items-center justify-between gap-3 p-3 rounded-lg border transition-colors group cursor-pointer ${currentTrackId === track.id
                       ? 'bg-primary/10 border-primary/30'
                       : 'bg-background/50 border-white/5 hover:border-white/10 hover:bg-white/5'
                     }`}
                 >
-                  <div className="flex items-center gap-4 overflow-hidden w-full">
+                  <div className="flex items-center gap-3 sm:gap-4 overflow-hidden w-full">
                     <button
                       onClick={(e) => { e.stopPropagation(); onPlay(track, selectedPlaylistDetails.tracks); }}
                       className={`flex items-center justify-center p-2 rounded-full transition-colors shrink-0 ${currentTrackId === track.id
@@ -582,7 +582,7 @@ export function Playlist({ isAuthenticated, onPlay, currentTrackId }: PlaylistPr
                     </button>
 
                     {openMenuId === track.id && (
-                      <div className="absolute right-0 top-full mt-1 w-48 bg-[#1A1A1A] border border-white/10 rounded-lg shadow-xl overflow-hidden z-50 py-1">
+                      <div className="absolute right-0 top-full mt-1 w-48 max-w-[calc(100vw_-_2rem)] bg-[#1A1A1A] border border-white/10 rounded-lg shadow-xl overflow-hidden z-50 py-1">
                         <button
                           onClick={(e) => handlePlayNext(track, e)}
                           className="w-full flex items-center gap-3 px-4 py-2 text-sm text-left text-white/80 hover:bg-white/10"
@@ -634,7 +634,7 @@ export function Playlist({ isAuthenticated, onPlay, currentTrackId }: PlaylistPr
           onClick={() => setInfoTrack(null)}
         >
           <div
-            className="bg-[#1a1a1a] border border-white/10 rounded-2xl w-full max-w-md shadow-2xl overflow-hidden flex flex-col"
+            className="bg-[#1a1a1a] border border-white/10 rounded-2xl w-full max-w-md max-h-[calc(100dvh-2rem)] shadow-2xl overflow-hidden flex flex-col"
             onClick={(e) => e.stopPropagation()}
           >
             <div className="flex items-center justify-between p-5 border-b border-white/5">

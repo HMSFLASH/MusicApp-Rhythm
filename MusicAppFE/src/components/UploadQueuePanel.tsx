@@ -78,7 +78,7 @@ export function UploadQueuePanel() {
   }
 
   return (
-    <div className="fixed bottom-28 right-4 md:right-8 w-[calc(100vw-2rem)] max-w-96 bg-[#1e293b] border border-white/10 shadow-2xl rounded-2xl overflow-hidden flex flex-col z-[100] animate-in slide-in-from-bottom-5">
+    <div className="fixed bottom-28 right-4 md:right-8 w-[calc(100vw_-_2rem)] max-w-96 bg-[#1e293b] border border-white/10 shadow-2xl rounded-2xl overflow-hidden flex flex-col z-[100] animate-in slide-in-from-bottom-5">
       <div className="flex items-center justify-between p-4 border-b border-white/5 bg-black/20">
         <h3 className="font-bold text-white flex min-w-0 items-center gap-2">
           <CloudUpload size={18} className="text-blue-400" />

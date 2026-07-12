@@ -14,46 +14,57 @@ interface LyricLine {
 export function LyricsView({ lyrics, currentTime, onSeek }: LyricsViewProps) {
   const containerRef = useRef<HTMLDivElement>(null);
   const [isUserScrolling, setIsUserScrolling] = useState(false);
-  const scrollTimeoutRef = useRef<NodeJS.Timeout | null>(null);
+  const scrollTimeoutRef = useRef<ReturnType<typeof setTimeout> | null>(null);
+  const autoScrollTimeoutRef = useRef<ReturnType<typeof setTimeout> | null>(null);
+  const previousActiveIndexRef = useRef(-1);
+  const lastSeekTimeRef = useRef(0);
+  const isAutoScrollingRef = useRef(false);
 
   const handleUserInteraction = () => {
+    if (isAutoScrollingRef.current) return;
     setIsUserScrolling(true);
     if (scrollTimeoutRef.current) clearTimeout(scrollTimeoutRef.current);
     scrollTimeoutRef.current = setTimeout(() => {
       setIsUserScrolling(false);
-    }, 12000); // 12 seconds
+    }, 5000);
   };
 
 
   const parsedLyrics = useMemo(() => {
     const lines = lyrics.split('\n');
     const parsed: LyricLine[] = [];
-    const lrcRegex = /\[(\d{2}):(\d{2}(?:\.\d{1,3})?)\](.*)/;
+    const timestampRegex = /\[(\d{1,2}):(\d{2}(?:\.\d{1,3})?)\]/g;
+    const metadataRegex = /^\[[a-zA-Z]+:.*\]$/;
+    const offsetMatch = lyrics.match(/\[offset:([+-]?\d+)\]/i);
+    const offsetSeconds = offsetMatch ? Number(offsetMatch[1]) / 1000 : 0;
     
     let isSynced = false;
     
     for (const line of lines) {
-      const match = lrcRegex.exec(line);
-      if (match) {
+      const matches = [...line.matchAll(timestampRegex)];
+      if (matches.length > 0) {
         isSynced = true;
-        const minutes = parseInt(match[1], 10);
-        const seconds = parseFloat(match[2]);
-        const text = match[3].trim();
-        parsed.push({ time: minutes * 60 + seconds, text });
-      } else if (line.trim() !== '') {
-        // Unsynced line
+        const text = line.replace(timestampRegex, '').trim();
+        for (const match of matches) {
+          const minutes = parseInt(match[1], 10);
+          const seconds = parseFloat(match[2]);
+          parsed.push({ time: Math.max(0, minutes * 60 + seconds + offsetSeconds), text });
+        }
+      } else if (line.trim() !== '' && !metadataRegex.test(line.trim())) {
         parsed.push({ time: -1, text: line.trim() });
       }
     }
     
-    return { isSynced, lines: parsed };
+    return {
+      isSynced,
+      lines: isSynced ? parsed.sort((a, b) => a.time - b.time) : parsed,
+    };
   }, [lyrics]);
 
   const activeIndex = useMemo(() => {
     if (!parsedLyrics.isSynced) return -1;
-    // Find the last line whose time is <= currentTime
     for (let i = parsedLyrics.lines.length - 1; i >= 0; i--) {
-      if (currentTime >= parsedLyrics.lines[i].time) {
+      if (parsedLyrics.lines[i].time >= 0 && currentTime >= parsedLyrics.lines[i].time) {
         return i;
       }
     }
@@ -61,16 +72,48 @@ export function LyricsView({ lyrics, currentTime, onSeek }: LyricsViewProps) {
   }, [parsedLyrics, currentTime]);
 
   useEffect(() => {
-    if (!isUserScrolling && parsedLyrics.isSynced && activeIndex !== -1 && containerRef.current) {
-      const activeEl = containerRef.current.querySelector(`[data-index="${activeIndex}"]`) as HTMLElement;
-      if (activeEl) {
-        containerRef.current.scrollTo({
-          top: activeEl.offsetTop - containerRef.current.clientHeight / 2 + activeEl.clientHeight / 2,
-          behavior: 'smooth'
-        });
-      }
+    setIsUserScrolling(false);
+    previousActiveIndexRef.current = -1;
+    if (scrollTimeoutRef.current) clearTimeout(scrollTimeoutRef.current);
+  }, [lyrics]);
+
+  useEffect(() => {
+    if (isUserScrolling || !parsedLyrics.isSynced || activeIndex === -1 || !containerRef.current) {
+      previousActiveIndexRef.current = activeIndex;
+      return;
     }
+
+    const container = containerRef.current;
+    const activeEl = container.querySelector(`[data-index="${activeIndex}"]`) as HTMLElement | null;
+    if (!activeEl) return;
+
+    const targetTop = Math.max(
+      0,
+      activeEl.offsetTop - (container.clientHeight / 2) + (activeEl.clientHeight / 2)
+    );
+    const distance = Math.abs(container.scrollTop - targetTop);
+    const indexJump = Math.abs(activeIndex - previousActiveIndexRef.current);
+    const recentlySeeked = performance.now() - lastSeekTimeRef.current < 700;
+    const behavior: ScrollBehavior = indexJump > 3 || recentlySeeked || distance > container.clientHeight
+      ? 'auto'
+      : 'smooth';
+
+    isAutoScrollingRef.current = true;
+    container.scrollTo({ top: targetTop, behavior });
+    if (autoScrollTimeoutRef.current) clearTimeout(autoScrollTimeoutRef.current);
+    autoScrollTimeoutRef.current = setTimeout(() => {
+      isAutoScrollingRef.current = false;
+    }, behavior === 'smooth' ? 500 : 80);
+
+    previousActiveIndexRef.current = activeIndex;
   }, [activeIndex, parsedLyrics.isSynced, isUserScrolling]);
+
+  useEffect(() => {
+    return () => {
+      if (scrollTimeoutRef.current) clearTimeout(scrollTimeoutRef.current);
+      if (autoScrollTimeoutRef.current) clearTimeout(autoScrollTimeoutRef.current);
+    };
+  }, []);
 
   if (!parsedLyrics.isSynced) {
     return (
@@ -88,6 +131,7 @@ export function LyricsView({ lyrics, currentTime, onSeek }: LyricsViewProps) {
       ref={containerRef} 
       onWheel={handleUserInteraction}
       onTouchMove={handleUserInteraction}
+      onPointerDown={handleUserInteraction}
       className="flex-1 w-full h-full flex flex-col gap-6 overflow-y-auto overflow-x-hidden scroll-smooth pt-8 pb-8 relative mask-image-fade scrollbar-thin scrollbar-thumb-white/20 scrollbar-track-transparent hover:scrollbar-thumb-white/40"
       style={{ WebkitMaskImage: 'linear-gradient(to bottom, transparent, black 10%, black 90%, transparent)' }}
     >
@@ -100,6 +144,8 @@ export function LyricsView({ lyrics, currentTime, onSeek }: LyricsViewProps) {
             data-index={idx}
             onClick={() => {
               if (onSeek && line.time >= 0) {
+                lastSeekTimeRef.current = performance.now();
+                setIsUserScrolling(false);
                 onSeek(line.time);
               }
             }}

@@ -136,7 +136,7 @@ export function SearchPage() {
   };
 
   return (
-    <div className="w-full h-full flex flex-col p-4 md:p-8 max-w-5xl mx-auto pb-32">
+    <div className="w-full h-full flex flex-col max-w-5xl 2xl:max-w-none mx-auto pb-28 md:pb-32">
       <AddToPlaylistModal
         isOpen={!!trackToPlaylist}
         onClose={() => setTrackToPlaylist(null)}
@@ -154,7 +154,7 @@ export function SearchPage() {
           value={searchQuery}
           onChange={(e) => setSearchQuery(e.target.value)}
           placeholder="Search by name or artist"
-          className="w-full bg-[#111] border border-white/5 text-white text-lg rounded-2xl pl-12 pr-6 py-4 outline-none focus:bg-[#1a1a1a] focus:border-primary/50 transition-all placeholder:text-white/30 font-sans"
+          className="w-full bg-[#111] border border-white/5 text-white text-base sm:text-lg rounded-2xl pl-12 pr-4 sm:pr-6 py-3.5 sm:py-4 outline-none focus:bg-[#1a1a1a] focus:border-primary/50 transition-all placeholder:text-white/30 font-sans"
         />
       </div>
 
@@ -176,12 +176,12 @@ export function SearchPage() {
                   setOpenPopover(isOpen ? null : filterLabel);
                   setPopoverSearch('');
                 }}
-                className={`flex items-center gap-2 px-4 py-1.5 rounded-full border transition-all font-semibold text-sm shadow-sm ${isOpen || selections.length > 0
+                className={`flex max-w-[calc(100vw-2rem)] items-center gap-2 px-4 py-1.5 rounded-full border transition-all font-semibold text-sm shadow-sm ${isOpen || selections.length > 0
                     ? 'bg-[#00E5FF] border-[#00E5FF] text-black hover:bg-[#00E5FF]/90'
                     : 'bg-transparent border-white/20 text-white hover:border-white/40'
                   }`}
               >
-                <span>{displayText}</span>
+              <span className="truncate">{displayText}</span>
                 <div
                   className={`p-0.5 rounded-full transition-colors ${isOpen || selections.length > 0 ? 'hover:bg-black/20' : 'hover:bg-white/20'}`}
                   onClick={(e) => handleRemoveFilter(filterLabel, e)}
@@ -192,7 +192,7 @@ export function SearchPage() {
 
               {/* Nested Popover for this Filter */}
               {isOpen && (
-                <div className="absolute top-10 left-0 w-80 bg-[#1e293b] border border-white/10 rounded-xl shadow-2xl py-3 z-50 animate-in fade-in zoom-in-95 duration-100 flex flex-col">
+                <div className="absolute top-10 left-0 w-80 max-w-[calc(100vw_-_2rem)] bg-[#1e293b] border border-white/10 rounded-xl shadow-2xl py-3 z-50 animate-in fade-in zoom-in-95 duration-100 flex flex-col">
 
                   {/* Popover Search Bar */}
                   <div className="px-4 pb-3 border-b border-white/10 relative">
@@ -271,7 +271,7 @@ export function SearchPage() {
 
           {/* Add Filters Dropdown Menu */}
           {showAddFilters && (
-            <div className="absolute top-10 left-0 w-56 bg-[#1e293b] border border-white/5 rounded-xl shadow-2xl py-2 z-40 animate-in fade-in zoom-in-95 duration-100">
+            <div className="absolute top-10 left-0 w-56 max-w-[calc(100vw-2rem)] bg-[#1e293b] border border-white/5 rounded-xl shadow-2xl py-2 z-40 animate-in fade-in zoom-in-95 duration-100">
               {filterOptions.filter(opt => !activeFilters.includes(opt.label)).map((option, idx) => (
                 <button
                   key={idx}
@@ -312,11 +312,11 @@ export function SearchPage() {
                 <h3 className="text-sm font-semibold text-white/40 uppercase tracking-widest mb-3">Songs</h3>
                 <div className="flex flex-col gap-1.5">
                   {searchResults.map((track, idx) => (
-                    <div key={track.id} onClick={() => playerState.playTrack(track, searchResults)} className={`flex items-center gap-4 p-3 rounded-xl border transition-colors group cursor-pointer ${playerState.currentTrack?.id === track.id
+                    <div key={track.id} onClick={() => playerState.playTrack(track, searchResults)} className={`flex items-center gap-3 sm:gap-4 p-3 rounded-xl border transition-colors group cursor-pointer ${playerState.currentTrack?.id === track.id
                         ? 'bg-primary/10 border-primary/30'
                         : 'bg-white/[0.02] border-white/5 hover:bg-white/5 hover:border-white/10'
                       }`}>
-                      <span className="text-xs text-white/20 w-5 text-right lg:group-hover:hidden">{idx + 1}</span>
+                      <span className="hidden sm:block text-xs text-white/20 w-5 text-right lg:group-hover:hidden">{idx + 1}</span>
                       <button onClick={(e) => { e.stopPropagation(); playerState.playTrack(track, searchResults); }}
                         className="hidden lg:group-hover:flex w-5 items-center justify-center text-white">
                         <Play size={13} fill="currentColor" />
@@ -406,7 +406,7 @@ export function SearchPage() {
               return uniqueAlbums.length > 0 ? (
                 <div>
                   <h3 className="text-sm font-semibold text-white/40 uppercase tracking-widest mb-3">Albums</h3>
-                  <div className="grid grid-cols-2 md:grid-cols-4 lg:grid-cols-5 gap-4">
+                  <div className="grid grid-cols-2 sm:grid-cols-3 md:grid-cols-4 lg:grid-cols-5 2xl:grid-cols-6 3xl:grid-cols-8 4k:grid-cols-10 gap-4">
                     {uniqueAlbums.map((album, i) => {
                       const track = searchResults.find(t => t.album === album);
                       const albumTracks = allTracks.filter(t => t.album === album || playerState.getTrackMetadata(t.id)?.album === album);

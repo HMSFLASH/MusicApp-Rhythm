@@ -10,16 +10,16 @@ export function PlaylistPage() {
   const navigate = useNavigate();
 
   return (
-    <div className="max-w-4xl mx-auto p-4 md:p-8">
-      <div className="mb-8 flex items-center gap-4">
+    <div className="max-w-4xl 2xl:max-w-none mx-auto pb-28 md:pb-32">
+      <div className="mb-6 md:mb-8 flex items-center gap-3 md:gap-4">
         <button 
           onClick={() => navigate('/library')} 
-          className="p-2 -ml-2 rounded-full hover:bg-white/10 transition-colors text-white"
+          className="p-2 -ml-2 rounded-full hover:bg-white/10 transition-colors text-white shrink-0"
         >
           <ArrowLeft size={24} />
         </button>
-        <div>
-          <h1 className="text-3xl font-bold font-sans text-white tracking-tight">Your Playlist</h1>
+        <div className="min-w-0">
+          <h1 className="text-2xl md:text-3xl font-bold font-sans text-white tracking-tight truncate">Your Playlist</h1>
           <p className="text-secondary/60 text-sm font-mono mt-1">Manage and sync your Dual-Storage tracks.</p>
         </div>
       </div>

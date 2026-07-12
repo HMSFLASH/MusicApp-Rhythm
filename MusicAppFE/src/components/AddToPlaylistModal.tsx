@@ -6,7 +6,7 @@ import { axiosClient } from '../api/axiosClient';
 interface AddToPlaylistModalProps {
   isOpen: boolean;
   onClose: () => void;
-  isAuthenticated: boolean;
+  isAuthenticated?: boolean;
   track: Track | null;
 }
 
@@ -63,13 +63,13 @@ export function AddToPlaylistModal({ isOpen, onClose, track }: AddToPlaylistModa
   return (
     <div className="fixed inset-0 z-[100] flex items-center justify-center bg-black/60 backdrop-blur-sm p-4 animate-in fade-in duration-200">
       <div 
-        className="bg-surface border border-white/10 rounded-2xl w-full max-w-sm shadow-2xl overflow-hidden animate-in zoom-in-95 duration-200 flex flex-col max-h-[80vh]"
+        className="bg-surface border border-white/10 rounded-2xl w-full max-w-sm shadow-2xl overflow-hidden animate-in zoom-in-95 duration-200 flex flex-col max-h-[calc(100dvh-2rem)]"
         onClick={(e) => e.stopPropagation()}
       >
-        <div className="flex items-center justify-between p-6 border-b border-white/5 shrink-0">
-          <div>
-            <h2 className="text-xl font-bold text-white">Add to Playlist</h2>
-            <p className="text-sm text-white/50 truncate max-w-[200px] mt-1">{track.title || playerState.getTrackMetadata(track.id)?.title || (track.fileName ? (track.fileName.includes(' - ') ? track.fileName.split(' - ')[1].replace(/\.[^/.]+$/, "") : track.fileName.replace(/\.[^/.]+$/, "")) : 'Unknown Title')}</p>
+        <div className="flex items-center justify-between gap-3 p-4 sm:p-6 border-b border-white/5 shrink-0">
+          <div className="min-w-0">
+            <h2 className="text-lg sm:text-xl font-bold text-white">Add to Playlist</h2>
+            <p className="text-sm text-white/50 truncate mt-1">{track.title || playerState.getTrackMetadata(track.id)?.title || (track.fileName ? (track.fileName.includes(' - ') ? track.fileName.split(' - ')[1].replace(/\.[^/.]+$/, "") : track.fileName.replace(/\.[^/.]+$/, "")) : 'Unknown Title')}</p>
           </div>
           <button 
             onClick={onClose}
@@ -107,7 +107,7 @@ export function AddToPlaylistModal({ isOpen, onClose, track }: AddToPlaylistModa
                 disabled={addingId !== null}
                 className="w-full flex items-center justify-between p-3 rounded-xl bg-white/5 hover:bg-white/10 border border-white/5 hover:border-white/10 transition-all text-left group disabled:opacity-50 disabled:cursor-not-allowed"
               >
-                <div className="flex flex-col truncate pr-4">
+                <div className="flex min-w-0 flex-col truncate pr-4">
                   <span className="text-sm font-bold text-white truncate">{p.name}</span>
                   <span className="text-xs text-white/40 mt-0.5">{p.trackCount} tracks</span>
                 </div>

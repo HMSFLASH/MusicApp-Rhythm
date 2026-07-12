@@ -1,4 +1,4 @@
-import { NavLink, Outlet, useLocation, useNavigate } from 'react-router-dom';
+import { NavLink, Outlet, useLocation, useNavigate, Link } from 'react-router-dom';
 import {
   Library,
   SlidersHorizontal,
@@ -161,22 +161,24 @@ export function Layout() {
         {/* Mobile Menu Overlay */}
         {isMobileMenuOpen && (
           <div
-            className="fixed inset-0 bg-black/60 z-[50] md:hidden"
+            className="fixed inset-0 bg-black/60 z-[59] md:hidden"
             onClick={() => setIsMobileMenuOpen(false)}
           />
         )}
 
         {/* Sidebar */}
-        <aside className={`w-64 bg-surface border-r border-white/5 flex flex-col flex-shrink-0 transition-transform duration-300 fixed inset-y-0 left-0 z-[60] md:relative md:translate-x-0 ${isMobileMenuOpen ? 'translate-x-0' : '-translate-x-full'}`}>
+        <aside className={`w-[min(18rem,85vw)] bg-surface border-r border-white/5 flex flex-col flex-shrink-0 transition-transform duration-300 fixed inset-y-0 left-0 z-[60] md:relative md:w-64 md:translate-x-0 ${isMobileMenuOpen ? 'translate-x-0' : '-translate-x-full'}`}>
           <div className="p-6 flex items-center justify-between">
-            <h1 className="text-2xl font-bold font-sans text-white tracking-tight flex items-center gap-2">
-              <svg width="28" height="28" viewBox="0 0 24 24" fill="none" xmlns="http://www.w3.org/2000/svg" className="text-primary">
-                <rect x="3" y="9" width="4" height="12" rx="2" fill="currentColor" className="animate-pulse" style={{ animationDelay: '0ms' }} />
-                <rect x="10" y="3" width="4" height="18" rx="2" fill="currentColor" className="animate-pulse" style={{ animationDelay: '150ms' }} />
-                <rect x="17" y="7" width="4" height="14" rx="2" fill="currentColor" className="animate-pulse" style={{ animationDelay: '300ms' }} />
-              </svg>
-              Rhythm
-            </h1>
+            <Link to="/" onClick={() => setIsMobileMenuOpen(false)} className="hover:opacity-80 transition-opacity">
+              <h1 className="text-2xl font-bold font-sans text-white tracking-tight flex items-center gap-2">
+                <svg width="28" height="28" viewBox="0 0 24 24" fill="none" xmlns="http://www.w3.org/2000/svg" className="text-primary">
+                  <rect x="3" y="9" width="4" height="12" rx="2" fill="currentColor" className="animate-pulse" style={{ animationDelay: '0ms' }} />
+                  <rect x="10" y="3" width="4" height="18" rx="2" fill="currentColor" className="animate-pulse" style={{ animationDelay: '150ms' }} />
+                  <rect x="17" y="7" width="4" height="14" rx="2" fill="currentColor" className="animate-pulse" style={{ animationDelay: '300ms' }} />
+                </svg>
+                Rhythm
+              </h1>
+            </Link>
             <button className="md:hidden text-white/50 hover:text-white" onClick={() => setIsMobileMenuOpen(false)} aria-label="Close menu">
               <CloseIcon size={24} />
             </button>
@@ -383,26 +385,28 @@ export function Layout() {
             <button onClick={() => setIsMobileMenuOpen(true)} className="text-white hover:text-primary transition-colors" aria-label="Open menu">
               <Menu size={24} />
             </button>
-            <h1 className="text-xl font-bold font-sans text-white tracking-tight flex items-center gap-2">
-              <svg width="24" height="24" viewBox="0 0 24 24" fill="none" xmlns="http://www.w3.org/2000/svg" className="text-primary">
-                <rect x="3" y="9" width="4" height="12" rx="2" fill="currentColor" className="animate-pulse" style={{ animationDelay: '0ms' }} />
-                <rect x="10" y="3" width="4" height="18" rx="2" fill="currentColor" className="animate-pulse" style={{ animationDelay: '150ms' }} />
-                <rect x="17" y="7" width="4" height="14" rx="2" fill="currentColor" className="animate-pulse" style={{ animationDelay: '300ms' }} />
-              </svg>
-              Rhythm
-            </h1>
+            <Link to="/" className="hover:opacity-80 transition-opacity">
+              <h1 className="text-xl font-bold font-sans text-white tracking-tight flex items-center gap-2">
+                <svg width="24" height="24" viewBox="0 0 24 24" fill="none" xmlns="http://www.w3.org/2000/svg" className="text-primary">
+                  <rect x="3" y="9" width="4" height="12" rx="2" fill="currentColor" className="animate-pulse" style={{ animationDelay: '0ms' }} />
+                  <rect x="10" y="3" width="4" height="18" rx="2" fill="currentColor" className="animate-pulse" style={{ animationDelay: '150ms' }} />
+                  <rect x="17" y="7" width="4" height="14" rx="2" fill="currentColor" className="animate-pulse" style={{ animationDelay: '300ms' }} />
+                </svg>
+                Rhythm
+              </h1>
+            </Link>
           </div>
 
           <main className="flex-1 overflow-y-auto w-full relative">
             {notification && (
-              <div className={`fixed top-16 md:top-4 left-1/2 -translate-x-1/2 z-[100] flex items-center gap-2 px-4 py-3 rounded-lg shadow-lg border ${notification.type === 'error' ? 'bg-red-500/10 border-red-500/20 text-red-400' : 'bg-green-500/10 border-green-500/20 text-green-400'
+              <div className={`fixed top-16 md:top-4 left-1/2 -translate-x-1/2 z-[100] flex w-[calc(100vw_-_2rem)] max-w-lg items-start gap-2 px-4 py-3 rounded-lg shadow-lg border ${notification.type === 'error' ? 'bg-red-500/10 border-red-500/20 text-red-400' : 'bg-green-500/10 border-green-500/20 text-green-400'
                 }`}>
-                {notification.type === 'error' ? <AlertCircle size={20} /> : <CheckCircle2 size={20} />}
-                <span className="font-medium text-sm">{notification.message}</span>
+                {notification.type === 'error' ? <AlertCircle size={20} className="shrink-0" /> : <CheckCircle2 size={20} className="shrink-0" />}
+                <span className="min-w-0 text-sm font-medium break-words">{notification.message}</span>
               </div>
             )}
             {playerState.isLoadingTrack && (
-              <div className={`fixed ${notification ? 'top-32 md:top-20' : 'top-16 md:top-4'} left-1/2 -translate-x-1/2 z-[100] flex max-w-[calc(100vw-2rem)] items-center gap-2 rounded-lg border border-primary/25 bg-primary/10 px-4 py-3 text-primary shadow-lg backdrop-blur-md`}>
+              <div className={`fixed ${notification ? 'top-32 md:top-20' : 'top-16 md:top-4'} left-1/2 -translate-x-1/2 z-[100] flex max-w-[calc(100vw_-_2rem)] items-center gap-2 rounded-lg border border-primary/25 bg-primary/10 px-4 py-3 text-primary shadow-lg backdrop-blur-md`}>
                 <Loader2 size={20} className="animate-spin shrink-0" />
                 <span className="truncate text-sm font-medium">
                   {playerState.loadingTrackPhase === 'processing'
@@ -411,7 +415,7 @@ export function Layout() {
                 </span>
               </div>
             )}
-            <div className="p-4 md:p-8 max-w-7xl mx-auto min-h-full w-full pb-32">
+            <div className="px-3 py-4 sm:px-4 md:px-6 lg:px-8 max-w-7xl 2xl:max-w-[1500px] 3xl:max-w-[1800px] 4k:max-w-[2800px] mx-auto min-h-full w-full pb-28 md:pb-32">
               <Outlet />
             </div>
           </main>
@@ -433,7 +437,7 @@ export function Layout() {
             <p className="text-white/70 mb-6 text-sm">
               {t('layout.backupConfigDesc', 'This will overwrite your existing backup on Google Drive with your current local settings (EQ, playlists, presets). Do you want to continue?')}
             </p>
-            <div className="flex justify-end gap-3">
+            <div className="flex flex-col-reverse sm:flex-row sm:justify-end gap-3">
               <button
                 onClick={() => setShowBackupConfirm(false)}
                 className="px-4 py-2 rounded-xl text-white hover:bg-white/10 transition-colors font-medium text-sm"
@@ -462,7 +466,7 @@ export function Layout() {
             <p className="text-white/70 mb-6 text-sm">
               {t('layout.restoreConfigDesc', 'This will overwrite your current local EQ settings, presets, and playlists with the backup from Google Drive. Do you want to continue?')}
             </p>
-            <div className="flex justify-end gap-3">
+            <div className="flex flex-col-reverse sm:flex-row sm:justify-end gap-3">
               <button
                 onClick={() => setShowRestoreConfirm(false)}
                 className="px-4 py-2 rounded-xl text-white hover:bg-white/10 transition-colors font-medium text-sm"

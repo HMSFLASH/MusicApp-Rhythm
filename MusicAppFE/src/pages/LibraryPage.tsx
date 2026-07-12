@@ -1,17 +1,20 @@
-import { Heart, ListMusic, Album, Mic2, Music, Disc, CloudUpload, RefreshCw, Play, TrendingUp, Cloud } from 'lucide-react';
+import { Heart, ListMusic, Album, Mic2, Music, Disc, CloudUpload, RefreshCw, Play, TrendingUp, Cloud, ListPlus } from 'lucide-react';
 import { useNavigate } from 'react-router-dom';
-import { useEffect, useMemo } from 'react';
+import { useEffect, useMemo, useState } from 'react';
 import { useGlobalAudio } from '../context/AudioContext';
 import { useUploadQueue } from '../context/UploadContext';
 
 import { useLibrary } from '../context/LibraryContext';
 import { ActionMenu } from '../components/ActionMenu';
+import { AddToPlaylistModal } from '../components/AddToPlaylistModal';
+import type { Track } from '../hooks/useAudioPlayer';
 
 export function LibraryPage() {
   const navigate = useNavigate();
   const { playerState } = useGlobalAudio();
   const { queueFiles, queueDirectFiles, uploadTasks } = useUploadQueue();
-  const { tracks, favorites, syncLibrary, isLoading } = useLibrary();
+  const { tracks, favorites, toggleFavorite, syncLibrary, isLoading } = useLibrary();
+  const [trackToPlaylist, setTrackToPlaylist] = useState<Track | null>(null);
 
   const getUploadSelection = (files: File[]) => {
     const pendingFiles: File[] = [];
@@ -67,13 +70,13 @@ export function LibraryPage() {
   }, [tracks]);
 
   return (
-    <div className="w-full h-full flex flex-col p-4 md:p-8 max-w-6xl mx-auto pb-32 overflow-y-auto">
-      <div className="mb-8 flex flex-col md:flex-row justify-between items-start md:items-end gap-4 md:gap-0">
-        <div>
-          <h1 className="text-3xl font-bold font-sans text-white tracking-tight">Your Library</h1>
+    <div className="w-full h-full flex flex-col max-w-6xl 2xl:max-w-none mx-auto pb-28 md:pb-32 overflow-y-auto">
+      <div className="mb-6 md:mb-8 flex flex-col md:flex-row justify-between items-start md:items-end gap-4">
+        <div className="min-w-0">
+          <h1 className="text-2xl md:text-3xl font-bold font-sans text-white tracking-tight">Your Library</h1>
           <p className="text-white/80 text-sm mt-1">{tracks.length} songs across all your collections.</p>
         </div>
-        <div className="flex items-center gap-2">
+        <div className="flex w-full flex-wrap items-center gap-2 sm:w-auto">
           <input
             type="file"
             accept="audio/*"
@@ -92,11 +95,11 @@ export function LibraryPage() {
           />
           <label
             htmlFor="drive-upload"
-            className="flex items-center gap-2 px-4 py-2 rounded-xl border border-white/10 hover:border-white/20 bg-white/5 hover:bg-white/10 cursor-pointer transition-colors"
+            className="flex min-w-0 flex-1 sm:flex-none items-center justify-center gap-2 px-4 py-2 rounded-xl border border-white/10 hover:border-white/20 bg-white/5 hover:bg-white/10 cursor-pointer transition-colors"
             title="Upload through backend metadata scan"
           >
             <CloudUpload size={16} className="text-blue-400" />
-            <span className="text-sm font-medium">Upload to Drive</span>
+            <span className="truncate text-sm font-medium">Upload to Drive</span>
           </label>
           <ActionMenu
             ariaLabel="More library actions"
@@ -120,9 +123,9 @@ export function LibraryPage() {
       </div>
 
       {/* Category Cards */}
-      <div className="grid grid-cols-2 md:grid-cols-3 gap-6 mt-4">
+      <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 2xl:grid-cols-6 gap-4 md:gap-6 mt-2 md:mt-4">
         <div
-          className="bg-gradient-to-br from-[#00E5FF]/20 to-[#00E5FF]/5 border border-[#00E5FF]/20 rounded-2xl p-6 hover:border-[#00E5FF]/50 hover:shadow-[0_0_30px_-10px_rgba(0,229,255,0.3)] transition-all cursor-pointer group relative overflow-hidden flex flex-col justify-between min-h-[160px]"
+          className="bg-gradient-to-br from-[#00E5FF]/20 to-[#00E5FF]/5 border border-[#00E5FF]/20 rounded-2xl p-5 md:p-6 hover:border-[#00E5FF]/50 hover:shadow-[0_0_30px_-10px_rgba(0,229,255,0.3)] transition-all cursor-pointer group relative overflow-hidden flex flex-col justify-between min-h-[140px] md:min-h-[160px]"
           onClick={() => navigate('/tracks?tab=all')}
         >
           <div className="absolute -right-4 -bottom-4 p-0 opacity-10 group-hover:opacity-20 transition-opacity text-[#00E5FF]">
@@ -138,7 +141,7 @@ export function LibraryPage() {
         </div>
 
         <div
-          className="bg-gradient-to-br from-[#4f46e5]/30 to-[#7c3aed]/20 border border-[#7c3aed]/20 rounded-2xl p-6 hover:border-[#7c3aed]/50 hover:shadow-[0_0_30px_-10px_rgba(124,58,237,0.3)] transition-all cursor-pointer group relative overflow-hidden flex flex-col justify-between min-h-[160px]"
+          className="bg-gradient-to-br from-[#4f46e5]/30 to-[#7c3aed]/20 border border-[#7c3aed]/20 rounded-2xl p-5 md:p-6 hover:border-[#7c3aed]/50 hover:shadow-[0_0_30px_-10px_rgba(124,58,237,0.3)] transition-all cursor-pointer group relative overflow-hidden flex flex-col justify-between min-h-[140px] md:min-h-[160px]"
           onClick={() => navigate('/tracks?tab=favorites')}
         >
           <div className="absolute -right-4 -bottom-4 p-0 opacity-10 group-hover:opacity-20 transition-opacity text-[#7c3aed]">
@@ -154,7 +157,7 @@ export function LibraryPage() {
         </div>
 
         <div
-          className="bg-gradient-to-br from-[#10b981]/20 to-[#10b981]/5 border border-[#10b981]/20 rounded-2xl p-6 hover:border-[#10b981]/50 hover:shadow-[0_0_30px_-10px_rgba(16,185,129,0.3)] transition-all cursor-pointer group relative overflow-hidden flex flex-col justify-between min-h-[160px]"
+          className="bg-gradient-to-br from-[#10b981]/20 to-[#10b981]/5 border border-[#10b981]/20 rounded-2xl p-5 md:p-6 hover:border-[#10b981]/50 hover:shadow-[0_0_30px_-10px_rgba(16,185,129,0.3)] transition-all cursor-pointer group relative overflow-hidden flex flex-col justify-between min-h-[140px] md:min-h-[160px]"
           onClick={() => navigate('/playlist')}
         >
           <div className="absolute -right-4 -bottom-4 p-0 opacity-10 group-hover:opacity-20 transition-opacity text-[#10b981]">
@@ -170,7 +173,7 @@ export function LibraryPage() {
         </div>
 
         <div
-          className="bg-gradient-to-br from-[#f59e0b]/15 to-[#d97706]/10 border border-[#f59e0b]/20 rounded-2xl p-6 hover:border-[#f59e0b]/50 hover:shadow-[0_0_30px_-10px_rgba(245,158,11,0.3)] transition-all cursor-pointer group relative overflow-hidden flex flex-col justify-between min-h-[160px]"
+          className="bg-gradient-to-br from-[#f59e0b]/15 to-[#d97706]/10 border border-[#f59e0b]/20 rounded-2xl p-5 md:p-6 hover:border-[#f59e0b]/50 hover:shadow-[0_0_30px_-10px_rgba(245,158,11,0.3)] transition-all cursor-pointer group relative overflow-hidden flex flex-col justify-between min-h-[140px] md:min-h-[160px]"
           onClick={() => navigate('/albums')}
         >
           <div className="absolute -right-4 -bottom-4 p-0 opacity-10 group-hover:opacity-20 transition-opacity text-[#f59e0b]">
@@ -186,7 +189,7 @@ export function LibraryPage() {
         </div>
 
         <div
-          className="bg-gradient-to-br from-[#10b981]/15 to-[#059669]/10 border border-[#10b981]/20 rounded-2xl p-6 hover:border-[#10b981]/50 hover:shadow-[0_0_30px_-10px_rgba(16,185,129,0.3)] transition-all cursor-pointer group relative overflow-hidden flex flex-col justify-between min-h-[160px]"
+          className="bg-gradient-to-br from-[#10b981]/15 to-[#059669]/10 border border-[#10b981]/20 rounded-2xl p-5 md:p-6 hover:border-[#10b981]/50 hover:shadow-[0_0_30px_-10px_rgba(16,185,129,0.3)] transition-all cursor-pointer group relative overflow-hidden flex flex-col justify-between min-h-[140px] md:min-h-[160px]"
           onClick={() => navigate('/artists')}
         >
           <div className="absolute -right-4 -bottom-4 p-0 opacity-10 group-hover:opacity-20 transition-opacity text-[#10b981]">
@@ -202,7 +205,7 @@ export function LibraryPage() {
         </div>
 
         <div
-          className="bg-gradient-to-br from-[#ec4899]/15 to-[#db2777]/10 border border-[#ec4899]/20 rounded-2xl p-6 hover:border-[#ec4899]/50 hover:shadow-[0_0_30px_-10px_rgba(236,72,153,0.3)] transition-all cursor-pointer group relative overflow-hidden flex flex-col justify-between min-h-[160px]"
+          className="bg-gradient-to-br from-[#ec4899]/15 to-[#db2777]/10 border border-[#ec4899]/20 rounded-2xl p-5 md:p-6 hover:border-[#ec4899]/50 hover:shadow-[0_0_30px_-10px_rgba(236,72,153,0.3)] transition-all cursor-pointer group relative overflow-hidden flex flex-col justify-between min-h-[140px] md:min-h-[160px]"
           onClick={() => navigate('/genres')}
         >
           <div className="absolute -right-4 -bottom-4 p-0 opacity-10 group-hover:opacity-20 transition-opacity text-[#ec4899]">
@@ -225,7 +228,7 @@ export function LibraryPage() {
             <TrendingUp size={24} className="text-primary" />
             Most Played
           </h2>
-          <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-4">
+          <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 2xl:grid-cols-4 3xl:grid-cols-5 4k:grid-cols-6 gap-4">
             {[...tracks].sort((a, b) => (b.playCount ?? 0) - (a.playCount ?? 0)).slice(0, 12).map((track) => (
               <div
                 key={track.id}
@@ -242,7 +245,7 @@ export function LibraryPage() {
                     <Play size={20} fill="currentColor" className="text-white ml-1" />
                   </div>
                 </div>
-                <div className="flex flex-col truncate flex-1">
+                <div className="flex flex-col truncate flex-1 pr-2">
                   <span className="text-sm font-semibold text-white truncate group-hover:text-primary transition-colors">
                     {track.title || playerState.getTrackMetadata(track.id)?.title || (track.fileName ? track.fileName.replace(/\.[^/.]+$/, "") : 'Unknown')}
                   </span>
@@ -255,12 +258,33 @@ export function LibraryPage() {
                     <span className="text-xs text-white/30 shrink-0">{track.playCount ?? 0} listens</span>
                   </div>
                 </div>
+                <ActionMenu
+                  ariaLabel={`Song actions for ${track.title || track.fileName}`}
+                  buttonClassName="p-1.5 text-white/40 hover:text-white hover:bg-white/10 rounded-full transition-colors shrink-0"
+                  actions={[
+                    { label: 'Play Next', icon: <ListMusic size={14} />, onSelect: () => playerState.addToNextQueue([track]) },
+                    { label: 'Add to Queue', icon: <ListPlus size={14} />, onSelect: () => playerState.addToCurrentQueue([track]) },
+                    { label: 'Add to Playlist', icon: <ListPlus size={14} />, onSelect: () => setTrackToPlaylist(track) },
+                    ...(track.sourceType !== 'LOCAL'
+                      ? [{
+                          label: favorites.some(f => f.id === track.id) ? 'Remove Favorite' : 'Add to Favorite',
+                          icon: <Heart size={14} fill={favorites.some(f => f.id === track.id) ? "currentColor" : "none"} className={favorites.some(f => f.id === track.id) ? "text-primary" : ""} />,
+                          onSelect: () => void toggleFavorite(track)
+                        }]
+                      : [])
+                  ]}
+                />
               </div>
             ))}
           </div>
         </div>
       )}
 
+      <AddToPlaylistModal
+        isOpen={!!trackToPlaylist}
+        onClose={() => setTrackToPlaylist(null)}
+        track={trackToPlaylist}
+      />
     </div>
   );
 }

@@ -12,10 +12,10 @@ export function StudioPage() {
   const [activeTab, setActiveTab] = useState<'eq' | 'dynamics' | 'spatial'>('eq');
 
   return (
-    <div className="flex flex-col h-full max-w-7xl mx-auto p-4 md:p-8">
-      <div className="mb-6 border-b border-white/10 pb-6 flex flex-col md:flex-row items-start md:items-center justify-between gap-4">
-        <div className="flex-1">
-          <h1 className="text-3xl font-bold font-sans text-white tracking-tight">{t('studio.pageTitle', 'Audio Studio')}</h1>
+    <div className="flex flex-col h-full max-w-7xl 2xl:max-w-none mx-auto pb-28 md:pb-32">
+      <div className="mb-6 border-b border-white/10 pb-6 flex flex-col lg:flex-row items-start lg:items-center justify-between gap-4">
+        <div className="flex-1 min-w-0">
+          <h1 className="text-2xl lg:text-3xl font-bold font-sans text-white tracking-tight">{t('studio.pageTitle', 'Audio Studio')}</h1>
           <p className="text-secondary/60 text-sm font-mono mt-2 mb-4">
             {t('studio.pageDesc', 'Professional-grade audio processing chain.')}
           </p>
@@ -34,10 +34,10 @@ export function StudioPage() {
         </div>
 
         {/* Tabs */}
-        <div className="flex w-full sm:w-auto bg-[#111] p-1 rounded-xl border border-white/10 overflow-hidden">
+        <div className="flex w-full gap-1 overflow-x-auto rounded-xl border border-white/10 bg-[#111] p-1 lg:w-auto">
           <button aria-label="Action"
             onClick={() => setActiveTab('eq')}
-            className={`flex-1 sm:flex-none px-3 sm:px-6 py-2 rounded-lg text-xs sm:text-sm font-bold transition-all whitespace-nowrap ${
+            className={`grow shrink-0 lg:flex-none px-4 lg:px-6 py-2 rounded-lg text-xs lg:text-sm font-bold transition-all whitespace-nowrap ${
               activeTab === 'eq' ? 'bg-[#00E5FF]/20 text-[#00E5FF]' : 'text-white/80 hover:text-white hover:bg-white/10'
             }`}
           >
@@ -45,7 +45,7 @@ export function StudioPage() {
           </button>
           <button aria-label="Action"
             onClick={() => setActiveTab('dynamics')}
-            className={`flex-1 sm:flex-none px-3 sm:px-6 py-2 rounded-lg text-xs sm:text-sm font-bold transition-all whitespace-nowrap ${
+            className={`grow shrink-0 lg:flex-none px-4 lg:px-6 py-2 rounded-lg text-xs lg:text-sm font-bold transition-all whitespace-nowrap ${
               activeTab === 'dynamics' ? 'bg-[#ff0055]/20 text-[#ff0055]' : 'text-white/80 hover:text-white hover:bg-white/10'
             }`}
           >
@@ -53,7 +53,7 @@ export function StudioPage() {
           </button>
           <button aria-label="Action"
             onClick={() => setActiveTab('spatial')}
-            className={`flex-1 sm:flex-none px-3 sm:px-6 py-2 rounded-lg text-xs sm:text-sm font-bold transition-all whitespace-nowrap ${
+            className={`grow shrink-0 lg:flex-none px-4 lg:px-6 py-2 rounded-lg text-xs lg:text-sm font-bold transition-all whitespace-nowrap ${
               activeTab === 'spatial' ? 'bg-[#9d00ff]/20 text-[#9d00ff]' : 'text-white/80 hover:text-white hover:bg-white/10'
             }`}
           >

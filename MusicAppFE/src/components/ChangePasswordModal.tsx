@@ -56,15 +56,15 @@ export function ChangePasswordModal({ isOpen, onClose }: ChangePasswordModalProp
   return (
     <div className="fixed inset-0 z-[100] flex items-center justify-center bg-black/60 backdrop-blur-sm p-4 animate-in fade-in duration-200">
       <div 
-        className="bg-surface border border-white/10 rounded-2xl w-full max-w-md shadow-2xl overflow-hidden animate-in zoom-in-95 duration-200"
+        className="bg-surface border border-white/10 rounded-2xl w-full max-w-md max-h-[calc(100dvh-2rem)] shadow-2xl overflow-hidden animate-in zoom-in-95 duration-200 flex flex-col"
         onClick={(e) => e.stopPropagation()}
       >
-        <div className="flex items-center justify-between p-6 border-b border-white/5">
-          <div className="flex items-center gap-3 text-white">
+        <div className="flex items-center justify-between gap-3 p-4 sm:p-6 border-b border-white/5 shrink-0">
+          <div className="flex min-w-0 items-center gap-3 text-white">
             <div className="p-2 bg-primary/20 text-primary rounded-lg">
               <Key size={20} />
             </div>
-            <h2 className="text-xl font-bold font-sans">Change Password</h2>
+            <h2 className="text-lg sm:text-xl font-bold font-sans truncate">Change Password</h2>
           </div>
           <button 
             onClick={onClose}
@@ -74,7 +74,7 @@ export function ChangePasswordModal({ isOpen, onClose }: ChangePasswordModalProp
           </button>
         </div>
 
-        <form onSubmit={handleSubmit} className="p-6 flex flex-col gap-5">
+        <form onSubmit={handleSubmit} className="p-4 sm:p-6 flex flex-col gap-5 overflow-y-auto">
           {error && (
             <div className="p-3 bg-red-500/10 border border-red-500/20 rounded-lg text-red-400 text-sm font-medium">
               {error}
@@ -143,7 +143,7 @@ export function ChangePasswordModal({ isOpen, onClose }: ChangePasswordModalProp
             </div>
           </div>
 
-          <div className="flex justify-end gap-3 mt-2">
+          <div className="flex flex-col-reverse sm:flex-row sm:justify-end gap-3 mt-2">
             <button
               type="button"
               onClick={onClose}

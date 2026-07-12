@@ -28,7 +28,7 @@ export function ForgotPasswordPage() {
   };
 
   return (
-    <div className="w-full h-full min-h-[75vh] flex items-center justify-center relative overflow-hidden rounded-3xl group">
+    <div className="w-full min-h-[calc(100dvh-8rem)] flex items-center justify-center relative overflow-hidden rounded-2xl md:rounded-3xl group p-3 sm:p-4">
       {/* Dynamic Background */}
       <div className="absolute inset-0 bg-[#050914]"></div>
       
@@ -38,8 +38,8 @@ export function ForgotPasswordPage() {
       <div className="absolute top-1/2 left-1/2 -translate-x-1/2 -translate-y-1/2 w-[120%] h-[120%] bg-[radial-gradient(ellipse_at_center,transparent_20%,#050914_70%)] pointer-events-none"></div>
 
       {/* Main Container */}
-      <div className="z-10 w-full max-w-md bg-white/[0.02] border border-white/5 rounded-3xl backdrop-blur-3xl shadow-2xl overflow-hidden p-8 sm:p-12 relative">
-        <NavLink to="/login" className="absolute top-8 left-8 text-white/50 hover:text-white transition-colors flex items-center gap-2 text-sm">
+      <div className="z-10 w-full max-w-md bg-white/[0.02] border border-white/5 rounded-2xl md:rounded-3xl backdrop-blur-3xl shadow-2xl overflow-hidden p-5 sm:p-8 md:p-12 relative">
+        <NavLink to="/login" className="absolute top-5 left-5 sm:top-8 sm:left-8 text-white/50 hover:text-white transition-colors flex items-center gap-2 text-sm">
           <ArrowLeft size={16} />
           Back
         </NavLink>

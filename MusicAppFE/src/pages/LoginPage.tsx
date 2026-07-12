@@ -41,7 +41,7 @@ export function LoginPage() {
   };
 
   return (
-    <div className="w-full h-full min-h-[75vh] flex items-center justify-center relative overflow-hidden rounded-3xl group">
+    <div className="w-full min-h-[calc(100dvh-8rem)] flex items-center justify-center relative overflow-hidden rounded-2xl md:rounded-3xl group p-3 sm:p-4">
       {/* Dynamic Background */}
       <div className="absolute inset-0 bg-[#050914]"></div>
 
@@ -51,7 +51,7 @@ export function LoginPage() {
       <div className="absolute top-1/2 left-1/2 -translate-x-1/2 -translate-y-1/2 w-[120%] h-[120%] bg-[radial-gradient(ellipse_at_center,transparent_20%,#050914_70%)] pointer-events-none"></div>
 
       {/* Main Container */}
-      <div className="z-10 w-full max-w-4xl grid grid-cols-1 md:grid-cols-2 bg-white/[0.02] border border-white/5 rounded-3xl backdrop-blur-3xl shadow-2xl overflow-hidden">
+      <div className="z-10 w-full max-w-4xl grid grid-cols-1 md:grid-cols-2 bg-white/[0.02] border border-white/5 rounded-2xl md:rounded-3xl backdrop-blur-3xl shadow-2xl overflow-hidden">
 
         {/* Left Side: Branding / Visual */}
         <div className="hidden md:flex flex-col items-start justify-between p-12 relative overflow-hidden border-r border-white/5 bg-gradient-to-br from-white/[0.03] to-transparent">
@@ -79,7 +79,7 @@ export function LoginPage() {
         </div>
 
         {/* Right Side: Login Form */}
-        <div className="flex flex-col justify-center p-8 sm:p-12 relative">
+        <div className="flex flex-col justify-center p-5 sm:p-8 md:p-12 relative">
           <h2 className="text-2xl font-semibold text-white mb-2">Welcome back</h2>
           <p className="text-sm text-white/50 mb-10">Sign in to sync your presets and audio graphs.</p>
 

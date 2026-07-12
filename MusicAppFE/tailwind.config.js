@@ -18,6 +18,10 @@ export default {
       fontFamily: {
         sans: ['Inter', 'sans-serif'],
         mono: ['JetBrains Mono', 'monospace'],
+      },
+      screens: {
+        '3xl': '1920px',
+        '4k': '2560px',
       }
     },
   },

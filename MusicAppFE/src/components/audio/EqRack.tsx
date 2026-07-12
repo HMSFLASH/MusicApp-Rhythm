@@ -76,7 +76,7 @@ function EqResponseModal({
 
   return (
     <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/80 backdrop-blur-sm p-4">
-      <div className="bg-[#0b0b0b] border border-white/10 rounded-xl shadow-2xl w-full max-w-5xl overflow-hidden">
+      <div className="bg-[#0b0b0b] border border-white/10 rounded-xl shadow-2xl w-full max-w-5xl max-h-[calc(100dvh-2rem)] overflow-hidden flex flex-col">
         <div className="flex items-center justify-between px-4 py-3 border-b border-white/10 bg-white/[0.03]">
           <div className="flex items-baseline gap-3 min-w-0">
             <h2 className="text-white font-bold text-sm uppercase tracking-widest">EQ Response</h2>
@@ -91,11 +91,11 @@ function EqResponseModal({
           </button>
         </div>
 
-        <div className="p-4">
+        <div className="p-4 overflow-y-auto">
           <div className="w-full overflow-x-auto">
             <svg
               viewBox={`0 0 ${GRAPH_WIDTH} ${GRAPH_HEIGHT}`}
-              className="min-w-[700px] w-full h-auto"
+              className="min-w-[520px] sm:min-w-[700px] w-full h-auto"
               role="img"
               aria-label="EQ frequency response from 20 Hz to 20 kHz"
             >
@@ -267,6 +267,12 @@ export function EqRack() {
     || currentSavedPreset?.isCustomOrigin
     || currentSavedPreset?.presetMode === 'custom'
     || currentSavedPreset?.presetMode === 'parametric';
+  const bandColumnWidth = isEditablePreset ? 72 : 48;
+  const bandGap = 16;
+  const eqRackMinWidth = Math.max(
+    0,
+    playerState.eqBands.length * bandColumnWidth + Math.max(0, playerState.eqBands.length - 1) * bandGap
+  );
 
   return (
     <div className="bg-[#0a0a0a] rounded-2xl border border-white/5 shadow-2xl flex flex-col overflow-hidden w-full">
@@ -396,7 +402,7 @@ export function EqRack() {
           </div>
         </div>
 
-        <div className="flex items-center justify-end w-full md:w-auto gap-2">
+        <div className="flex items-center justify-end w-full md:w-auto gap-2 overflow-x-auto pb-1 md:overflow-visible md:pb-0">
           <button
             aria-label="EQ response"
             title="EQ response"
@@ -410,14 +416,14 @@ export function EqRack() {
               setModalInput("");
               setModalState({ type: 'save' });
             }}
-            className="flex items-center gap-1.5 px-3 py-1.5 rounded-md bg-[#00f5ff]/10 text-[#00f5ff] hover:bg-[#00f5ff]/20 transition-colors text-sm font-medium border border-[#00f5ff]/30 whitespace-nowrap"
+            className="flex items-center gap-1.5 px-3 py-1.5 rounded-md bg-[#00f5ff]/10 text-[#00f5ff] hover:bg-[#00f5ff]/20 transition-colors text-sm font-medium border border-[#00f5ff]/30 whitespace-nowrap shrink-0"
           >
             {t('studio.eq.save', 'Lưu')}
           </button>
           {isEditablePreset && (
             <button aria-label="Action"
               onClick={() => playerState.addCustomEqBand(1000)}
-              className="flex items-center gap-1.5 px-3 py-1.5 rounded-md bg-[#00E5FF]/10 text-[#00E5FF] hover:bg-[#00E5FF]/20 transition-colors text-sm font-medium border border-[#00E5FF]/30 whitespace-nowrap"
+              className="flex items-center gap-1.5 px-3 py-1.5 rounded-md bg-[#00E5FF]/10 text-[#00E5FF] hover:bg-[#00E5FF]/20 transition-colors text-sm font-medium border border-[#00E5FF]/30 whitespace-nowrap shrink-0"
             >
               <Plus size={16} />
               {t('studio.eq.addBand', 'Add Band')}
@@ -426,13 +432,20 @@ export function EqRack() {
         </div>
       </div>
 
-      <div className="flex-1 p-4 md:p-8 w-full overflow-x-auto md:overflow-x-visible no-scrollbar">
-        <div className="flex items-end gap-x-4 px-2 min-w-max md:min-w-0 md:w-full pb-4 justify-start md:justify-center">
+      <div className="flex-1 p-4 md:p-8 w-full overflow-x-auto">
+        <div
+          className="flex items-end gap-x-4 px-1 sm:px-2 pb-4 justify-start"
+          style={{ minWidth: eqRackMinWidth }}
+        >
 
-          <div className={`flex items-end gap-x-4 md:flex-wrap md:gap-x-2 md:gap-y-12 transition-opacity duration-300 ${playerState.fxEnabled.eq ? 'opacity-100' : 'opacity-30 pointer-events-none'}`}>
+          <div className={`flex items-end gap-x-4 transition-opacity duration-300 ${playerState.fxEnabled.eq ? 'opacity-100' : 'opacity-30 pointer-events-none'}`}>
 
           {playerState.eqBands.map((band) => (
-            <div key={band.id} className="flex flex-col items-center gap-3 group">
+            <div
+              key={band.id}
+              className="flex flex-col items-center gap-3 group"
+              style={{ flex: `0 0 ${bandColumnWidth}px`, width: bandColumnWidth }}
+            >
               {isEditablePreset && <button aria-label="Action"
                     onClick={() => playerState.removeCustomEqBand(band.id)}
                     className="w-6 h-6 rounded-full bg-red-500/10 text-red-400 flex items-center justify-center opacity-100 lg:opacity-30 group-hover:opacity-100 transition-opacity hover:bg-red-500/30"
@@ -451,8 +464,8 @@ export function EqRack() {
               />
 
               {isEditablePreset ? (
-                <div className="flex flex-col items-center gap-1 mt-1">
-                  <span className="text-[10px] text-white/80 uppercase tracking-widest font-sans">Freq</span>
+                <div className="flex w-full flex-col items-center gap-1 mt-1">
+                  <span className="text-[9px] text-white/65 uppercase font-sans">Hz</span>
                   <NumberInput
                     value={band.frequency}
                     min={20}
@@ -460,13 +473,13 @@ export function EqRack() {
                     step={0.1}
                     onChange={(value) => playerState.updateEqBandFreq(band.id, value)}
                     ariaLabel="Band frequency"
-                    className="w-14 bg-transparent border-b border-white/20 text-center text-xs text-white/70 font-mono outline-none focus:border-[#00E5FF] pb-1"
+                    className="w-full bg-transparent border-b border-white/20 text-center text-[11px] text-white/70 font-mono outline-none focus:border-[#00E5FF] pb-1"
                   />
                 </div>
               ) : null}
 
               {isParametricPreset ? (
-                <div className="flex flex-col items-center gap-1 mt-2 border-t border-white/5 pt-2">
+                <div className="flex w-full flex-col items-center gap-1 mt-2 border-t border-white/5 pt-2">
                   <div className="relative">
                     <button 
                       aria-label="Action" 
@@ -504,7 +517,7 @@ export function EqRack() {
                     )}
                   </div>
 
-                  <span className="text-[10px] text-white/80 uppercase tracking-widest font-sans mt-1">Q-Fact</span>
+                  <span className="text-[9px] text-white/65 uppercase font-sans mt-1">Q</span>
                   <NumberInput
                     step={0.1}
                     min={0.1}
@@ -512,25 +525,25 @@ export function EqRack() {
                     value={band.q}
                     onChange={(value) => playerState.updateEqBandQ(band.id, value)}
                     ariaLabel="Band Q factor"
-                    className="w-14 bg-transparent border-b border-white/20 text-center text-xs text-[#00f5ff] font-mono outline-none focus:border-[#00E5FF] pb-1"
+                    className="w-full bg-transparent border-b border-white/20 text-center text-[11px] text-[#00f5ff] font-mono outline-none focus:border-[#00E5FF] pb-1"
                   />
 
-                  <div className="flex items-center gap-1 mt-2 p-0.5 bg-white/5 rounded-md border border-white/10">
+                  <div className="grid w-full grid-cols-3 gap-0.5 mt-2 p-0.5 bg-white/5 rounded-md border border-white/10">
                     <button aria-label="Action"
                       onClick={() => playerState.updateEqBandChannel(band.id, 'L+R')}
-                      className={`text-[9px] font-bold px-1.5 py-0.5 rounded transition-colors ${band.channel === 'L+R' ? 'bg-[#00E5FF] text-black' : 'text-white/80 hover:text-white'}`}
+                      className={`text-[9px] font-bold py-0.5 rounded transition-colors ${band.channel === 'L+R' ? 'bg-[#00E5FF] text-black' : 'text-white/80 hover:text-white'}`}
                     >
                       M
                     </button>
                     <button aria-label="Action"
                       onClick={() => playerState.updateEqBandChannel(band.id, 'L')}
-                      className={`text-[9px] font-bold px-1.5 py-0.5 rounded transition-colors ${band.channel === 'L' ? 'bg-blue-500 text-white' : 'text-white/80 hover:text-white'}`}
+                      className={`text-[9px] font-bold py-0.5 rounded transition-colors ${band.channel === 'L' ? 'bg-blue-500 text-white' : 'text-white/80 hover:text-white'}`}
                     >
                       L
                     </button>
                     <button aria-label="Action"
                       onClick={() => playerState.updateEqBandChannel(band.id, 'R')}
-                      className={`text-[9px] font-bold px-1.5 py-0.5 rounded transition-colors ${band.channel === 'R' ? 'bg-red-500 text-white' : 'text-white/80 hover:text-white'}`}
+                      className={`text-[9px] font-bold py-0.5 rounded transition-colors ${band.channel === 'R' ? 'bg-red-500 text-white' : 'text-white/80 hover:text-white'}`}
                     >
                       R
                     </button>

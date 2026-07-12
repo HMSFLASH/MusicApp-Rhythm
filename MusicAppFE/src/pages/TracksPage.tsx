@@ -128,16 +128,16 @@ export function TracksPage() {
   const infoTrackBitsPerSample = infoTrack?.bitsPerSample ?? infoTrackMetadata?.bitsPerSample;
 
   return (
-    <div className="w-full h-full flex flex-col p-4 md:p-8 max-w-6xl mx-auto pb-32 overflow-y-auto">
+    <div className="w-full h-full flex flex-col max-w-6xl 2xl:max-w-none mx-auto pb-28 md:pb-32 overflow-y-auto">
       <div className="mb-6 md:mb-8 border-b border-white/10 pb-4 md:pb-6 flex flex-col md:flex-row items-start md:items-center justify-between gap-4">
-        <div>
-          <h1 className="text-2xl md:text-3xl font-bold font-sans text-white tracking-tight flex items-center gap-3">
-            <button onClick={() => navigate('/library')} aria-label="Back to library" className="p-2 hover:bg-white/10 rounded-full transition-colors text-white/50 hover:text-white">
+        <div className="min-w-0">
+          <h1 className="text-2xl md:text-3xl font-bold font-sans text-white tracking-tight flex items-center gap-2 md:gap-3">
+            <button onClick={() => navigate('/library')} aria-label="Back to library" className="p-2 -ml-2 hover:bg-white/10 rounded-full transition-colors text-white/50 hover:text-white shrink-0">
               <ArrowLeft size={24} />
             </button>
-            {activeTab === 'all' ? 'All Songs' : 'Favorites'}
+            <span className="truncate">{activeTab === 'all' ? 'All Songs' : 'Favorites'}</span>
           </h1>
-          <p className="text-secondary/60 text-sm font-mono mt-1 ml-12">
+          <p className="text-secondary/60 text-sm font-mono mt-1 sm:ml-12">
             {displayTracks.length} {activeTab === 'all' ? 'songs in your library' : 'favorite songs'}.
           </p>
         </div>
@@ -151,8 +151,8 @@ export function TracksPage() {
       />
 
       <div className="flex items-center justify-between mb-4 mt-2 flex-wrap gap-4">
-        <div className="flex items-center gap-3">
-          <h2 className="text-lg md:text-xl font-bold text-white flex items-center gap-2">
+        <div className="flex min-w-0 items-center gap-3">
+          <h2 className="text-lg md:text-xl font-bold text-white flex min-w-0 items-center gap-2">
             {activeTab === 'all' ? <><Clock size={18} className="text-[#00E5FF]" /> Songs List</> : <><Star size={18} className="text-yellow-400" /> Favorites List</>}
           </h2>
           <button
@@ -165,11 +165,11 @@ export function TracksPage() {
           </button>
         </div>
         {displayTracks.length > 0 && (
-          <div className="flex items-center gap-2 flex-wrap">
-            <div className="relative">
+          <div className="flex w-full flex-wrap items-center gap-2 sm:w-auto sm:flex-nowrap">
+            <div className="relative w-full sm:w-auto">
               <button
                 onClick={() => setIsSortMenuOpen(!isSortMenuOpen)}
-                className="h-9 rounded-full bg-white/5 border border-white/10 px-4 text-sm text-white/70 hover:bg-white/10 focus:outline-none flex items-center gap-2 transition-colors"
+                className="h-9 w-full justify-between rounded-full bg-white/5 border border-white/10 px-4 text-sm text-white/70 hover:bg-white/10 focus:outline-none flex items-center gap-2 transition-colors whitespace-nowrap sm:w-auto"
                 title="Sort songs"
               >
                 {sortMode === 'default' ? 'Default order' : sortMode === 'leastPlayed' ? 'Least played' : 'Most played'}
@@ -178,7 +178,7 @@ export function TracksPage() {
               {isSortMenuOpen && (
                 <>
                   <div className="fixed inset-0 z-40" onClick={() => setIsSortMenuOpen(false)}></div>
-                  <div className="absolute left-0 top-full mt-2 w-48 bg-[#1A1A1A] border border-white/10 rounded-xl shadow-2xl overflow-hidden z-50 py-1 flex flex-col">
+                  <div className="absolute left-0 top-full mt-2 w-full min-w-48 sm:w-48 bg-[#1A1A1A] border border-white/10 rounded-xl shadow-2xl overflow-hidden z-50 py-1 flex flex-col">
                     {[
                       { value: 'default', label: 'Default order' },
                       { value: 'leastPlayed', label: 'Least played' },
@@ -202,14 +202,14 @@ export function TracksPage() {
             </div>
             <button
               onClick={playAllTracks}
-              className="px-4 h-9 rounded-full bg-primary text-black hover:bg-primary/90 flex items-center gap-1.5 transition-all text-sm font-bold shadow-lg shadow-primary/20"
+              className="h-9 flex-1 justify-center rounded-full bg-primary px-4 text-black hover:bg-primary/90 flex items-center gap-1.5 transition-all text-sm font-bold shadow-lg shadow-primary/20 whitespace-nowrap sm:flex-none"
               title="Play All"
             >
               <Play size={15} fill="currentColor" /> Play
             </button>
             <button
               onClick={shuffleAllTracks}
-              className="px-4 h-9 rounded-full bg-white/10 text-white hover:bg-white hover:text-black flex items-center gap-1.5 transition-all text-sm font-bold"
+              className="h-9 flex-1 justify-center rounded-full bg-white/10 px-4 text-white hover:bg-white hover:text-black flex items-center gap-1.5 transition-all text-sm font-bold whitespace-nowrap sm:flex-none"
               title="Shuffle & Play"
             >
               <Shuffle size={15} /> Shuffle
@@ -232,12 +232,12 @@ export function TracksPage() {
             key={track.id}
             onMouseLeave={() => setOpenMenuId(null)}
             onClick={() => playerState.playTrack(track, displayTracks)}
-            className={`flex items-center gap-4 p-3 rounded-xl border transition-colors group cursor-pointer ${playerState.currentTrack?.id === track.id
+            className={`flex items-center gap-3 sm:gap-4 p-3 rounded-xl border transition-colors group cursor-pointer ${playerState.currentTrack?.id === track.id
               ? 'bg-primary/10 border-primary/30'
               : 'bg-white/[0.02] border-white/5 hover:bg-white/5 hover:border-white/10'
               }`}
           >
-            <span className="text-xs text-white/20 w-5 text-right lg:group-hover:hidden">{(currentPage - 1) * ITEMS_PER_PAGE + idx + 1}</span>
+            <span className="hidden sm:block text-xs text-white/20 w-5 text-right lg:group-hover:hidden">{(currentPage - 1) * ITEMS_PER_PAGE + idx + 1}</span>
             <button
               aria-label="Play track"
               onClick={(e) => { e.stopPropagation(); playerState.playTrack(track, displayTracks); }}
@@ -256,11 +256,11 @@ export function TracksPage() {
               <span className={`text-sm font-medium truncate ${playerState.currentTrack?.id === track.id ? 'text-primary' : 'text-white'}`}>
                 {track.title || playerState.getTrackMetadata(track.id)?.title || (track.fileName ? (track.fileName.includes(' - ') ? track.fileName.split(' - ')[1].replace(/\.[^/.]+$/, "") : track.fileName.replace(/\.[^/.]+$/, "")) : 'Unknown Title')}
               </span>
-              <div className="flex items-center gap-2 mt-1">
+              <div className="flex min-w-0 items-center gap-2 mt-1">
                 <Cloud size={12} className="text-blue-400" />
                 <span className="text-xs text-white/30 truncate">{track.artist || playerState.getTrackMetadata(track.id)?.artist || (track.fileName?.includes(' - ') ? track.fileName.split(' - ')[0] : 'Unknown Artist')}</span>
-                <span className="text-xs text-white/20">|</span>
-                <span className="text-xs text-white/30 shrink-0">{track.playCount ?? 0} listens</span>
+                <span className="hidden sm:inline text-xs text-white/20">|</span>
+                <span className="hidden sm:inline text-xs text-white/30 shrink-0">{track.playCount ?? 0} listens</span>
               </div>
             </div>
             <div className={`relative flex items-center gap-2 transition-opacity ${openMenuId === track.id ? 'opacity-100' : 'opacity-100 lg:opacity-0 lg:group-hover:opacity-100'}`}>
@@ -274,7 +274,7 @@ export function TracksPage() {
               </button>
 
               {openMenuId === track.id && (
-                <div className="absolute right-0 top-full mt-1 w-56 bg-[#1A1A1A] border border-white/10 rounded-lg shadow-xl overflow-hidden z-50 py-1">
+                <div className="absolute right-0 top-full mt-1 w-56 max-w-[calc(100vw_-_2rem)] bg-[#1A1A1A] border border-white/10 rounded-lg shadow-xl overflow-hidden z-50 py-1">
                   <button
                     onClick={(e) => handlePlayNext(track, e)}
                     className="w-full flex items-center gap-3 px-4 py-2 text-sm text-left text-white/80 hover:bg-white/10"
@@ -369,7 +369,7 @@ export function TracksPage() {
 
       {/* Pagination Controls */}
       {totalPages > 1 && (
-        <div className="flex justify-center items-center gap-4 mt-6">
+        <div className="flex flex-wrap justify-center items-center gap-3 sm:gap-4 mt-6">
           <button
             aria-label="Previous page"
             onClick={() => setCurrentPage(p => Math.max(1, p - 1))}

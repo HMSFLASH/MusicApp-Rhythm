@@ -260,10 +260,10 @@ export function NowPlaying() {
 
   return (
     <div className="h-full overflow-y-auto w-full no-scrollbar" onScroll={handleScroll}>
-      <div className="flex flex-col lg:flex-row items-start justify-center max-w-6xl mx-auto w-full gap-8 md:gap-12 py-6 md:py-10 px-4 md:px-8 pb-32">
+      <div className="flex flex-col lg:flex-row items-start justify-center max-w-6xl 2xl:max-w-[1400px] 3xl:max-w-[1600px] 4k:max-w-[2000px] mx-auto w-full gap-8 md:gap-12 py-4 md:py-8 pb-28 md:pb-32">
 
         {/* Left Side: Player */}
-        <div className="flex-1 flex flex-col items-center w-full max-w-lg mx-auto gap-8 pt-8">
+        <div className="flex-1 flex flex-col items-center w-full max-w-lg mx-auto gap-6 md:gap-8 pt-2 md:pt-8">
           {/* Album Art / Lyrics Wrapper */}
           <div
             className={`flex items-center justify-center transition-all duration-500 relative w-full ${showLyrics && hasLyrics ? 'flex-shrink-0' : 'flex-shrink-0'}`}
@@ -319,7 +319,7 @@ export function NowPlaying() {
           </div>
 
           <div className="text-center px-4 w-full">
-            <h2 className="text-2xl md:text-3xl font-bold text-white mb-2 truncate">{currentTrack.title || playerState.getTrackMetadata(currentTrack.id)?.title || (currentTrack.fileName ? (currentTrack.fileName.includes(' - ') ? currentTrack.fileName.split(' - ')[1].replace(/\.[^/.]+$/, "") : currentTrack.fileName.replace(/\.[^/.]+$/, "")) : 'Unknown Title')}</h2>
+            <h2 className="text-xl sm:text-2xl md:text-3xl font-bold text-white mb-2 truncate">{currentTrack.title || playerState.getTrackMetadata(currentTrack.id)?.title || (currentTrack.fileName ? (currentTrack.fileName.includes(' - ') ? currentTrack.fileName.split(' - ')[1].replace(/\.[^/.]+$/, "") : currentTrack.fileName.replace(/\.[^/.]+$/, "")) : 'Unknown Title')}</h2>
             <div className="flex items-center justify-center gap-2 text-base md:text-lg text-white/50 truncate w-full">
               <User size={16} className="flex-shrink-0" />
               <span className="truncate">{currentTrack.artist || playerState.getTrackMetadata(currentTrack.id)?.artist || (currentTrack.fileName?.includes(' - ') ? currentTrack.fileName.split(' - ')[0] : t('bottomPlayer.unknown'))}</span>
@@ -368,7 +368,7 @@ export function NowPlaying() {
                   <MoreHorizontal size={24} />
                 </button>
                 {showMenu && (
-                    <div className="absolute bottom-full left-1/2 -translate-x-1/2 mb-3 w-72 bg-[#1e1e1e] border border-white/10 rounded-2xl shadow-2xl overflow-hidden z-50">
+                    <div className="absolute bottom-full left-1/2 -translate-x-1/2 mb-3 w-72 max-w-[calc(100vw_-_2rem)] bg-[#1e1e1e] border border-white/10 rounded-2xl shadow-2xl overflow-hidden z-50">
                       <div className="px-4 py-3 border-b border-white/10">
                         <p className="text-xs text-white/40 font-medium uppercase tracking-wider">{t('nowPlaying.options')}</p>
                       </div>
@@ -526,9 +526,9 @@ export function NowPlaying() {
                 )}
 
                 {showRepeatMenu && (
-                  <div className="absolute bottom-full left-1/2 -translate-x-1/2 mb-3 w-80 bg-[#1e1e1e] border border-white/10 rounded-2xl shadow-2xl overflow-hidden z-50">
+                  <div className="fixed left-1/2 top-1/2 z-[120] flex max-h-[calc(100dvh_-_2rem)] w-80 max-w-[calc(100vw_-_2rem)] -translate-x-1/2 -translate-y-1/2 flex-col overflow-hidden rounded-2xl border border-white/10 bg-[#1e1e1e] shadow-2xl">
                     {/* Tabs */}
-                    <div className="flex border-b border-white/10">
+                    <div className="flex shrink-0 border-b border-white/10">
                       <button
                         onClick={() => setRepeatMode('simple')}
                         className={`flex-1 py-3 text-sm font-semibold transition-colors rounded-tl-2xl ${repeatMode === 'simple' ? 'text-white border-b-2 border-primary' : 'text-white/40 hover:text-white/70'
@@ -543,7 +543,7 @@ export function NowPlaying() {
 
                     {/* Simple Tab */}
                     {repeatMode === 'simple' && (
-                      <div>
+                      <div className="overflow-y-auto">
                         {([
                           { sMode: 'next' as SongEndMode, qMode: 'stop' as QueueEndMode, label: t('nowPlaying.playNext') },
                           { sMode: 'next' as SongEndMode, qMode: 'repeat' as QueueEndMode, label: t('nowPlaying.repeatQueue') },
@@ -573,7 +573,7 @@ export function NowPlaying() {
 
                     {/* Advanced Tab */}
                     {repeatMode === 'advanced' && (
-                      <div className="divide-y divide-white/5">
+                      <div className="divide-y divide-white/5 overflow-y-auto">
                         <div className="px-4 py-3">
                           <p className="text-xs font-bold text-primary uppercase tracking-wider mb-3">{t('nowPlaying.whenSongEnds')}</p>
                           {([
@@ -635,7 +635,7 @@ export function NowPlaying() {
                     )}
 
                     {/* Bottom Action Buttons */}
-                    <div className="flex items-center justify-end border-t border-white/10 p-2 gap-2">
+                    <div className="flex shrink-0 items-center justify-end gap-2 border-t border-white/10 p-2">
                       <button onClick={confirmRepeat} className="w-9 h-9 flex items-center justify-center rounded-xl bg-primary/80 hover:bg-primary text-white transition-colors">
                         <Check size={16} />
                       </button>
@@ -699,7 +699,7 @@ export function NowPlaying() {
                 )}
               </div>
 
-              <div className="flex items-center gap-6 md:gap-10">
+              <div className="flex items-center gap-4 sm:gap-6 md:gap-10">
                 <button
                   aria-label="Previous track"
                   onClick={playPrevious}
@@ -746,7 +746,7 @@ export function NowPlaying() {
 
         {/* Right Side: Playlist */}
         <div className="w-full lg:w-[400px] flex-shrink-0">
-          <div className="w-full bg-white/5 rounded-2xl p-6 border border-white/10 h-full max-h-[80vh] flex flex-col">
+          <div className="w-full bg-white/5 rounded-2xl p-4 md:p-6 border border-white/10 h-full max-h-[65vh] lg:max-h-[80vh] flex flex-col">
             <div className="flex items-center gap-6 mb-6 border-b border-white/10 pb-1">
               <div className="font-bold pb-2 border-b-2 border-primary text-primary flex items-center gap-2">
                 <ListPlus size={18} />
@@ -762,7 +762,7 @@ export function NowPlaying() {
                     key={track.id}
                     id={isActive ? 'nowplaying-current-track' : undefined}
                     onClick={() => playerState.playTrack(track, playerState.queue)}
-                    className={`flex items-center gap-4 p-3 rounded-xl cursor-pointer transition-colors shadow-sm ${isActive ? 'bg-primary/20 border border-primary/30' : 'bg-white/5 hover:bg-white/10 border border-white/5'
+                    className={`flex items-center gap-3 sm:gap-4 p-3 rounded-xl cursor-pointer transition-colors shadow-sm ${isActive ? 'bg-primary/20 border border-primary/30' : 'bg-white/5 hover:bg-white/10 border border-white/5'
                       }`}
                   >
                     <div
@@ -795,7 +795,7 @@ export function NowPlaying() {
           onClick={() => setShowMetadata(false)}
         >
           <div
-            className="bg-[#1a1a1a] border border-white/10 rounded-2xl w-full max-w-md shadow-2xl overflow-hidden flex flex-col"
+            className="bg-[#1a1a1a] border border-white/10 rounded-2xl w-full max-w-md max-h-[calc(100dvh-2rem)] shadow-2xl overflow-hidden flex flex-col"
             onClick={(e) => e.stopPropagation()}
           >
             <div className="flex items-center justify-between p-5 border-b border-white/5">

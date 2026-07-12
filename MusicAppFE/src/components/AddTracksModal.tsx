@@ -53,11 +53,11 @@ export function AddTracksModal({ isOpen, onClose, playlistId, playlistTracks, on
   return (
     <div className="fixed inset-0 z-[100] flex items-center justify-center bg-black/60 backdrop-blur-sm p-4 animate-in fade-in duration-200">
       <div 
-        className="bg-surface border border-white/10 rounded-2xl w-full max-w-lg shadow-2xl overflow-hidden flex flex-col h-[70vh] animate-in zoom-in-95 duration-200"
+        className="bg-surface border border-white/10 rounded-2xl w-full max-w-lg shadow-2xl overflow-hidden flex flex-col h-[min(70vh,calc(100dvh-2rem))] animate-in zoom-in-95 duration-200"
         onClick={(e) => e.stopPropagation()}
       >
-        <div className="flex items-center justify-between p-6 border-b border-white/5 shrink-0">
-          <h2 className="text-xl font-bold text-white">Add Tracks to Playlist</h2>
+        <div className="flex items-center justify-between gap-3 p-4 sm:p-6 border-b border-white/5 shrink-0">
+          <h2 className="text-lg sm:text-xl font-bold text-white">Add Tracks to Playlist</h2>
           <button 
             onClick={onClose}
             className="text-white/40 hover:text-white hover:bg-white/10 p-2 rounded-full transition-colors"

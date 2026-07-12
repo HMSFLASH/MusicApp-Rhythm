@@ -222,10 +222,10 @@ export function BottomPlayerBar() {
       : <ListX size={14} />;
 
   return (
-    <div className="h-16 md:h-20 bg-surface border-t border-white/5 px-3 md:px-6 flex items-center justify-between select-none shadow-[0_-10px_40px_rgba(0,0,0,0.3)] z-50">
+    <div className="h-16 md:h-20 bg-surface border-t border-white/5 px-2 sm:px-3 md:px-6 grid grid-cols-[minmax(0,1fr)_auto_auto] md:flex items-center gap-2 md:gap-4 md:justify-between select-none shadow-[0_-10px_40px_rgba(0,0,0,0.3)] z-50">
       
       {/* Left: Track Info */}
-      <div className="flex items-center flex-1 w-auto md:w-full max-w-[60%] sm:max-w-[70%] md:max-w-xs gap-2 md:gap-3 cursor-pointer md:cursor-auto" onClick={() => { if (window.innerWidth < 768) navigate('/'); }}>
+      <div className="flex items-center min-w-0 md:flex-1 w-full md:max-w-xs gap-2 md:gap-3 cursor-pointer md:cursor-auto" onClick={() => { if (window.innerWidth < 768) navigate('/'); }}>
         <div className={`w-10 h-10 md:w-12 md:h-12 rounded-md bg-background border border-white/10 flex items-center justify-center overflow-hidden shrink-0`}>
           {currentArtwork ? (
             <img src={currentArtwork} alt="Album Art" className="w-full h-full object-cover" />
@@ -235,7 +235,7 @@ export function BottomPlayerBar() {
             </div>
           )}
         </div>
-        <div className="flex flex-col overflow-hidden pr-2">
+        <div className="flex flex-col min-w-0 overflow-hidden pr-1 sm:pr-2">
           <span className="text-sm font-medium text-white truncate">{currentTrack.title || playerState.getTrackMetadata(currentTrack.id)?.title || (currentTrack.fileName ? (currentTrack.fileName.includes(' - ') ? currentTrack.fileName.split(' - ')[1].replace(/\.[^/.]+$/, "") : currentTrack.fileName.replace(/\.[^/.]+$/, "")) : 'Unknown Title')}</span>
           <span className="text-xs text-secondary/60 font-mono flex items-center gap-1 mt-0.5 truncate">
             {currentTrack.sourceType === 'DRIVE' && <Cloud size={10} className="text-primary shrink-0" />}
@@ -247,7 +247,7 @@ export function BottomPlayerBar() {
             onClick={(e) => { e.stopPropagation(); toggleFavorite(); }}
             className={`
               ${isFavorite ? 'text-primary drop-shadow-[0_0_8px_var(--tw-colors-primary)] scale-110' : 'text-white/40 hover:text-white'} 
-              transition-all duration-300 ml-1 md:ml-2 p-1.5 md:p-1 rounded-full
+              transition-all duration-300 ml-0 md:ml-2 p-1.5 md:p-1 rounded-full shrink-0
               active:scale-95
             `}
             aria-label={isFavorite ? "Remove from Favorites" : "Add to Favorites"}
@@ -260,8 +260,8 @@ export function BottomPlayerBar() {
       </div>
 
       {/* Center: Controls & Seek Bar */}
-      <div className="flex flex-col items-end md:items-center gap-1 shrink-0 md:w-2/4 md:max-w-2xl pr-2 md:pr-0">
-        <div className="flex items-center gap-4 md:gap-6">
+      <div className="flex flex-col items-end md:items-center gap-1 shrink-0 md:w-2/4 md:max-w-2xl md:pr-0">
+        <div className="flex items-center gap-2 sm:gap-3 md:gap-6">
           <button 
             onClick={(e) => { e.stopPropagation(); setIsShuffle(prev => !prev); }}
             aria-label={isShuffle ? "Turn off shuffle" : "Turn on shuffle"}
@@ -276,7 +276,7 @@ export function BottomPlayerBar() {
             disabled={!hasPrevious}
             className={`transition-colors ${hasPrevious ? 'text-white/60 hover:text-white' : 'text-white/20 cursor-not-allowed'}`}
           >
-            <SkipBack size={18} fill="currentColor" />
+            <SkipBack size={17} fill="currentColor" />
           </button>
           <button 
             onClick={(e) => { e.stopPropagation(); togglePlay(); }}
@@ -302,7 +302,7 @@ export function BottomPlayerBar() {
             disabled={!hasNext}
             className={`transition-colors ${hasNext ? 'text-white/60 hover:text-white' : 'text-white/20 cursor-not-allowed'}`}
           >
-            <SkipForward size={18} fill="currentColor" />
+            <SkipForward size={17} fill="currentColor" />
           </button>
           <div className="hidden md:flex items-center gap-2 border-l border-white/10 pl-4 ml-2">
             {repeatMode === 'simple' ? (
@@ -454,7 +454,7 @@ export function BottomPlayerBar() {
           </button>
           
           {showQueue && (
-            <div className="absolute bottom-full right-0 mb-4 w-[320px] bg-[#1e1e1e] border border-white/10 rounded-2xl shadow-2xl overflow-hidden z-50 flex flex-col max-h-[60vh]">
+            <div className="absolute bottom-full right-0 mb-4 w-80 max-w-[calc(100vw_-_2rem)] bg-[#1e1e1e] border border-white/10 rounded-2xl shadow-2xl overflow-hidden z-50 flex flex-col max-h-[60vh]">
               <div className="p-4 border-b border-white/10 flex items-center justify-between sticky top-0 bg-[#1e1e1e]/90 backdrop-blur-md z-10">
                 <h2 className="font-bold text-white flex items-center gap-2">
                   <ListPlus size={18} className="text-primary" /> 
@@ -523,7 +523,7 @@ export function BottomPlayerBar() {
           onClick={() => setShowMetadata(false)}
         >
           <div 
-            className="bg-[#1a1a1a] border border-white/10 rounded-2xl w-full max-w-md shadow-2xl overflow-hidden flex flex-col"
+            className="bg-[#1a1a1a] border border-white/10 rounded-2xl w-full max-w-md max-h-[calc(100dvh-2rem)] shadow-2xl overflow-hidden flex flex-col"
             onClick={(e) => e.stopPropagation()}
           >
             <div className="flex items-center justify-between p-5 border-b border-white/5">
