@@ -7,6 +7,9 @@ import { Play, Pause, SkipForward, SkipBack, Cloud, Disc, Heart, Shuffle, Repeat
 import { HorizontalSlider } from './HorizontalSlider';
 import { useTranslation } from 'react-i18next';
 import { ActionMenu } from './ActionMenu';
+import { useVirtualList } from '../hooks/useVirtualList';
+
+const QUEUE_POPOVER_ITEM_HEIGHT = 58;
 
 const formatTime = (time: number) => {
   const m = Math.floor(time / 60);
@@ -93,6 +96,17 @@ export function BottomPlayerBar() {
   const [showMetadata, setShowMetadata] = useState(false);
   const [showQueue, setShowQueue] = useState(false);
   const queueRef = useRef<HTMLDivElement>(null);
+  const {
+    containerRef: queueListRef,
+    handleScroll: handleQueueListScroll,
+    offsetY: queueListOffsetY,
+    totalHeight: queueListTotalHeight,
+    visibleIndexes: queueListVisibleIndexes,
+  } = useVirtualList({
+    itemCount: showQueue ? queue.length : 0,
+    itemHeight: QUEUE_POPOVER_ITEM_HEIGHT,
+    overscan: 6,
+  });
   const progressBarRef = useRef<HTMLDivElement>(null);
   const [isDraggingProgress, setIsDraggingProgress] = useState(false);
   const [dragProgressPercent, setDragProgressPercent] = useState(0);
@@ -467,33 +481,51 @@ export function BottomPlayerBar() {
                 </h2>
                 <span className="text-xs text-white/50">{queue.length} {t('bottomPlayer.songs', 'songs')}</span>
               </div>
-              <div className="flex-1 overflow-y-auto p-2 no-scrollbar">
-                {queue.map((track, idx) => {
+              <div
+                ref={queueListRef}
+                className="flex-1 overflow-y-auto p-2 no-scrollbar"
+                onScroll={handleQueueListScroll}
+              >
+                <div className="relative" style={{ height: queueListTotalHeight }}>
+                  <div
+                    className="absolute inset-x-0 top-0"
+                    style={{ transform: `translateY(${queueListOffsetY}px)` }}
+                  >
+                {queueListVisibleIndexes.map((idx) => {
+                  const track = queue[idx];
+                  if (!track) return null;
                   const isActive = currentTrack?.id === track.id;
                   const artwork = track.imageUrl || playerState.getTrackImage?.(track.id);
                   return (
-                    <div 
+                    <div
                       key={`${track.id}-${idx}`}
-                      onClick={() => playTrack(track, queue)}
-                      className={`flex items-center gap-3 p-2 rounded-xl cursor-pointer transition-colors ${
-                        isActive ? 'bg-primary/20 border border-primary/30' : 'hover:bg-white/5 border border-transparent'
-                      }`}
+                      className="relative"
+                      style={{ height: QUEUE_POPOVER_ITEM_HEIGHT }}
                     >
-                      <div className="w-10 h-10 rounded-full bg-primary/20 bg-cover bg-center flex-shrink-0" style={{ backgroundImage: artwork ? `url(${artwork})` : undefined }}>
-                        {!artwork && <Disc size={16} className="text-white/30 m-auto mt-3" />}
+                      <div
+                        onClick={() => playTrack(track, queue)}
+                        className={`flex h-[50px] items-center gap-3 p-2 rounded-xl cursor-pointer transition-colors ${
+                          isActive ? 'bg-primary/20 border border-primary/30' : 'hover:bg-white/5 border border-transparent'
+                        }`}
+                      >
+                        <div className="w-10 h-10 rounded-full bg-primary/20 bg-cover bg-center flex-shrink-0" style={{ backgroundImage: artwork ? `url(${artwork})` : undefined }}>
+                          {!artwork && <Disc size={16} className="text-white/30 m-auto mt-3" />}
+                        </div>
+                        <div className="flex-1 min-w-0">
+                          <p className={`text-sm font-medium truncate ${isActive ? 'text-primary' : 'text-white'}`}>
+                            {track.title || track.fileName?.replace(/\.[^/.]+$/, "")}
+                          </p>
+                          <p className="text-xs text-white/50 truncate">
+                            {track.artist || track.fileName?.split(' - ')[0] || 'Unknown Artist'}
+                          </p>
+                        </div>
+                        {isActive && <div className="w-1.5 h-1.5 rounded-full bg-primary mr-2 shadow-[0_0_8px_var(--tw-colors-primary)]" />}
                       </div>
-                      <div className="flex-1 min-w-0">
-                        <p className={`text-sm font-medium truncate ${isActive ? 'text-primary' : 'text-white'}`}>
-                          {track.title || track.fileName?.replace(/\.[^/.]+$/, "")}
-                        </p>
-                        <p className="text-xs text-white/50 truncate">
-                          {track.artist || track.fileName?.split(' - ')[0] || 'Unknown Artist'}
-                        </p>
-                      </div>
-                      {isActive && <div className="w-1.5 h-1.5 rounded-full bg-primary mr-2 shadow-[0_0_8px_var(--tw-colors-primary)]" />}
                     </div>
                   );
                 })}
+                  </div>
+                </div>
               </div>
             </div>
           )}

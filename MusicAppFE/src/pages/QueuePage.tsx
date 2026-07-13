@@ -1,29 +1,37 @@
-import { useState, useEffect } from 'react';
+import { useState, useEffect, useMemo } from 'react';
 import { useGlobalAudio } from '../context/AudioContext';
 import { useLibrary } from '../context/LibraryContext';
 import { Play, Pause, Trash2, GripVertical, MoreHorizontal, ArrowUp, ArrowDown, ListPlus, Heart, Info, X, ChevronsUp, ChevronsDown } from 'lucide-react';
 import type { Track } from '../hooks/useAudioPlayer';
+import { useVirtualList } from '../hooks/useVirtualList';
+
+const QUEUE_ITEM_HEIGHT = 84;
 
 export function QueuePage() {
   const { playerState } = useGlobalAudio();
   const { queue, setQueue, currentTrack, isPlaying, playTrack, togglePlay, upcomingQueues, removeUpcomingQueue } = playerState;
   const { favorites, toggleFavorite } = useLibrary();
+  const currentTrackIndex = useMemo(() => (
+    currentTrack ? queue.findIndex(track => String(track.id) === String(currentTrack.id)) : -1
+  ), [currentTrack, queue]);
+  const favoriteIds = useMemo(() => new Set(favorites.map(track => String(track.id))), [favorites]);
+  const {
+    containerRef,
+    handleScroll,
+    offsetY,
+    scrollToIndex,
+    totalHeight,
+    visibleIndexes,
+  } = useVirtualList({
+    itemCount: queue.length,
+    itemHeight: QUEUE_ITEM_HEIGHT,
+  });
 
   useEffect(() => {
-    if (currentTrack) {
-      // Delay geometric querying to prevent forced synchronous layout
-      requestAnimationFrame(() => {
-        const el = document.getElementById('queue-current-track');
-        const container = document.getElementById('queue-page-container');
-        if (el && container) {
-          container.scrollTo({
-            top: el.offsetTop - container.clientHeight / 2 + el.clientHeight / 2,
-            behavior: 'smooth'
-          });
-        }
-      });
+    if (currentTrackIndex >= 0) {
+      requestAnimationFrame(() => scrollToIndex(currentTrackIndex, 'smooth'));
     }
-  }, [currentTrack]);
+  }, [currentTrackIndex, scrollToIndex]);
 
   const handleRemoveTrack = (e: React.MouseEvent, trackId: string) => {
     e.stopPropagation();
@@ -122,148 +130,166 @@ export function QueuePage() {
         </p>
       </div>
 
-      <div id="queue-page-container" className="flex-1 overflow-y-auto relative">
+      <div
+        ref={containerRef}
+        id="queue-page-container"
+        className="flex-1 overflow-y-auto relative"
+        onScroll={handleScroll}
+      >
         {queue.length === 0 ? (
           <div className="flex flex-col items-center justify-center h-64 text-white/60">
             <p>Queue is empty</p>
           </div>
         ) : (
-          <div className="flex flex-col gap-2">
-            {queue.map((track, index) => {
+          <div className="relative" style={{ height: totalHeight }}>
+            <div
+              className="absolute inset-x-0 top-0"
+              style={{ transform: `translateY(${offsetY}px)` }}
+            >
+            {visibleIndexes.map((index) => {
+              const track = queue[index];
+              if (!track) return null;
               const isCurrent = currentTrack?.id === track.id;
+              const isFavorite = favoriteIds.has(String(track.id));
 
               return (
                 <div
                   key={`${track.id}-${index}`}
-                  id={isCurrent ? 'queue-current-track' : undefined}
-                  draggable
-                  onDragStart={(e) => handleDragStart(e, index)}
-                  onDragEnter={(e) => handleDragEnter(e, index)}
-                  onDragEnd={handleDragEnd}
-                  onDragOver={handleDragOver}
-                  onClick={() => {
-                    setOpenMenuIndex(null);
-                    handlePlayTrack(track);
-                  }}
-                  className={`group flex items-center gap-3 sm:gap-4 p-3 rounded-xl transition-all cursor-pointer ${isCurrent
-                      ? 'bg-primary/20 border border-primary/30'
-                      : 'hover:bg-white/5 border border-transparent'
-                    } ${draggedIndex === index ? 'opacity-50' : 'opacity-100'}`}
+                  className="relative"
+                  style={{ height: QUEUE_ITEM_HEIGHT }}
                 >
-                  <div className="text-white/20 hover:text-white/60 cursor-grab active:cursor-grabbing p-1 hidden sm:block">
-                    <GripVertical size={16} />
-                  </div>
-
-                  <div className="w-10 h-10 sm:w-12 sm:h-12 flex-shrink-0 bg-white/5 rounded-lg overflow-hidden relative flex items-center justify-center">
-                    {track.imageUrl || playerState.getTrackImage(track.id) ? (
-                      <img src={track.imageUrl || playerState.getTrackImage(track.id)} alt="" className="w-full h-full object-cover" />
-                    ) : (
-                      <div className="w-full h-full bg-white/5 flex items-center justify-center text-white/40">
-                        🎵
-                      </div>
-                    )}
-
-                    <div className={`absolute inset-0 flex items-center justify-center bg-black/60 transition-opacity ${isCurrent && isPlaying ? 'opacity-100' : 'opacity-100 lg:opacity-0 lg:group-hover:opacity-100'
-                      }`}>
-                      {isCurrent && isPlaying ? (
-                        <Pause size={20} className="text-primary fill-primary" />
-                      ) : (
-                        <Play size={20} className="text-white fill-white ml-1" />
-                      )}
+                  <div
+                    id={isCurrent ? 'queue-current-track' : undefined}
+                    draggable
+                    onDragStart={(e) => handleDragStart(e, index)}
+                    onDragEnter={(e) => handleDragEnter(e, index)}
+                    onDragEnd={handleDragEnd}
+                    onDragOver={handleDragOver}
+                    onClick={() => {
+                      setOpenMenuIndex(null);
+                      handlePlayTrack(track);
+                    }}
+                    className={`group flex h-[76px] items-center gap-3 sm:gap-4 p-3 rounded-xl transition-all cursor-pointer ${isCurrent
+                        ? 'bg-primary/20 border border-primary/30'
+                        : 'hover:bg-white/5 border border-transparent'
+                      } ${draggedIndex === index ? 'opacity-50' : 'opacity-100'}`}
+                  >
+                    <div className="text-white/20 hover:text-white/60 cursor-grab active:cursor-grabbing p-1 hidden sm:block">
+                      <GripVertical size={16} />
                     </div>
-                  </div>
 
-                  <div className="flex-1 min-w-0">
-                    <span className={`block text-sm sm:text-base font-medium truncate ${isCurrent ? 'text-primary' : 'text-white'}`}>
-                      {track.title || playerState.getTrackMetadata(track.id)?.title || (track.fileName ? (track.fileName.includes(' - ') ? track.fileName.split(' - ')[1].replace(/\.[^/.]+$/, "") : track.fileName.replace(/\.[^/.]+$/, "")) : 'Unknown Title')}
-                    </span>
-                    <p className="text-xs sm:text-sm text-white/60 truncate">
-                      {track.artist || playerState.getTrackMetadata(track.id)?.artist || (track.fileName?.includes(' - ') ? track.fileName.split(' - ')[0] : 'Unknown Artist')} {track.album ? `• ${track.album}` : ''}
-                    </p>
-                  </div>
+                    <div className="w-10 h-10 sm:w-12 sm:h-12 flex-shrink-0 bg-white/5 rounded-lg overflow-hidden relative flex items-center justify-center">
+                      {track.imageUrl || playerState.getTrackImage(track.id) ? (
+                        <img src={track.imageUrl || playerState.getTrackImage(track.id)} alt="" className="w-full h-full object-cover" />
+                      ) : (
+                        <div className="w-full h-full bg-white/5 flex items-center justify-center text-white/40">
+                          🎵
+                        </div>
+                      )}
 
-                  <div className="relative flex items-center gap-2">
-                    <button
-                      aria-label="More options"
-                      onClick={(e) => {
-                        e.stopPropagation();
-                        setOpenMenuIndex(openMenuIndex === index ? null : index);
-                      }}
-                      className="p-2 text-white/60 hover:text-white hover:bg-white/10 rounded-full transition-colors opacity-100 lg:opacity-0 lg:group-hover:opacity-100"
-                    >
-                      <MoreHorizontal size={18} />
-                    </button>
+                      <div className={`absolute inset-0 flex items-center justify-center bg-black/60 transition-opacity ${isCurrent && isPlaying ? 'opacity-100' : 'opacity-100 lg:opacity-0 lg:group-hover:opacity-100'
+                      }`}>
+                        {isCurrent && isPlaying ? (
+                          <Pause size={20} className="text-primary fill-primary" />
+                        ) : (
+                          <Play size={20} className="text-white fill-white ml-1" />
+                        )}
+                      </div>
+                    </div>
 
-                    {openMenuIndex === index && (
-                      <div className="absolute right-0 top-full mt-1 w-44 max-w-[calc(100vw_-_2rem)] bg-[#1A1A1A] border border-white/10 rounded-lg shadow-xl overflow-hidden z-50 py-1">
-                        <button
-                          disabled={index === 0}
-                          onClick={(e) => moveTrack(e, index, 'top')}
-                          className="w-full flex items-center gap-3 px-4 py-2 text-sm text-left text-white/80 hover:bg-white/10 disabled:opacity-30 disabled:cursor-not-allowed"
-                        >
-                          <ChevronsUp size={14} /> Move to Top
-                        </button>
-                        <button
-                          disabled={index === 0}
-                          onClick={(e) => moveTrack(e, index, 'up')}
-                          className="w-full flex items-center gap-3 px-4 py-2 text-sm text-left text-white/80 hover:bg-white/10 disabled:opacity-30 disabled:cursor-not-allowed"
-                        >
-                          <ArrowUp size={14} /> Move Up
-                        </button>
-                        <button
-                          disabled={index === queue.length - 1}
-                          onClick={(e) => moveTrack(e, index, 'down')}
-                          className="w-full flex items-center gap-3 px-4 py-2 text-sm text-left text-white/80 hover:bg-white/10 disabled:opacity-30 disabled:cursor-not-allowed"
-                        >
-                          <ArrowDown size={14} /> Move Down
-                        </button>
-                        <button
-                          disabled={index === queue.length - 1}
-                          onClick={(e) => moveTrack(e, index, 'bottom')}
-                          className="w-full flex items-center gap-3 px-4 py-2 text-sm text-left text-white/80 hover:bg-white/10 disabled:opacity-30 disabled:cursor-not-allowed"
-                        >
-                          <ChevronsDown size={14} /> Move to Bottom
-                        </button>
-                        {track.sourceType !== 'LOCAL' && (
+                    <div className="flex-1 min-w-0">
+                      <span className={`block text-sm sm:text-base font-medium truncate ${isCurrent ? 'text-primary' : 'text-white'}`}>
+                        {track.title || playerState.getTrackMetadata(track.id)?.title || (track.fileName ? (track.fileName.includes(' - ') ? track.fileName.split(' - ')[1].replace(/\.[^/.]+$/, "") : track.fileName.replace(/\.[^/.]+$/, "")) : 'Unknown Title')}
+                      </span>
+                      <p className="text-xs sm:text-sm text-white/60 truncate">
+                        {track.artist || playerState.getTrackMetadata(track.id)?.artist || (track.fileName?.includes(' - ') ? track.fileName.split(' - ')[0] : 'Unknown Artist')} {track.album ? `• ${track.album}` : ''}
+                      </p>
+                    </div>
+
+                    <div className="relative flex items-center gap-2">
+                      <button
+                        aria-label="More options"
+                        onClick={(e) => {
+                          e.stopPropagation();
+                          setOpenMenuIndex(openMenuIndex === index ? null : index);
+                        }}
+                        className="p-2 text-white/60 hover:text-white hover:bg-white/10 rounded-full transition-colors opacity-100 lg:opacity-0 lg:group-hover:opacity-100"
+                      >
+                        <MoreHorizontal size={18} />
+                      </button>
+
+                      {openMenuIndex === index && (
+                        <div className="absolute right-0 top-full mt-1 w-44 max-w-[calc(100vw_-_2rem)] bg-[#1A1A1A] border border-white/10 rounded-lg shadow-xl overflow-hidden z-50 py-1">
                           <button
-                            onClick={(e) => handleToggleFavorite(track, e)}
+                            disabled={index === 0}
+                            onClick={(e) => moveTrack(e, index, 'top')}
+                            className="w-full flex items-center gap-3 px-4 py-2 text-sm text-left text-white/80 hover:bg-white/10 disabled:opacity-30 disabled:cursor-not-allowed"
+                          >
+                            <ChevronsUp size={14} /> Move to Top
+                          </button>
+                          <button
+                            disabled={index === 0}
+                            onClick={(e) => moveTrack(e, index, 'up')}
+                            className="w-full flex items-center gap-3 px-4 py-2 text-sm text-left text-white/80 hover:bg-white/10 disabled:opacity-30 disabled:cursor-not-allowed"
+                          >
+                            <ArrowUp size={14} /> Move Up
+                          </button>
+                          <button
+                            disabled={index === queue.length - 1}
+                            onClick={(e) => moveTrack(e, index, 'down')}
+                            className="w-full flex items-center gap-3 px-4 py-2 text-sm text-left text-white/80 hover:bg-white/10 disabled:opacity-30 disabled:cursor-not-allowed"
+                          >
+                            <ArrowDown size={14} /> Move Down
+                          </button>
+                          <button
+                            disabled={index === queue.length - 1}
+                            onClick={(e) => moveTrack(e, index, 'bottom')}
+                            className="w-full flex items-center gap-3 px-4 py-2 text-sm text-left text-white/80 hover:bg-white/10 disabled:opacity-30 disabled:cursor-not-allowed"
+                          >
+                            <ChevronsDown size={14} /> Move to Bottom
+                          </button>
+                          {track.sourceType !== 'LOCAL' && (
+                            <button
+                              onClick={(e) => handleToggleFavorite(track, e)}
+                              className="w-full flex items-center gap-3 px-4 py-2 text-sm text-left text-white/80 hover:bg-white/10"
+                            >
+                              <Heart size={14} fill={isFavorite ? "currentColor" : "none"} className={isFavorite ? "text-primary" : ""} /> 
+                              {isFavorite ? "Remove from Favorites" : "Add to Favorites"}
+                            </button>
+                          )}
+                          <button
+                            onClick={(e) => { e.stopPropagation(); setInfoTrack(track); setOpenMenuIndex(null); }}
                             className="w-full flex items-center gap-3 px-4 py-2 text-sm text-left text-white/80 hover:bg-white/10"
                           >
-                            <Heart size={14} fill={favorites.some(f => f.id === track.id) ? "currentColor" : "none"} className={favorites.some(f => f.id === track.id) ? "text-primary" : ""} /> 
-                            {favorites.some(f => f.id === track.id) ? "Remove from Favorites" : "Add to Favorites"}
+                            <Info size={14} /> Info
                           </button>
-                        )}
-                        <button
-                          onClick={(e) => { e.stopPropagation(); setInfoTrack(track); setOpenMenuIndex(null); }}
-                          className="w-full flex items-center gap-3 px-4 py-2 text-sm text-left text-white/80 hover:bg-white/10"
-                        >
-                          <Info size={14} /> Info
-                        </button>
-                        <div className="h-px bg-white/10 my-1"></div>
-                        <button
-                          onClick={(e) => {
-                            setOpenMenuIndex(null);
-                            handleRemoveTrack(e, track.id);
-                          }}
-                          className="w-full flex items-center gap-3 px-4 py-2 text-sm text-left text-red-400 hover:bg-white/10"
-                        >
-                          <Trash2 size={14} /> Remove
-                        </button>
-                      </div>
-                    )}
-                    
-                    <button
-                      aria-label="Remove from queue"
-                      onClick={(e) => handleRemoveTrack(e, track.id)}
-                      className="p-2 text-white/60 hover:text-red-400 hover:bg-white/10 rounded-full transition-colors opacity-100 lg:opacity-0 lg:group-hover:opacity-100 hidden sm:block"
-                      title="Remove from queue"
-                    >
-                      <Trash2 size={18} />
-                    </button>
+                          <div className="h-px bg-white/10 my-1"></div>
+                          <button
+                            onClick={(e) => {
+                              setOpenMenuIndex(null);
+                              handleRemoveTrack(e, track.id);
+                            }}
+                            className="w-full flex items-center gap-3 px-4 py-2 text-sm text-left text-red-400 hover:bg-white/10"
+                          >
+                            <Trash2 size={14} /> Remove
+                          </button>
+                        </div>
+                      )}
+                      
+                      <button
+                        aria-label="Remove from queue"
+                        onClick={(e) => handleRemoveTrack(e, track.id)}
+                        className="p-2 text-white/60 hover:text-red-400 hover:bg-white/10 rounded-full transition-colors opacity-100 lg:opacity-0 lg:group-hover:opacity-100 hidden sm:block"
+                        title="Remove from queue"
+                      >
+                        <Trash2 size={18} />
+                      </button>
+                    </div>
                   </div>
                 </div>
               );
             })}
+            </div>
           </div>
         )}
         {upcomingQueues && upcomingQueues.length > 0 && (
