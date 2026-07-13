@@ -54,6 +54,21 @@ export async function getCachedAudio(id: string): Promise<Blob | null> {
   }
 }
 
+export async function hasCachedAudio(id: string): Promise<boolean> {
+  try {
+    const database = await openDatabase();
+    return await new Promise((resolve) => {
+      const transaction = database.transaction(STORE_NAME, 'readonly');
+      const store = transaction.objectStore(STORE_NAME);
+      const request = store.count(id);
+      request.onsuccess = () => resolve(request.result > 0);
+      request.onerror = () => resolve(false);
+    });
+  } catch {
+    return false;
+  }
+}
+
 export async function removeCachedAudio(id: string): Promise<void> {
   try {
     const database = await openDatabase();

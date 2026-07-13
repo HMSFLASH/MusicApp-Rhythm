@@ -40,6 +40,7 @@ import { getAudioExtension } from './audioMime';
 import { decodeFlacToAudioBuffer } from './flacDecoder';
 import { saveCover } from '../utils/idb';
 import { BACKEND_URL } from '../config/env';
+import { hasCachedAudio } from '../utils/mediaCache';
 
 const getQueueMembershipKey = (tracks: Track[]) => (
   tracks
@@ -1250,10 +1251,25 @@ export function useAudioPlayback(
     const { allowedIds, prev1, next1 } = getAdjacentTrackWindow(currentId, currentQueue, {
       wrap: queueEndMode === 'repeat',
     });
+
+    const isRealtime = !precalculateOnIdleRef.current;
+    if (isRealtime) {
+      if (next1?.sourceType !== 'LOCAL' && next1?.driveFileId) {
+        if (await hasCachedAudio(`drive:${next1.driveFileId}`)) {
+          allowedIds.delete(String(next1.id));
+        }
+      }
+      if (prev1?.sourceType !== 'LOCAL' && prev1?.driveFileId) {
+        if (await hasCachedAudio(`drive:${prev1.driveFileId}`)) {
+          allowedIds.delete(String(prev1.id));
+        }
+      }
+    }
+
     allowedIdsRef.current = allowedIds;
     prunePrecalculatedQueueBuffers(allowedIds);
 
-    // 1. Memory Cleanup: only keep current, prev1, and next1 in RAM.
+    // 1. Memory Cleanup: only keep current, and allowed adjacent tracks in RAM.
     for (const [key, objectUrl] of blobCacheRef.current.entries()) {
       if (!allowedIds.has(String(key))) {
         URL.revokeObjectURL(objectUrl);
@@ -1264,10 +1280,10 @@ export function useAudioPlayback(
     if (!shouldPreload) return;
 
     // 2. Preload the next and prev tracks
-    if (next1) {
+    if (next1 && allowedIds.has(String(next1.id))) {
       await preloadTrack(next1);
     }
-    if (prev1 && (!next1 || String(prev1.id) !== String(next1.id))) {
+    if (prev1 && (!next1 || String(prev1.id) !== String(next1.id)) && allowedIds.has(String(prev1.id))) {
       await preloadTrack(prev1);
     }
   };
@@ -1423,6 +1439,10 @@ export function useAudioPlayback(
             try {
               console.log(`[Audio] Fetching audio URL...`);
               slowPathAudioUrl = await getTrackAudioUrl(startingTrack, forceReloadFromDrive);
+              if (decodeSessionRef.current !== playSessionId) {
+                console.log(`[Audio] Session changed after getTrackAudioUrl, aborting.`);
+                return;
+              }
               if (!slowPathAudioUrl) {
                 console.warn(`[Audio] Empty audio URL returned.`);
                 setIsPlaying(false);
@@ -1564,6 +1584,10 @@ export function useAudioPlayback(
       try {
         console.log(`[Audio] Fetching audio URL for streaming...`);
         audioUrl = await getTrackAudioUrl(startingTrack, forceReloadFromDrive);
+        if (decodeSessionRef.current !== playSessionId) {
+          console.log(`[Audio] Session changed after getTrackAudioUrl, aborting.`);
+          return;
+        }
         if (!audioUrl) {
           console.warn(`[Audio] Empty audio URL returned in streaming path.`);
           setIsPlaying(false);
