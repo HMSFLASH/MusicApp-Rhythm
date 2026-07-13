@@ -200,6 +200,11 @@
     "repeatQueue": "Repeat queue",
     "switchToNextQueue": "Switch to next queue",
     "cycleQueues": "When the last queue ends, switch to the first queue and vice versa",
-    "noLyrics": "No lyrics available"
+    "speedAndPitch": "Speed & Pitch",
+    "speed": "Speed",
+    "pitch": "Pitch",
+    "allSongs": "All songs",
+    "thisTrack": "This track only",
+    "advancedRequiresPrecalculate": "Advanced mode requires Precalculate"
   }
 }

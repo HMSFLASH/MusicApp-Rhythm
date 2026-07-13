@@ -34,6 +34,7 @@ type RenderOfflineAudioOptions = {
   params: AudioRenderParams;
   fxEnabled: FxEnabledFlags;
   irBuffer: AudioBuffer | null;
+  pitchRate?: number;
 };
 
 export const renderOfflineAudio = async ({
@@ -41,10 +42,14 @@ export const renderOfflineAudio = async ({
   params,
   fxEnabled,
   irBuffer,
+  pitchRate: rawPitchRate,
 }: RenderOfflineAudioOptions) => {
+  const pitchRate = (rawPitchRate && Number.isFinite(rawPitchRate) && rawPitchRate > 0) ? rawPitchRate : 1;
   if (!audioBuffer) return audioBuffer;
   const sampleRate = audioBuffer.sampleRate;
-  const length = audioBuffer.length;
+  const length = pitchRate !== 1
+    ? Math.ceil(audioBuffer.length / pitchRate)
+    : audioBuffer.length;
   const enabled = fxEnabled || {};
   const {
     preampGain,
@@ -89,7 +94,7 @@ export const renderOfflineAudio = async ({
     panValue,
   }, enabledWithAutoPreamp);
 
-  if (!activity.any && !loudnessNormalization) {
+  if (!activity.any && !loudnessNormalization && pitchRate === 1) {
     return audioBuffer;
   }
 
@@ -105,10 +110,9 @@ export const renderOfflineAudio = async ({
     : 0;
 
   const offlineCtx = new OfflineAudioContext(2, length, sampleRate);
-
   const offlineSource = offlineCtx.createBufferSource();
   offlineSource.buffer = audioBuffer;
-  offlineSource.playbackRate.value = 1.0;
+  offlineSource.playbackRate.value = pitchRate;
 
   let currentNode: AudioNode = offlineSource;
 

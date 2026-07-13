@@ -131,6 +131,11 @@ export function useAudioPlayback(
   const [volume, setVolumeState] = useState<number>(savedState.volume ?? 1);
   const [playbackRate, setPlaybackRate] = useState<number>(savedState.playbackRate ?? 1);
   const [preservesPitch, setPreservesPitch] = useState<boolean>(savedState.preservesPitch ?? true);
+  const [pitchRate, setPitchRate] = useState<number>(1);
+  const [speedPitchMode, setSpeedPitchMode] = useState<'simple' | 'advanced'>(savedState.speedPitchMode ?? 'simple');
+  const [speedPitchScope, setSpeedPitchScope] = useState<'global' | 'track'>('global');
+  const perTrackSpeedPitchRef = useRef<Map<string, { speed: number; pitch: number }>>(new Map());
+  const pitchRateRef = useRef<number>(1);
 
   const audioBufferRef = useRef<AudioBuffer | null>(null);
   const renderedAudioRef = useRef<HTMLAudioElement | null>(null);
@@ -305,8 +310,11 @@ export function useAudioPlayback(
     renderedAudioRef.current.loop = false;
     renderedAudioRef.current.preload = 'auto';
     renderedAudioRef.current.volume = volume;
-    renderedAudioRef.current.playbackRate = playbackRate;
-    renderedAudioRef.current.preservesPitch = preservesPitch;
+    const effectiveRenderedRate = (speedPitchMode === 'advanced' && pitchRateRef.current !== 1)
+      ? playbackRate / pitchRateRef.current
+      : playbackRate;
+    renderedAudioRef.current.playbackRate = Math.max(0.1, effectiveRenderedRate);
+    renderedAudioRef.current.preservesPitch = (speedPitchMode === 'advanced') ? true : preservesPitch;
     renderedAudioRef.current.src = objectUrl;
 
     // Explicitly load the new source to flush the old pipeline immediately.
@@ -319,7 +327,7 @@ export function useAudioPlayback(
     }
 
     return objectUrl;
-  }, [playbackRate, preservesPitch, revokeRenderedAudioUrl, volume]);
+  }, [playbackRate, preservesPitch, pitchRate, speedPitchMode, revokeRenderedAudioUrl, volume]);
 
   useEffect(() => {
     if (!audioRef.current) {
@@ -705,28 +713,46 @@ export function useAudioPlayback(
   }, [audioRef]);
 
   const updatePlaybackRate = useCallback((val: number) => setPlaybackRate(val), []);
+  const updatePitchRate = useCallback((val: number) => {
+    setPitchRate(val);
+    pitchRateRef.current = val;
+  }, []);
   // eslint-disable-next-line @typescript-eslint/no-explicit-any
   const togglePreservesPitch = useCallback(() => setPreservesPitch((prev: any) => !prev), []);
 
   useEffect(() => {
+    const isAdvancedPitch = speedPitchMode === 'advanced' && pitchRate !== 1;
+    const effectiveRenderedRate = isAdvancedPitch
+      ? Math.max(0.1, playbackRate / pitchRate)
+      : playbackRate;
     if (audioRef.current) {
       audioRef.current.playbackRate = playbackRate;
       audioRef.current.preservesPitch = preservesPitch;
     }
     if (renderedAudioRef.current) {
-      renderedAudioRef.current.playbackRate = playbackRate;
-      renderedAudioRef.current.preservesPitch = preservesPitch;
+      renderedAudioRef.current.playbackRate = effectiveRenderedRate;
+      renderedAudioRef.current.preservesPitch = isAdvancedPitch ? true : preservesPitch;
     }
     if (bufferSourceRef.current) {
       bufferSourceRef.current.playbackRate.value = playbackRate;
     }
     try {
       const existing = JSON.parse(localStorage.getItem(configStorageKey) || '{}');
-      localStorage.setItem(configStorageKey, JSON.stringify({ ...existing, playbackRate, preservesPitch }));
+      localStorage.setItem(configStorageKey, JSON.stringify({ ...existing, playbackRate, preservesPitch, speedPitchMode }));
     } catch {
       // Ignore localStorage write failures.
     }
-  }, [playbackRate, preservesPitch, audioRef, bufferSourceRef, configStorageKey]);
+    // Save per-track settings if scope is 'track'
+    if (speedPitchScope === 'track' && currentTrackSnapshotRef.current) {
+      const trackId = String(currentTrackSnapshotRef.current.id);
+      perTrackSpeedPitchRef.current.set(trackId, { speed: playbackRate, pitch: pitchRate });
+      try {
+        const storageKey = `${configStorageKey}_perTrackSpeedPitch`;
+        const map = Object.fromEntries(perTrackSpeedPitchRef.current.entries());
+        localStorage.setItem(storageKey, JSON.stringify(map));
+      } catch { /* ignore */ }
+    }
+  }, [playbackRate, preservesPitch, pitchRate, speedPitchMode, speedPitchScope, audioRef, bufferSourceRef, configStorageKey]);
 
   useEffect(() => {
     currentTimeSnapshotRef.current = currentTime;
@@ -968,12 +994,13 @@ export function useAudioPlayback(
     });
   };
 
-  const performOfflineRender = async (audioBuffer: AudioBuffer) =>
+  const performOfflineRender = async (audioBuffer: AudioBuffer, overridePitchRate?: number) =>
     renderOfflineAudio({
       audioBuffer,
       params: audioParamsRef.current,
       fxEnabled: fxEnabledRef.current || {},
       irBuffer: irBufferRef.current,
+      pitchRate: (speedPitchMode === 'advanced') ? (overridePitchRate ?? pitchRateRef.current) : undefined,
     });
 
   const getRealtimeTrackLoudnessGain = async (track: Track, audioUrl: string) => {
@@ -1371,7 +1398,21 @@ export function useAudioPlayback(
     currentTimeSnapshotRef.current = 0;
     setDuration(initialDuration);
     bufferPausedTimeRef.current = 0;
-    setPlaybackRate(1);
+    // Load per-track speed/pitch or reset to defaults
+    const startingId = String(startingTrack.id);
+    const perTrackSettings = perTrackSpeedPitchRef.current.get(startingId);
+    if (perTrackSettings && speedPitchScope === 'track') {
+      setPlaybackRate(perTrackSettings.speed);
+      setPitchRate(perTrackSettings.pitch);
+      pitchRateRef.current = perTrackSettings.pitch;
+    } else {
+      setPlaybackRate(1);
+      if (speedPitchMode === 'advanced') {
+        setPitchRate(1);
+        pitchRateRef.current = 1;
+      }
+    }
+    setSpeedPitchScope('global');
 
     setCurrentTrack(startingTrack);
     setQueue(currentQueue);
@@ -2056,6 +2097,12 @@ export function useAudioPlayback(
     updatePlaybackRate,
     preservesPitch,
     togglePreservesPitch,
+    pitchRate,
+    updatePitchRate,
+    speedPitchMode,
+    setSpeedPitchMode,
+    speedPitchScope,
+    setSpeedPitchScope,
     queuePrecalculateStatus,
     precalculateEntireQueue,
     cancelQueuePrecalculate,

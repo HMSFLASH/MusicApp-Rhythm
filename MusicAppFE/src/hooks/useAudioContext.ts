@@ -118,6 +118,8 @@ export function useAudioContext(effectsState: any) {
   const dryGainRef = useRef<GainNode | null>(null);
   const wetGainRef = useRef<GainNode | null>(null);
   const reverbOutRef = useRef<GainNode | null>(null);
+
+
   const reverbPreDelayRef = useRef<DelayNode | null>(null);
   const reverbHighpassRef = useRef<BiquadFilterNode | null>(null);
   const reverbLowpassRef = useRef<BiquadFilterNode | null>(null);
@@ -127,6 +129,7 @@ export function useAudioContext(effectsState: any) {
   const stereoRightAnalyserRef = useRef<AnalyserNode | null>(null);
   const stereoAnalysisIntervalRef = useRef<number | null>(null);
   const stereoPseudoBaseAmountRef = useRef(0);
+  const masterAnalyserRef = useRef<AnalyserNode | null>(null);
   const initializeAudioContextRef = useRef<(() => void) | null>(null);
 
   const stopStereoNearMonoAnalysis = useCallback(() => {
@@ -420,6 +423,7 @@ export function useAudioContext(effectsState: any) {
       disconnectNode(softClipWaveShaperRef.current);
     }
     disconnectNode(panNodeRef.current);
+    disconnectNode(masterAnalyserRef.current);
 
     let currentNode: AudioNode = sourceNodeRef.current;
     const enabled = fxEnabledRef.current || {};
@@ -755,6 +759,13 @@ export function useAudioContext(effectsState: any) {
       softClipWaveShaperRef.current = null;
     }
 
+    if (!masterAnalyserRef.current) {
+      masterAnalyserRef.current = ctx.createAnalyser();
+      masterAnalyserRef.current.fftSize = 1024;
+      masterAnalyserRef.current.smoothingTimeConstant = 0.8;
+    }
+    currentNode.connect(masterAnalyserRef.current);
+
     currentNode.connect(ctx.destination);
     if (audioContextRef.current && audioContextRef.current.state === 'suspended') {
       audioContextRef.current.resume();
@@ -978,6 +989,7 @@ export function useAudioContext(effectsState: any) {
     wetGainRef,
     reverbPreDelayRef,
     initializeAudioContext,
-    eqResponseData
+    eqResponseData,
+    masterAnalyserRef
   };
 }

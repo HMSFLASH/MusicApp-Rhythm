@@ -3,6 +3,7 @@ import { useGlobalAudio } from '../context/AudioContext';
 import { useAuth } from '../context/AuthContext';
 import { Disc, Play, Pause, SkipBack, SkipForward, Shuffle, Repeat, Heart, Info, ListPlus, MoreHorizontal, Repeat1, User, Volume2, VolumeX, BarChart2, Gauge, Music, Check, X, ArrowRight, Square, PauseCircle, ListX, Loader2, Trash2, Cpu, Tags, RefreshCw } from 'lucide-react';
 import { HorizontalSlider } from '../components/HorizontalSlider';
+import { SpeedPitchPanel } from '../components/SpeedPitchPanel';
 import { useLibrary } from '../context/LibraryContext';
 import { LyricsView } from '../components/LyricsView';
 import { useNavigate } from 'react-router-dom';
@@ -27,6 +28,8 @@ export function NowPlaying() {
     isPlaying, isLoadingTrack, currentTrack, currentTime, duration,
     togglePlay, seek, playNext, playPrevious,
     playbackRate, updatePlaybackRate, preservesPitch, togglePreservesPitch,
+    pitchRate, updatePitchRate, speedPitchMode, setSpeedPitchMode,
+    speedPitchScope, setSpeedPitchScope,
     isShuffle, setIsShuffle, songEndMode, setSongEndMode, queueEndMode, setQueueEndMode,
     repeatMode, setRepeatMode,
     volume, setVolume,
@@ -160,6 +163,7 @@ export function NowPlaying() {
 
   // More menu state
   const [showMenu, setShowMenu] = useState(false);
+  const [showSpeedPitch, setShowSpeedPitch] = useState(false);
   const menuRef = useRef<HTMLDivElement>(null);
   // Volume menu state
   const [showVolume, setShowVolume] = useState(false);
@@ -169,6 +173,7 @@ export function NowPlaying() {
   const [showMetadata, setShowMetadata] = useState(false);
   // Lyrics Modal state
   const [showLyrics, setShowLyrics] = useState(false);
+  
 
   const trackLyrics = currentTrack?.lyrics || (currentTrack ? playerState.getTrackMetadata(currentTrack.id)?.lyrics : undefined);
   const hasLyrics = !!trackLyrics;
@@ -196,6 +201,7 @@ export function NowPlaying() {
     const handler = (e: MouseEvent) => {
       if (menuRef.current && !menuRef.current.contains(e.target as Node)) {
         setShowMenu(false);
+        setShowSpeedPitch(false);
       }
       if (repeatRef.current && !repeatRef.current.contains(e.target as Node)) {
         setShowRepeatMenu(false);
@@ -289,8 +295,9 @@ export function NowPlaying() {
   }
 
   return (
-    <div ref={pageScrollRef} className="h-full overflow-y-auto w-full no-scrollbar" onScroll={handleScroll}>
-      <div className="flex flex-col lg:flex-row items-start justify-center max-w-6xl 2xl:max-w-[1400px] 3xl:max-w-[1600px] 4k:max-w-[2000px] mx-auto w-full gap-8 md:gap-12 py-4 md:py-8 pb-28 md:pb-32">
+    <div ref={pageScrollRef} className="h-full overflow-y-auto w-full no-scrollbar relative" onScroll={handleScroll}>
+
+      <div className="flex flex-col lg:flex-row items-start justify-center max-w-6xl 2xl:max-w-[1400px] 3xl:max-w-[1600px] 4k:max-w-[2000px] mx-auto w-full gap-8 md:gap-12 py-4 md:py-8 pb-28 md:pb-32 relative z-10">
 
         {/* Left Side: Player */}
         <div className="flex-1 flex flex-col items-center w-full max-w-lg mx-auto gap-6 md:gap-8 pt-2 md:pt-8">
@@ -399,34 +406,41 @@ export function NowPlaying() {
                 </button>
                 {showMenu && (
                   <div className="absolute bottom-full left-1/2 -translate-x-1/2 mb-3 w-72 max-w-[calc(100vw_-_2rem)] bg-[#1e1e1e] border border-white/10 rounded-2xl shadow-2xl overflow-hidden z-50">
-                    {/* Tempo Control */}
-                    <div className="px-4 py-4 border-b border-white/5">
-                      <div className="flex items-center justify-between mb-3">
-                        <div className="flex items-center gap-2 text-white">
-                          <Gauge size={16} className="text-primary" />
-                          <span className="text-sm font-semibold">{t('nowPlaying.playbackSpeed')}</span>
-                        </div>
-                        <button
-                          onClick={togglePreservesPitch}
-                          className={`text-[10px] font-mono px-2 py-1 rounded-full border transition-all ${preservesPitch
-                            ? 'bg-primary/20 text-primary border-primary/50'
-                            : 'bg-white/10 text-white/50 border-white/20'
-                            }`}
-                        >
-                          {preservesPitch ? t('nowPlaying.preservePitch') : t('nowPlaying.vinyl')}
-                        </button>
-                      </div>
-                      <HorizontalSlider
-                        value={playbackRate}
-                        min={0.5}
-                        max={2.0}
-                        step={0.05}
-                        onChange={updatePlaybackRate}
-                        label={t('nowPlaying.tempo')}
-                        color="#00f5ff"
-                        unit="x"
+                    {showSpeedPitch ? (
+                      <SpeedPitchPanel
+                        playbackRate={playbackRate}
+                        updatePlaybackRate={updatePlaybackRate}
+                        preservesPitch={preservesPitch}
+                        togglePreservesPitch={togglePreservesPitch}
+                        pitchRate={pitchRate}
+                        updatePitchRate={updatePitchRate}
+                        speedPitchMode={speedPitchMode}
+                        setSpeedPitchMode={setSpeedPitchMode}
+                        speedPitchScope={speedPitchScope}
+                        setSpeedPitchScope={setSpeedPitchScope}
+                        precalculateOnIdle={playerState.precalculateOnIdle}
+                        currentTrackId={currentTrack?.id ? String(currentTrack.id) : undefined}
+                        t={t}
+                        onBack={() => setShowSpeedPitch(false)}
                       />
-                    </div>
+                    ) : (
+                      <>
+                    {/* Speed & Pitch Button */}
+                    <button
+                      onClick={() => setShowSpeedPitch(true)}
+                      className="w-full flex items-center justify-between px-4 py-3 text-sm text-white/80 hover:bg-white/5 transition-colors border-b border-white/5"
+                    >
+                      <div className="flex items-center gap-3">
+                        <Gauge size={16} className={playbackRate !== 1 || (speedPitchMode === 'advanced' && pitchRate !== 1) ? 'text-primary' : ''} />
+                        <span>{t('nowPlaying.speedAndPitch')}</span>
+                      </div>
+                      <span className="text-[10px] font-mono text-white/40">
+                        {speedPitchMode === 'advanced' && pitchRate !== 1
+                          ? `${playbackRate}x / ${pitchRate}x`
+                          : `${playbackRate}x`
+                        }
+                      </span>
+                    </button>
                     {getAudioExtension(currentTrack.fileName) === 'flac' && (
                       <button
                         onClick={() => {
@@ -504,6 +518,8 @@ export function NowPlaying() {
                         <Trash2 size={16} />
                         <span>Delete from Library</span>
                       </button>
+                    )}
+                      </>
                     )}
                   </div>
                 )}

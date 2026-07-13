@@ -50,5 +50,6 @@ export function useAudioEngine(
     reloadMetadataFromBackend: metadataState.reloadMetadataFromBackend,
     metadataVersion: metadataState.metadataVersion,
     eqResponseData: contextState.eqResponseData,
+    masterAnalyserRef: contextState.masterAnalyserRef,
   };
 }
