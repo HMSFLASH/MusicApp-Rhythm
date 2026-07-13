@@ -1371,6 +1371,7 @@ export function useAudioPlayback(
     currentTimeSnapshotRef.current = 0;
     setDuration(initialDuration);
     bufferPausedTimeRef.current = 0;
+    setPlaybackRate(1);
 
     setCurrentTrack(startingTrack);
     setQueue(currentQueue);
