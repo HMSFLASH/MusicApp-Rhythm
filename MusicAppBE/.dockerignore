@@ -6,3 +6,19 @@ target/
 *.iml
 Dockerfile
 .dockerignore
+
+# Uploads and Media
+uploads/
+media/
+public/uploads/
+
+# API Credentials
+credentials.json
+token.json
+client_secret*.json
+google-credentials.json
+firebase-adminsdk.json
+
+# Cache and Logs
+*.log
+coverage/
