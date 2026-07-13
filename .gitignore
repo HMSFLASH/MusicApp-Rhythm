@@ -63,3 +63,21 @@ dist-ssr
 *.db-shm
 *.db-wal
 Note.txt
+
+# Uploads and Media
+uploads/
+media/
+MusicAppBE/uploads/
+MusicAppFE/public/uploads/
+
+# API Credentials
+credentials.json
+token.json
+client_secret*.json
+google-credentials.json
+firebase-adminsdk.json
+
+# Vite/Node cache
+.eslintcache
+.vite/
+coverage/
