@@ -1184,7 +1184,7 @@ export function useAudioPlayback(
     }
     failedTrackIdsRef.current = [];
     precalculateEntireQueue(requestedWorkerCount, failedTracks);
-  // eslint-disable-next-line react-hooks/exhaustive-deps
+    // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [queue]);
 
   // Download tracks into RAM-backed blob URLs. The backend only provides the
@@ -1728,7 +1728,7 @@ export function useAudioPlayback(
 
       const now = Date.now();
       const lastReloadAt = autoDriveReloadAtRef.current.get(failedTrackId) || 0;
-      if (now - lastReloadAt < 15000) return;
+      if (lastReloadAt > 0) return;
       autoDriveReloadAtRef.current.set(failedTrackId, now);
 
       console.warn(`[Audio] Cover image failed for ${failedTrackId}; trying legacy cover fallback before backend metadata reload.`);

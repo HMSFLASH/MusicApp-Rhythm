@@ -216,7 +216,8 @@ export function useAudioMetadata(isAuthenticated: boolean, queueState: any, sett
 
                         const hasCover = !!parsed.imageUrl || !!track.imageUrl;
                         const coverStored = (lsData as any).coverStored;
-                        if (hasCover || (coverStored && idbCover)) {
+                        const isCoverChecked = (lsData as any).coverChecked || (lsData as any).coverMissing;
+                        if (hasCover || (coverStored && idbCover) || isCoverChecked) {
                             return; // SKIP EXTRACTION!
                         }
                     }
@@ -439,7 +440,7 @@ export function useAudioMetadata(isAuthenticated: boolean, queueState: any, sett
             const shouldMarkCoverChecked = extractedPicture && (track.sourceType === 'LOCAL' || extractedCoverStored);
             const updatedCachePayload = {
                 ...cachePayload,
-                ...(shouldMarkCoverChecked ? { coverChecked: true } : {}),
+                ...(shouldMarkCoverChecked ? { coverChecked: true } : (!extractedPicture ? { coverMissing: true } : {})),
             };
             metadataCacheRef.current.set(trackId, updatedCachePayload);
             if (track.sourceType !== 'LOCAL') {
@@ -597,9 +598,10 @@ export function useAudioMetadata(isAuthenticated: boolean, queueState: any, sett
 
         if (currentTrack) {
             const trackId = String(currentTrack.id);
-            const cached = metadataCacheRef.current.get(trackId);
+            const cached = metadataCacheRef.current.get(trackId) as any;
             const hasCover = !!cached?.imageUrl || !!currentTrack.imageUrl || imageCacheRef.current.has(trackId);
-            if (!cached || !hasCover) {
+            const isCoverChecked = cached?.coverChecked || cached?.coverMissing;
+            if (!cached || (!hasCover && !isCoverChecked)) {
                 void extractMetadata(currentTrack);
             }
         }
