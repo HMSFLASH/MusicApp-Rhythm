@@ -1,11 +1,12 @@
 import { useState, useRef, useEffect, useCallback } from 'react';
 import { useGlobalAudio } from '../context/AudioContext';
 import { useAuth } from '../context/AuthContext';
-import { Disc, Play, Pause, SkipBack, SkipForward, Shuffle, Repeat, Heart, Info, ListPlus, MoreHorizontal, Repeat1, User, Volume2, VolumeX, BarChart2, Gauge, Music, Check, X, ArrowRight, Square, PauseCircle, ListX, Loader2, Trash2, Cpu, Tags, RefreshCw } from 'lucide-react';
+import { Disc, Play, Pause, SkipBack, SkipForward, Shuffle, Repeat, Heart, Info, ListPlus, MoreHorizontal, Repeat1, User, Volume2, VolumeX, BarChart2, Gauge, Music, Check, X, ArrowRight, Square, PauseCircle, ListX, Loader2, Trash2, Cpu, Tags, RefreshCw, Activity } from 'lucide-react';
 import { HorizontalSlider } from '../components/HorizontalSlider';
 import { SpeedPitchPanel } from '../components/SpeedPitchPanel';
 import { useLibrary } from '../context/LibraryContext';
 import { LyricsView } from '../components/LyricsView';
+import { ScreenSpectrum } from '../components/ScreenSpectrum';
 import { useNavigate } from 'react-router-dom';
 import { useTranslation } from 'react-i18next';
 import { useConfirm } from '../context/ConfirmContext';
@@ -173,6 +174,7 @@ export function NowPlaying() {
   const [showMetadata, setShowMetadata] = useState(false);
   // Lyrics Modal state
   const [showLyrics, setShowLyrics] = useState(false);
+  const [showSpectrum, setShowSpectrum] = useState(false);
 
 
   const trackLyrics = currentTrack?.lyrics || (currentTrack ? playerState.getTrackMetadata(currentTrack.id)?.lyrics : undefined);
@@ -296,7 +298,6 @@ export function NowPlaying() {
 
   return (
     <div ref={pageScrollRef} className="h-full overflow-y-auto w-full no-scrollbar relative" onScroll={handleScroll}>
-
       <div className="flex flex-col lg:flex-row items-start justify-center max-w-6xl 2xl:max-w-[1400px] 3xl:max-w-[1600px] 4k:max-w-[2000px] mx-auto w-full gap-8 md:gap-12 py-4 md:py-8 pb-28 md:pb-32 relative z-10">
 
         {/* Left Side: Player */}
@@ -491,6 +492,16 @@ export function NowPlaying() {
                             <span>{t('nowPlaying.reloadLyrics')}</span>
                           </button>
                         )}
+                        <button
+                          onClick={() => {
+                            setShowMenu(false);
+                            setShowSpectrum(!showSpectrum);
+                          }}
+                          className="w-full flex items-center gap-3 px-4 py-3 text-sm text-white/80 hover:bg-white/5 transition-colors border-b border-white/5"
+                        >
+                          <Activity size={16} className={showSpectrum ? 'text-primary' : ''} />
+                          <span>Screen Spectrum (Classic)</span>
+                        </button>
                         {currentTrack.sourceType !== 'LOCAL' && (
                           <button
                             onClick={async () => {
@@ -709,11 +720,16 @@ export function NowPlaying() {
               </button>
             </div>
 
-            <div className="flex items-center gap-4 font-mono text-sm font-bold text-white/90 mb-8 select-none">
-              <span className="min-w-[40px] text-right">{formatTime(displayTime)}</span>
+            <div className="flex items-center gap-4 font-mono text-sm font-bold text-white/90 mb-8 select-none relative">
+              {showSpectrum && playerState.masterAnalyserRef?.current && (
+                <div className="absolute left-[56px] right-[56px] bottom-1/2 h-24 opacity-100 pointer-events-none z-0">
+                  <ScreenSpectrum analyser={playerState.masterAnalyserRef.current} />
+                </div>
+              )}
+              <span className="min-w-[40px] text-right z-10">{formatTime(displayTime)}</span>
               <div
                 ref={progressBarRef}
-                className="flex-1 relative flex items-center group h-6 cursor-pointer touch-none"
+                className="flex-1 relative flex items-center group h-6 cursor-pointer touch-none z-10"
                 onPointerDown={handleProgressPointerDown}
               >
                 <div className="absolute inset-x-0 h-1.5 bg-white/20 rounded-full overflow-hidden">
@@ -727,7 +743,7 @@ export function NowPlaying() {
                   style={{ left: `calc(${displayPercent}% - 8px)` }}
                 />
               </div>
-              <span className="min-w-[40px] text-left">{formatTime(duration)}</span>
+              <span className="min-w-[40px] text-left z-10">{formatTime(duration)}</span>
             </div>
 
             <div className="flex items-center justify-between px-2 mb-4">

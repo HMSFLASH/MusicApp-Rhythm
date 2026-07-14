@@ -761,8 +761,10 @@ export function useAudioContext(effectsState: any) {
 
     if (!masterAnalyserRef.current) {
       masterAnalyserRef.current = ctx.createAnalyser();
-      masterAnalyserRef.current.fftSize = 1024;
-      masterAnalyserRef.current.smoothingTimeConstant = 0.8;
+      masterAnalyserRef.current.fftSize = 4096;
+      masterAnalyserRef.current.smoothingTimeConstant = 0.4;
+      masterAnalyserRef.current.minDecibels = -182;
+      masterAnalyserRef.current.maxDecibels = -10;
     }
     currentNode.connect(masterAnalyserRef.current);
 
