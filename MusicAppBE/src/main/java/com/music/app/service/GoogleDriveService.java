@@ -38,7 +38,13 @@ public class GoogleDriveService {
                 .setClientSecret(clientSecret)
                 .setRefreshToken(refreshToken)
                 .build();
-        return new Drive.Builder(httpTransport, jsonFactory, new HttpCredentialsAdapter(credentials))
+        
+        com.google.api.client.http.HttpRequestInitializer requestInitializer = new HttpCredentialsAdapter(credentials);
+        return new Drive.Builder(httpTransport, jsonFactory, request -> {
+            requestInitializer.initialize(request);
+            request.setConnectTimeout(180000); // 3 minutes
+            request.setReadTimeout(180000); // 3 minutes
+        })
                 .setApplicationName("MusicApp")
                 .build();
     }

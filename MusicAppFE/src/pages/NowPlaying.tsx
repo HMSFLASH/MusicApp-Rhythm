@@ -173,7 +173,7 @@ export function NowPlaying() {
   const [showMetadata, setShowMetadata] = useState(false);
   // Lyrics Modal state
   const [showLyrics, setShowLyrics] = useState(false);
-  
+
 
   const trackLyrics = currentTrack?.lyrics || (currentTrack ? playerState.getTrackMetadata(currentTrack.id)?.lyrics : undefined);
   const hasLyrics = !!trackLyrics;
@@ -425,100 +425,100 @@ export function NowPlaying() {
                       />
                     ) : (
                       <>
-                    {/* Speed & Pitch Button */}
-                    <button
-                      onClick={() => setShowSpeedPitch(true)}
-                      className="w-full flex items-center justify-between px-4 py-3 text-sm text-white/80 hover:bg-white/5 transition-colors border-b border-white/5"
-                    >
-                      <div className="flex items-center gap-3">
-                        <Gauge size={16} className={playbackRate !== 1 || (speedPitchMode === 'advanced' && pitchRate !== 1) ? 'text-primary' : ''} />
-                        <span>{t('nowPlaying.speedAndPitch')}</span>
-                      </div>
-                      <span className="text-[10px] font-mono text-white/40">
-                        {speedPitchMode === 'advanced' && pitchRate !== 1
-                          ? `${playbackRate}x / ${pitchRate}x`
-                          : `${playbackRate}x`
-                        }
-                      </span>
-                    </button>
-                    {getAudioExtension(currentTrack.fileName) === 'flac' && (
-                      <button
-                        onClick={() => {
-                          playerState.toggleFlacWasmForTrack(currentTrack);
-                          setShowMenu(false);
-                        }}
-                        className="w-full flex items-center gap-3 px-4 py-3 text-sm text-white/80 hover:bg-white/5 transition-colors border-b border-white/5"
-                      >
-                        <Cpu size={16} className={playerState.isFlacWasmEnabled(currentTrack) ? 'text-primary' : ''} />
-                        <span>{playerState.isFlacWasmEnabled(currentTrack) ? 'Use Normal FLAC' : 'Use FLAC WASM'}</span>
-                      </button>
-                    )}
-                    {currentTrack && (
-                      <button
-                        onClick={() => {
-                          playerState.toggleLegacyMetadataForTrack(currentTrack);
-                          setShowMenu(false);
-                        }}
-                        className="w-full flex items-center gap-3 px-4 py-3 text-sm text-white/80 hover:bg-white/5 transition-colors border-b border-white/5"
-                      >
-                        <Tags size={16} className={playerState.isLegacyMetadataEnabled(currentTrack) ? 'text-primary' : ''} />
-                        <span>{playerState.isLegacyMetadataEnabled(currentTrack) ? 'Use New Metadata Parser' : 'Use Legacy Metadata Parser'}</span>
-                      </button>
-                    )}
-                    {currentTrack.sourceType !== 'LOCAL' && (
-                      <button
-                        onClick={async () => {
-                          setShowMenu(false);
-                          await playerState.reloadCurrentTrackFromDrive();
-                        }}
-                        className="w-full flex items-center gap-3 px-4 py-3 text-sm text-white/80 hover:bg-white/5 transition-colors border-b border-white/5"
-                      >
-                        <RefreshCw size={16} />
-                        <span>{t('nowPlaying.reloadFromDrive')}</span>
-                      </button>
-                    )}
-                    {currentTrack.sourceType !== 'LOCAL' && (
-                      <button
-                        onClick={async () => {
-                          setShowMenu(false);
-                          if (playerState.reloadMetadataFromBackend) {
-                            await playerState.reloadMetadataFromBackend(currentTrack);
-                          }
-                        }}
-                        className="w-full flex items-center gap-3 px-4 py-3 text-sm text-white/80 hover:bg-white/5 transition-colors border-b border-white/5"
-                      >
-                        <Music size={16} />
-                        <span>{t('nowPlaying.reloadLyrics')}</span>
-                      </button>
-                    )}
-                    {currentTrack.sourceType !== 'LOCAL' && (
-                      <button
-                        onClick={async () => {
-                          const isConfirmed = await confirm({
-                            title: 'Xóa bài hát',
-                            description: `Bạn có chắc chắn muốn xóa bài hát "${currentTrack.title || currentTrack.fileName}" khỏi thư viện?`,
-                            confirmText: 'Xóa',
-                            confirmColor: 'bg-red-500/20 text-red-400 hover:bg-red-500/30 border-red-500/30'
-                          });
-                          if (isConfirmed) {
-                            const isConfirmed2 = await confirm({
-                              title: 'Xác nhận xóa vĩnh viễn',
-                              description: `Hành động này sẽ xóa vĩnh viễn bài hát "${currentTrack.title || currentTrack.fileName}" từ Google Drive của bạn và không thể hoàn tác. Bạn vẫn muốn tiếp tục?`,
-                              confirmText: 'Xóa vĩnh viễn',
-                              confirmColor: 'bg-red-600 text-white hover:bg-red-700 border-red-600'
-                            });
-                            if (isConfirmed2) {
-                              setShowMenu(false);
-                              await deleteTrack(currentTrack);
+                        {/* Speed & Pitch Button */}
+                        <button
+                          onClick={() => setShowSpeedPitch(true)}
+                          className="w-full flex items-center justify-between px-4 py-3 text-sm text-white/80 hover:bg-white/5 transition-colors border-b border-white/5"
+                        >
+                          <div className="flex items-center gap-3">
+                            <Gauge size={16} className={playbackRate !== 1 || (speedPitchMode === 'advanced' && pitchRate !== 1) ? 'text-primary' : ''} />
+                            <span>{t('nowPlaying.speedAndPitch')}</span>
+                          </div>
+                          <span className="text-[10px] font-mono text-white/40">
+                            {speedPitchMode === 'advanced' && pitchRate !== 1
+                              ? `${playbackRate}x / ${pitchRate}x`
+                              : `${playbackRate}x`
                             }
-                          }
-                        }}
-                        className="w-full flex items-center gap-3 px-4 py-3 text-sm text-red-400 hover:bg-white/5 hover:text-red-300 transition-colors border-t border-white/5"
-                      >
-                        <Trash2 size={16} />
-                        <span>Delete from Library</span>
-                      </button>
-                    )}
+                          </span>
+                        </button>
+                        {getAudioExtension(currentTrack.fileName) === 'flac' && (
+                          <button
+                            onClick={() => {
+                              playerState.toggleFlacWasmForTrack(currentTrack);
+                              setShowMenu(false);
+                            }}
+                            className="w-full flex items-center gap-3 px-4 py-3 text-sm text-white/80 hover:bg-white/5 transition-colors border-b border-white/5"
+                          >
+                            <Cpu size={16} className={playerState.isFlacWasmEnabled(currentTrack) ? 'text-primary' : ''} />
+                            <span>{playerState.isFlacWasmEnabled(currentTrack) ? 'Use Normal FLAC' : 'Use FLAC WASM'}</span>
+                          </button>
+                        )}
+                        {currentTrack && (
+                          <button
+                            onClick={() => {
+                              playerState.toggleLegacyMetadataForTrack(currentTrack);
+                              setShowMenu(false);
+                            }}
+                            className="w-full flex items-center gap-3 px-4 py-3 text-sm text-white/80 hover:bg-white/5 transition-colors border-b border-white/5"
+                          >
+                            <Tags size={16} className={playerState.isLegacyMetadataEnabled(currentTrack) ? 'text-primary' : ''} />
+                            <span>{playerState.isLegacyMetadataEnabled(currentTrack) ? 'Use New Metadata Parser' : 'Use Legacy Metadata Parser'}</span>
+                          </button>
+                        )}
+                        {currentTrack.sourceType !== 'LOCAL' && (
+                          <button
+                            onClick={async () => {
+                              setShowMenu(false);
+                              await playerState.reloadCurrentTrackFromDrive();
+                            }}
+                            className="w-full flex items-center gap-3 px-4 py-3 text-sm text-white/80 hover:bg-white/5 transition-colors border-b border-white/5"
+                          >
+                            <RefreshCw size={16} />
+                            <span>{t('nowPlaying.reloadFromDrive')}</span>
+                          </button>
+                        )}
+                        {currentTrack.sourceType !== 'LOCAL' && (
+                          <button
+                            onClick={async () => {
+                              setShowMenu(false);
+                              if (playerState.reloadMetadataFromBackend) {
+                                await playerState.reloadMetadataFromBackend(currentTrack);
+                              }
+                            }}
+                            className="w-full flex items-center gap-3 px-4 py-3 text-sm text-white/80 hover:bg-white/5 transition-colors border-b border-white/5"
+                          >
+                            <Music size={16} />
+                            <span>{t('nowPlaying.reloadLyrics')}</span>
+                          </button>
+                        )}
+                        {currentTrack.sourceType !== 'LOCAL' && (
+                          <button
+                            onClick={async () => {
+                              const isConfirmed = await confirm({
+                                title: 'Xóa bài hát',
+                                description: `Bạn có chắc chắn muốn xóa bài hát "${currentTrack.title || currentTrack.fileName}" khỏi thư viện?`,
+                                confirmText: 'Xóa',
+                                confirmColor: 'bg-red-500/20 text-red-400 hover:bg-red-500/30 border-red-500/30'
+                              });
+                              if (isConfirmed) {
+                                const isConfirmed2 = await confirm({
+                                  title: 'Xác nhận xóa vĩnh viễn',
+                                  description: `Hành động này sẽ xóa vĩnh viễn bài hát "${currentTrack.title || currentTrack.fileName}" từ Google Drive của bạn và không thể hoàn tác. Bạn vẫn muốn tiếp tục?`,
+                                  confirmText: 'Xóa vĩnh viễn',
+                                  confirmColor: 'bg-red-600 text-white hover:bg-red-700 border-red-600'
+                                });
+                                if (isConfirmed2) {
+                                  setShowMenu(false);
+                                  await deleteTrack(currentTrack);
+                                }
+                              }
+                            }}
+                            className="w-full flex items-center gap-3 px-4 py-3 text-sm text-red-400 hover:bg-white/5 hover:text-red-300 transition-colors border-t border-white/5"
+                          >
+                            <Trash2 size={16} />
+                            <span>Delete from Library</span>
+                          </button>
+                        )}
                       </>
                     )}
                   </div>
