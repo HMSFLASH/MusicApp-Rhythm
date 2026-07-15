@@ -179,6 +179,74 @@ export function useAudioPlayback(
   const audioCoverFallbackTrackIdsRef = useRef<Set<string>>(new Set());
   const persistedBackendImageIdsRef = useRef<Set<string>>(new Set());
 
+  const pendingNetworkRetryTrackRef = useRef<Track | null>(null);
+  const networkRetryIntervalRef = useRef<number | null>(null);
+  const wasOfflineRef = useRef(!navigator.onLine);
+  const isLoadingTrackSnapshotRef = useRef(false);
+
+  useEffect(() => {
+    isLoadingTrackSnapshotRef.current = isLoadingTrack;
+  }, [isLoadingTrack]);
+
+  const startNetworkRetryTimer = useCallback(() => {
+    if (networkRetryIntervalRef.current) return;
+    networkRetryIntervalRef.current = window.setInterval(() => {
+      if (pendingNetworkRetryTrackRef.current) {
+         if (navigator.onLine) {
+             playTrackRef.current?.(pendingNetworkRetryTrackRef.current, queueSnapshotRef.current, true);
+         }
+      } else {
+         if (networkRetryIntervalRef.current) {
+            window.clearInterval(networkRetryIntervalRef.current);
+            networkRetryIntervalRef.current = null;
+         }
+      }
+    }, 5 * 60 * 1000); // 5 minutes
+  }, []);
+
+  const handleNetworkFailure = useCallback((track: Track) => {
+     pendingNetworkRetryTrackRef.current = track;
+     window.dispatchEvent(new CustomEvent('app-notification', { 
+       detail: { type: 'error', message: 'Mất kết nối mạng. Sẽ tự động thử lại sau 5 phút.' }
+     }));
+     startNetworkRetryTimer();
+  }, [startNetworkRetryTimer]);
+
+  useEffect(() => {
+    const handleOffline = () => {
+       wasOfflineRef.current = true;
+       if (isLoadingTrackSnapshotRef.current) {
+          window.dispatchEvent(new CustomEvent('app-notification', {
+             detail: { type: 'error', message: 'Đã mất kết nối mạng khi đang tải nhạc.' }
+          }));
+          if (currentTrackSnapshotRef.current) {
+             pendingNetworkRetryTrackRef.current = currentTrackSnapshotRef.current;
+             startNetworkRetryTimer();
+          }
+       }
+    };
+
+    const handleOnline = () => {
+       if (wasOfflineRef.current) {
+          wasOfflineRef.current = false;
+          window.dispatchEvent(new CustomEvent('app-notification', {
+             detail: { type: 'success', message: 'Đã kết nối lại mạng.' }
+          }));
+       }
+       
+       if (pendingNetworkRetryTrackRef.current) {
+          playTrackRef.current?.(pendingNetworkRetryTrackRef.current, queueSnapshotRef.current, true);
+       }
+    };
+
+    window.addEventListener('offline', handleOffline);
+    window.addEventListener('online', handleOnline);
+    return () => {
+      window.removeEventListener('offline', handleOffline);
+      window.removeEventListener('online', handleOnline);
+    };
+  }, [startNetworkRetryTimer]);
+
   const clearTrackLoading = useCallback(() => {
     setIsLoadingTrack(false);
     setLoadingTrackId(null);
@@ -1549,6 +1617,11 @@ export function useAudioPlayback(
           if (autoPlay) {
             bufferPausedTimeRef.current = 0;
             clearTrackLoading();
+            pendingNetworkRetryTrackRef.current = null;
+            if (networkRetryIntervalRef.current) {
+               window.clearInterval(networkRetryIntervalRef.current);
+               networkRetryIntervalRef.current = null;
+            }
             try {
               renderedAudioRef.current!.currentTime = 0;
             } catch {
@@ -1605,6 +1678,9 @@ export function useAudioPlayback(
           } catch (retryError) {
             if (decodeSessionRef.current !== playSessionId) return;
             console.error("[Audio] Retry also failed, giving up", retryError);
+            if (!navigator.onLine || String(retryError).toLowerCase().includes('fetch') || String(retryError).toLowerCase().includes('network')) {
+               handleNetworkFailure(startingTrack);
+            }
             audioBufferRef.current = null;
             usingBufferPlaybackRef.current = false;
             pauseMediaSessionAnchor();
@@ -1658,6 +1734,9 @@ export function useAudioPlayback(
         }
       } catch (e) {
         console.error("[Audio] Failed to prepare track for playback", e);
+        if (!navigator.onLine || String(e).toLowerCase().includes('fetch') || String(e).toLowerCase().includes('network')) {
+           handleNetworkFailure(startingTrack);
+        }
         setIsPlaying(false);
         clearTrackLoading();
         return;
@@ -1682,6 +1761,11 @@ export function useAudioPlayback(
       console.log(`[Audio] Configuring streaming audio element source...`);
       configureAudioElementSource(audioUrl);
       if (autoPlay) {
+        pendingNetworkRetryTrackRef.current = null;
+        if (networkRetryIntervalRef.current) {
+           window.clearInterval(networkRetryIntervalRef.current);
+           networkRetryIntervalRef.current = null;
+        }
         try {
           audioRef.current!.currentTime = 0;
         } catch {

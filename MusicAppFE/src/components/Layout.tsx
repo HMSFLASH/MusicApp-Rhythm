@@ -65,6 +65,16 @@ export function Layout() {
     }
   }, [notification]);
 
+  useEffect(() => {
+    const handleAppNotification = (e: CustomEvent) => {
+      setNotification(e.detail);
+    };
+    window.addEventListener('app-notification', handleAppNotification as EventListener);
+    return () => {
+      window.removeEventListener('app-notification', handleAppNotification as EventListener);
+    };
+  }, []);
+
   const handleBackup = async () => {
     setShowBackupConfirm(false);
     if (!isAuthenticated) return;
