@@ -1,0 +1,43 @@
+services:
+  mysql:
+    image: mysql:8.4
+    container_name: mysql-8.4
+    environment:
+      MYSQL_ROOT_PASSWORD: admin
+    ports:
+      - "3306:3306"
+    volumes:
+      - C:\mysql-8.4:/var/lib/mysql
+    healthcheck:
+      test: ["CMD", "mysqladmin", "ping", "-h", "localhost", "-u", "root", "-padmin"]
+      interval: 10s
+      timeout: 5s
+      retries: 10
+
+  backend:
+    build:
+      context: ./MusicAppBE
+      dockerfile: Dockerfile
+    image: musicapp_be:latest
+    container_name: musicapp_be_container
+    env_file: local.env
+    ports:
+      - "8000:8000"
+    depends_on:
+      mysql:
+        condition: service_healthy
+
+  frontend:
+    build:
+      context: ./MusicAppFE
+      dockerfile: Dockerfile
+    image: musicapp_fe:latest
+    container_name: musicapp_fe_container
+    env_file: local.env
+    ports:
+      - "5000:80"
+    depends_on:
+      - backend
+
+volumes:
+  mysql-data:

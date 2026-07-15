@@ -29,5 +29,5 @@ ENV PATH="/opt/jre/bin:${PATH}"
 COPY --from=build /app/target/*.jar app.jar
 
 # Command to run the application
-EXPOSE 8080
+EXPOSE 8000
 ENTRYPOINT ["java","-jar","app.jar"]

@@ -1,4 +1,4 @@
-import React, { useState } from 'react';
+import { useState } from 'react';
 import { HorizontalSlider } from './HorizontalSlider';
 import { Gauge, ChevronLeft, AlertTriangle } from 'lucide-react';
 

@@ -33,6 +33,15 @@ function ProtectedRoute({ children }: { children: React.ReactNode }) {
   return <>{children}</>;
 }
 
+function GuestRoute({ children }: { children: React.ReactNode }) {
+  const { isAuthenticated, isAuthResolved } = useAuth();
+  if (!isAuthResolved) return null;
+  if (isAuthenticated) {
+    return <Navigate to="/" replace />;
+  }
+  return <>{children}</>;
+}
+
 function App() {
   return (
     <BrowserRouter>
@@ -41,10 +50,10 @@ function App() {
 
         <Route path="/" element={<Layout />}>
           <Route index element={<NowPlaying />} />
-          <Route path="login" element={<LoginPage />} />
-          <Route path="register" element={<RegisterPage />} />
-          <Route path="forgot-password" element={<ForgotPasswordPage />} />
-          <Route path="reset-password" element={<ResetPasswordPage />} />
+          <Route path="login" element={<GuestRoute><LoginPage /></GuestRoute>} />
+          <Route path="register" element={<GuestRoute><RegisterPage /></GuestRoute>} />
+          <Route path="forgot-password" element={<GuestRoute><ForgotPasswordPage /></GuestRoute>} />
+          <Route path="reset-password" element={<GuestRoute><ResetPasswordPage /></GuestRoute>} />
           <Route path="playlist" element={
             <ProtectedRoute><PlaylistPage /></ProtectedRoute>
           } />

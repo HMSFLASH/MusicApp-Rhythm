@@ -10,6 +10,7 @@ dotenv.config()
 export default defineConfig({
   server: {
     host: '::', // Listen on all IPv4 and IPv6 addresses (allows localhost and LAN IP access)
+    port: 5000,
   },
   plugins: [
     react(),

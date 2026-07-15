@@ -39,7 +39,7 @@ import { loadTrackAudioUrl } from './audioTrackLoader';
 import { getAudioExtension } from './audioMime';
 import { decodeFlacToAudioBuffer } from './flacDecoder';
 import { saveCover } from '../utils/idb';
-import { BACKEND_URL } from '../config/env';
+import { BACKEND_URL } from '../api/axiosClient';
 import { hasCachedAudio } from '../utils/mediaCache';
 
 const getQueueMembershipKey = (tracks: Track[]) => (
@@ -1436,6 +1436,12 @@ export function useAudioPlayback(
     isDecodingRef.current = false;
     stopBufferPlayback();
     if (audioRef.current) audioRef.current.pause();
+    
+    // Clear old state immediately so if the new track fails to load,
+    // we don't accidentally play the old track on subsequent play button clicks.
+    audioBufferRef.current = null;
+    releaseAudioElementSource();
+    releaseRenderedAudioSource();
 
     const useRenderedBufferPlayback = precalculateOnIdle || shouldUseFlacWasmPlayback(startingTrack);
     console.log(`[Audio] useRenderedBufferPlayback: ${useRenderedBufferPlayback}`);
@@ -1443,8 +1449,6 @@ export function useAudioPlayback(
     if (useRenderedBufferPlayback) {
       setTrackLoudnessGain?.(1);
       usingBufferPlaybackRef.current = true;
-      releaseAudioElementSource();
-      releaseRenderedAudioSource();
       updateMediaSessionMetadata(startingTrack);
       setIsPlaying(false);
       pauseMediaSessionAnchor();

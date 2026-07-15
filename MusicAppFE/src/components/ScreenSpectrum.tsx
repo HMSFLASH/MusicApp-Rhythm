@@ -66,7 +66,7 @@ export function ScreenSpectrum({ analyser }: ScreenSpectrumProps) {
           if (dataArray[j] > maxVal) maxVal = dataArray[j];
         }
 
-        const barHeight = (maxVal / 255) * height;
+        const barHeight = Math.max(2, (maxVal / 255) * height);
 
         // Classic spectrum color
         const r = barHeight + (25 * (i / numBands));

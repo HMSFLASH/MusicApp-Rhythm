@@ -21,7 +21,7 @@ firebase-adminsdk.json
 coverage/
 
 # Environments
-.env
+
 .env.*
 !.env.example
 

@@ -3,7 +3,7 @@ import { NavLink, useNavigate } from 'react-router-dom';
 import { useState } from 'react';
 import { axiosClient } from '../api/axiosClient';
 import { useAuth } from '../context/AuthContext';
-import { BACKEND_URL } from '../config/env';
+import { BACKEND_URL } from '../api/axiosClient';
 
 export function RegisterPage() {
   const [email, setEmail] = useState('');

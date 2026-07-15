@@ -3,7 +3,7 @@ import type { Track } from './audioTypes';
 import { getCover, removeCover, saveCover } from '../utils/idb';
 import { db } from '../lib/db';
 import { axiosClient } from '../api/axiosClient';
-import { BACKEND_URL } from '../config/env';
+import { BACKEND_URL } from '../api/axiosClient';
 import { parseLocalAudioMetadata } from '../utils/localAudioFiles';
 import { getAudioMimeType, shouldUseLegacyMetadataParser } from './audioMime';
 import { getCachedMetadataForTrack, getMetadataCacheKey, removeCachedMetadataForTrack, sanitizeMetadataForCache } from '../utils/metadataCache';

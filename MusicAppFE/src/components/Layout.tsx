@@ -31,7 +31,7 @@ import { db } from '../lib/db';
 import { clearCachedAudio } from '../utils/mediaCache';
 import { clearCovers } from '../utils/idb';
 import { useGlobalAudio } from '../context/AudioContext';
-import { BACKEND_URL } from '../config/env';
+import { BACKEND_URL } from '../api/axiosClient';
 import { LOCAL_STORAGE_KEY, PLAYBACK_STORAGE_KEY } from '../hooks/audioStorage';
 
 // parseJwt removed as user data is now fetched from /me

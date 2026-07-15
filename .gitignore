@@ -57,6 +57,7 @@ dist-ssr
 .env
 .env.*
 !.env.example
+local.env
 
 # Local database files must never be versioned. MySQL is the runtime database.
 *.db
