@@ -377,7 +377,7 @@ export function useAudioMetadata(isAuthenticated: boolean, queueState: any, sett
                 for (const tagType in metadata.native) {
                     const tags = metadata.native[tagType];
                     if (Array.isArray(tags)) {
-                        const lyricTag = tags.find((tag: { id?: string; value?: unknown }) => tag.id === 'USLT' || tag.id === 'SYLT' || tag.id === 'LYRICS' || tag.id === 'WM/Lyrics');
+                        const lyricTag = tags.find((tag: { id?: string; value?: unknown }) => tag.id?.toLowerCase().includes('lyric') || tag.id === 'USLT' || tag.id === 'SYLT');
                         if (lyricTag && lyricTag.value) {
                             extractedLyrics = typeof lyricTag.value === 'string'
                                 ? lyricTag.value

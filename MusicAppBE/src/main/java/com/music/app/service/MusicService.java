@@ -260,30 +260,6 @@ public class MusicService {
                                 album = tags.getAlbum();
                             if (genre == null || genre.isBlank())
                                 genre = tags.getGenre();
-
-                            java.util.List<String> lyricsList = tags.getComments("LYRICS");
-                            if (lyricsList == null || lyricsList.isEmpty())
-                                lyricsList = tags.getComments("UNSYNCEDLYRICS");
-                            if (lyricsList == null || lyricsList.isEmpty())
-                                lyricsList = tags.getComments("UNSYNCED LYRICS");
-                            if (lyricsList == null || lyricsList.isEmpty()) {
-                                java.util.Map<String, java.util.List<String>> allComments = tags.getAllComments();
-                                for (java.util.Map.Entry<String, java.util.List<String>> entry : allComments
-                                        .entrySet()) {
-                                    String id = entry.getKey().toUpperCase();
-                                    if (id.contains("LYRICS") || id.equals("USLT") || id.equals("SYLT")) {
-                                        lyricsList = entry.getValue();
-                                        break;
-                                    }
-                                }
-                            }
-                            if (lyricsList != null && !lyricsList.isEmpty()) {
-                                lyrics = lyricsList.get(0);
-                                log.info("Extracted lyrics from Opus tags via vorbis-java-core, length: {}",
-                                        lyrics.length());
-                            } else {
-                                log.info("No lyrics found in Opus tags");
-                            }
                         }
                     } else {
                         AudioFile audioFile = AudioFileIO.read(tempFile);
@@ -299,68 +275,6 @@ public class MusicService {
                                 genre = tag.getFirst(FieldKey.GENRE);
                             if (imageUrl == null || imageUrl.isBlank())
                                 imageUrl = extractArtworkDataUrl(tag);
-
-                            String tagLyrics = tag.getFirst(FieldKey.LYRICS);
-                            if (tagLyrics == null || tagLyrics.isBlank()) {
-                                try {
-                                    tagLyrics = tag.getFirst("UNSYNCEDLYRICS");
-                                } catch (Exception ex) {
-                                }
-                            }
-                            if (tagLyrics == null || tagLyrics.isBlank()) {
-                                try {
-                                    tagLyrics = tag.getFirst("UNSYNCED LYRICS");
-                                } catch (Exception ex) {
-                                }
-                            }
-                            if (tagLyrics == null || tagLyrics.isBlank()) {
-                                try {
-                                    tagLyrics = tag.getFirst("USLT");
-                                } catch (Exception ex) {
-                                }
-                            }
-                            if (tagLyrics == null || tagLyrics.isBlank()) {
-                                try {
-                                    tagLyrics = tag.getFirst("SYLT");
-                                } catch (Exception ex) {
-                                }
-                            }
-
-                            if (tagLyrics == null || tagLyrics.isBlank()) {
-                                java.util.Iterator<org.jaudiotagger.tag.TagField> fields = tag.getFields();
-                                while (fields.hasNext()) {
-                                    org.jaudiotagger.tag.TagField field = fields.next();
-                                    String id = field.getId();
-                                    String content = field.toString();
-
-                                    log.info("=== METADATA TAG === ID: [{}], CONTENT length: {}, startsWith: [{}]",
-                                            id,
-                                            content == null ? 0 : content.length(),
-                                            content != null && content.length() > 50
-                                                    ? content.substring(0, 50).replace("\n", " ") + "..."
-                                                    : (content != null ? content.replace("\n", " ") : "null"));
-
-                                    String upperId = id.toUpperCase();
-                                    if (content != null && content.contains("\n") && content.length() > 20) {
-                                        tagLyrics = content;
-                                        // Clean up Jaudiotagger's toString format like: ID="Lyrics..."
-                                        if (tagLyrics.contains("=\"")) {
-                                            tagLyrics = tagLyrics.substring(tagLyrics.indexOf("=\"") + 2);
-                                            if (tagLyrics.endsWith("\""))
-                                                tagLyrics = tagLyrics.substring(0, tagLyrics.length() - 1);
-                                        }
-                                        // Don't break, keep logging the rest!
-                                    }
-                                }
-                            }
-
-                            if (tagLyrics != null && !tagLyrics.isBlank()) {
-                                lyrics = tagLyrics;
-                                log.info("Extracted lyrics from file tags via jaudiotagger, length: {}",
-                                        lyrics.length());
-                            } else {
-                                log.info("No lyrics found in file tags via jaudiotagger");
-                            }
                         }
                     }
                 } catch (Exception e) {
@@ -613,25 +527,6 @@ public class MusicService {
                         artist = tags.getArtist();
                         album = tags.getAlbum();
                         genre = tags.getGenre();
-
-                        java.util.List<String> lyricsList = tags.getComments("LYRICS");
-                        if (lyricsList == null || lyricsList.isEmpty())
-                            lyricsList = tags.getComments("UNSYNCEDLYRICS");
-                        if (lyricsList == null || lyricsList.isEmpty())
-                            lyricsList = tags.getComments("UNSYNCED LYRICS");
-                        if (lyricsList == null || lyricsList.isEmpty()) {
-                            java.util.Map<String, java.util.List<String>> allComments = tags.getAllComments();
-                            for (java.util.Map.Entry<String, java.util.List<String>> entry : allComments.entrySet()) {
-                                String keyId = entry.getKey().toUpperCase();
-                                if (keyId.contains("LYRICS") || keyId.equals("USLT") || keyId.equals("SYLT")) {
-                                    lyricsList = entry.getValue();
-                                    break;
-                                }
-                            }
-                        }
-                        if (lyricsList != null && !lyricsList.isEmpty()) {
-                            lyrics = lyricsList.get(0);
-                        }
                     }
                 } else {
                     AudioFile audioFile = AudioFileIO.read(tempFile);
@@ -642,42 +537,6 @@ public class MusicService {
                         album = tag.getFirst(FieldKey.ALBUM);
                         genre = tag.getFirst(FieldKey.GENRE);
                         imageUrl = extractArtworkDataUrl(tag);
-
-                        String tagLyrics = tag.getFirst(FieldKey.LYRICS);
-                        if (tagLyrics == null || tagLyrics.isBlank()) {
-                            try { tagLyrics = tag.getFirst("UNSYNCEDLYRICS"); } catch (Exception ex) {}
-                        }
-                        if (tagLyrics == null || tagLyrics.isBlank()) {
-                            try { tagLyrics = tag.getFirst("UNSYNCED LYRICS"); } catch (Exception ex) {}
-                        }
-                        if (tagLyrics == null || tagLyrics.isBlank()) {
-                            try { tagLyrics = tag.getFirst("USLT"); } catch (Exception ex) {}
-                        }
-                        if (tagLyrics == null || tagLyrics.isBlank()) {
-                            try { tagLyrics = tag.getFirst("SYLT"); } catch (Exception ex) {}
-                        }
-
-                        if (tagLyrics == null || tagLyrics.isBlank()) {
-                            java.util.Iterator<org.jaudiotagger.tag.TagField> fields = tag.getFields();
-                            while (fields.hasNext()) {
-                                org.jaudiotagger.tag.TagField field = fields.next();
-                                String tagId = field.getId();
-                                String content = field.toString();
-
-                                if (content != null && content.contains("\n") && content.length() > 20) {
-                                    tagLyrics = content;
-                                    if (tagLyrics.contains("=\"")) {
-                                        tagLyrics = tagLyrics.substring(tagLyrics.indexOf("=\"") + 2);
-                                        if (tagLyrics.endsWith("\""))
-                                            tagLyrics = tagLyrics.substring(0, tagLyrics.length() - 1);
-                                    }
-                                }
-                            }
-                        }
-
-                        if (tagLyrics != null && !tagLyrics.isBlank()) {
-                            lyrics = tagLyrics;
-                        }
                     }
                 }
 

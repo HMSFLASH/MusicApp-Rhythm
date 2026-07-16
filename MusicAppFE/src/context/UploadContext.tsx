@@ -268,8 +268,7 @@ export function UploadProvider({ children }: { children: ReactNode }) {
         for (const tagType in metadata.native) {
           const tags = metadata.native[tagType];
           if (Array.isArray(tags)) {
-            // eslint-disable-next-line @typescript-eslint/no-explicit-any
-            const lyricTag = tags.find((t: any) => t.id === 'USLT' || t.id === 'SYLT' || t.id === 'LYRICS' || t.id === 'WM/Lyrics');
+            const lyricTag = tags.find((t: any) => t.id?.toLowerCase().includes('lyric') || t.id === 'USLT' || t.id === 'SYLT');
             if (lyricTag && lyricTag.value) {
               const lyricValue = lyricTag.value as string | { text?: string };
               extractedLyrics = typeof lyricValue === 'string' ? lyricValue : (lyricValue.text || JSON.stringify(lyricValue));
@@ -403,7 +402,7 @@ export function UploadProvider({ children }: { children: ReactNode }) {
       mode: 'direct' as const,
       status: 'skipped' as const
     }));
-    
+
     uploadQueueRef.current = [...uploadQueueRef.current, ...pendingTasks, ...skippedTasks];
     setUploadTasks([...uploadQueueRef.current]);
     setIsQueueOpen(true);
