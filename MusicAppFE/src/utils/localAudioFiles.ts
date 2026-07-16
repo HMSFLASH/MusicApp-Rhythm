@@ -119,6 +119,27 @@ export async function readLocalTrackMetadata(
   if (metadata.common.genre?.length) update.genre = metadata.common.genre[0];
   if (metadata.format.duration) update.durationSeconds = metadata.format.duration;
 
+  // Lấy lyrics (ưu tiên common.lyrics, sau đó quét native tags như Vorbis comments của FLAC)
+  if (metadata.common.lyrics && metadata.common.lyrics.length > 0) {
+    const firstLyric = metadata.common.lyrics[0];
+    if (typeof firstLyric === 'string') {
+      update.lyrics = firstLyric;
+    } else if (firstLyric?.text) {
+      update.lyrics = firstLyric.text;
+    }
+  }
+
+  if (!update.lyrics && metadata.native) {
+    for (const format of Object.keys(metadata.native)) {
+      const nativeTags = metadata.native[format];
+      const lyricTag = nativeTags.find(t => t.id?.toLowerCase().includes('lyric'));
+      if (lyricTag && typeof lyricTag.value === 'string') {
+        update.lyrics = lyricTag.value;
+        break;
+      }
+    }
+  }
+
   if (metadata.common.picture?.length) {
     const pic = metadata.common.picture.reduce((prev, current) => (prev.data.length > current.data.length) ? prev : current);
     console.log('[Metadata] Found picture:', pic.format, 'Size:', pic.data.length, 'bytes');
