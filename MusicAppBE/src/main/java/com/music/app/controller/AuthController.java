@@ -95,7 +95,7 @@ public class AuthController {
     @PostMapping("/refresh")
     public ApiResponse<AuthenticationResponse> refresh(@CookieValue(name = "music_app_refresh_token", required = false) String refreshTokenCookie, HttpServletResponse response) {
         if (refreshTokenCookie == null || refreshTokenCookie.isEmpty()) {
-            throw new RuntimeException("Refresh token is missing");
+            throw new com.music.app.exception.AppException(com.music.app.exception.ErrorCode.UNAUTHENTICATED, "Refresh token is missing");
         }
         AuthenticationResponse authResponse = authService.refreshToken(new RefreshRequest(refreshTokenCookie));
         setTokenCookie(response, authResponse.getAccessToken());

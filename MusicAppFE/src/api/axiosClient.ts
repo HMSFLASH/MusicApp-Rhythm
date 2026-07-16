@@ -61,6 +61,9 @@ axiosClient.interceptors.response.use(
     ]);
 
     if (originalRequest.url === '/api/auth/refresh') {
+      if (window.location.pathname !== '/login') {
+        window.location.href = '/login';
+      }
       return Promise.reject(error);
     }
 
