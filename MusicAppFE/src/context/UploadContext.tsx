@@ -5,7 +5,7 @@ import { axiosClient } from '../api/axiosClient';
 export type UploadTask = {
   id: string;
   file: File;
-  mode: 'server' | 'direct';
+  mode: 'direct';
   status: 'pending' | 'uploading' | 'success' | 'error' | 'skipped';
 };
 
@@ -13,7 +13,6 @@ interface UploadContextType {
   uploadTasks: UploadTask[];
   isQueueOpen: boolean;
   setIsQueueOpen: (v: boolean) => void;
-  queueFiles: (pendingFiles: File[], skippedFiles: File[]) => void;
   queueDirectFiles: (pendingFiles: File[], skippedFiles: File[]) => void;
   retryTask: (id: string) => void;
   clearCompletedTasks: () => void;
@@ -175,7 +174,6 @@ async function uploadFileDirectlyToDrive(file: File, session: DriveUploadSession
 export function UploadProvider({ children }: { children: ReactNode }) {
   const [uploadTasks, setUploadTasks] = useState<UploadTask[]>([]);
   const uploadQueueRef = useRef<UploadTask[]>([]);
-  const isServerProcessingRef = useRef(false);
   const directActiveCountRef = useRef(0);
   const autoClearTimerRef = useRef<ReturnType<typeof setTimeout> | null>(null);
   const [isQueueOpen, setIsQueueOpen] = useState(false);
@@ -227,66 +225,6 @@ export function UploadProvider({ children }: { children: ReactNode }) {
       genre: extractedMetadata.genre,
       imageUrl: extractedMetadata.imageUrl,
       lyrics: extractedMetadata.lyrics
-    });
-  };
-
-  const uploadServerTask = async (file: File) => {
-    const formData = new FormData();
-    formData.append('file', file);
-
-    // Parse metadata with a timeout to prevent hanging.
-    try {
-      const musicMetadata = await import('music-metadata');
-      const parseBufferFn = musicMetadata.parseBuffer;
-      if (!parseBufferFn) throw new Error('parseBuffer not found');
-
-      const arrayBuffer = await file.arrayBuffer();
-      const buffer = new Uint8Array(arrayBuffer);
-      const metadata = await Promise.race([
-        parseBufferFn(buffer, getAudioMimeType(file), { duration: false }),
-        new Promise<never>((_, reject) => setTimeout(() => reject(new Error('Metadata parse timeout (15s)')), 15000))
-      ]);
-
-      if (metadata.common.title) formData.append('title', metadata.common.title);
-      if (metadata.common.artist) formData.append('artist', metadata.common.artist);
-      if (metadata.common.album) formData.append('album', metadata.common.album);
-      if (metadata.common.genre && metadata.common.genre.length > 0) formData.append('genre', metadata.common.genre[0]);
-      if (metadata.common.picture && metadata.common.picture.length > 0) {
-        const pic = metadata.common.picture[0];
-        if (pic.data.byteLength <= MAX_BACKEND_COVER_BYTES) {
-          const format = pic.format?.startsWith('image/') ? pic.format : `image/${pic.format || 'jpeg'}`;
-          formData.append('imageUrl', `data:${format};base64,${bytesToBase64(new Uint8Array(pic.data))}`);
-        }
-      }
-
-      let extractedLyrics = '';
-      if (metadata.common.lyrics && metadata.common.lyrics.length > 0) {
-        // eslint-disable-next-line @typescript-eslint/no-explicit-any
-        extractedLyrics = metadata.common.lyrics.map((l: any) => typeof l === 'string' ? l : (l.text || JSON.stringify(l))).join('\n\n');
-      }
-      if (!extractedLyrics && metadata.native) {
-        for (const tagType in metadata.native) {
-          const tags = metadata.native[tagType];
-          if (Array.isArray(tags)) {
-            const lyricTag = tags.find((t: any) => t.id?.toLowerCase().includes('lyric') || t.id === 'USLT' || t.id === 'SYLT');
-            if (lyricTag && lyricTag.value) {
-              const lyricValue = lyricTag.value as string | { text?: string };
-              extractedLyrics = typeof lyricValue === 'string' ? lyricValue : (lyricValue.text || JSON.stringify(lyricValue));
-              break;
-            }
-          }
-        }
-      }
-      if (extractedLyrics) {
-        formData.append('lyrics', extractedLyrics);
-      }
-    } catch (err) {
-      console.warn(`[Upload] Metadata parse skipped for ${file.name}:`, err);
-    }
-
-    await axiosClient.post('/api/music/upload', formData, {
-      headers: { 'Content-Type': 'multipart/form-data' },
-      timeout: 5 * 60 * 1000, // 5 minutes timeout for large files
     });
   };
 
@@ -362,30 +300,7 @@ export function UploadProvider({ children }: { children: ReactNode }) {
   };
 
   const processUploadQueues = () => {
-    void processServerQueue();
     processDirectQueue();
-  };
-
-  const queueFiles = (pendingFiles: File[], skippedFiles: File[]) => {
-    clearAutoClearTimer();
-    const pendingTasks = pendingFiles.map(file => ({
-      id: Math.random().toString(36).substring(2, 9),
-      file,
-      mode: 'server' as const,
-      status: 'pending' as const
-    }));
-    const skippedTasks = skippedFiles.map(file => ({
-      id: Math.random().toString(36).substring(2, 9),
-      file,
-      mode: 'server' as const,
-      status: 'skipped' as const
-    }));
-
-    uploadQueueRef.current = [...uploadQueueRef.current, ...pendingTasks, ...skippedTasks];
-    setUploadTasks([...uploadQueueRef.current]);
-    setIsQueueOpen(true);
-    scheduleAutoClearFinishedTasks();
-    processUploadQueues();
   };
 
   const queueDirectFiles = (pendingFiles: File[], skippedFiles: File[]) => {
@@ -428,7 +343,7 @@ export function UploadProvider({ children }: { children: ReactNode }) {
   };
 
   return (
-    <UploadContext.Provider value={{ uploadTasks, isQueueOpen, setIsQueueOpen, queueFiles, queueDirectFiles, retryTask, clearCompletedTasks }}>
+    <UploadContext.Provider value={{ uploadTasks, isQueueOpen, setIsQueueOpen, queueDirectFiles, retryTask, clearCompletedTasks }}>
       {children}
     </UploadContext.Provider>
   );

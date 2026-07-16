@@ -12,7 +12,7 @@ import type { Track } from '../hooks/useAudioPlayer';
 export function LibraryPage() {
   const navigate = useNavigate();
   const { playerState } = useGlobalAudio();
-  const { queueFiles, queueDirectFiles, uploadTasks } = useUploadQueue();
+  const { queueDirectFiles, uploadTasks } = useUploadQueue();
   const { tracks, favorites, toggleFavorite, syncLibrary, isLoading } = useLibrary();
   const [trackToPlaylist, setTrackToPlaylist] = useState<Track | null>(null);
 
@@ -41,17 +41,8 @@ export function LibraryPage() {
     const files = Array.from(e.target.files);
     const { pendingFiles, skippedFiles } = getUploadSelection(files);
 
-    queueFiles(pendingFiles, skippedFiles);
-    e.target.value = ''; // clear input
-  };
-
-  const handleDirectUpload = (e: React.ChangeEvent<HTMLInputElement>) => {
-    if (!e.target.files || e.target.files.length === 0) return;
-    const files = Array.from(e.target.files);
-    const { pendingFiles, skippedFiles } = getUploadSelection(files);
-
     queueDirectFiles(pendingFiles, skippedFiles);
-    e.target.value = '';
+    e.target.value = ''; // clear input
   };
 
   useEffect(() => {
@@ -85,14 +76,6 @@ export function LibraryPage() {
             multiple
             onChange={handleUpload}
           />
-          <input
-            type="file"
-            accept="audio/*"
-            id="drive-direct-upload"
-            className="hidden"
-            multiple
-            onChange={handleDirectUpload}
-          />
           <label
             htmlFor="drive-upload"
             className="flex min-w-0 flex-1 sm:flex-none items-center justify-center gap-2 px-4 py-2 rounded-xl border border-white/10 hover:border-white/20 bg-white/5 hover:bg-white/10 cursor-pointer transition-colors"
@@ -110,12 +93,7 @@ export function LibraryPage() {
                 icon: <RefreshCw size={14} className={isLoading ? 'animate-spin text-primary' : ''} />,
                 disabled: isLoading,
                 onSelect: () => syncLibrary(),
-              },
-              {
-                label: 'Direct to Drive',
-                icon: <Cloud size={14} className="text-emerald-300" />,
-                onSelect: () => document.getElementById('drive-direct-upload')?.click(),
-              },
+              }
             ]}
           />
 

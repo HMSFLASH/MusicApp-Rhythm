@@ -67,22 +67,6 @@ public class MusicController {
                 .build();
     }
 
-    @PostMapping(value = "/upload", consumes = MediaType.MULTIPART_FORM_DATA_VALUE)
-    public ApiResponse<MusicItemDto> uploadToDrive(
-            @RequestParam("file") MultipartFile file,
-            @RequestParam(value = "title", required = false) String title,
-            @RequestParam(value = "artist", required = false) String artist,
-            @RequestParam(value = "album", required = false) String album,
-            @RequestParam(value = "genre", required = false) String genre,
-            @RequestParam(value = "imageUrl", required = false) String imageUrl,
-            @RequestParam(value = "lyrics", required = false) String lyrics,
-            Principal principal) {
-
-        String userId = SecurityUtils.extractUserId(principal);
-        return ApiResponse.<MusicItemDto>builder()
-                .result(musicService.uploadToDrive(file, title, artist, album, genre, imageUrl, lyrics, userId))
-                .build();
-    }
 
     @GetMapping("/drive-token")
     public ApiResponse<Map<String, String>> getDriveToken(Principal principal) {

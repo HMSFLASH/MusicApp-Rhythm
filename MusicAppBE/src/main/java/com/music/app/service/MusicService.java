@@ -34,7 +34,6 @@ public class MusicService {
     private final MusicLibraryRepository musicLibraryRepository;
     private final GoogleDriveService googleDriveService;
     private final UserRepository userRepository;
-    private final UploadQueueService uploadQueueService;
 
     @PersistenceContext
     private EntityManager entityManager;
@@ -208,108 +207,6 @@ public class MusicService {
         musicLibraryRepository.delete(lib);
     }
 
-    public MusicItemDto uploadToDrive(MultipartFile file, String title, String artist, String album, String genre,
-            String imageUrl, String lyrics, String userId) {
-        return uploadQueueService.run(() -> uploadToDriveNow(file, title, artist, album, genre, imageUrl, lyrics, userId));
-    }
-
-    private MusicItemDto uploadToDriveNow(MultipartFile file, String title, String artist, String album, String genre,
-            String imageUrl, String lyrics, String userId) {
-        try {
-            if (file.isEmpty() || file.getOriginalFilename() == null
-                    || !isSupportedAudioFile(file.getOriginalFilename())) {
-                throw new AppException(ErrorCode.NOT_FOUND, "A supported non-empty audio file is required");
-            }
-            User user = userRepository.findById(userId)
-                    .orElseThrow(() -> new AppException(ErrorCode.USER_NOT_EXISTED));
-
-            if (user.getRefreshToken() == null) {
-                throw new AppException(ErrorCode.FORBIDDEN, "User Google Drive not linked");
-            }
-
-            String originalFilename = file.getOriginalFilename() != null ? file.getOriginalFilename() : "Unknown Audio";
-
-            // Check for duplicates
-            boolean exists = musicLibraryRepository.findByUserId(userId).stream()
-                    .anyMatch(lib -> originalFilename.equals(lib.getName()));
-            if (exists) {
-                throw new AppException(ErrorCode.DUPLICATE_FILE, "File already exists in library");
-            }
-
-            // Extract metadata via jaudiotagger
-            String ext = ".tmp";
-            if (originalFilename.lastIndexOf(".") != -1) {
-                ext = originalFilename.substring(originalFilename.lastIndexOf("."));
-            }
-            java.io.File tempFile = java.io.File.createTempFile("musicapp_", ext);
-            String driveFileId;
-            try {
-                java.nio.file.Files.copy(file.getInputStream(), tempFile.toPath(),
-                        java.nio.file.StandardCopyOption.REPLACE_EXISTING);
-
-                try {
-                    if (originalFilename.toLowerCase().endsWith(".opus")) {
-                        org.gagravarr.opus.OpusFile opusFile = new org.gagravarr.opus.OpusFile(tempFile);
-                        org.gagravarr.opus.OpusTags tags = opusFile.getTags();
-                        if (tags != null) {
-                            if (title == null || title.isBlank())
-                                title = tags.getTitle();
-                            if (artist == null || artist.isBlank())
-                                artist = tags.getArtist();
-                            if (album == null || album.isBlank())
-                                album = tags.getAlbum();
-                            if (genre == null || genre.isBlank())
-                                genre = tags.getGenre();
-                        }
-                    } else {
-                        AudioFile audioFile = AudioFileIO.read(tempFile);
-                        Tag tag = audioFile.getTag();
-                        if (tag != null) {
-                            if (title == null || title.isBlank())
-                                title = tag.getFirst(FieldKey.TITLE);
-                            if (artist == null || artist.isBlank())
-                                artist = tag.getFirst(FieldKey.ARTIST);
-                            if (album == null || album.isBlank())
-                                album = tag.getFirst(FieldKey.ALBUM);
-                            if (genre == null || genre.isBlank())
-                                genre = tag.getFirst(FieldKey.GENRE);
-                            if (imageUrl == null || imageUrl.isBlank())
-                                imageUrl = extractArtworkDataUrl(tag);
-                        }
-                    }
-                } catch (Exception e) {
-                    log.error("Failed to extract metadata", e);
-                }
-
-                try (FileInputStream is = new FileInputStream(tempFile)) {
-                    driveFileId = googleDriveService.uploadAudioStream(is, tempFile.length(),
-                            user.getRefreshToken(), originalFilename);
-                }
-            } finally {
-                tempFile.delete();
-            }
-
-            MusicLibrary lib = MusicLibrary.builder()
-                    .name(originalFilename)
-                    .sourceType("DRIVE")
-                    .driveFileId(driveFileId)
-                    .title(title)
-                    .artist(artist)
-                    .album(album)
-                    .genre(genre)
-                    .imageUrl(imageUrl)
-                    .lyrics(lyrics)
-                    .user(user)
-                    .build();
-
-            return toDto(musicLibraryRepository.save(lib));
-        } catch (AppException e) {
-            throw e;
-        } catch (Exception e) {
-            log.error("Failed to upload file to drive", e);
-            throw new AppException(ErrorCode.UNCATEGORIZED_EXCEPTION, "Failed to upload file to drive");
-        }
-    }
 
     private boolean isSupportedAudioFile(String filename) {
         String lower = filename.toLowerCase(java.util.Locale.ROOT);
