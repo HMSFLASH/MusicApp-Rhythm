@@ -1,5 +1,9 @@
 import axios from 'axios';
-export const BACKEND_URL = import.meta.env.VITE_API_URL || 'http://localhost:8000';
+let envUrl = import.meta.env.VITE_API_URL || 'http://localhost:8000';
+if (typeof window !== 'undefined' && envUrl.includes('localhost')) {
+  envUrl = envUrl.replace('localhost', window.location.hostname);
+}
+export const BACKEND_URL = envUrl;
 
 export const axiosClient = axios.create({
   baseURL: BACKEND_URL,
