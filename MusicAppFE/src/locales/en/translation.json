@@ -206,5 +206,10 @@
     "allSongs": "All songs",
     "thisTrack": "This track only",
     "advancedRequiresPrecalculate": "Advanced mode requires Precalculate"
+  },
+  "network": {
+    "offline": "Network connection lost. Will automatically retry in 5 minutes.",
+    "offlineDuringLoad": "Network connection lost while loading track.",
+    "reconnected": "Network reconnected."
   }
 }

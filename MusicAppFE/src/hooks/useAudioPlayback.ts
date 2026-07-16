@@ -1,4 +1,5 @@
 import { useState, useRef, useEffect, useCallback } from 'react';
+import { useTranslation } from 'react-i18next';
 import type { Track } from './audioTypes';
 import { axiosClient } from '../api/axiosClient';
 import { getAudioConfigStorageKey } from './audioStorage';
@@ -84,6 +85,7 @@ export function useAudioPlayback(
   driveToken?: string,
   fetchDriveToken?: () => Promise<string>
 ) {
+  const { t } = useTranslation();
   const configStorageKey = getAudioConfigStorageKey(isAuthenticated);
   const { currentTrack, setCurrentTrack, queue, setQueue, isShuffleState, songEndMode, queueEndMode, upcomingQueues, cycleQueues, setUpcomingQueues } = queueState || {};
   const {
@@ -206,19 +208,19 @@ export function useAudioPlayback(
 
   const handleNetworkFailure = useCallback((track: Track) => {
      pendingNetworkRetryTrackRef.current = track;
-     window.dispatchEvent(new CustomEvent('app-notification', { 
-       detail: { type: 'error', message: 'Mất kết nối mạng. Sẽ tự động thử lại sau 5 phút.' }
-     }));
+           window.dispatchEvent(new CustomEvent('app-notification', {
+              detail: { type: 'error', message: t('network.offline') }
+           }));
      startNetworkRetryTimer();
-  }, [startNetworkRetryTimer]);
+  }, [startNetworkRetryTimer, t]);
 
   useEffect(() => {
     const handleOffline = () => {
        wasOfflineRef.current = true;
        if (isLoadingTrackSnapshotRef.current) {
-          window.dispatchEvent(new CustomEvent('app-notification', {
-             detail: { type: 'error', message: 'Đã mất kết nối mạng khi đang tải nhạc.' }
-          }));
+           window.dispatchEvent(new CustomEvent('app-notification', {
+              detail: { type: 'error', message: t('network.offlineDuringLoad') }
+           }));
           if (currentTrackSnapshotRef.current) {
              pendingNetworkRetryTrackRef.current = currentTrackSnapshotRef.current;
              startNetworkRetryTimer();
@@ -229,9 +231,9 @@ export function useAudioPlayback(
     const handleOnline = () => {
        if (wasOfflineRef.current) {
           wasOfflineRef.current = false;
-          window.dispatchEvent(new CustomEvent('app-notification', {
-             detail: { type: 'success', message: 'Đã kết nối lại mạng.' }
-          }));
+           window.dispatchEvent(new CustomEvent('app-notification', {
+              detail: { type: 'success', message: t('network.reconnected') }
+           }));
        }
        
        if (pendingNetworkRetryTrackRef.current) {
@@ -245,7 +247,7 @@ export function useAudioPlayback(
       window.removeEventListener('offline', handleOffline);
       window.removeEventListener('online', handleOnline);
     };
-  }, [startNetworkRetryTimer]);
+  }, [startNetworkRetryTimer, t]);
 
   const clearTrackLoading = useCallback(() => {
     setIsLoadingTrack(false);
