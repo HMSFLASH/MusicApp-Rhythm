@@ -445,22 +445,6 @@ export function useAudioMetadata(isAuthenticated: boolean, queueState: any, sett
             metadataCacheRef.current.set(trackId, updatedCachePayload);
             if (track.sourceType !== 'LOCAL') {
                 await db.set(lsKey, updatedCachePayload);
-
-                if (isAuthenticated) {
-                    try {
-                        await axiosClient.put(`/api/music/${trackId}/metadata`, {
-                            title: cachePayload.title,
-                            artist: cachePayload.artist,
-                            album: cachePayload.album,
-                            genre: cachePayload.genre,
-                            imageUrl: backendImageUrl,
-                            lyrics: cachePayload.lyrics,
-                            durationSeconds: cachePayload.durationSeconds
-                        });
-                    } catch (apiErr) {
-                        console.warn('[Metadata] Failed to save extracted metadata to backend', apiErr);
-                    }
-                }
             }
             setMetadataVersion(v => v + 1);
 

@@ -40,16 +40,6 @@ public class MusicController {
                 .build();
     }
 
-    @PutMapping("/{id}/metadata")
-    public ApiResponse<MusicItemDto> updateMetadata(@PathVariable String id,
-            @RequestBody MusicItemDto dto,
-            Principal principal) {
-        String userId = SecurityUtils.extractUserId(principal);
-        return ApiResponse.<MusicItemDto>builder()
-                .result(musicService.updateMetadata(id, dto, userId))
-                .build();
-    }
-
     @PostMapping("/{id}/play")
     public ApiResponse<MusicItemDto> recordPlay(@PathVariable String id, Principal principal) {
         String userId = SecurityUtils.extractUserId(principal);
@@ -66,7 +56,6 @@ public class MusicController {
                 .result(null)
                 .build();
     }
-
 
     @GetMapping("/drive-token")
     public ApiResponse<Map<String, String>> getDriveToken(Principal principal) {

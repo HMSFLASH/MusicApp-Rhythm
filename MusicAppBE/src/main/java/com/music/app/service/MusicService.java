@@ -104,27 +104,7 @@ public class MusicService {
                 .collect(Collectors.toList());
     }
 
-    public MusicItemDto updateMetadata(String id, MusicItemDto dto, String userId) {
-        MusicLibrary lib = musicLibraryRepository.findByIdAndUserId(id, userId)
-                .orElseThrow(() -> new AppException(ErrorCode.NOT_FOUND));
 
-        if (dto.getTitle() != null)
-            lib.setTitle(dto.getTitle());
-        if (dto.getArtist() != null)
-            lib.setArtist(dto.getArtist());
-        if (dto.getAlbum() != null)
-            lib.setAlbum(dto.getAlbum());
-        if (dto.getGenre() != null)
-            lib.setGenre(dto.getGenre());
-        if (dto.getImageUrl() != null && !dto.getImageUrl().startsWith("/api/music/"))
-            lib.setImageUrl(dto.getImageUrl());
-        if (dto.getLyrics() != null)
-            lib.setLyrics(dto.getLyrics());
-        if (dto.getDurationSeconds() != null)
-            lib.setDurationSeconds(dto.getDurationSeconds());
-
-        return toDto(musicLibraryRepository.save(lib));
-    }
 
     @org.springframework.transaction.annotation.Transactional
     public MusicItemDto recordPlay(String id, String userId) {
