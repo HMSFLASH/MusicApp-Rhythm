@@ -115,14 +115,4 @@ public class MusicController {
         return ResponseEntity.notFound().build();
     }
 
-    @PostMapping("/{id}/reload-metadata")
-    public ApiResponse<MusicItemDto> reloadMetadataFromDrive(
-            @PathVariable String id,
-            Principal principal) {
-        String userId = SecurityUtils.extractUserId(principal);
-        return ApiResponse.<MusicItemDto>builder()
-                .result(musicService.reloadMetadataFromDrive(id, userId))
-                .build();
-    }
-
 }

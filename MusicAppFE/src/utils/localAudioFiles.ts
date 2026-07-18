@@ -132,9 +132,13 @@ export async function readLocalTrackMetadata(
   if (!update.lyrics && metadata.native) {
     for (const format of Object.keys(metadata.native)) {
       const nativeTags = metadata.native[format];
-      const lyricTag = nativeTags.find(t => t.id?.toLowerCase().includes('lyric'));
-      if (lyricTag && typeof lyricTag.value === 'string') {
-        update.lyrics = lyricTag.value;
+      const lyricTags = nativeTags.filter(t => t.id?.toLowerCase().includes('lyric') || t.id === 'USLT' || t.id === 'SYLT');
+      if (lyricTags && lyricTags.length > 0) {
+        update.lyrics = lyricTags.map(lyricTag => 
+            typeof lyricTag.value === 'string'
+                ? lyricTag.value
+                : ((lyricTag.value as { text?: string })?.text || JSON.stringify(lyricTag.value))
+        ).join('\n');
         break;
       }
     }

@@ -2198,6 +2198,56 @@ export function useAudioPlayback(
     cancelQueuePrecalculate,
     retryFailedQueuePrecalculate,
     reloadCurrentTrackFromDrive,
+    setAudioOutputDevice: useCallback(async (deviceId: string) => {
+      let successCount = 0;
+      
+      try {
+        if (audioRef.current && typeof (audioRef.current as any).setSinkId === 'function') {
+          // eslint-disable-next-line @typescript-eslint/no-explicit-any
+          await (audioRef.current as any).setSinkId(deviceId);
+          successCount++;
+        }
+      } catch (e) {
+        console.warn('Failed to set HTMLAudioElement sinkId', e);
+      }
+
+      try {
+        if (renderedAudioRef.current && typeof (renderedAudioRef.current as any).setSinkId === 'function') {
+          // eslint-disable-next-line @typescript-eslint/no-explicit-any
+          await (renderedAudioRef.current as any).setSinkId(deviceId);
+          successCount++;
+        }
+      } catch (e) {
+        console.warn('Failed to set rendered HTMLAudioElement sinkId', e);
+      }
+
+      try {
+        if (audioContextRef.current && typeof (audioContextRef.current as any).setSinkId === 'function') {
+          // eslint-disable-next-line @typescript-eslint/no-explicit-any
+          await (audioContextRef.current as any).setSinkId(deviceId);
+          successCount++;
+        } else if (audioContextRef.current) {
+          console.warn('AudioContext does not support setSinkId in this browser');
+        }
+      } catch (e) {
+        console.warn('Failed to set AudioContext sinkId', e);
+      }
+
+      if (successCount === 0) {
+        window.dispatchEvent(new CustomEvent('app-notification', {
+          detail: { type: 'error', message: 'Trình duyệt không hỗ trợ đổi thiết bị phát hoặc có lỗi xảy ra.' }
+        }));
+      } else {
+        // Save to local storage for persistence across reloads
+        try {
+          const configStorageKey = getAudioConfigStorageKey(isAuthenticated);
+          const existing = JSON.parse(localStorage.getItem(configStorageKey) || '{}');
+          localStorage.setItem(configStorageKey, JSON.stringify({ ...existing, sinkId: deviceId }));
+        } catch {
+          // ignore
+        }
+      }
+    }, [audioContextRef, audioRef, isAuthenticated]),
     playTrack,
     playNext,
     playPrevious,

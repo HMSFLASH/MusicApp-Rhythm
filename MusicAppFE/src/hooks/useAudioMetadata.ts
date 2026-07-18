@@ -377,11 +377,13 @@ export function useAudioMetadata(isAuthenticated: boolean, queueState: any, sett
                 for (const tagType in metadata.native) {
                     const tags = metadata.native[tagType];
                     if (Array.isArray(tags)) {
-                        const lyricTag = tags.find((tag: { id?: string; value?: unknown }) => tag.id?.toLowerCase().includes('lyric') || tag.id === 'USLT' || tag.id === 'SYLT');
-                        if (lyricTag && lyricTag.value) {
-                            extractedLyrics = typeof lyricTag.value === 'string'
-                                ? lyricTag.value
-                                : ((lyricTag.value as { text?: string }).text || JSON.stringify(lyricTag.value));
+                        const lyricTags = tags.filter((tag: { id?: string; value?: unknown }) => tag.id?.toLowerCase().includes('lyric') || tag.id === 'USLT' || tag.id === 'SYLT');
+                        if (lyricTags && lyricTags.length > 0) {
+                            extractedLyrics = lyricTags.map(lyricTag => 
+                                typeof lyricTag.value === 'string'
+                                    ? lyricTag.value
+                                    : ((lyricTag.value as { text?: string }).text || JSON.stringify(lyricTag.value))
+                            ).join('\n');
                             break;
                         }
                     }
@@ -473,42 +475,7 @@ export function useAudioMetadata(isAuthenticated: boolean, queueState: any, sett
         }
     }
 
-    async function reloadMetadataFromBackend(track: Track) {
-        if (track.sourceType === 'LOCAL') return null;
-        const trackId = String(track.id);
 
-        try {
-            const response = await axiosClient.post(`/api/music/${trackId}/reload-metadata`) as { result?: any } | any;
-            const updatedTrack = response?.result || response;
-            if (updatedTrack) {
-                const cachePayload: Partial<Track> = {
-                    title: updatedTrack.title,
-                    artist: updatedTrack.artist,
-                    album: updatedTrack.album,
-                    genre: updatedTrack.genre,
-                    imageUrl: updatedTrack.imageUrl,
-                    lyrics: updatedTrack.lyrics,
-                    durationSeconds: updatedTrack.durationSeconds,
-                    coverChecked: true
-                };
-
-                metadataCacheRef.current.set(trackId, cachePayload);
-                const lsKey = getMetadataCacheKey(trackId);
-                await db.set(lsKey, cachePayload);
-
-                setCurrentTrack((prev: any) => prev && String(prev.id) === trackId ? { ...prev, ...cachePayload } : prev);
-                setQueue((prevQ: any) => prevQ?.map ? prevQ.map((t: any) => String(t.id) === trackId ? { ...t, ...cachePayload } : t) : prevQ);
-                setMetadataVersion(v => v + 1);
-
-                window.dispatchEvent(new CustomEvent('sonic_metadata_updated', { detail: trackId }));
-                window.dispatchEvent(new CustomEvent('music-uploaded'));
-                return updatedTrack;
-            }
-        } catch (err) {
-            console.error('[Metadata] Failed to reload metadata from backend:', err);
-        }
-        return null;
-    }
 
     async function refreshTrackMetadataFromDrive(track: Track) {
         if (track.sourceType === 'LOCAL') return;
@@ -597,7 +564,6 @@ export function useAudioMetadata(isAuthenticated: boolean, queueState: any, sett
         clearTrackCachedMetadata,
         refreshTrackMetadataFromDrive,
         refreshMissingTrackCover,
-        reloadMetadataFromBackend,
         metadataCacheRef,
         imageCacheRef,
         blobCacheRef,

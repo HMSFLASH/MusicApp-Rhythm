@@ -1,7 +1,7 @@
 import { useState, useRef, useEffect, useCallback } from 'react';
 import { useGlobalAudio } from '../context/AudioContext';
 import { useAuth } from '../context/AuthContext';
-import { Disc, Play, Pause, SkipBack, SkipForward, Shuffle, Repeat, Heart, Info, ListPlus, MoreHorizontal, Repeat1, User, Volume2, VolumeX, BarChart2, Gauge, Music, Check, X, ArrowRight, Square, PauseCircle, ListX, Loader2, Trash2, Cpu, Tags, RefreshCw, Activity } from 'lucide-react';
+import { Disc, Play, Pause, SkipBack, SkipForward, Shuffle, Repeat, Heart, Info, ListPlus, MoreHorizontal, Repeat1, User, Volume2, VolumeX, BarChart2, Gauge, Music, Check, X, ArrowRight, Square, PauseCircle, ListX, Loader2, Trash2, Cpu, Tags, RefreshCw, Activity, MonitorSpeaker } from 'lucide-react';
 import { HorizontalSlider } from '../components/HorizontalSlider';
 import { SpeedPitchPanel } from '../components/SpeedPitchPanel';
 import { useLibrary } from '../context/LibraryContext';
@@ -176,6 +176,41 @@ export function NowPlaying() {
   const [showLyrics, setShowLyrics] = useState(false);
   const [showSpectrum, setShowSpectrum] = useState(false);
 
+  // Audio Device state
+  const [showDeviceMenu, setShowDeviceMenu] = useState(false);
+  const [audioDevices, setAudioDevices] = useState<MediaDeviceInfo[]>([]);
+  const [selectedDeviceId, setSelectedDeviceId] = useState<string>('default');
+  const [hasDeviceLabels, setHasDeviceLabels] = useState(true);
+  const deviceMenuRef = useRef<HTMLDivElement>(null);
+
+  const fetchAudioDevices = useCallback(async () => {
+    if (!navigator.mediaDevices?.enumerateDevices) return;
+    try {
+      const devices = await navigator.mediaDevices.enumerateDevices();
+      const outputDevices = devices.filter(d => d.kind === 'audiooutput');
+      setAudioDevices(outputDevices);
+      setHasDeviceLabels(outputDevices.some(d => d.label !== ''));
+    } catch (e) {
+      console.error(e);
+    }
+  }, []);
+
+  const requestAudioPermission = async () => {
+    try {
+      const stream = await navigator.mediaDevices.getUserMedia({ audio: true });
+      stream.getTracks().forEach(t => t.stop());
+      await fetchAudioDevices();
+    } catch (e) {
+      console.error('Failed to get audio permissions', e);
+    }
+  };
+
+  useEffect(() => {
+    if (showDeviceMenu) {
+      fetchAudioDevices();
+    }
+  }, [showDeviceMenu, fetchAudioDevices]);
+
 
   const trackLyrics = currentTrack?.lyrics || (currentTrack ? playerState.getTrackMetadata(currentTrack.id)?.lyrics : undefined);
   const hasLyrics = !!trackLyrics;
@@ -210,6 +245,9 @@ export function NowPlaying() {
       }
       if (volumeRef.current && !volumeRef.current.contains(e.target as Node)) {
         setShowVolume(false);
+      }
+      if (deviceMenuRef.current && !deviceMenuRef.current.contains(e.target as Node)) {
+        setShowDeviceMenu(false);
       }
     };
     document.addEventListener('mousedown', handler);
@@ -478,20 +516,6 @@ export function NowPlaying() {
                             <span>{t('nowPlaying.reloadFromDrive')}</span>
                           </button>
                         )}
-                        {currentTrack.sourceType !== 'LOCAL' && (
-                          <button
-                            onClick={async () => {
-                              setShowMenu(false);
-                              if (playerState.reloadMetadataFromBackend) {
-                                await playerState.reloadMetadataFromBackend(currentTrack);
-                              }
-                            }}
-                            className="w-full flex items-center gap-3 px-4 py-3 text-sm text-white/80 hover:bg-white/5 transition-colors border-b border-white/5"
-                          >
-                            <Music size={16} />
-                            <span>{t('nowPlaying.reloadLyrics')}</span>
-                          </button>
-                        )}
                         <button
                           onClick={() => {
                             setShowMenu(false);
@@ -747,29 +771,81 @@ export function NowPlaying() {
             </div>
 
             <div className="flex items-center justify-between px-2 mb-4">
-              <div className="relative" ref={volumeRef}>
-                <button
-                  aria-label="Volume"
-                  onClick={() => setShowVolume(v => !v)}
-                  className={`transition-colors ${showVolume ? 'text-white' : 'text-white/60 hover:text-white'}`}
-                >
-                  {volume === 0 ? <VolumeX size={24} className="text-white/40" /> : <Volume2 size={24} fill="currentColor" className={volume > 0.5 ? "text-white/20" : "text-white/40"} />}
-                </button>
+              <div className="flex items-center gap-1 sm:gap-2">
+                <div className="relative" ref={deviceMenuRef}>
+                  <button
+                    aria-label="Output Device"
+                    onClick={() => setShowDeviceMenu(v => !v)}
+                    className={`transition-colors p-2 rounded-full ${showDeviceMenu ? 'text-white bg-white/10' : 'text-white/60 hover:text-white'}`}
+                  >
+                    <MonitorSpeaker size={20} />
+                  </button>
 
-                {showVolume && (
-                  <div className="absolute bottom-full left-0 mb-4 bg-[#1e1e1e] border border-white/10 p-4 rounded-2xl shadow-2xl z-50 w-40">
-                    <HorizontalSlider
-                      value={Math.round(volume * 100)}
-                      min={0}
-                      max={100}
-                      step={1}
-                      onChange={(val) => setVolume(val / 100)}
-                      label="Volume"
-                      color="#00f5ff"
-                      unit="%"
-                    />
-                  </div>
-                )}
+                  {showDeviceMenu && (
+                    <div className="absolute bottom-full left-0 mb-4 bg-[#1e1e1e] border border-white/10 p-2 rounded-xl shadow-2xl z-50 w-64 max-h-64 overflow-y-auto">
+                      <p className="text-xs font-bold text-primary uppercase tracking-wider mb-2 px-2 pt-1">{t('nowPlaying.outputDevice') || 'Output Device'}</p>
+                      
+                      {!hasDeviceLabels && (
+                        <div className="mb-2 px-2 pb-2 border-b border-white/10">
+                          <p className="text-xs text-white/70 mb-2 leading-tight">
+                            {t('nowPlaying.devicePermissionReason') || 'Trình duyệt ẩn tên thiết bị cho đến khi bạn cấp quyền Audio.'}
+                          </p>
+                          <button
+                            onClick={requestAudioPermission}
+                            className="w-full text-xs bg-primary/20 text-primary py-1.5 rounded-lg hover:bg-primary/30 transition-colors"
+                          >
+                            {t('nowPlaying.grantPermission') || 'Hiện tên thiết bị'}
+                          </button>
+                        </div>
+                      )}
+
+                      {audioDevices.length > 0 ? audioDevices.map(device => (
+                        <button
+                          key={device.deviceId || 'default'}
+                          onClick={() => {
+                            const id = device.deviceId || '';
+                            setSelectedDeviceId(id);
+                            if (playerState.setAudioOutputDevice) {
+                              playerState.setAudioOutputDevice(id);
+                            }
+                            setShowDeviceMenu(false);
+                          }}
+                          className={`w-full text-left px-3 py-2 rounded-lg text-sm transition-colors flex items-center justify-between ${selectedDeviceId === (device.deviceId || '') ? 'bg-primary/20 text-primary font-medium' : 'text-white/80 hover:bg-white/10'}`}
+                        >
+                          <span className="truncate pr-2">{device.label || `Device (${device.deviceId ? device.deviceId.slice(0, 5) : 'default'}...)`}</span>
+                          {selectedDeviceId === (device.deviceId || '') && <Check size={14} className="flex-shrink-0" />}
+                        </button>
+                      )) : (
+                        <p className="text-sm text-white/50 px-3 py-2">No devices found</p>
+                      )}
+                    </div>
+                  )}
+                </div>
+
+                <div className="relative" ref={volumeRef}>
+                  <button
+                    aria-label="Volume"
+                    onClick={() => setShowVolume(v => !v)}
+                    className={`transition-colors p-2 rounded-full ${showVolume ? 'text-white bg-white/10' : 'text-white/60 hover:text-white'}`}
+                  >
+                    {volume === 0 ? <VolumeX size={20} className="text-white/40" /> : <Volume2 size={20} fill="currentColor" className={volume > 0.5 ? "text-white/20" : "text-white/40"} />}
+                  </button>
+
+                  {showVolume && (
+                    <div className="absolute bottom-full left-0 mb-4 bg-[#1e1e1e] border border-white/10 p-4 rounded-2xl shadow-2xl z-50 w-40">
+                      <HorizontalSlider
+                        value={Math.round(volume * 100)}
+                        min={0}
+                        max={100}
+                        step={1}
+                        onChange={(val) => setVolume(val / 100)}
+                        label="Volume"
+                        color="#00f5ff"
+                        unit="%"
+                      />
+                    </div>
+                  )}
+                </div>
               </div>
 
               <div className="flex items-center gap-4 sm:gap-6 md:gap-10">
