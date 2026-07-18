@@ -62,22 +62,9 @@ public class MusicService {
     }
 
     public MusicItemDto toDto(MusicLibrary lib) {
-        String imageUrl = lib.getImageUrl();
-        if (imageUrl != null && imageUrl.startsWith("data:image/")) {
-            imageUrl = "/api/music/" + lib.getId() + "/image";
-        } else if (isMusicImageEndpoint(imageUrl)) {
-            imageUrl = null;
-        }
         return MusicItemDto.builder()
                 .id(lib.getId().toString())
                 .name(lib.getName())
-                .title(lib.getTitle())
-                .artist(lib.getArtist())
-                .album(lib.getAlbum())
-                .genre(lib.getGenre())
-                .imageUrl(imageUrl)
-                .lyrics(lib.getLyrics())
-                .durationSeconds(lib.getDurationSeconds())
                 .sourceType(lib.getSourceType())
                 .driveFileId(lib.getDriveFileId())
                 .playCount(lib.getPlayCount() == null ? 0L : lib.getPlayCount())
@@ -286,76 +273,6 @@ public class MusicService {
         }
     }
 
-    public String getMusicImage(String id) {
-        return musicLibraryRepository.findById(id)
-                .map(MusicLibrary::getImageUrl)
-                .orElse(null);
-    }
 
-    @org.springframework.transaction.annotation.Transactional
-    public String getMusicImage(String id, String userId) {
-        MusicLibrary lib = musicLibraryRepository.findById(id).orElse(null);
-        if (lib == null) {
-            return null;
-        }
-
-        String imageUrl = lib.getImageUrl();
-        if (imageUrl != null && !imageUrl.isBlank() && !isMusicImageEndpoint(imageUrl)) {
-            return imageUrl;
-        }
-
-        if (userId == null || lib.getUser() == null || !userId.equals(lib.getUser().getId())) {
-            return null;
-        }
-
-        imageUrl = extractArtworkDataUrlFromDrive(lib);
-        if (imageUrl != null && !imageUrl.isBlank()) {
-            lib.setImageUrl(imageUrl);
-            musicLibraryRepository.save(lib);
-            log.info("Lazy-extracted cover image for track {}", id);
-            return imageUrl;
-        }
-
-        return null;
-    }
-
-    private String extractArtworkDataUrlFromDrive(MusicLibrary lib) {
-        if (!"DRIVE".equals(lib.getSourceType()) || lib.getDriveFileId() == null || lib.getUser() == null
-                || lib.getUser().getRefreshToken() == null) {
-            return null;
-        }
-
-        java.io.File tempFile = null;
-        try (java.io.InputStream is = googleDriveService
-                .streamFile(lib.getDriveFileId(), null, lib.getUser().getRefreshToken())
-                .getInputStream()) {
-            if (is == null) {
-                return null;
-            }
-
-            String originalFilename = lib.getName() == null ? "music.tmp" : lib.getName();
-            String ext = ".tmp";
-            if (originalFilename.lastIndexOf(".") != -1) {
-                ext = originalFilename.substring(originalFilename.lastIndexOf("."));
-            }
-
-            tempFile = java.io.File.createTempFile("musicapp_cover_", ext);
-            java.nio.file.Files.copy(is, tempFile.toPath(), java.nio.file.StandardCopyOption.REPLACE_EXISTING);
-
-            if (originalFilename.toLowerCase(java.util.Locale.ROOT).endsWith(".opus")) {
-                return null;
-            }
-
-            AudioFile audioFile = AudioFileIO.read(tempFile);
-            return extractArtworkDataUrl(audioFile.getTag());
-        } catch (Exception e) {
-            log.warn("Failed to lazy-extract cover image for track {}", lib.getId(), e);
-            return null;
-        } finally {
-            if (tempFile != null) {
-                tempFile.delete();
-            }
-        }
-    }
 
 }

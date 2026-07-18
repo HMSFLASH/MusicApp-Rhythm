@@ -12,13 +12,7 @@ import lombok.NoArgsConstructor;
 public class MusicItemDto {
     private String id;
     private String name;
-    private String title;
-    private String artist;
-    private String album;
-    private String genre;
-    private String imageUrl;
-    private String lyrics;
-    private Long durationSeconds;
+
     private String sourceType;
     private String driveFileId;
     private Long playCount;

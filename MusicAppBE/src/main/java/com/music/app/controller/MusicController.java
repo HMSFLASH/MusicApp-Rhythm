@@ -83,36 +83,6 @@ public class MusicController {
                 .build();
     }
 
-    @GetMapping("/{id}/image")
-    public ResponseEntity<byte[]> getMusicImage(@PathVariable String id, Principal principal) {
-        String userId = null;
-        if (principal != null) {
-            try {
-                userId = SecurityUtils.extractUserId(principal);
-            } catch (Exception ignored) {
-            }
-        }
 
-        String imageUrl = userId == null
-                ? musicService.getMusicImage(id)
-                : musicService.getMusicImage(id, userId);
-        if (imageUrl != null && imageUrl.startsWith("data:image/")) {
-            int commaIndex = imageUrl.indexOf(',');
-            if (commaIndex != -1) {
-                String base64 = imageUrl.substring(commaIndex + 1);
-                String mimeType = imageUrl.substring(5, imageUrl.indexOf(';'));
-                byte[] data = java.util.Base64.getDecoder().decode(base64);
-                return ResponseEntity.ok()
-                        .header(org.springframework.http.HttpHeaders.CONTENT_TYPE, mimeType)
-                        .header(org.springframework.http.HttpHeaders.CACHE_CONTROL, "max-age=31536000") // 1 year cache
-                        .body(data);
-            }
-        } else if (imageUrl != null && imageUrl.startsWith("http")) {
-            return ResponseEntity.status(org.springframework.http.HttpStatus.FOUND)
-                    .header(org.springframework.http.HttpHeaders.LOCATION, imageUrl)
-                    .build();
-        }
-        return ResponseEntity.notFound().build();
-    }
 
 }

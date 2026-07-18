@@ -39,6 +39,7 @@ import {
 import { loadTrackAudioUrl } from './audioTrackLoader';
 import { getAudioExtension } from './audioMime';
 import { decodeFlacToAudioBuffer } from './flacDecoder';
+import { decodeAacToAudioBuffer } from './aacDecoder';
 import { saveCover } from '../utils/idb';
 import { BACKEND_URL } from '../api/axiosClient';
 import { hasCachedAudio } from '../utils/mediaCache';
@@ -110,6 +111,7 @@ export function useAudioPlayback(
     loudnessNormalization,
     fullQueueCacheEnabled,
     flacWasmOverrides,
+    m4aWasmOverrides,
   } = effectsState || {};
   const { audioContextRef, audioRef, bufferSourceRef, bufferVolumeNodeRef, initializeAudioContext, irBufferRef, setTrackLoudnessGain } = contextState;
   const { blobCacheRef } = metadataState;
@@ -344,6 +346,19 @@ export function useAudioPlayback(
       )
     )
   ), [flacWasmOverrides]);
+
+  const shouldUseM4aWasmPlayback = useCallback((track: Track | null | undefined) => {
+    if (!track) return false;
+    const ext = getAudioExtension(track.fileName);
+    if (ext !== 'm4a' && ext !== 'aac') return false;
+    
+    return Boolean(
+      m4aWasmOverrides &&
+      Object.prototype.hasOwnProperty.call(m4aWasmOverrides, String(track.id))
+        ? m4aWasmOverrides[String(track.id)]
+        : false
+    );
+  }, [m4aWasmOverrides]);
 
   const revokeRenderedAudioUrl = useCallback(() => {
     if (!renderedAudioUrlRef.current) return;
@@ -1172,6 +1187,11 @@ export function useAudioPlayback(
               new Uint8Array(arrayBuffer),
               track.durationSeconds,
             )
+            : shouldUseM4aWasmPlayback(track)
+            ? decodeAacToAudioBuffer(
+              audioContextRef.current || createDecodeContext(),
+              new Uint8Array(arrayBuffer),
+            )
             : decodeAudioDataForPreRender(arrayBuffer),
           PRECALCULATE_TIMEOUT_MS,
           `decode(${trackId})`
@@ -1513,7 +1533,7 @@ export function useAudioPlayback(
     releaseAudioElementSource();
     releaseRenderedAudioSource();
 
-    const useRenderedBufferPlayback = precalculateOnIdle || shouldUseFlacWasmPlayback(startingTrack);
+    const useRenderedBufferPlayback = precalculateOnIdle || shouldUseFlacWasmPlayback(startingTrack) || shouldUseM4aWasmPlayback(startingTrack);
     console.log(`[Audio] useRenderedBufferPlayback: ${useRenderedBufferPlayback}`);
 
     if (useRenderedBufferPlayback) {
@@ -1589,7 +1609,7 @@ export function useAudioPlayback(
           // Check if session changed while decoding
           if (
             decodeSessionRef.current !== playSessionId ||
-            (!precalculateOnIdleRef.current && !shouldUseFlacWasmPlayback(startingTrack))
+            (!precalculateOnIdleRef.current && !shouldUseFlacWasmPlayback(startingTrack) && !shouldUseM4aWasmPlayback(startingTrack))
           ) {
             console.log(`[Audio] Session changed or precalculation cancelled, aborting.`);
             return;

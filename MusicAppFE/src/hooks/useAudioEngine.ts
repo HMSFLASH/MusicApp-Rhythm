@@ -6,6 +6,7 @@ import type { useAudioEffectsState } from './useAudioEffectsState';
 
 type AudioEngineEffectsState = ReturnType<typeof useAudioEffectsState> & {
   flacWasmOverrides?: Record<string, boolean>;
+  m4aWasmOverrides?: Record<string, boolean>;
   legacyMetadataOverrides?: Record<string, boolean>;
 };
 

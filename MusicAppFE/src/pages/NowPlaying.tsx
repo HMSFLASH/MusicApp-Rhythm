@@ -1,7 +1,7 @@
 import { useState, useRef, useEffect, useCallback } from 'react';
 import { useGlobalAudio } from '../context/AudioContext';
 import { useAuth } from '../context/AuthContext';
-import { Disc, Play, Pause, SkipBack, SkipForward, Shuffle, Repeat, Heart, Info, ListPlus, MoreHorizontal, Repeat1, User, Volume2, VolumeX, BarChart2, Gauge, Music, Check, X, ArrowRight, Square, PauseCircle, ListX, Loader2, Trash2, Cpu, Tags, RefreshCw, Activity, MonitorSpeaker } from 'lucide-react';
+import { Disc, Play, Pause, SkipBack, SkipForward, Shuffle, Repeat, Heart, Info, ListPlus, MoreHorizontal, Repeat1, User, Volume2, VolumeX, BarChart2, Gauge, Music, Check, X, ArrowRight, Square, PauseCircle, ListX, Loader2, Trash2, Cpu, Tags, RefreshCw, Activity, MonitorSpeaker, Radio } from 'lucide-react';
 import { HorizontalSlider } from '../components/HorizontalSlider';
 import { SpeedPitchPanel } from '../components/SpeedPitchPanel';
 import { useLibrary } from '../context/LibraryContext';
@@ -490,6 +490,18 @@ export function NowPlaying() {
                           >
                             <Cpu size={16} className={playerState.isFlacWasmEnabled(currentTrack) ? 'text-primary' : ''} />
                             <span>{playerState.isFlacWasmEnabled(currentTrack) ? 'Use Normal FLAC' : 'Use FLAC WASM'}</span>
+                          </button>
+                        )}
+                        {(getAudioExtension(currentTrack.fileName) === 'm4a' || getAudioExtension(currentTrack.fileName) === 'aac') && (
+                          <button
+                            onClick={() => {
+                              playerState.toggleM4aWasmForTrack(currentTrack);
+                              setShowMenu(false);
+                            }}
+                            className="w-full flex items-center gap-3 px-4 py-3 text-sm text-white/80 hover:bg-white/5 transition-colors border-b border-white/5"
+                          >
+                            <Cpu size={16} className={playerState.isM4aWasmEnabled(currentTrack) ? 'text-primary' : ''} />
+                            <span>{playerState.isM4aWasmEnabled(currentTrack) ? 'Use Normal M4A' : 'Use M4A WASM'}</span>
                           </button>
                         )}
                         {currentTrack && (

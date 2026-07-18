@@ -11,6 +11,7 @@ export type { Track } from './audioTypes';
 export { EQ_PRESETS, STYLISTIC_PRESETS } from './audioTypes';
 
 const FLAC_WASM_TRACKS_STORAGE_KEY = 'SONIC_FLAC_WASM_TRACKS_V1';
+const M4A_WASM_TRACKS_STORAGE_KEY = 'SONIC_M4A_WASM_TRACKS_V1';
 
 export function useAudioPlayer(
   isAuthenticated: boolean,
@@ -20,6 +21,7 @@ export function useAudioPlayer(
 ) {
   const savedState = useMemo(() => getInitialState(isAuthenticated), [isAuthenticated]);
   const [flacWasmOverrides, setFlacWasmOverrides] = useState<Record<string, boolean>>({});
+  const [m4aWasmOverrides, setM4aWasmOverrides] = useState<Record<string, boolean>>({});
   const [legacyMetadataOverrides, setLegacyMetadataOverrides] = useState<Record<string, boolean>>({});
 
   const queueState = useAudioQueue(savedState, isAuthenticated, isAuthResolved);
@@ -35,6 +37,23 @@ export function useAudioPlayer(
         setFlacWasmOverrides(normalized);
       })
       .catch((error) => console.warn('[Audio] Failed to load FLAC WASM settings', error));
+
+    return () => {
+      cancelled = true;
+    };
+  }, []);
+
+  useEffect(() => {
+    let cancelled = false;
+    void db.get<Record<string, boolean> | string[]>(M4A_WASM_TRACKS_STORAGE_KEY)
+      .then((saved) => {
+        if (cancelled || !saved) return;
+        const normalized = Array.isArray(saved)
+          ? Object.fromEntries(saved.map((id) => [String(id), true]))
+          : saved;
+        setM4aWasmOverrides(normalized);
+      })
+      .catch((error) => console.warn('[Audio] Failed to load M4A WASM settings', error));
 
     return () => {
       cancelled = true;
@@ -74,6 +93,26 @@ export function useAudioPlayer(
     });
   }, [isFlacWasmEnabled]);
 
+  const isM4aWasmEnabled = useCallback((track?: AudioTrack | null) => {
+    if (!track) return false;
+    const ext = getAudioExtension(track.fileName);
+    if (ext !== 'm4a' && ext !== 'aac') return false;
+    const trackId = String(track.id);
+    return Boolean(m4aWasmOverrides[trackId]);
+  }, [m4aWasmOverrides]);
+
+  const toggleM4aWasmForTrack = useCallback((track: AudioTrack) => {
+    const trackId = String(track.id);
+    const nextEnabled = !isM4aWasmEnabled(track);
+
+    setM4aWasmOverrides((previous) => {
+      const next = { ...previous, [trackId]: nextEnabled };
+      void db.set(M4A_WASM_TRACKS_STORAGE_KEY, next)
+        .catch((error) => console.warn('[Audio] Failed to save M4A WASM settings', error));
+      return next;
+    });
+  }, [isM4aWasmEnabled]);
+
   const isLegacyMetadataEnabled = useCallback((track?: AudioTrack | null) => (
     shouldUseLegacyMetadataParser(track, legacyMetadataOverrides)
   ), [legacyMetadataOverrides]);
@@ -98,7 +137,7 @@ export function useAudioPlayer(
   const engineState = useAudioEngine(
     isAuthenticated,
     queueState as Parameters<typeof useAudioEngine>[1],
-    { ...effectsState, flacWasmOverrides, legacyMetadataOverrides } as Parameters<typeof useAudioEngine>[2],
+    { ...effectsState, flacWasmOverrides, m4aWasmOverrides, legacyMetadataOverrides } as Parameters<typeof useAudioEngine>[2],
     savedState,
     driveToken,
     fetchDriveToken
@@ -166,6 +205,8 @@ export function useAudioPlayer(
     getTrackImage: engineState.getTrackImage,
     isFlacWasmEnabled,
     toggleFlacWasmForTrack,
+    isM4aWasmEnabled,
+    toggleM4aWasmForTrack,
     isLegacyMetadataEnabled,
     toggleLegacyMetadataForTrack,
   };
