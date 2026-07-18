@@ -1,6 +1,6 @@
 import { useState } from 'react';
 import { useNavigate, useSearchParams } from 'react-router-dom';
-import { Heart, ListMusic, Cloud, Star, Clock, ListPlus, Play, ArrowLeft, Shuffle, MoreHorizontal, Info, X, ListEnd, ListStart, RefreshCw, Trash2, Cpu, Tags, ChevronDown } from 'lucide-react';
+import { Heart, ListMusic, Cloud, Star, Clock, ListPlus, Play, ArrowLeft, Shuffle, MoreHorizontal, Info, X, ListEnd, ListStart, RefreshCw, Trash2, Cpu, Tags, ChevronDown, Radio } from 'lucide-react';
 import { AddToPlaylistModal } from '../components/AddToPlaylistModal';
 import { useGlobalAudio } from '../context/AudioContext';
 import { useAuth } from '../context/AuthContext';
@@ -313,6 +313,19 @@ export function TracksPage() {
                     >
                       <Cpu size={14} className={playerState.isFlacWasmEnabled(track) ? 'text-primary' : ''} />
                       {playerState.isFlacWasmEnabled(track) ? 'Use Normal FLAC' : 'Use FLAC WASM'}
+                    </button>
+                  )}
+                  {(getAudioExtension(track.fileName) === 'm4a' || getAudioExtension(track.fileName) === 'aac') && (
+                    <button
+                      onClick={(e) => {
+                        e.stopPropagation();
+                        playerState.toggleM4aWasmForTrack(track);
+                        setOpenMenuId(null);
+                      }}
+                      className="w-full flex items-center gap-3 px-4 py-2 text-sm text-left text-white/80 hover:bg-white/10"
+                    >
+                      <Cpu size={14} className={playerState.isM4aWasmEnabled(track) ? 'text-primary' : ''} />
+                      {playerState.isM4aWasmEnabled(track) ? 'Use Normal M4A' : 'Use M4A WASM'}
                     </button>
                   )}
                   <button
