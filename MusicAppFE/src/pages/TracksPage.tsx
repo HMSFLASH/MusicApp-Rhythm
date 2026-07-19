@@ -1,6 +1,6 @@
 import { useState } from 'react';
 import { useNavigate, useSearchParams } from 'react-router-dom';
-import { Heart, ListMusic, Cloud, Star, Clock, ListPlus, Play, ArrowLeft, Shuffle, MoreHorizontal, Info, X, ListEnd, ListStart, RefreshCw, Trash2, Cpu, Tags, ChevronDown, Radio } from 'lucide-react';
+import { Heart, ListMusic, Cloud, Star, Clock, ListPlus, Play, ArrowLeft, Shuffle, MoreHorizontal, Info, X, ListEnd, ListStart, RefreshCw, Trash2, Cpu, Tags, ChevronDown, CheckSquare, Square } from 'lucide-react';
 import { AddToPlaylistModal } from '../components/AddToPlaylistModal';
 import { useGlobalAudio } from '../context/AudioContext';
 import { useAuth } from '../context/AuthContext';
@@ -25,6 +25,8 @@ export function TracksPage() {
   const [infoTrack, setInfoTrack] = useState<Track | null>(null);
   const [sortMode, setSortMode] = useState<SortMode>('default');
   const [isSortMenuOpen, setIsSortMenuOpen] = useState(false);
+  const [selectedTrackIds, setSelectedTrackIds] = useState<Set<string>>(new Set());
+  const [tracksToPlaylist, setTracksToPlaylist] = useState<Track[] | null>(null);
   
   const [currentPage, setCurrentPage] = useState(1);
   const ITEMS_PER_PAGE = 20;
@@ -117,6 +119,75 @@ export function TracksPage() {
     playerState.setQueue([...playerState.queue, ...displayTracks]);
   };
   
+  const toggleSelection = (trackId: string, e: React.MouseEvent) => {
+    e.stopPropagation();
+    setSelectedTrackIds(prev => {
+      const next = new Set(prev);
+      if (next.has(trackId)) next.delete(trackId);
+      else next.add(trackId);
+      return next;
+    });
+  };
+
+  const handleBatchAddToQueue = () => {
+    const selectedTracks = displayTracks.filter(t => selectedTrackIds.has(String(t.id)));
+    playerState.setQueue([...playerState.queue, ...selectedTracks]);
+    setSelectedTrackIds(new Set());
+  };
+
+  const handleBatchAddToFavorites = async () => {
+    const selectedTracks = displayTracks.filter(t => selectedTrackIds.has(String(t.id)));
+    try {
+      await Promise.all(selectedTracks.map(t => {
+        const isFav = favorites.some(f => f.id === t.id);
+        if (!isFav) {
+          return ctxToggleFavorite(t);
+        }
+        return Promise.resolve();
+      }));
+      setSelectedTrackIds(new Set());
+    } catch (err) {
+      console.error(err);
+    }
+  };
+
+  const handleBatchDelete = async () => {
+    const selectedTracks = displayTracks.filter(t => selectedTrackIds.has(String(t.id)));
+    const localTracks = selectedTracks.filter(t => t.sourceType === 'LOCAL');
+    const cloudTracks = selectedTracks.filter(t => t.sourceType !== 'LOCAL');
+    
+    if (cloudTracks.length === 0) {
+      if (localTracks.length > 0) {
+        alert("Cannot delete local files from library.");
+      }
+      return;
+    }
+
+    const isConfirmed = await confirm({
+      title: 'Xóa nhiều bài hát',
+      description: `Bạn có chắc chắn muốn xóa ${cloudTracks.length} bài hát khỏi thư viện? (Local files sẽ bị bỏ qua)`,
+      confirmText: 'Xóa',
+      confirmColor: 'bg-red-500/20 text-red-400 hover:bg-red-500/30 border-red-500/30'
+    });
+
+    if (isConfirmed) {
+      const isConfirmed2 = await confirm({
+        title: 'Xác nhận xóa vĩnh viễn',
+        description: `Hành động này sẽ xóa vĩnh viễn ${cloudTracks.length} bài hát từ Google Drive của bạn và không thể hoàn tác. Bạn vẫn muốn tiếp tục?`,
+        confirmText: 'Xóa vĩnh viễn',
+        confirmColor: 'bg-red-600 text-white hover:bg-red-700 border-red-600'
+      });
+      if (isConfirmed2) {
+        try {
+          await Promise.all(cloudTracks.map(t => deleteTrack(t)));
+          setSelectedTrackIds(new Set());
+        } catch(e) {
+          console.error(e);
+        }
+      }
+    }
+  };
+  
   const totalPages = Math.ceil(displayTracks.length / ITEMS_PER_PAGE);
   const boundedCurrentPage = Math.min(currentPage, Math.max(1, totalPages));
   const currentTracks = displayTracks.slice((boundedCurrentPage - 1) * ITEMS_PER_PAGE, boundedCurrentPage * ITEMS_PER_PAGE);
@@ -144,10 +215,11 @@ export function TracksPage() {
       </div>
 
       <AddToPlaylistModal
-        isOpen={!!trackToPlaylist}
-        onClose={() => setTrackToPlaylist(null)}
+        isOpen={!!trackToPlaylist || !!tracksToPlaylist}
+        onClose={() => { setTrackToPlaylist(null); setTracksToPlaylist(null); }}
         isAuthenticated={isAuthenticated}
         track={trackToPlaylist}
+        tracks={tracksToPlaylist || undefined}
       />
 
       <div className="flex items-center justify-between mb-4 mt-2 flex-wrap gap-4">
@@ -155,6 +227,20 @@ export function TracksPage() {
           <h2 className="text-lg md:text-xl font-bold text-white flex min-w-0 items-center gap-2">
             {activeTab === 'all' ? <><Clock size={18} className="text-[#00E5FF]" /> Songs List</> : <><Star size={18} className="text-yellow-400" /> Favorites List</>}
           </h2>
+          <button
+            onClick={() => {
+              if (selectedTrackIds.size === displayTracks.length && displayTracks.length > 0) {
+                setSelectedTrackIds(new Set());
+              } else {
+                setSelectedTrackIds(new Set(displayTracks.map(t => String(t.id))));
+              }
+            }}
+            className="p-1.5 rounded-full bg-white/5 border border-white/10 hover:bg-white/10 text-white/60 hover:text-white transition-colors flex items-center gap-2 px-3 text-sm"
+            title="Select All"
+          >
+            {selectedTrackIds.size === displayTracks.length && displayTracks.length > 0 ? <CheckSquare size={16} /> : <Square size={16} />}
+            <span className="hidden sm:inline">Select All</span>
+          </button>
           <button
             onClick={() => syncLibrary()}
             disabled={isLoading}
@@ -227,6 +313,30 @@ export function TracksPage() {
       </div>
 
       <div className="flex flex-col gap-1.5">
+        {selectedTrackIds.size > 0 && (
+          <div className="sticky top-0 z-20 mb-2 flex items-center justify-between bg-[#1A1A1A]/95 backdrop-blur border border-primary/30 rounded-xl p-3 shadow-lg shadow-black/50">
+            <div className="flex items-center gap-3">
+              <span className="text-primary font-bold">{selectedTrackIds.size} selected</span>
+              <button onClick={() => setSelectedTrackIds(new Set())} className="text-white/50 hover:text-white transition-colors" title="Clear selection">
+                <X size={18} />
+              </button>
+            </div>
+            <div className="flex items-center gap-2">
+              <button onClick={handleBatchAddToQueue} className="p-2 rounded-lg bg-white/5 hover:bg-white/10 text-white flex items-center gap-2 text-sm" title="Add to Queue">
+                <ListEnd size={16} /> <span className="hidden sm:inline">Queue</span>
+              </button>
+              <button onClick={() => setTracksToPlaylist(displayTracks.filter(t => selectedTrackIds.has(String(t.id))))} className="p-2 rounded-lg bg-white/5 hover:bg-white/10 text-white flex items-center gap-2 text-sm" title="Add to Playlist">
+                <ListPlus size={16} /> <span className="hidden sm:inline">Playlist</span>
+              </button>
+              <button onClick={handleBatchAddToFavorites} className="p-2 rounded-lg bg-white/5 hover:bg-white/10 text-white flex items-center gap-2 text-sm" title="Add to Favorites">
+                <Heart size={16} /> <span className="hidden sm:inline">Favorite</span>
+              </button>
+              <button onClick={handleBatchDelete} className="p-2 rounded-lg bg-red-500/10 hover:bg-red-500/20 text-red-400 flex items-center gap-2 text-sm" title="Delete">
+                <Trash2 size={16} /> <span className="hidden sm:inline">Delete</span>
+              </button>
+            </div>
+          </div>
+        )}
         {currentTracks.map((track, idx) => (
           <div
             key={track.id}
@@ -237,7 +347,24 @@ export function TracksPage() {
               : 'bg-white/[0.02] border-white/5 hover:bg-white/5 hover:border-white/10'
               }`}
           >
-            <span className="hidden sm:block text-xs text-white/20 w-5 text-right lg:group-hover:hidden">{(currentPage - 1) * ITEMS_PER_PAGE + idx + 1}</span>
+            {selectedTrackIds.size > 0 ? (
+              <button
+                onClick={(e) => toggleSelection(String(track.id), e)}
+                className="w-5 flex items-center justify-center transition-colors"
+              >
+                {selectedTrackIds.has(String(track.id)) ? <CheckSquare size={18} className="text-primary" /> : <Square size={18} className="text-white/50" />}
+              </button>
+            ) : (
+              <>
+                <span className="hidden sm:block text-xs text-white/20 w-5 text-right lg:group-hover:hidden">{(currentPage - 1) * ITEMS_PER_PAGE + idx + 1}</span>
+                <button
+                  onClick={(e) => toggleSelection(String(track.id), e)}
+                  className="hidden text-white/50 hover:text-white transition-colors lg:group-hover:flex w-5 items-center justify-center"
+                >
+                  <Square size={18} />
+                </button>
+              </>
+            )}
             <button
               aria-label="Play track"
               onClick={(e) => { e.stopPropagation(); playerState.playTrack(track, displayTracks); }}

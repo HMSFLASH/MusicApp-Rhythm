@@ -8,12 +8,13 @@ interface AddToPlaylistModalProps {
   onClose: () => void;
   isAuthenticated?: boolean;
   track: Track | null;
+  tracks?: Track[];
 }
 
 import { useGlobalAudio } from '../context/AudioContext';
 import { useAuth } from '../context/AuthContext';
 
-export function AddToPlaylistModal({ isOpen, onClose, track }: AddToPlaylistModalProps) {
+export function AddToPlaylistModal({ isOpen, onClose, track, tracks }: AddToPlaylistModalProps) {
   const { isAuthenticated } = useAuth();
   const { playerState } = useGlobalAudio();
   // eslint-disable-next-line @typescript-eslint/no-explicit-any
@@ -37,7 +38,8 @@ export function AddToPlaylistModal({ isOpen, onClose, track }: AddToPlaylistModa
     }
   }, [isOpen, isAuthenticated]);
 
-  if (!isOpen || !track) return null;
+  const items = tracks && tracks.length > 0 ? tracks : (track ? [track] : []);
+  if (!isOpen || items.length === 0) return null;
 
   const handleAddToPlaylist = async (playlistId: number) => {
     setAddingId(playlistId);
@@ -45,8 +47,18 @@ export function AddToPlaylistModal({ isOpen, onClose, track }: AddToPlaylistModa
     setSuccessMsg('');
 
     try {
-      const nameParam = track ? `?name=${encodeURIComponent(track.fileName || '')}` : '';
-      await axiosClient.post(`/api/playlists/${playlistId}/tracks/${track.id}${nameParam}`);
+      if (items.length === 1) {
+        const item = items[0];
+        const nameParam = item ? `?name=${encodeURIComponent(item.fileName || '')}` : '';
+        await axiosClient.post(`/api/playlists/${playlistId}/tracks/${item.id}${nameParam}`);
+      } else {
+        // Add multiple tracks sequentially to avoid concurrent issues or implement a batch API if available.
+        // Assuming no batch API, we do it via Promise.all
+        await Promise.all(items.map(item => {
+          const nameParam = item ? `?name=${encodeURIComponent(item.fileName || '')}` : '';
+          return axiosClient.post(`/api/playlists/${playlistId}/tracks/${item.id}${nameParam}`);
+        }));
+      }
 
       setSuccessMsg('Added to playlist successfully!');
       setTimeout(() => {
@@ -69,7 +81,11 @@ export function AddToPlaylistModal({ isOpen, onClose, track }: AddToPlaylistModa
         <div className="flex items-center justify-between gap-3 p-4 sm:p-6 border-b border-white/5 shrink-0">
           <div className="min-w-0">
             <h2 className="text-lg sm:text-xl font-bold text-white">Add to Playlist</h2>
-            <p className="text-sm text-white/50 truncate mt-1">{track.title || playerState.getTrackMetadata(track.id)?.title || (track.fileName ? (track.fileName.includes(' - ') ? track.fileName.split(' - ')[1].replace(/\.[^/.]+$/, "") : track.fileName.replace(/\.[^/.]+$/, "")) : 'Unknown Title')}</p>
+            <p className="text-sm text-white/50 truncate mt-1">
+              {items.length === 1 
+                ? (items[0].title || playerState.getTrackMetadata(items[0].id)?.title || (items[0].fileName ? (items[0].fileName.includes(' - ') ? items[0].fileName.split(' - ')[1].replace(/\.[^/.]+$/, "") : items[0].fileName.replace(/\.[^/.]+$/, "")) : 'Unknown Title'))
+                : `${items.length} tracks selected`}
+            </p>
           </div>
           <button 
             onClick={onClose}
