@@ -5,6 +5,7 @@ import { Play, Pause, Trash2, GripVertical, MoreHorizontal, ArrowUp, ArrowDown, 
 import type { Track } from '../hooks/useAudioPlayer';
 import { useVirtualList } from '../hooks/useVirtualList';
 import { AddToPlaylistModal } from '../components/AddToPlaylistModal';
+import { ActionMenu } from '../components/ActionMenu';
 import { useAuth } from '../context/AuthContext';
 
 const QUEUE_ITEM_HEIGHT = 84;
@@ -236,15 +237,15 @@ export function QueuePage() {
             </button>
           </div>
           <div className="flex items-center gap-2 flex-wrap">
-            <button onClick={() => setTracksToPlaylist(Array.from(selectedIndexes).map(idx => queue[idx]).filter(Boolean))} className="p-2 rounded-lg bg-white/5 hover:bg-white/10 text-white flex items-center gap-2 text-sm shrink-0 whitespace-nowrap" title="Add to Playlist">
-              <ListPlus size={16} /> <span className="hidden md:inline">Playlist</span>
-            </button>
-            <button onClick={handleBatchAddToFavorites} className="p-2 rounded-lg bg-white/5 hover:bg-white/10 text-white flex items-center gap-2 text-sm shrink-0 whitespace-nowrap" title="Add to Favorites">
-              <Heart size={16} /> <span className="hidden md:inline">Favorite</span>
-            </button>
-            <button onClick={handleBatchRemove} className="p-2 rounded-lg bg-red-500/10 hover:bg-red-500/20 text-red-400 flex items-center gap-2 text-sm shrink-0 whitespace-nowrap" title="Remove from Queue">
-              <Trash2 size={16} /> <span className="hidden md:inline">Remove</span>
-            </button>
+            <ActionMenu
+              ariaLabel="Batch actions"
+              buttonClassName="p-2 rounded-lg bg-white/5 hover:bg-white/10 text-white flex items-center justify-center transition-colors"
+              actions={[
+                { label: 'Add to Playlist', icon: <ListPlus size={16} />, onSelect: () => setTracksToPlaylist(Array.from(selectedIndexes).map(idx => queue[idx]).filter(Boolean)) },
+                { label: 'Add to Favorites', icon: <Heart size={16} />, onSelect: handleBatchAddToFavorites },
+                { label: 'Remove from Queue', icon: <Trash2 size={16} />, onSelect: handleBatchRemove, tone: 'danger' },
+              ]}
+            />
           </div>
         </div>
       )}

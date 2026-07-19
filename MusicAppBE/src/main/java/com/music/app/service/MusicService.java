@@ -215,13 +215,6 @@ public class MusicService {
                     .name(fileName)
                     .sourceType("DRIVE")
                     .driveFileId(request.getDriveFileId())
-                    .title(firstNonBlank(request.getTitle(), stripExtension(fileName)))
-                    .artist(request.getArtist())
-                    .album(request.getAlbum())
-                    .genre(request.getGenre())
-                    .imageUrl(request.getImageUrl())
-                    .lyrics(request.getLyrics())
-                    .durationSeconds(request.getDurationSeconds())
                     .user(user)
                     .build();
 

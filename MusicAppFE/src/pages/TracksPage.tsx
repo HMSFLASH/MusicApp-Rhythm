@@ -358,20 +358,31 @@ export function TracksPage() {
               <button onClick={() => setSelectedTrackIds(new Set())} className="text-white/50 hover:text-white transition-colors shrink-0" title="Clear selection">
                 <X size={18} />
               </button>
+              <button
+                onClick={() => {
+                  if (selectedTrackIds.size === displayTracks.length && displayTracks.length > 0) {
+                    setSelectedTrackIds(new Set());
+                  } else {
+                    setSelectedTrackIds(new Set(displayTracks.map(t => String(t.id))));
+                  }
+                }}
+                className="p-1.5 rounded-full bg-white/5 border border-white/10 hover:bg-white/10 text-white/60 hover:text-white transition-colors flex items-center gap-2 px-3 text-sm ml-2 shrink-0 whitespace-nowrap"
+              >
+                {selectedTrackIds.size === displayTracks.length && displayTracks.length > 0 ? <CheckSquare size={16} /> : <Square size={16} />}
+                <span className="hidden md:inline">Select All</span>
+              </button>
             </div>
             <div className="flex items-center gap-2 flex-wrap">
-              <button onClick={handleBatchAddToQueue} className="p-2 rounded-lg bg-white/5 hover:bg-white/10 text-white flex items-center gap-2 text-sm shrink-0 whitespace-nowrap" title="Add to Queue">
-                <ListEnd size={16} /> <span className="hidden md:inline">Queue</span>
-              </button>
-              <button onClick={() => setTracksToPlaylist(displayTracks.filter(t => selectedTrackIds.has(String(t.id))))} className="p-2 rounded-lg bg-white/5 hover:bg-white/10 text-white flex items-center gap-2 text-sm shrink-0 whitespace-nowrap" title="Add to Playlist">
-                <ListPlus size={16} /> <span className="hidden md:inline">Playlist</span>
-              </button>
-              <button onClick={handleBatchAddToFavorites} className="p-2 rounded-lg bg-white/5 hover:bg-white/10 text-white flex items-center gap-2 text-sm shrink-0 whitespace-nowrap" title="Add to Favorites">
-                <Heart size={16} /> <span className="hidden md:inline">Favorite</span>
-              </button>
-              <button onClick={handleBatchDelete} className="p-2 rounded-lg bg-red-500/10 hover:bg-red-500/20 text-red-400 flex items-center gap-2 text-sm shrink-0 whitespace-nowrap" title="Delete">
-                <Trash2 size={16} /> <span className="hidden md:inline">Delete</span>
-              </button>
+              <ActionMenu
+                ariaLabel="Batch actions"
+                buttonClassName="p-2 rounded-lg bg-white/5 hover:bg-white/10 text-white flex items-center justify-center transition-colors"
+                actions={[
+                  { label: 'Add to Queue', icon: <ListEnd size={16} />, onSelect: handleBatchAddToQueue },
+                  { label: 'Add to Playlist', icon: <ListPlus size={16} />, onSelect: () => setTracksToPlaylist(displayTracks.filter(t => selectedTrackIds.has(String(t.id)))) },
+                  { label: 'Add to Favorites', icon: <Heart size={16} />, onSelect: handleBatchAddToFavorites },
+                  { label: 'Delete', icon: <Trash2 size={16} />, onSelect: handleBatchDelete, tone: 'danger' },
+                ]}
+              />
             </div>
           </div>
         )}

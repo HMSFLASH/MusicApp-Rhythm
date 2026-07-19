@@ -46,7 +46,8 @@ public class BackupService {
             .registerModule(new com.fasterxml.jackson.datatype.jsr310.JavaTimeModule())
             .disable(com.fasterxml.jackson.databind.SerializationFeature.WRITE_DATES_AS_TIMESTAMPS);
 
-    public void backupToDrive(Map<String, Object> config, Map<String, Object> idbData, String userId) throws org.hibernate.FetchNotFoundException {
+    public void backupToDrive(Map<String, Object> config, Map<String, Object> idbData, String userId)
+            throws org.hibernate.FetchNotFoundException {
         User user = userRepository.findById(userId).orElseThrow(() -> new AppException(ErrorCode.UNAUTHENTICATED));
         if (user.getRefreshToken() == null) {
             throw new AppException(ErrorCode.DRIVE_NOT_LINKED);
@@ -174,16 +175,9 @@ public class BackupService {
             return null;
         }
         MusicLibrary lib = musicLibraryRepository.findByDriveFileIdAndUserId(driveFileId, user.getId())
-                .orElseGet(() -> MusicLibrary.builder().driveFileId(driveFileId).sourceType("DRIVE").user(user).build());
-        lib.setName(trackDto.getName() != null ? trackDto.getName()
-                : (trackDto.getTitle() != null ? trackDto.getTitle() : "Drive File"));
-        lib.setTitle(trackDto.getTitle());
-        lib.setArtist(trackDto.getArtist());
-        lib.setAlbum(trackDto.getAlbum());
-        lib.setGenre(trackDto.getGenre());
-        lib.setImageUrl(trackDto.getImageUrl());
-        lib.setLyrics(trackDto.getLyrics());
-        lib.setDurationSeconds(trackDto.getDurationSeconds());
+                .orElseGet(
+                        () -> MusicLibrary.builder().driveFileId(driveFileId).sourceType("DRIVE").user(user).build());
+        lib.setName(trackDto.getName() != null ? trackDto.getName() : "Drive File");
         if (trackDto.getPlayCount() != null) {
             lib.setPlayCount(trackDto.getPlayCount());
         }
