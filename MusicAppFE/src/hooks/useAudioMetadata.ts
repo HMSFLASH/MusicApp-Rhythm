@@ -379,7 +379,7 @@ export function useAudioMetadata(isAuthenticated: boolean, queueState: any, sett
                     if (Array.isArray(tags)) {
                         const lyricTags = tags.filter((tag: { id?: string; value?: unknown }) => tag.id?.toLowerCase().includes('lyric') || tag.id === 'USLT' || tag.id === 'SYLT');
                         if (lyricTags && lyricTags.length > 0) {
-                            extractedLyrics = lyricTags.map(lyricTag => 
+                            extractedLyrics = lyricTags.map(lyricTag =>
                                 typeof lyricTag.value === 'string'
                                     ? lyricTag.value
                                     : ((lyricTag.value as { text?: string }).text || JSON.stringify(lyricTag.value))
@@ -528,8 +528,6 @@ export function useAudioMetadata(isAuthenticated: boolean, queueState: any, sett
         });
 
         if (imageCacheRef.current.has(trackId)) return;
-
-        await reloadMetadataFromBackend(withoutBackendImageUrl(track));
     }
 
     useEffect(() => {

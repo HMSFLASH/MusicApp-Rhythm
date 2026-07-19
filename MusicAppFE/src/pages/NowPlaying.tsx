@@ -6,7 +6,7 @@ import { HorizontalSlider } from '../components/HorizontalSlider';
 import { SpeedPitchPanel } from '../components/SpeedPitchPanel';
 import { useLibrary } from '../context/LibraryContext';
 import { LyricsView } from '../components/LyricsView';
-import { ScreenSpectrum } from '../components/ScreenSpectrum';
+
 import { useNavigate } from 'react-router-dom';
 import { useTranslation } from 'react-i18next';
 import { useConfirm } from '../context/ConfirmContext';
@@ -173,8 +173,7 @@ export function NowPlaying() {
   // Metadata Modal state
   const [showMetadata, setShowMetadata] = useState(false);
   // Lyrics Modal state
-  const [showLyrics, setShowLyrics] = useState(false);
-  const [showSpectrum, setShowSpectrum] = useState(false);
+    const [showLyrics, setShowLyrics] = useState(false);
 
   // Audio Device state
   const [showDeviceMenu, setShowDeviceMenu] = useState(false);
@@ -528,16 +527,7 @@ export function NowPlaying() {
                             <span>{t('nowPlaying.reloadFromDrive')}</span>
                           </button>
                         )}
-                        <button
-                          onClick={() => {
-                            setShowMenu(false);
-                            setShowSpectrum(!showSpectrum);
-                          }}
-                          className="w-full flex items-center gap-3 px-4 py-3 text-sm text-white/80 hover:bg-white/5 transition-colors border-b border-white/5"
-                        >
-                          <Activity size={16} className={showSpectrum ? 'text-primary' : ''} />
-                          <span>Screen Spectrum (Classic)</span>
-                        </button>
+
                         {currentTrack.sourceType !== 'LOCAL' && (
                           <button
                             onClick={async () => {
@@ -757,11 +747,7 @@ export function NowPlaying() {
             </div>
 
             <div className="flex items-center gap-4 font-mono text-sm font-bold text-white/90 mb-8 select-none relative">
-              {showSpectrum && playerState.masterAnalyserRef?.current && (
-                <div className="absolute left-[56px] right-[56px] bottom-1/2 h-24 opacity-100 pointer-events-none z-0">
-                  <ScreenSpectrum analyser={playerState.masterAnalyserRef.current} />
-                </div>
-              )}
+
               <span className="min-w-[40px] text-right z-10">{formatTime(displayTime)}</span>
               <div
                 ref={progressBarRef}

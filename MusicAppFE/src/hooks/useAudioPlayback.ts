@@ -420,6 +420,10 @@ export function useAudioPlayback(
       audioRef.current.crossOrigin = "use-credentials";
       audioRef.current.volume = savedState.volume ?? 1;
 
+      if (savedState.sinkId && typeof (audioRef.current as any).setSinkId === 'function') {
+        (audioRef.current as any).setSinkId(savedState.sinkId).catch((e: any) => console.warn('Failed to restore HTMLAudioElement sinkId', e));
+      }
+
       audioRef.current.addEventListener('timeupdate', () => {
         if (document.hidden) return;
         if (rafRef.current) return; // Ignore native timeupdate if raf is active
@@ -467,6 +471,9 @@ export function useAudioPlayback(
       const renderedAudio = new Audio();
       renderedAudio.volume = savedState.volume ?? 1;
       renderedAudio.preload = 'auto';
+      if (savedState.sinkId && typeof (renderedAudio as any).setSinkId === 'function') {
+        (renderedAudio as any).setSinkId(savedState.sinkId).catch((e: any) => console.warn('Failed to restore rendered HTMLAudioElement sinkId', e));
+      }
       renderedAudioRef.current = renderedAudio;
 
       renderedAudio.addEventListener('timeupdate', () => {

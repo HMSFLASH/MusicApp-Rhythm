@@ -8,8 +8,6 @@ export function OAuthCallback() {
   const { setIsAuthenticated } = useAuth();
 
   useEffect(() => {
-    // With HttpOnly cookies, the backend sets the cookie and redirects here.
-    // We just need to mark as authenticated and redirect home.
     setIsAuthenticated(true);
     navigate('/', { replace: true });
   }, [navigate, setIsAuthenticated]);

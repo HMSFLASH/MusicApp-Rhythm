@@ -30,6 +30,7 @@ import {
 } from './audioLoudness';
 import { getAudioFxActivity } from './audioFxActivity';
 import { processGraphicEqBands } from '../utils/eqFitting';
+import { getAudioConfigStorageKey } from './audioStorage';
 import React from 'react';
 
 export {
@@ -48,7 +49,7 @@ const disconnectNode = (node: AudioNode | null) => {
 
 // eslint-disable-next-line @typescript-eslint/no-explicit-any
 export function useAudioContext(effectsState: any) {
-  const { eqBands: rawEqBands, preampGain, bassGain, trebleGain, compThreshold, compRatio, compKnee, compAttack, compRelease, compRmsSize, compMakeupGain, panValue, stereoWidth, reverbMix, reverbTime, useOversample, loudnessNormalization, fxEnabled, audioIsStereo = true, } = effectsState;
+  const { eqBands: rawEqBands, preampGain, bassGain, trebleGain, compThreshold, compRatio, compKnee, compAttack, compRelease, compRmsSize, compMakeupGain, panValue, stereoWidth, reverbMix, reverbTime, useOversample, loudnessNormalization, fxEnabled, audioIsStereo = true, isAuthenticated } = effectsState;
   const [audioSampleRate, setAudioSampleRate] = useState(44100);
 
   // Audio Context and Core Nodes
@@ -362,6 +363,17 @@ export function useAudioContext(effectsState: any) {
         audioContextRef.current = new AudioContextCtor({ latencyHint: 'playback' });
       } catch {
         audioContextRef.current = new AudioContextCtor();
+      }
+      try {
+        if (isAuthenticated !== undefined) {
+          const configStorageKey = getAudioConfigStorageKey(isAuthenticated);
+          const existing = JSON.parse(localStorage.getItem(configStorageKey) || '{}');
+          if (existing.sinkId && typeof (audioContextRef.current as any).setSinkId === 'function') {
+            (audioContextRef.current as any).setSinkId(existing.sinkId).catch((e: any) => console.warn('Failed to restore AudioContext sinkId', e));
+          }
+        }
+      } catch (e) {
+        // ignore
       }
     }
     const ctx = audioContextRef.current;

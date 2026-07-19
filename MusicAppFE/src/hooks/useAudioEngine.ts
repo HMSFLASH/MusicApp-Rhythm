@@ -30,6 +30,7 @@ export function useAudioEngine(
   const contextState = useAudioContext({
     ...effectsState,
     audioIsStereo: currentTrackChannelCount == null ? true : currentTrackChannelCount >= 2,
+    isAuthenticated,
   });
 
   const playbackState = useAudioPlayback(
