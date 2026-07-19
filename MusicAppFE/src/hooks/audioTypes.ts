@@ -9,79 +9,98 @@ export const EQ_PRESETS = {
 };
 
 export const STYLISTIC_PRESETS = {
-  'BASS_BOOST': {
-    name: 'Bass Boost',
-    eqBands: [31.5, 63, 125, 250, 500, 1000, 2000, 4000, 8000, 16000],
-    gains: [5, 6, 4, 1, 0, -1, 0, 1, 2, 2],
-    bassGain: 5,
-    trebleGain: 1,
-    preampGain: -4
+  'BASS': {
+    name: 'Bass',
+    eqBands: [16, 20, 26, 32, 41, 52, 66, 84, 105, 135, 170, 220, 280, 350, 440, 560, 720, 910, 1200, 1500, 1900, 2300, 3000, 3800, 4800, 6100, 7700, 10000, 12500, 16000, 20000],
+    gains: [5.8, 5.8, 5.8, 5.8, 5.8, 5.8, 5.7, 4.8, 3.8, 2.7, 1.9, 0.7, -0.2, -0.6, -1.2, -1.5, -1.5, -1.5, -1.3, -0.8, -0.2, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0],
+    bassGain: 2.3,
+    trebleGain: 0,
+    preampGain: 0
   },
-  'VOCAL_CLEAR': {
-    name: 'Vocal Clear',
-    eqBands: [31.5, 63, 125, 250, 500, 1000, 2000, 4000, 8000, 16000],
-    gains: [-2, -2, -1, 1, 3, 5, 4, 2, 1, 0],
-    bassGain: -2,
-    trebleGain: 2,
-    preampGain: -2
-  },
-  'TREBLE_BRIGHT': {
-    name: 'Treble Bright',
-    eqBands: [31.5, 63, 125, 250, 500, 1000, 2000, 4000, 8000, 16000],
-    gains: [-2, -1, 0, 0, 0, 1, 3, 4, 5, 5],
-    bassGain: -1,
-    trebleGain: 5,
-    preampGain: -3
-  },
-  'NIGHT_MODE': {
-    name: 'Night Mode',
-    eqBands: [31.5, 63, 125, 250, 500, 1000, 2000, 4000, 8000, 16000],
-    gains: [-5, -4, -2, -1, 1, 3, 1, -1, -3, -4],
-    bassGain: -5,
-    trebleGain: -4,
-    preampGain: 2
-  },
-  'EDM_DANCE': {
-    name: 'EDM / Dance',
-    eqBands: [31.5, 63, 125, 250, 500, 1000, 2000, 4000, 8000, 16000],
-    gains: [5, 6, 3, 0, -2, -1, 2, 4, 5, 4],
-    bassGain: 4,
-    trebleGain: 4,
-    preampGain: -4
-  },
-  'ROCK': {
-    name: 'Rock',
-    eqBands: [31.5, 63, 125, 250, 500, 1000, 2000, 4000, 8000, 16000],
-    gains: [4, 3, 2, 0, -2, -1, 1, 3, 4, 3],
-    bassGain: 3,
+  'BASS_TREBLE': {
+    name: 'Bass & Treble',
+    eqBands: [16, 20, 26, 32, 41, 52, 66, 84, 105, 135, 170, 220, 280, 350, 440, 560, 720, 910, 1200, 1500, 1900, 2300, 3000, 3800, 4800, 6100, 7700, 10000, 12500, 16000, 20000],
+    gains: [5.8, 5.8, 5.8, 5.8, 5.8, 5.8, 5.7, 4.8, 3.8, 2.7, 1.9, 0.7, -0.2, -0.6, -1.2, -1.5, -1.5, -1.5, -1.3, -0.8, -0.2, 0.3, 0.7, 1.3, 2.4, 3.8, 5.6, 5.8, 5.8, 5.8, 5.8],
+    bassGain: 2.3,
     trebleGain: 3,
-    preampGain: -3
+    preampGain: 0
   },
-  'POP': {
-    name: 'Pop',
-    eqBands: [31.5, 63, 125, 250, 500, 1000, 2000, 4000, 8000, 16000],
-    gains: [-1, 0, 2, 4, 3, 1, 2, 3, 2, 1],
-    bassGain: 1,
-    trebleGain: 2,
-    preampGain: -2
+  'PARAMETRIC_BASS_TREBLE': {
+    name: 'Parametric Bass & Treble',
+    isParametric: true,
+    bands: [
+      {
+        id: 'param_bass_treble_1',
+        frequency: 100,
+        gain: 7,
+        q: 1.03,
+        channel: 'L+R' as const,
+        type: 'lowshelf' as const
+      },
+      {
+        id: 'param_bass_treble_2',
+        frequency: 8000,
+        gain: 6.2,
+        q: 0.83,
+        channel: 'L+R' as const,
+        type: 'highshelf' as const
+      }
+    ],
+    bassGain: 0,
+    trebleGain: 0,
+    preampGain: 0
   },
-  'ACOUSTIC': {
-    name: 'Acoustic / Classical',
-    eqBands: [31.5, 63, 125, 250, 500, 1000, 2000, 4000, 8000, 16000],
-    gains: [2, 3, 2, 1, 0, 1, 2, 3, 2, 1],
-    bassGain: 2,
-    trebleGain: 2,
-    preampGain: -2
+  'BASS_EXTREME': {
+    name: 'Bass Extreme',
+    eqBands: [16, 20, 26, 32, 41, 52, 66, 84, 105, 135, 170, 220, 280, 350, 440, 560, 720, 910, 1200, 1500, 1900, 2300, 3000, 3800, 4800, 6100, 7700, 10000, 12500, 16000, 20000],
+    gains: [6.0, 6.0, 6.0, 6.0, 6.0, 6.0, 5.9, 5.6, 5.2, 4.5, 3.1, 1.2, -0.2, -0.6, -1.2, -1.5, -1.5, -1.5, -1.3, -0.8, -0.2, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0],
+    bassGain: 9,
+    trebleGain: 0,
+    preampGain: -2.4
   },
-  'JAZZ': {
-    name: 'Jazz',
-    eqBands: [31.5, 63, 125, 250, 500, 1000, 2000, 4000, 8000, 16000],
-    gains: [3, 4, 2, 1, -1, -2, 0, 2, 3, 2],
-    bassGain: 3,
-    trebleGain: 2,
-    preampGain: -2
+  'CLARITY': {
+    name: 'Clarity',
+    isParametric: true,
+    bands: [
+      {
+        id: 'param_clarity_1',
+        frequency: 3350,
+        gain: 6,
+        q: 1.25,
+        channel: 'L+R' as const,
+        type: 'highshelf' as const
+      }
+    ],
+    bassGain: 0,
+    trebleGain: 0,
+    preampGain: 0
   }
 };
+
+export function expandResonantEqBands(bands: EqBand[]): EqBand[] {
+  return bands.flatMap(band => {
+    if ((band.type === 'lowshelf' || band.type === 'highshelf') && band.q && band.q > 0.707) {
+      const q = Number(band.q);
+      const gain = Number(band.gain) || 0;
+      if (Math.abs(gain) < 0.001) return [band];
+
+      const qExcess = Math.max(0, q - 0.707);
+
+      let peakGain = Math.sign(gain) * qExcess * Math.abs(gain) * 1.0;
+
+      const offset = 1 + qExcess * 0.15;
+      const peakFreq = band.type === 'lowshelf'
+        ? band.frequency / offset
+        : band.frequency * offset;
+
+      return [
+        { ...band, q: 1, id: `${band.id}_shelf` },
+        { ...band, type: 'peaking', frequency: peakFreq, gain: peakGain, id: `${band.id}_peak` }
+      ];
+    }
+    return [band];
+  });
+}
 
 export type CompressorSettings = {
   threshold: number;

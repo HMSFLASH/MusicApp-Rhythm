@@ -1093,6 +1093,7 @@ export function useAudioPlayback(
       fxEnabled: fxEnabledRef.current || {},
       irBuffer: irBufferRef.current,
       pitchRate: (speedPitchMode === 'advanced') ? (overridePitchRate ?? pitchRateRef.current) : undefined,
+      isParametricPreset: effectsState.isParametricPreset,
     });
 
   const getRealtimeTrackLoudnessGain = async (track: Track, audioUrl: string) => {

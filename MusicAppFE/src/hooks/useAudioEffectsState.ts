@@ -126,8 +126,8 @@ const createEqBands = (frequencies: number[], gains?: number[]): EqBand[] =>
     frequency: freq,
     gain: gains?.[i] ?? 0,
     q: calculateGraphicEqQ(frequencies, i),
-    channel: 'L+R',
-    type: 'peaking'
+    channel: 'L+R' as const,
+    type: 'peaking' as const
   }));
 
 const clampPreampGain = (value: number) => clamp(value, -12, 6);
@@ -158,7 +158,9 @@ export function useAudioEffectsState(savedState: SavedAudioEffectsState = {}) {
   const [eqPresetName, setEqPresetName] = useState<string>(savedState.eqPresetName || '10_BANDS');
   const [eqBands, setEqBands] = useState<EqBand[]>(() => {
     const initialBands = savedStylisticPreset
-      ? createEqBands(savedStylisticPreset.eqBands, savedStylisticPreset.gains)
+      ? ('bands' in savedStylisticPreset)
+        ? (savedStylisticPreset.bands as EqBand[])
+        : createEqBands((savedStylisticPreset as any).eqBands, (savedStylisticPreset as any).gains)
       : savedState.eqBands
         ? initialPresetIsParametric
           ? savedState.eqBands
@@ -261,7 +263,11 @@ export function useAudioEffectsState(savedState: SavedAudioEffectsState = {}) {
     const preset = STYLISTIC_PRESETS[presetName as keyof typeof STYLISTIC_PRESETS];
     if (preset) {
       setEqPresetName(presetName);
-      setEqBands(createEqBands(preset.eqBands, preset.gains));
+      if ('bands' in preset) {
+        setEqBands(preset.bands as EqBand[]);
+      } else {
+        setEqBands(createEqBands((preset as any).eqBands, (preset as any).gains));
+      }
       setBassGain(preset.bassGain);
       setTrebleGain(preset.trebleGain);
       setPreampGain(preset.preampGain);
@@ -270,9 +276,11 @@ export function useAudioEffectsState(savedState: SavedAudioEffectsState = {}) {
 
   const isCurrentParametricEq = useCallback(() => {
     const currentPreset = customEqPresets.find(p => p.name === eqPresetName);
+    const currentStylisticPreset = STYLISTIC_PRESETS[eqPresetName as keyof typeof STYLISTIC_PRESETS];
     return eqPresetName === 'PARAMETRIC'
       || currentPreset?.presetMode === 'parametric'
-      || Boolean(currentPreset?.isCustomOrigin && hasParametricBandSettings(currentPreset.bands));
+      || Boolean(currentPreset?.isCustomOrigin && hasParametricBandSettings(currentPreset.bands))
+      || Boolean(currentStylisticPreset && 'bands' in currentStylisticPreset);
   }, [customEqPresets, eqPresetName]);
 
   const setCustomPreset = useCallback(() => {
@@ -380,6 +388,7 @@ export function useAudioEffectsState(savedState: SavedAudioEffectsState = {}) {
     applyPreset, applyStylisticPreset, setCustomPreset, setParametricPreset,
     saveCustomPreset, applyCustomSavedPreset, renameCustomPreset, deleteCustomPreset,
     addCustomEqBand, removeCustomEqBand,
-    updateEqGain, updateEqBandFreq, updateEqBandQ, updateEqBandChannel, updateEqBandType
+    updateEqGain, updateEqBandFreq, updateEqBandQ, updateEqBandChannel, updateEqBandType,
+    isParametricPreset: isCurrentParametricEq(),
   };
 }

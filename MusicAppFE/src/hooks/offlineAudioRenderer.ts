@@ -1,4 +1,5 @@
 import type { AudioRenderParams, FxEnabledFlags } from './audioRenderSignature';
+import { generateGraphicEqImpulseResponse } from './firFilterGenerator';
 import {
   clamp,
   compressorAttackSeconds,
@@ -28,6 +29,7 @@ import {
   INPUT_HEADROOM_DB,
 } from './audioLoudness';
 import { getAudioFxActivity, isActiveEqBand } from './audioFxActivity';
+import { expandResonantEqBands } from './audioTypes';
 
 type RenderOfflineAudioOptions = {
   audioBuffer: AudioBuffer;
@@ -35,6 +37,7 @@ type RenderOfflineAudioOptions = {
   fxEnabled: FxEnabledFlags;
   irBuffer: AudioBuffer | null;
   pitchRate?: number;
+  isParametricPreset?: boolean;
 };
 
 export const renderOfflineAudio = async ({
@@ -43,6 +46,7 @@ export const renderOfflineAudio = async ({
   fxEnabled,
   irBuffer,
   pitchRate: rawPitchRate,
+  isParametricPreset: paramPresetOpt,
 }: RenderOfflineAudioOptions) => {
   const pitchRate = (rawPitchRate && Number.isFinite(rawPitchRate) && rawPitchRate > 0) ? rawPitchRate : 1;
   if (!audioBuffer) return audioBuffer;
@@ -72,7 +76,8 @@ export const renderOfflineAudio = async ({
 
   let autoPreamp = 0;
   let processedEqBands = eqBands;
-  if (enabled.interpolate) {
+  const isParametricPreset = paramPresetOpt ?? eqBands.some((band: any) => band.q !== undefined);
+  if (!isParametricPreset) {
     const result = processGraphicEqBands(eqBands, sampleRate, true);
     processedEqBands = result.fittedBands;
     autoPreamp = result.autoPreamp;
@@ -154,77 +159,93 @@ export const renderOfflineAudio = async ({
     currentNode = preamp;
   }
 
-  const activeEqBands = activity.eq && processedEqBands ? processedEqBands.filter(isActiveEqBand) : [];
-  if (activeEqBands.length > 0) {
-    const filters = activeEqBands.map((band) => {
-      const filter = offlineCtx.createBiquadFilter();
-      filter.type = band.type || 'peaking';
-      filter.frequency.value = band.frequency;
-      filter.Q.value = band.q;
-      filter.gain.value = band.gain;
-      return filter;
-    });
+  if (activity.eq) {
+    if (!isParametricPreset && eqBands && eqBands.length > 0) {
+      const convolver = offlineCtx.createConvolver();
+      convolver.normalize = false;
+      const ir = generateGraphicEqImpulseResponse(eqBands, offlineCtx.sampleRate, 4096);
+      const buffer = offlineCtx.createBuffer(2, ir.length, offlineCtx.sampleRate);
+      buffer.copyToChannel(ir as any, 0);
+      buffer.copyToChannel(ir as any, 1);
+      convolver.buffer = buffer;
+      
+      currentNode.connect(convolver);
+      currentNode = convolver;
+    } else {
+      const expandedEqBands = expandResonantEqBands(processedEqBands || []);
+      const activeEqBands = expandedEqBands.filter(isActiveEqBand);
+      if (activeEqBands.length > 0) {
+        const filters = activeEqBands.map((band) => {
+          const filter = offlineCtx.createBiquadFilter();
+          filter.type = band.type || 'peaking';
+          filter.frequency.value = band.frequency;
+          filter.Q.value = band.q;
+          filter.gain.value = band.gain;
+          return filter;
+        });
 
-    const splitter = offlineCtx.createChannelSplitter(2);
-    const merger = offlineCtx.createChannelMerger(2);
+        const splitter = offlineCtx.createChannelSplitter(2);
+        const merger = offlineCtx.createChannelMerger(2);
 
-    const stereoFilters = filters.filter((_, i) => activeEqBands[i].channel === 'L+R');
-    const leftFilters = filters.filter((_, i) => activeEqBands[i].channel === 'L');
-    const rightFilters = filters.filter((_, i) => activeEqBands[i].channel === 'R');
+        const stereoFilters = filters.filter((_, i) => activeEqBands[i].channel === 'L+R');
+        const leftFilters = filters.filter((_, i) => activeEqBands[i].channel === 'L');
+        const rightFilters = filters.filter((_, i) => activeEqBands[i].channel === 'R');
 
-    let prevNode: BiquadFilterNode | null = null;
-    for (const filter of stereoFilters) {
-      if (prevNode) prevNode.connect(filter);
-      else currentNode.connect(filter);
-      prevNode = filter;
+        let prevNode: BiquadFilterNode | null = null;
+        for (const filter of stereoFilters) {
+          if (prevNode) prevNode.connect(filter);
+          else currentNode.connect(filter);
+          prevNode = filter;
+        }
+        if (prevNode) prevNode.connect(splitter);
+        else currentNode.connect(splitter);
+
+        let leftNode: AudioNode = splitter;
+        let prevLeft: BiquadFilterNode | null = null;
+        for (const filter of leftFilters) {
+          if (prevLeft) prevLeft.connect(filter);
+          else leftNode.connect(filter, 0, 0);
+          leftNode = filter;
+          prevLeft = filter;
+        }
+        if (prevLeft) prevLeft.connect(merger, 0, 0);
+        else splitter.connect(merger, 0, 0);
+
+        let rightNode: AudioNode = splitter;
+        let prevRight: BiquadFilterNode | null = null;
+        for (const filter of rightFilters) {
+          if (prevRight) prevRight.connect(filter);
+          else rightNode.connect(filter, 1, 0);
+          rightNode = filter;
+          prevRight = filter;
+        }
+        if (prevRight) rightNode.connect(merger, 0, 1);
+        else splitter.connect(merger, 1, 1);
+
+        currentNode = merger;
+      }
     }
-    if (prevNode) prevNode.connect(splitter);
-    else currentNode.connect(splitter);
-
-    let leftNode: AudioNode = splitter;
-    let prevLeft: BiquadFilterNode | null = null;
-    for (const filter of leftFilters) {
-      if (prevLeft) prevLeft.connect(filter);
-      else splitter.connect(filter, 0, 0);
-      prevLeft = filter;
-    }
-    if (prevLeft) leftNode = prevLeft;
-
-    let rightNode: AudioNode = splitter;
-    let prevRight: BiquadFilterNode | null = null;
-    for (const filter of rightFilters) {
-      if (prevRight) prevRight.connect(filter);
-      else splitter.connect(filter, 1, 0);
-      prevRight = filter;
-    }
-    if (prevRight) rightNode = prevRight;
-
-    leftNode.connect(merger, leftNode === splitter ? 0 : 0, 0);
-    rightNode.connect(merger, rightNode === splitter ? 1 : 0, 1);
-
-    currentNode = merger;
   }
 
   if (activity.tone) {
-    if (bassGain !== 0) {
-      const bass = offlineCtx.createBiquadFilter();
-      bass.type = 'lowshelf';
-      bass.frequency.value = 150;
-      bass.gain.value = bassGain;
+    const toneBands = [];
+    if (Math.abs(bassGain) > 0.001) toneBands.push({ id: 'bass', type: 'lowshelf', frequency: 150, q: 1, gain: bassGain } as any);
+    if (Math.abs(trebleGain) > 0.001) toneBands.push({ id: 'treble', type: 'highshelf', frequency: 4000, q: 1, gain: trebleGain } as any);
 
-      currentNode.connect(bass);
-      currentNode = bass;
-    }
+    const expandedToneBands = expandResonantEqBands(toneBands);
 
-    if (trebleGain !== 0) {
-      const treble = offlineCtx.createBiquadFilter();
-      treble.type = 'highshelf';
-      treble.frequency.value = 4000;
-      treble.gain.value = trebleGain;
+    let prevTone = currentNode;
+    expandedToneBands.forEach((band) => {
+      const filter = offlineCtx.createBiquadFilter();
+      filter.type = band.type || 'peaking';
+      filter.frequency.value = band.frequency;
+      filter.Q.value = band.q || 1;
+      filter.gain.value = band.gain;
 
-      currentNode.connect(treble);
-      currentNode = treble;
-    }
+      prevTone.connect(filter);
+      prevTone = filter;
+    });
+    currentNode = prevTone;
   }
 
   if (activity.comp) {

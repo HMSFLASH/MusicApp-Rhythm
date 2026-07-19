@@ -1,4 +1,6 @@
 import { useRef, useEffect, useCallback, useState } from 'react';
+import { expandResonantEqBands } from './audioTypes';
+import { generateGraphicEqImpulseResponse } from './firFilterGenerator';
 import {
   applyCustomDynamicsCompressorSettings,
   applyMasterLimiterCompressorState,
@@ -49,7 +51,7 @@ const disconnectNode = (node: AudioNode | null) => {
 
 // eslint-disable-next-line @typescript-eslint/no-explicit-any
 export function useAudioContext(effectsState: any) {
-  const { eqBands: rawEqBands, preampGain, bassGain, trebleGain, compThreshold, compRatio, compKnee, compAttack, compRelease, compRmsSize, compMakeupGain, panValue, stereoWidth, reverbMix, reverbTime, useOversample, loudnessNormalization, fxEnabled, audioIsStereo = true, isAuthenticated } = effectsState;
+  const { eqBands: rawEqBands, isParametricPreset, preampGain, bassGain, trebleGain, compThreshold, compRatio, compKnee, compAttack, compRelease, compRmsSize, compMakeupGain, panValue, stereoWidth, reverbMix, reverbTime, useOversample, loudnessNormalization, fxEnabled, audioIsStereo = true, isAuthenticated } = effectsState;
   const [audioSampleRate, setAudioSampleRate] = useState(44100);
 
   // Audio Context and Core Nodes
@@ -80,12 +82,12 @@ export function useAudioContext(effectsState: any) {
   const bufferVolumeNodeRef = useRef<GainNode | null>(null);
 
   const { eqBands, autoPreamp, eqResponseData } = React.useMemo(() => {
-    if (fxEnabled?.interpolate) {
-      const result = processGraphicEqBands(rawEqBands, audioSampleRate, true); // qualityMode = true
+    if (!isParametricPreset) {
+      const result = processGraphicEqBands(rawEqBands, audioSampleRate, true);
       return { eqBands: result.fittedBands, autoPreamp: result.autoPreamp, eqResponseData: result };
     }
     return { eqBands: rawEqBands, autoPreamp: 0, eqResponseData: null };
-  }, [rawEqBands, fxEnabled?.interpolate, audioSampleRate]);
+  }, [rawEqBands, audioSampleRate, isParametricPreset]);
   const effectivePreampGain = (fxEnabled?.preamp ? (preampGain || 0) : 0) + autoPreamp;
   const effectiveFxEnabled = React.useMemo(() => ({
     ...(fxEnabled || {}),
@@ -94,6 +96,7 @@ export function useAudioContext(effectsState: any) {
 
   // FX Nodes
   const eqNodesRef = useRef<BiquadFilterNode[]>([]);
+  const eqConvolverRef = useRef<ConvolverNode | null>(null);
   const eqSplitterRef = useRef<ChannelSplitterNode | null>(null);
   const eqMergerRef = useRef<ChannelMergerNode | null>(null);
   const limiterNodeRef = useRef<DynamicsCompressorNode | null>(null);
@@ -107,8 +110,7 @@ export function useAudioContext(effectsState: any) {
   const headroomDropRef = useRef<GainNode | null>(null);
   const headroomRecoverRef = useRef<GainNode | null>(null);
   const preampNodeRef = useRef<GainNode | null>(null);
-  const bassNodeRef = useRef<BiquadFilterNode | null>(null);
-  const trebleNodeRef = useRef<BiquadFilterNode | null>(null);
+  const toneNodesRef = useRef<BiquadFilterNode[]>([]);
   const compressorNodeRef = useRef<DynamicsCompressorNode | null>(null);
   const customCompressorNodeRef = useRef<AudioWorkletNode | null>(null);
   const compMakeupNodeRef = useRef<GainNode | null>(null);
@@ -401,8 +403,8 @@ export function useAudioContext(effectsState: any) {
     eqNodesRef.current.forEach(disconnectNode);
     disconnectNode(eqSplitterRef.current);
     disconnectNode(eqMergerRef.current);
-    disconnectNode(bassNodeRef.current);
-    disconnectNode(trebleNodeRef.current);
+    disconnectNode(eqConvolverRef.current);
+    toneNodesRef.current.forEach(disconnectNode);
     disconnectNode(compressorNodeRef.current);
     disconnectNode(customCompressorNodeRef.current);
     disconnectNode(compMakeupNodeRef.current);
@@ -483,87 +485,116 @@ export function useAudioContext(effectsState: any) {
     }
 
     // 2. EQ
-    if (activity.eq && eqBands && eqBands.length > 0) {
-      if (eqNodesRef.current.length !== eqBands.length) {
-        eqNodesRef.current = eqBands.map(() => ctx.createBiquadFilter());
-      }
-      // eslint-disable-next-line @typescript-eslint/no-explicit-any
-      eqBands.forEach((band: any, i: number) => {
-        const filter = eqNodesRef.current[i];
-        filter.type = band.type || 'peaking';
-        const now = ctx.currentTime;
-        filter.frequency.cancelScheduledValues(now);
-        filter.frequency.setTargetAtTime(band.frequency, now, 0.015);
-        filter.Q.cancelScheduledValues(now);
-        filter.Q.setTargetAtTime(band.q, now, 0.015);
-        filter.gain.cancelScheduledValues(now);
-        filter.gain.setTargetAtTime(band.gain, now, 0.015);
-      });
-
-      const hasChannelSpecificBands = eqBands.some((band: { channel?: string }) =>
-        band.channel === 'L' || band.channel === 'R'
-      );
-
-      if (hasChannelSpecificBands) {
-        if (!eqSplitterRef.current) eqSplitterRef.current = ctx.createChannelSplitter(2);
-        if (!eqMergerRef.current) eqMergerRef.current = ctx.createChannelMerger(2);
-
-        const stereoFilters = eqNodesRef.current.filter((_, i) => (eqBands[i].channel || 'L+R') === 'L+R');
-        const leftFilters = eqNodesRef.current.filter((_, i) => eqBands[i].channel === 'L');
-        const rightFilters = eqNodesRef.current.filter((_, i) => eqBands[i].channel === 'R');
-
-        let prevEq = currentNode;
-        stereoFilters.forEach(filter => {
-          prevEq.connect(filter);
-          prevEq = filter;
-        });
-        prevEq.connect(eqSplitterRef.current);
-
-        let leftNode: AudioNode = eqSplitterRef.current;
-        leftFilters.forEach((filter, index) => {
-          if (index === 0) eqSplitterRef.current!.connect(filter, 0, 0);
-          else leftFilters[index - 1].connect(filter);
-          leftNode = filter;
-        });
-
-        let rightNode: AudioNode = eqSplitterRef.current;
-        rightFilters.forEach((filter, index) => {
-          if (index === 0) eqSplitterRef.current!.connect(filter, 1, 0);
-          else rightFilters[index - 1].connect(filter);
-          rightNode = filter;
-        });
-
-        leftNode.connect(eqMergerRef.current, leftNode === eqSplitterRef.current ? 0 : 0, 0);
-        rightNode.connect(eqMergerRef.current, rightNode === eqSplitterRef.current ? 1 : 0, 1);
-        currentNode = eqMergerRef.current;
+    if (activity.eq && rawEqBands && rawEqBands.length > 0) {
+      if (!isParametricPreset) {
+        // Graphic EQ -> FIR Convolver
+        if (!eqConvolverRef.current) eqConvolverRef.current = ctx.createConvolver();
+        eqConvolverRef.current.normalize = false; // Important: Do not normalize EQ impulse response!
+        
+        const ir = generateGraphicEqImpulseResponse(rawEqBands, ctx.sampleRate, 4096);
+        const buffer = ctx.createBuffer(2, ir.length, ctx.sampleRate);
+        buffer.copyToChannel(ir as any, 0);
+        buffer.copyToChannel(ir as any, 1);
+        eqConvolverRef.current.buffer = buffer;
+        
+        connectStage(eqConvolverRef.current);
       } else {
-        let prevEq = currentNode;
-        eqNodesRef.current.forEach(filter => {
-          prevEq.connect(filter);
-          prevEq = filter;
+        // Parametric EQ -> Biquads
+        const expandedEqBands = expandResonantEqBands(eqBands || []);
+        if (eqNodesRef.current.length !== expandedEqBands.length) {
+          eqNodesRef.current.forEach(node => node.disconnect());
+          eqNodesRef.current = expandedEqBands.map(() => ctx.createBiquadFilter());
+        }
+        // eslint-disable-next-line @typescript-eslint/no-explicit-any
+        expandedEqBands.forEach((band: any, i: number) => {
+          const filter = eqNodesRef.current[i];
+          filter.type = band.type || 'peaking';
+          const now = ctx.currentTime;
+          filter.frequency.cancelScheduledValues(now);
+          filter.frequency.setTargetAtTime(band.frequency, now, 0.015);
+          filter.Q.cancelScheduledValues(now);
+          filter.Q.setTargetAtTime(band.q, now, 0.015);
+          filter.gain.cancelScheduledValues(now);
+          filter.gain.setTargetAtTime(band.gain, now, 0.015);
         });
-        currentNode = prevEq;
+
+        const hasChannelSpecificBands = expandedEqBands.some((band: { channel?: string }) =>
+          band.channel === 'L' || band.channel === 'R'
+        );
+
+        if (hasChannelSpecificBands) {
+          if (!eqSplitterRef.current) eqSplitterRef.current = ctx.createChannelSplitter(2);
+          if (!eqMergerRef.current) eqMergerRef.current = ctx.createChannelMerger(2);
+
+          const stereoFilters = eqNodesRef.current.filter((_, i) => (expandedEqBands[i].channel || 'L+R') === 'L+R');
+          const leftFilters = eqNodesRef.current.filter((_, i) => expandedEqBands[i].channel === 'L');
+          const rightFilters = eqNodesRef.current.filter((_, i) => expandedEqBands[i].channel === 'R');
+
+          let prevEq = currentNode;
+          stereoFilters.forEach(filter => {
+            prevEq.connect(filter);
+            prevEq = filter;
+          });
+          prevEq.connect(eqSplitterRef.current);
+
+          let leftNode: AudioNode = eqSplitterRef.current;
+          leftFilters.forEach((filter, index) => {
+            if (index === 0) eqSplitterRef.current!.connect(filter, 0, 0);
+            else leftFilters[index - 1].connect(filter);
+            leftNode = filter;
+          });
+
+          let rightNode: AudioNode = eqSplitterRef.current;
+          rightFilters.forEach((filter, index) => {
+            if (index === 0) eqSplitterRef.current!.connect(filter, 1, 0);
+            else rightFilters[index - 1].connect(filter);
+            rightNode = filter;
+          });
+
+          leftNode.connect(eqMergerRef.current, leftNode === eqSplitterRef.current ? 0 : 0, 0);
+          rightNode.connect(eqMergerRef.current, rightNode === eqSplitterRef.current ? 1 : 0, 1);
+          currentNode = eqMergerRef.current;
+        } else {
+          let prevEq = currentNode;
+          eqNodesRef.current.forEach(filter => {
+            prevEq.connect(filter);
+            prevEq = filter;
+          });
+          currentNode = prevEq;
+        }
       }
     }
 
     // 3. Tone
     if (activity.tone) {
-      if (!bassNodeRef.current) {
-        bassNodeRef.current = ctx.createBiquadFilter();
-        bassNodeRef.current.type = 'lowshelf';
-        bassNodeRef.current.frequency.value = 150;
-      }
-      if (!trebleNodeRef.current) {
-        trebleNodeRef.current = ctx.createBiquadFilter();
-        trebleNodeRef.current.type = 'highshelf';
-        trebleNodeRef.current.frequency.value = 4000;
-      }
-      bassNodeRef.current.gain.value = bassGain;
-      trebleNodeRef.current.gain.value = trebleGain;
+      const toneBands = [];
+      if (Math.abs(bassGain) > 0.001) toneBands.push({ id: 'bass', type: 'lowshelf', frequency: 150, q: 1, gain: bassGain } as any);
+      if (Math.abs(trebleGain) > 0.001) toneBands.push({ id: 'treble', type: 'highshelf', frequency: 4000, q: 1, gain: trebleGain } as any);
 
-      currentNode.connect(bassNodeRef.current);
-      bassNodeRef.current.connect(trebleNodeRef.current);
-      currentNode = trebleNodeRef.current;
+      const expandedToneBands = expandResonantEqBands(toneBands);
+
+      if (toneNodesRef.current.length !== expandedToneBands.length) {
+        toneNodesRef.current.forEach(node => node.disconnect());
+        toneNodesRef.current = expandedToneBands.map(() => ctx.createBiquadFilter());
+      }
+
+      let prevTone = currentNode;
+      expandedToneBands.forEach((band, i) => {
+        const filter = toneNodesRef.current[i];
+        filter.type = band.type || 'peaking';
+
+        const now = ctx.currentTime;
+        filter.frequency.cancelScheduledValues(now);
+        filter.frequency.setTargetAtTime(band.frequency, now, 0.015);
+        filter.Q.cancelScheduledValues(now);
+        filter.Q.setTargetAtTime(band.q || 1, now, 0.015);
+        filter.gain.cancelScheduledValues(now);
+        filter.gain.setTargetAtTime(band.gain, now, 0.015);
+
+        prevTone.connect(filter);
+        prevTone = filter;
+      });
+      currentNode = prevTone;
     }
 
     // 4. Compressor
@@ -778,7 +809,7 @@ export function useAudioContext(effectsState: any) {
     }
     masterAnalyserRef.current.minDecibels = -130;
     masterAnalyserRef.current.maxDecibels = -10;
-    
+
     currentNode.connect(masterAnalyserRef.current);
 
     currentNode.connect(ctx.destination);
@@ -853,23 +884,67 @@ export function useAudioContext(effectsState: any) {
   }, [effectivePreampGain]);
 
   useEffect(() => {
-    if (bassNodeRef.current) bassNodeRef.current.gain.value = fxEnabled.tone ? bassGain : 0;
-    if (trebleNodeRef.current) trebleNodeRef.current.gain.value = fxEnabled.tone ? trebleGain : 0;
+    if (!fxEnabled.tone || toneNodesRef.current.length === 0) {
+      toneNodesRef.current.forEach(node => {
+        const now = audioContextRef.current?.currentTime || 0;
+        node.gain.cancelScheduledValues(now);
+        node.gain.setTargetAtTime(0, now, 0.015);
+      });
+      return;
+    }
+
+    const toneBands = [];
+    if (Math.abs(bassGain) > 0.001) toneBands.push({ id: 'bass', type: 'lowshelf', frequency: 150, q: 1, gain: bassGain } as any);
+    if (Math.abs(trebleGain) > 0.001) toneBands.push({ id: 'treble', type: 'highshelf', frequency: 4000, q: 1, gain: trebleGain } as any);
+
+    const expandedToneBands = expandResonantEqBands(toneBands);
+
+    if (toneNodesRef.current.length === expandedToneBands.length) {
+      expandedToneBands.forEach((band, i) => {
+        const filter = toneNodesRef.current[i];
+        const now = audioContextRef.current?.currentTime || 0;
+        filter.gain.cancelScheduledValues(now);
+        filter.gain.setTargetAtTime(band.gain, now, 0.015);
+        filter.frequency.cancelScheduledValues(now);
+        filter.frequency.setTargetAtTime(band.frequency, now, 0.015);
+      });
+    }
   }, [bassGain, trebleGain, fxEnabled.tone]);
 
   useEffect(() => {
-    if (eqNodesRef.current && eqBands) {
-      // eslint-disable-next-line @typescript-eslint/no-explicit-any
-      eqBands.forEach((band: any, i: number) => {
-        if (eqNodesRef.current[i]) {
-          eqNodesRef.current[i].type = band.type || 'peaking';
-          eqNodesRef.current[i].frequency.value = band.frequency;
-          eqNodesRef.current[i].Q.value = band.q;
-          eqNodesRef.current[i].gain.value = fxEnabled.eq ? band.gain : 0;
-        }
-      });
+    // eslint-disable-next-line @typescript-eslint/no-explicit-any
+    const isParametricPreset = eqBands?.some((b: any) => b.q !== undefined);
+
+    if (isParametricPreset) {
+      if (eqNodesRef.current && eqBands) {
+        // eslint-disable-next-line @typescript-eslint/no-explicit-any
+        eqBands.forEach((band: any, i: number) => {
+          if (eqNodesRef.current[i]) {
+            eqNodesRef.current[i].type = band.type || 'peaking';
+            eqNodesRef.current[i].frequency.value = band.frequency;
+            eqNodesRef.current[i].Q.value = band.q;
+            eqNodesRef.current[i].gain.value = fxEnabled.eq ? band.gain : 0;
+          }
+        });
+      }
+    } else if (eqConvolverRef.current && rawEqBands && audioContextRef.current) {
+      if (fxEnabled.eq) {
+        const ir = generateGraphicEqImpulseResponse(rawEqBands, audioContextRef.current.sampleRate, 4096);
+        const buffer = audioContextRef.current.createBuffer(2, ir.length, audioContextRef.current.sampleRate);
+        buffer.copyToChannel(ir as any, 0);
+        buffer.copyToChannel(ir as any, 1);
+        eqConvolverRef.current.buffer = buffer;
+      } else {
+        // Bypassed: Impulse response is just a single pulse at N/2
+        const ir = new Float32Array(4096);
+        ir[2048] = 1.0;
+        const buffer = audioContextRef.current.createBuffer(2, ir.length, audioContextRef.current.sampleRate);
+        buffer.copyToChannel(ir, 0);
+        buffer.copyToChannel(ir, 1);
+        eqConvolverRef.current.buffer = buffer;
+      }
     }
-  }, [eqBands, fxEnabled.eq]);
+  }, [eqBands, rawEqBands, fxEnabled.eq]);
 
   useEffect(() => {
     if (compressorNodeRef.current && compMakeupNodeRef.current) {
@@ -994,8 +1069,6 @@ export function useAudioContext(effectsState: any) {
     headroomDropRef,
     headroomRecoverRef,
     preampNodeRef,
-    bassNodeRef,
-    trebleNodeRef,
     compressorNodeRef,
     customCompressorNodeRef,
     compMakeupNodeRef,

@@ -1,4 +1,5 @@
-import type { EqBand } from './audioTypes';
+import { expandResonantEqBands, type EqBand } from './audioTypes';
+import { createMonotoneCubicSpline } from './audioInterpolation';
 
 export type EqResponsePoint = {
   frequency: number;
@@ -178,12 +179,14 @@ export const createEqResponseChartData = (
   preampGain = 0,
   bassGain = 0,
   trebleGain = 0,
-  enabledFlags?: { eq?: boolean; tone?: boolean; preamp?: boolean }
+  enabledFlags?: { eq?: boolean; tone?: boolean; preamp?: boolean },
+  isGraphicMode = false
 ): EqResponseChartData => {
   const frequencies = createLogFrequencies();
   const eqEnabled = enabledFlags?.eq ?? enabled;
   const toneEnabled = enabledFlags?.tone ?? enabled;
   const preampEnabled = enabledFlags?.preamp ?? enabled;
+  
   const toneBands: EqBand[] = [];
   if (toneEnabled) {
     if (Math.abs(bassGain) > 0.001) {
@@ -193,45 +196,84 @@ export const createEqResponseChartData = (
       toneBands.push({ id: 'tone-treble', type: 'highshelf', frequency: 4000, q: 1, gain: trebleGain, channel: 'L+R' });
     }
   }
-  const activeBands = [
-    ...(eqEnabled ? eqBands.filter(isAudibleBand) : []),
-    ...toneBands,
-  ];
-  const curves = activeBands.map((band) => ({
+
+  const activeEqBands = eqEnabled ? eqBands.filter(isAudibleBand) : [];
+  
+  // Parametric EQ: simulate all biquad curves
+  const curves = [...activeEqBands, ...toneBands].map((band) => ({
     band,
-    coefficients: createBiquadCoefficients(band),
+    coefficientsList: expandResonantEqBands([band]).map(createBiquadCoefficients),
   }));
 
-  const left = frequencies.map((frequency) => {
-    const gain = curves
-      .filter(({ band }) => band.channel !== 'R')
-      .reduce((current, { coefficients }) => current * getMagnitudeAtFrequency(coefficients, frequency), 1);
+  let graphicSpline: ((x: number) => number) | null = null;
+  if (isGraphicMode && activeEqBands.length > 0) {
+    const sortedBands = [...activeEqBands].sort((a, b) => a.frequency - b.frequency);
+    const freqs = sortedBands.map(b => b.frequency);
+    const gains = sortedBands.map(b => b.gain);
+    if (freqs[0] > 20) { freqs.unshift(20); gains.unshift(gains[0]); }
+    if (freqs[freqs.length - 1] < 20000) { freqs.push(20000); gains.push(gains[gains.length - 1]); }
+    const logFreqs = freqs.map(f => Math.log2(f));
+    graphicSpline = createMonotoneCubicSpline(logFreqs, gains);
+  }
 
-    return { frequency, db: linearToDb(gain) + (preampEnabled ? preampGain : 0) };
-  });
+  const getEqGainDb = (frequency: number, channelFilter: (b: EqBand) => boolean) => {
+    let eqDb = 0;
+    if (graphicSpline) {
+      // In graphic mode, eq is the spline
+      eqDb = graphicSpline(Math.log2(clampFrequency(frequency)));
+    } else {
+      const eqCurves = curves.filter(c => !c.band.id.startsWith('tone-') && channelFilter(c.band));
+      const gain = eqCurves.reduce((current, { coefficientsList }) => {
+        let cGain = 1;
+        for (const coef of coefficientsList) cGain *= getMagnitudeAtFrequency(coef, frequency);
+        return current * cGain;
+      }, 1);
+      eqDb = linearToDb(gain);
+    }
+    
+    // Add Tone
+    const toneCurves = curves.filter(c => c.band.id.startsWith('tone-') && channelFilter(c.band));
+    const toneGain = toneCurves.reduce((current, { coefficientsList }) => {
+      let cGain = 1;
+      for (const coef of coefficientsList) cGain *= getMagnitudeAtFrequency(coef, frequency);
+      return current * cGain;
+    }, 1);
+    
+    return eqDb + linearToDb(toneGain);
+  };
 
-  const right = frequencies.map((frequency) => {
-    const gain = curves
-      .filter(({ band }) => band.channel !== 'L')
-      .reduce((current, { coefficients }) => current * getMagnitudeAtFrequency(coefficients, frequency), 1);
+  const left = frequencies.map((frequency) => ({
+    frequency,
+    db: getEqGainDb(frequency, b => b.channel !== 'R') + (preampEnabled ? preampGain : 0)
+  }));
 
-    return { frequency, db: linearToDb(gain) + (preampEnabled ? preampGain : 0) };
-  });
+  const right = frequencies.map((frequency) => ({
+    frequency,
+    db: getEqGainDb(frequency, b => b.channel !== 'L') + (preampEnabled ? preampGain : 0)
+  }));
 
   const total = frequencies.map((frequency, index) => ({
     frequency,
     db: (left[index].db + right[index].db) / 2,
   }));
 
-  const bandCurves = curves.map(({ band, coefficients }) => ({
+  const bandCurves = curves.map(({ band, coefficientsList }) => ({
     id: band.id,
     label: `${Math.round(band.frequency)} Hz`,
     channel: band.channel,
     color: bandColor(band.channel),
-    points: frequencies.map((frequency) => ({
-      frequency,
-      db: linearToDb(getMagnitudeAtFrequency(coefficients, frequency)) + (band.id.startsWith('tone-') ? 0 : 0),
-    })),
+    points: frequencies.map((frequency) => {
+      if (graphicSpline && !band.id.startsWith('tone-')) {
+        // Don't draw individual eq band curves in graphic mode
+        return { frequency, db: 0 };
+      }
+      let cGain = 1;
+      for (const coef of coefficientsList) cGain *= getMagnitudeAtFrequency(coef, frequency);
+      return {
+        frequency,
+        db: linearToDb(cGain),
+      };
+    }),
   }));
 
   return {
@@ -240,6 +282,6 @@ export const createEqResponseChartData = (
     left,
     right,
     bandCurves,
-    hasStereoDifference: activeBands.some((band) => band.channel === 'L' || band.channel === 'R'),
+    hasStereoDifference: [...activeEqBands, ...toneBands].some((band) => band.channel === 'L' || band.channel === 'R'),
   };
 };
