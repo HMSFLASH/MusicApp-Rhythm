@@ -1,9 +1,11 @@
-import { useState, useEffect, useMemo } from 'react';
+import { useState, useEffect, useMemo, useRef } from 'react';
 import { useGlobalAudio } from '../context/AudioContext';
 import { useLibrary } from '../context/LibraryContext';
-import { Play, Pause, Trash2, GripVertical, MoreHorizontal, ArrowUp, ArrowDown, ListPlus, Heart, Info, X, ChevronsUp, ChevronsDown } from 'lucide-react';
+import { Play, Pause, Trash2, GripVertical, MoreHorizontal, ArrowUp, ArrowDown, ListPlus, Heart, Info, X, ChevronsUp, ChevronsDown, CheckSquare, Square } from 'lucide-react';
 import type { Track } from '../hooks/useAudioPlayer';
 import { useVirtualList } from '../hooks/useVirtualList';
+import { AddToPlaylistModal } from '../components/AddToPlaylistModal';
+import { useAuth } from '../context/AuthContext';
 
 const QUEUE_ITEM_HEIGHT = 84;
 
@@ -11,6 +13,7 @@ export function QueuePage() {
   const { playerState } = useGlobalAudio();
   const { queue, setQueue, currentTrack, isPlaying, playTrack, togglePlay, upcomingQueues, removeUpcomingQueue } = playerState;
   const { favorites, toggleFavorite } = useLibrary();
+  const { isAuthenticated } = useAuth();
   const currentTrackIndex = useMemo(() => (
     currentTrack ? queue.findIndex(track => String(track.id) === String(currentTrack.id)) : -1
   ), [currentTrack, queue]);
@@ -51,6 +54,79 @@ export function QueuePage() {
   // Favorites are now handled by LibraryContext
 
   const [infoTrack, setInfoTrack] = useState<Track | null>(null);
+
+  const [selectedIndexes, setSelectedIndexes] = useState<Set<number>>(new Set());
+  const [tracksToPlaylist, setTracksToPlaylist] = useState<Track[] | null>(null);
+  const longPressTimer = useRef<NodeJS.Timeout | null>(null);
+  const isLongPressTriggered = useRef(false);
+
+  const toggleSelection = (index: number, e?: React.MouseEvent) => {
+    if (e) e.stopPropagation();
+    setSelectedIndexes(prev => {
+      const next = new Set(prev);
+      if (next.has(index)) next.delete(index);
+      else next.add(index);
+      return next;
+    });
+  };
+
+  const handlePointerDown = (index: number, e: React.PointerEvent) => {
+    if (e.pointerType === 'mouse' && e.button !== 0) return;
+    
+    isLongPressTriggered.current = false;
+    longPressTimer.current = setTimeout(() => {
+      isLongPressTriggered.current = true;
+      setSelectedIndexes(prev => {
+        const next = new Set(prev);
+        next.add(index);
+        return next;
+      });
+      if (navigator.vibrate) navigator.vibrate(50);
+    }, 400);
+  };
+
+  const handlePointerUpOrLeave = () => {
+    if (longPressTimer.current) {
+      clearTimeout(longPressTimer.current);
+      longPressTimer.current = null;
+    }
+  };
+
+  const handleTrackClick = (track: Track, index: number, e: React.MouseEvent) => {
+    if (isLongPressTriggered.current) {
+      isLongPressTriggered.current = false;
+      return;
+    }
+    
+    if (selectedIndexes.size > 0) {
+      toggleSelection(index, e);
+      return;
+    }
+
+    setOpenMenuIndex(null);
+    handlePlayTrack(track);
+  };
+
+  const handleBatchRemove = () => {
+    setQueue(prev => prev.filter((_, idx) => !selectedIndexes.has(idx)));
+    setSelectedIndexes(new Set());
+  };
+
+  const handleBatchAddToFavorites = async () => {
+    const selectedTracks = Array.from(selectedIndexes).map(idx => queue[idx]).filter(Boolean);
+    try {
+      await Promise.all(selectedTracks.map(t => {
+        const isFav = favoriteIds.has(String(t.id));
+        if (!isFav) {
+          return toggleFavorite(t);
+        }
+        return Promise.resolve();
+      }));
+      setSelectedIndexes(new Set());
+    } catch (err) {
+      console.error(err);
+    }
+  };
 
   const handleToggleFavorite = async (track: Track, e: React.MouseEvent) => {
     e.stopPropagation();
@@ -130,6 +206,49 @@ export function QueuePage() {
         </p>
       </div>
 
+      <AddToPlaylistModal
+        isOpen={!!tracksToPlaylist}
+        onClose={() => setTracksToPlaylist(null)}
+        isAuthenticated={isAuthenticated}
+        track={null}
+        tracks={tracksToPlaylist || undefined}
+      />
+
+      {selectedIndexes.size > 0 && (
+        <div className="sticky top-0 z-20 mb-4 flex flex-wrap items-center justify-between gap-y-3 gap-x-4 bg-[#1A1A1A]/95 backdrop-blur border border-primary/30 rounded-xl p-3 shadow-lg shadow-black/50 mx-2 sm:mx-0">
+          <div className="flex items-center gap-2 sm:gap-3 flex-wrap">
+            <span className="text-primary font-bold whitespace-nowrap">{selectedIndexes.size} selected</span>
+            <button onClick={() => setSelectedIndexes(new Set())} className="text-white/50 hover:text-white transition-colors shrink-0" title="Clear selection">
+              <X size={18} />
+            </button>
+            <button
+              onClick={() => {
+                if (selectedIndexes.size === queue.length && queue.length > 0) {
+                  setSelectedIndexes(new Set());
+                } else {
+                  setSelectedIndexes(new Set(Array.from({ length: queue.length }, (_, i) => i)));
+                }
+              }}
+              className="p-1.5 rounded-full bg-white/5 border border-white/10 hover:bg-white/10 text-white/60 hover:text-white transition-colors flex items-center gap-2 px-3 text-sm ml-2 shrink-0 whitespace-nowrap"
+            >
+              {selectedIndexes.size === queue.length && queue.length > 0 ? <CheckSquare size={16} /> : <Square size={16} />}
+              <span className="hidden md:inline">Select All</span>
+            </button>
+          </div>
+          <div className="flex items-center gap-2 flex-wrap">
+            <button onClick={() => setTracksToPlaylist(Array.from(selectedIndexes).map(idx => queue[idx]).filter(Boolean))} className="p-2 rounded-lg bg-white/5 hover:bg-white/10 text-white flex items-center gap-2 text-sm shrink-0 whitespace-nowrap" title="Add to Playlist">
+              <ListPlus size={16} /> <span className="hidden md:inline">Playlist</span>
+            </button>
+            <button onClick={handleBatchAddToFavorites} className="p-2 rounded-lg bg-white/5 hover:bg-white/10 text-white flex items-center gap-2 text-sm shrink-0 whitespace-nowrap" title="Add to Favorites">
+              <Heart size={16} /> <span className="hidden md:inline">Favorite</span>
+            </button>
+            <button onClick={handleBatchRemove} className="p-2 rounded-lg bg-red-500/10 hover:bg-red-500/20 text-red-400 flex items-center gap-2 text-sm shrink-0 whitespace-nowrap" title="Remove from Queue">
+              <Trash2 size={16} /> <span className="hidden md:inline">Remove</span>
+            </button>
+          </div>
+        </div>
+      )}
+
       <div
         ref={containerRef}
         id="queue-page-container"
@@ -165,18 +284,36 @@ export function QueuePage() {
                     onDragEnter={(e) => handleDragEnter(e, index)}
                     onDragEnd={handleDragEnd}
                     onDragOver={handleDragOver}
-                    onClick={() => {
+                    onPointerDown={(e) => handlePointerDown(index, e)}
+                    onPointerUp={handlePointerUpOrLeave}
+                    onPointerCancel={handlePointerUpOrLeave}
+                    onMouseLeave={() => {
                       setOpenMenuIndex(null);
-                      handlePlayTrack(track);
+                      handlePointerUpOrLeave();
                     }}
-                    className={`group flex h-[76px] items-center gap-3 sm:gap-4 p-3 rounded-xl transition-all cursor-pointer ${isCurrent
+                    onContextMenu={(e) => {
+                      if (isLongPressTriggered.current || ('ontouchstart' in window && selectedIndexes.size > 0)) {
+                        e.preventDefault();
+                      }
+                    }}
+                    onClick={(e) => handleTrackClick(track, index, e)}
+                    className={`group flex h-[76px] items-center gap-3 sm:gap-4 p-3 rounded-xl transition-all cursor-pointer select-none ${isCurrent
                         ? 'bg-primary/20 border border-primary/30'
                         : 'hover:bg-white/5 border border-transparent'
                       } ${draggedIndex === index ? 'opacity-50' : 'opacity-100'}`}
                   >
-                    <div className="text-white/20 hover:text-white/60 cursor-grab active:cursor-grabbing p-1 hidden sm:block">
-                      <GripVertical size={16} />
-                    </div>
+                    {selectedIndexes.size > 0 ? (
+                      <button
+                        onClick={(e) => toggleSelection(index, e)}
+                        className="w-5 flex items-center justify-center transition-colors shrink-0"
+                      >
+                        {selectedIndexes.has(index) ? <CheckSquare size={18} className="text-primary" /> : <Square size={18} className="text-white/50" />}
+                      </button>
+                    ) : (
+                      <div className="text-white/20 hover:text-white/60 cursor-grab active:cursor-grabbing p-1 hidden sm:block shrink-0">
+                        <GripVertical size={16} />
+                      </div>
+                    )}
 
                     <div className="w-10 h-10 sm:w-12 sm:h-12 flex-shrink-0 bg-white/5 rounded-lg overflow-hidden relative flex items-center justify-center">
                       {track.imageUrl || playerState.getTrackImage(track.id) ? (
