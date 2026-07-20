@@ -3,6 +3,7 @@ import { getAllCachedIds } from '../utils/mediaCache';
 import { loadTrackAudioUrl } from '../hooks/audioTrackLoader';
 import type { Track } from '../hooks/useAudioPlayer';
 import { useAuth } from './AuthContext';
+import { useGlobalAudio } from './AudioContext';
 
 interface OfflineContextType {
   isOfflineMode: boolean;
@@ -25,6 +26,7 @@ export function OfflineProvider({ children }: { children: ReactNode }) {
   const [cachedMediaIds, setCachedMediaIds] = useState<Set<string>>(new Set());
   const [downloadingTrackIds, setDownloadingTrackIds] = useState<Set<string>>(new Set());
   const { driveToken, fetchDriveToken } = useAuth();
+  const { playerState } = useGlobalAudio();
 
   const refreshCachedMediaIds = async () => {
     const ids = await getAllCachedIds();
@@ -70,6 +72,12 @@ export function OfflineProvider({ children }: { children: ReactNode }) {
       if (url) {
         URL.revokeObjectURL(url);
       }
+      
+      // Extract metadata so it is cached in IndexedDB
+      if (playerState.extractMetadata) {
+        await playerState.extractMetadata(track);
+      }
+      
       await refreshCachedMediaIds();
     } catch (e) {
       console.error('Failed to download track', e);

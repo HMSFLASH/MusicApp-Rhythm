@@ -46,6 +46,7 @@ export function useAudioEngine(
 
   return {
     ...playbackState,
+    extractMetadata: metadataState.extractMetadata,
     getTrackMetadata: (id: string) => metadataState.metadataCacheRef.current.get(id),
     getTrackImage: (id: string) => metadataState.imageCacheRef.current.get(id),
     refreshTrackMetadataFromDrive: metadataState.refreshTrackMetadataFromDrive,
