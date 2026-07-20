@@ -97,7 +97,7 @@ export const loadTrackAudioUrl = async ({
       const objectUrl = URL.createObjectURL(audioBlob);
 
       blobCache.set(trackId, objectUrl);
-      void cacheAudio(mediaCacheId, audioBlob);
+      await cacheAudio(mediaCacheId, audioBlob);
       return objectUrl;
     })();
 

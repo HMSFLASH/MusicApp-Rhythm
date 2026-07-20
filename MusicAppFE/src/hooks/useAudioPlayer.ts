@@ -209,5 +209,6 @@ export function useAudioPlayer(
     toggleM4aWasmForTrack,
     isLegacyMetadataEnabled,
     toggleLegacyMetadataForTrack,
+    loadCoverFromCache: engineState.loadCoverFromCache,
   };
 }

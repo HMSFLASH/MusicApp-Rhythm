@@ -1,4 +1,4 @@
-import { useState, useRef } from 'react';
+import { useState, useRef, useEffect } from 'react';
 import { useNavigate, useSearchParams } from 'react-router-dom';
 import { Heart, ListMusic, Cloud, Star, Clock, ListPlus, Play, ArrowLeft, Shuffle, MoreHorizontal, Info, X, ListEnd, ListStart, RefreshCw, Trash2, Cpu, Tags, ChevronDown, CheckSquare, Square, Download, DownloadCloud, Loader2, CheckCircle2, CloudOff } from 'lucide-react';
 import { useTranslation } from 'react-i18next';
@@ -244,6 +244,8 @@ export function TracksPage() {
   const infoTrackBitsPerSample = infoTrack?.bitsPerSample ?? infoTrackMetadata?.bitsPerSample;
   
   const uncachedCount = displayTracks.filter(t => !isCached(t) && t.sourceType !== 'LOCAL').length;
+
+
 
   return (
     <div className="w-full h-full flex flex-col max-w-6xl 2xl:max-w-none mx-auto pb-28 md:pb-32 overflow-y-auto">

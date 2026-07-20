@@ -1,6 +1,7 @@
 import { useRef, useEffect, useState } from 'react';
 import type { Track } from './audioTypes';
 import { getCover, removeCover, saveCover } from '../utils/idb';
+import { getCachedAudio } from '../utils/mediaCache';
 import { db } from '../lib/db';
 import { axiosClient } from '../api/axiosClient';
 import { BACKEND_URL } from '../api/axiosClient';
@@ -129,7 +130,6 @@ async function parseMetadataBuffer(
     return parseBufferFn(buffer, fileInfo, { duration: false }) as Promise<ParsedAudioMetadata>;
 }
 
-// eslint-disable-next-line @typescript-eslint/no-explicit-any
 export function useAudioMetadata(isAuthenticated: boolean, queueState: any, settings: AudioMetadataSettings = {}) {
     const setCurrentTrack = queueState?.setCurrentTrack;
     const setQueue = queueState?.setQueue;
@@ -193,9 +193,7 @@ export function useAudioMetadata(isAuthenticated: boolean, queueState: any, sett
 
             if (idbCover && !lsData) {
                 setMetadataVersion(v => v + 1);
-                // eslint-disable-next-line @typescript-eslint/no-explicit-any
                 setCurrentTrack((prev: any) => prev && String(prev.id) === trackId ? { ...prev, ...cachedCoverUpdate } : prev);
-                // eslint-disable-next-line @typescript-eslint/no-explicit-any
                 setQueue((prevQ: any) => prevQ?.map ? prevQ.map((t: any) => String(t.id) === trackId ? { ...t, ...cachedCoverUpdate } : t) : prevQ);
                 window.dispatchEvent(new CustomEvent('sonic_metadata_updated', { detail: trackId }));
             }
@@ -208,9 +206,7 @@ export function useAudioMetadata(isAuthenticated: boolean, queueState: any, sett
                         metadataCacheRef.current.set(trackId, parsed);
                         await db.set(lsKey, cacheData);
                         setMetadataVersion(v => v + 1);
-                        // eslint-disable-next-line @typescript-eslint/no-explicit-any
                         setCurrentTrack((prev: any) => prev && String(prev.id) === trackId ? { ...prev, ...parsed } : prev);
-                        // eslint-disable-next-line @typescript-eslint/no-explicit-any
                         setQueue((prevQ: any) => prevQ?.map ? prevQ.map((t: any) => String(t.id) === trackId ? { ...t, ...parsed } : t) : prevQ);
                         window.dispatchEvent(new CustomEvent('sonic_metadata_updated', { detail: trackId }));
 
@@ -276,14 +272,26 @@ export function useAudioMetadata(isAuthenticated: boolean, queueState: any, sett
 
                 // eslint-disable-next-line prefer-const
                 let blobUrl = blobCacheRef.current.get(trackId);
-                if (blobUrl) {
-                    const fetched = await fetch(blobUrl);
-                    const arrayBuffer = await fetched.arrayBuffer();
-                    const buffer = new Uint8Array(arrayBuffer);
-                    const fetchedMimeType = fetched.headers.get('Content-Type');
+                let cachedBlob: Blob | undefined;
 
-                    const contentLengthHeader = fetched.headers.get('Content-Length');
-                    const fileSize = contentLengthHeader ? parseInt(contentLengthHeader, 10) : (track.fileSize || 0);
+                if (!blobUrl && track.driveFileId) {
+                    cachedBlob = await getCachedAudio(`drive:${track.driveFileId}`);
+                    console.log(`[Metadata Debug] getCachedAudio for drive:${track.driveFileId} returned:`, !!cachedBlob);
+                    if (cachedBlob) {
+                        blobUrl = URL.createObjectURL(cachedBlob);
+                    }
+                }
+
+                console.log(`[Metadata Debug] Processing blobUrl:`, !!blobUrl, `useLegacy:`, useLegacyMetadataParser);
+
+                if (blobUrl) {
+                    const fetched = cachedBlob ? undefined : await fetch(blobUrl);
+                    const arrayBuffer = cachedBlob ? await cachedBlob.arrayBuffer() : await fetched!.arrayBuffer();
+                    const buffer = new Uint8Array(arrayBuffer);
+                    const fetchedMimeType = cachedBlob ? cachedBlob.type : fetched!.headers.get('Content-Type');
+
+                    const contentLengthHeader = cachedBlob ? null : fetched!.headers.get('Content-Length');
+                    const fileSize = cachedBlob ? cachedBlob.size : (contentLengthHeader ? parseInt(contentLengthHeader, 10) : (track.fileSize || 0));
                     if (fileSize > 0) {
                         up.fileSize = fileSize;
                         cachePayload.fileSize = fileSize;
@@ -307,6 +315,10 @@ export function useAudioMetadata(isAuthenticated: boolean, queueState: any, sett
                         getAudioMimeType(track.fileName, fetchedMimeType),
                         useLegacyMetadataParser,
                     );
+
+                    if (cachedBlob) {
+                        URL.revokeObjectURL(blobUrl);
+                    }
                 } else {
                     const fetchUrl = `${BACKEND_URL}/api/music/stream/${track.id}`;
                     const controller = new AbortController();
@@ -450,16 +462,16 @@ export function useAudioMetadata(isAuthenticated: boolean, queueState: any, sett
             }
             setMetadataVersion(v => v + 1);
 
+            console.log(`[Metadata Debug] Finished extract. extractedPicture:`, extractedPicture, `keys(up):`, Object.keys(up));
+
             if (Object.keys(up).length > 0) {
-                // eslint-disable-next-line @typescript-eslint/no-explicit-any
                 setCurrentTrack((prev: any) => prev && String(prev.id) === trackId ? { ...prev, ...up } : prev);
-                // eslint-disable-next-line @typescript-eslint/no-explicit-any
                 setQueue((prevQ: any) => prevQ.map((t: any) => String(t.id) === trackId ? { ...t, ...up } : t));
                 window.dispatchEvent(new CustomEvent('sonic_metadata_updated', { detail: trackId }));
             }
 
             if (!extractedPicture && !useLegacyMetadataParser) {
-                // Auto fallback to legacy parser if regular parser failed to find a cover
+                console.log(`[Metadata Debug] Auto fallback triggered for ${trackId}`);
                 setTimeout(() => {
                     refreshMissingTrackCover(track).catch(err => console.warn('Failed auto legacy fallback', err));
                 }, 100);
@@ -536,6 +548,15 @@ export function useAudioMetadata(isAuthenticated: boolean, queueState: any, sett
 
         if (imageCacheRef.current.has(trackId)) return;
     }
+    async function loadCoverFromCache(trackId: string) {
+        if (imageCacheRef.current.has(trackId)) return;
+        const idbCover = await getCover(trackId);
+        if (idbCover) {
+            const imgUrl = URL.createObjectURL(new Blob([new Uint8Array(idbCover.data)], { type: idbCover.mimeType }));
+            imageCacheRef.current.set(trackId, imgUrl);
+            setMetadataVersion(v => v + 1);
+        }
+    }
 
     useEffect(() => {
         if (currentTrack) {
@@ -561,7 +582,6 @@ export function useAudioMetadata(isAuthenticated: boolean, queueState: any, sett
                 void extractMetadata(currentTrack);
             }
         }
-        // eslint-disable-next-line react-hooks/exhaustive-deps
     }, [currentTrack, legacyMetadataOverrides]);
 
     return {
@@ -569,6 +589,7 @@ export function useAudioMetadata(isAuthenticated: boolean, queueState: any, sett
         clearTrackCachedMetadata,
         refreshTrackMetadataFromDrive,
         refreshMissingTrackCover,
+        loadCoverFromCache,
         metadataCacheRef,
         imageCacheRef,
         blobCacheRef,
