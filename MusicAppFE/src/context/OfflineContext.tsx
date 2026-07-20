@@ -7,7 +7,6 @@ import { useGlobalAudio } from './AudioContext';
 
 interface OfflineContextType {
   isOfflineMode: boolean;
-  toggleOfflineMode: () => void;
   cachedMediaIds: Set<string>;
   isCached: (track: Track) => boolean;
   downloadTrack: (track: Track) => Promise<void>;
@@ -20,9 +19,7 @@ const OfflineContext = createContext<OfflineContextType | undefined>(undefined);
 const OFFLINE_STORAGE_KEY = 'SONIC_OFFLINE_MODE';
 
 export function OfflineProvider({ children }: { children: ReactNode }) {
-  const [isOfflineMode, setIsOfflineMode] = useState(() => {
-    return localStorage.getItem(OFFLINE_STORAGE_KEY) === 'true';
-  });
+  const [isOfflineMode, setIsOfflineMode] = useState(!navigator.onLine);
   const [cachedMediaIds, setCachedMediaIds] = useState<Set<string>>(new Set());
   const [downloadingTrackIds, setDownloadingTrackIds] = useState<Set<string>>(new Set());
   const { driveToken, fetchDriveToken } = useAuth();
@@ -35,15 +32,18 @@ export function OfflineProvider({ children }: { children: ReactNode }) {
 
   useEffect(() => {
     void refreshCachedMediaIds();
-  }, []);
 
-  const toggleOfflineMode = () => {
-    setIsOfflineMode((prev) => {
-      const next = !prev;
-      localStorage.setItem(OFFLINE_STORAGE_KEY, next ? 'true' : 'false');
-      return next;
-    });
-  };
+    const handleOnline = () => setIsOfflineMode(false);
+    const handleOffline = () => setIsOfflineMode(true);
+
+    window.addEventListener('online', handleOnline);
+    window.addEventListener('offline', handleOffline);
+
+    return () => {
+      window.removeEventListener('online', handleOnline);
+      window.removeEventListener('offline', handleOffline);
+    };
+  }, []);
 
   const isCached = (track: Track) => {
     if (track.sourceType === 'LOCAL') return true;
@@ -94,7 +94,6 @@ export function OfflineProvider({ children }: { children: ReactNode }) {
     <OfflineContext.Provider
       value={{
         isOfflineMode,
-        toggleOfflineMode,
         cachedMediaIds,
         isCached,
         downloadTrack,

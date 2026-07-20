@@ -50,7 +50,7 @@ export const loadTrackAudioUrl = async ({
     }
 
     const loadPromise = (async () => {
-      const isOfflineMode = localStorage.getItem('SONIC_OFFLINE_MODE') === 'true';
+      const isOfflineMode = !navigator.onLine;
       if (forceReloadFromDrive && !isOfflineMode) {
         await removeCachedAudio(mediaCacheId);
       } else {
