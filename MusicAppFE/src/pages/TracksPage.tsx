@@ -33,9 +33,12 @@ export function TracksPage() {
   const [tracksToPlaylist, setTracksToPlaylist] = useState<Track[] | null>(null);
   const longPressTimer = useRef<NodeJS.Timeout | null>(null);
   const isLongPressTriggered = useRef(false);
-  
+
   const [currentPage, setCurrentPage] = useState(1);
   const ITEMS_PER_PAGE = 20;
+
+  const [downloadProgress, setDownloadProgress] = useState<{ current: number, total: number } | null>(null);
+  const isDownloadingAllRef = useRef(false);
 
   const toggleFavorite = async (track: Track, e: React.MouseEvent) => {
     e.stopPropagation();
@@ -124,7 +127,7 @@ export function TracksPage() {
   const addAllToQueue = () => {
     playerState.setQueue([...playerState.queue, ...displayTracks]);
   };
-  
+
   const toggleSelection = (trackId: string, e?: React.MouseEvent) => {
     if (e) e.stopPropagation();
     setSelectedTrackIds(prev => {
@@ -137,7 +140,7 @@ export function TracksPage() {
 
   const handlePointerDown = (trackId: string, e: React.PointerEvent) => {
     if (e.pointerType === 'mouse' && e.button !== 0) return;
-    
+
     isLongPressTriggered.current = false;
     longPressTimer.current = setTimeout(() => {
       isLongPressTriggered.current = true;
@@ -162,7 +165,7 @@ export function TracksPage() {
       isLongPressTriggered.current = false;
       return;
     }
-    
+
     if (selectedTrackIds.size > 0) {
       toggleSelection(String(track.id), e);
       return;
@@ -197,7 +200,7 @@ export function TracksPage() {
     const selectedTracks = displayTracks.filter(t => selectedTrackIds.has(String(t.id)));
     const localTracks = selectedTracks.filter(t => t.sourceType === 'LOCAL');
     const cloudTracks = selectedTracks.filter(t => t.sourceType !== 'LOCAL');
-    
+
     if (cloudTracks.length === 0) {
       if (localTracks.length > 0) {
         alert("Cannot delete local files from library.");
@@ -223,13 +226,13 @@ export function TracksPage() {
         try {
           await Promise.all(cloudTracks.map(t => deleteTrack(t)));
           setSelectedTrackIds(new Set());
-        } catch(e) {
+        } catch (e) {
           console.error(e);
         }
       }
     }
   };
-  
+
   const totalPages = Math.ceil(displayTracks.length / ITEMS_PER_PAGE);
   const boundedCurrentPage = Math.min(currentPage, Math.max(1, totalPages));
   const currentTracks = displayTracks.slice((boundedCurrentPage - 1) * ITEMS_PER_PAGE, boundedCurrentPage * ITEMS_PER_PAGE);
@@ -252,23 +255,46 @@ export function TracksPage() {
           </h1>
           <p className="text-secondary/60 text-sm font-mono mt-1 sm:ml-12">
             {displayTracks.length} {activeTab === 'all' ? 'songs in your library' : 'favorite songs'}.
-            {isOfflineMode && <span className="ml-2 text-primary">({t('offline.offlineOnly', 'Showing downloaded tracks only')})</span>}
           </p>
         </div>
         {!isOfflineMode && (
           <div className="flex items-center gap-2">
-            <button
-              onClick={async () => {
-                const uncached = displayTracks.filter(t => !isCached(t));
-                for (const t of uncached) {
-                  await downloadTrack(t);
-                }
-              }}
-              className="flex items-center gap-2 bg-primary/20 hover:bg-primary/30 text-primary px-4 py-2 rounded-xl transition-colors shrink-0 whitespace-nowrap text-sm font-medium"
-            >
-              <DownloadCloud size={18} />
-              <span className="hidden sm:inline">{t('offline.downloadAll', 'Download All')}</span>
-            </button>
+            {downloadProgress ? (
+              <button
+                onClick={() => {
+                  isDownloadingAllRef.current = false;
+                  setDownloadProgress(null);
+                }}
+                className="flex items-center gap-2 bg-red-500/20 hover:bg-red-500/30 text-red-400 px-4 py-2 rounded-xl transition-colors shrink-0 whitespace-nowrap text-sm font-medium"
+                title="Stop downloading"
+              >
+                <X size={18} />
+                <span>{Math.round((downloadProgress.current / downloadProgress.total) * 100)}% ({downloadProgress.current}/{downloadProgress.total})</span>
+              </button>
+            ) : (
+              <button
+                onClick={async () => {
+                  const uncached = displayTracks.filter(t => !isCached(t) && t.sourceType !== 'LOCAL');
+                  if (uncached.length === 0) return;
+                  
+                  isDownloadingAllRef.current = true;
+                  setDownloadProgress({ current: 0, total: uncached.length });
+                  
+                  for (let i = 0; i < uncached.length; i++) {
+                    if (!isDownloadingAllRef.current) break;
+                    await downloadTrack(uncached[i]);
+                    setDownloadProgress({ current: i + 1, total: uncached.length });
+                  }
+                  
+                  isDownloadingAllRef.current = false;
+                  setDownloadProgress(null);
+                }}
+                className="flex items-center gap-2 bg-primary/20 hover:bg-primary/30 text-primary px-4 py-2 rounded-xl transition-colors shrink-0 whitespace-nowrap text-sm font-medium"
+              >
+                <DownloadCloud size={18} />
+                <span className="hidden sm:inline">{t('offline.downloadAll', 'Download All')}</span>
+              </button>
+            )}
           </div>
         )}
       </div>
@@ -429,11 +455,10 @@ export function TracksPage() {
               if (isOfflineMode && !isCached(track)) return;
               handleTrackClick(track, e);
             }}
-            className={`flex items-center gap-3 sm:gap-4 p-3 rounded-xl border transition-colors group cursor-pointer select-none ${
-              isOfflineMode && !isCached(track) ? 'opacity-40 grayscale pointer-events-none' :
-              playerState.currentTrack?.id === track.id
-              ? 'bg-primary/10 border-primary/30'
-              : 'bg-white/[0.02] border-white/5 hover:bg-white/5 hover:border-white/10'
+            className={`flex items-center gap-3 sm:gap-4 p-3 rounded-xl border transition-colors group cursor-pointer select-none ${isOfflineMode && !isCached(track) ? 'opacity-40 grayscale pointer-events-none' :
+                playerState.currentTrack?.id === track.id
+                  ? 'bg-primary/10 border-primary/30'
+                  : 'bg-white/[0.02] border-white/5 hover:bg-white/5 hover:border-white/10'
               }`}
           >
             {selectedTrackIds.size > 0 ? (
@@ -481,10 +506,9 @@ export function TracksPage() {
                       await downloadTrack(track);
                     }
                   }}
-                  className={`p-1.5 rounded-full transition-colors ${
-                    isCached(track) ? 'text-green-400' : 
-                    downloadingTrackIds.has(String(track.id)) ? 'text-primary' : 'text-white/40 hover:text-white hover:bg-white/10'
-                  }`}
+                  className={`p-1.5 rounded-full transition-colors ${isCached(track) ? 'text-green-400' :
+                      downloadingTrackIds.has(String(track.id)) ? 'text-primary' : 'text-white/40 hover:text-white hover:bg-white/10'
+                    }`}
                   title={isCached(track) ? t('offline.downloaded', 'Downloaded') : downloadingTrackIds.has(String(track.id)) ? t('offline.downloading', 'Downloading...') : t('offline.downloadTrack', 'Download')}
                 >
                   {isCached(track) ? <CheckCircle2 size={16} /> : downloadingTrackIds.has(String(track.id)) ? <Loader2 size={16} className="animate-spin" /> : <Download size={16} />}
@@ -525,7 +549,7 @@ export function TracksPage() {
                       onClick={(e) => toggleFavorite(track, e)}
                       className="w-full flex items-center gap-3 px-4 py-2 text-sm text-left text-white/80 hover:bg-white/10"
                     >
-                      <Heart size={14} fill={favorites.some(f => f.id === track.id) ? "currentColor" : "none"} className={favorites.some(f => f.id === track.id) ? "text-primary" : ""} /> 
+                      <Heart size={14} fill={favorites.some(f => f.id === track.id) ? "currentColor" : "none"} className={favorites.some(f => f.id === track.id) ? "text-primary" : ""} />
                       {favorites.some(f => f.id === track.id) ? "Remove from Favorites" : "Add to Favorites"}
                     </button>
                   )}
