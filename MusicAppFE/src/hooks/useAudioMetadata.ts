@@ -457,6 +457,13 @@ export function useAudioMetadata(isAuthenticated: boolean, queueState: any, sett
                 setQueue((prevQ: any) => prevQ.map((t: any) => String(t.id) === trackId ? { ...t, ...up } : t));
                 window.dispatchEvent(new CustomEvent('sonic_metadata_updated', { detail: trackId }));
             }
+
+            if (!extractedPicture && !useLegacyMetadataParser) {
+                // Auto fallback to legacy parser if regular parser failed to find a cover
+                setTimeout(() => {
+                    refreshMissingTrackCover(track).catch(err => console.warn('Failed auto legacy fallback', err));
+                }, 100);
+            }
         } catch (e) {
             console.warn('[Metadata] Failed to extract for', track.fileName, e);
             const currentCached = metadataCacheRef.current.get(trackId) || {};
