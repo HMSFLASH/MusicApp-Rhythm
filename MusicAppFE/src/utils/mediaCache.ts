@@ -69,6 +69,25 @@ export async function hasCachedAudio(id: string): Promise<boolean> {
   }
 }
 
+export async function getAllCachedIds(): Promise<string[]> {
+  try {
+    const database = await openDatabase();
+    return await new Promise((resolve) => {
+      const transaction = database.transaction(STORE_NAME, 'readonly');
+      const store = transaction.objectStore(STORE_NAME);
+      const request = store.getAllKeys();
+      request.onsuccess = () => {
+        // filter out drive prefix if any? We store as "drive:FILE_ID", wait, we store by track ID or mediaCacheId?
+        // Let's check how cacheAudio is called in audioTrackLoader.ts.
+        resolve(request.result.map(String));
+      };
+      request.onerror = () => resolve([]);
+    });
+  } catch {
+    return [];
+  }
+}
+
 export async function removeCachedAudio(id: string): Promise<void> {
   try {
     const database = await openDatabase();

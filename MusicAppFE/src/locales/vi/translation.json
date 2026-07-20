@@ -215,5 +215,14 @@
     "offline": "Mất kết nối mạng. Sẽ tự động thử lại sau 5 phút.",
     "offlineDuringLoad": "Đã mất kết nối mạng khi đang tải nhạc.",
     "reconnected": "Đã kết nối lại mạng."
+  },
+  "offline": {
+    "offlineMode": "Chế độ Offline",
+    "downloadTrack": "Tải về máy",
+    "downloadAll": "Tải tất cả",
+    "downloading": "Đang tải...",
+    "downloaded": "Đã tải",
+    "notCached": "Chưa tải về",
+    "offlineOnly": "Chỉ hiển thị bài đã tải"
   }
 }

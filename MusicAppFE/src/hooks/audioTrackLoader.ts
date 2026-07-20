@@ -50,7 +50,8 @@ export const loadTrackAudioUrl = async ({
     }
 
     const loadPromise = (async () => {
-      if (forceReloadFromDrive) {
+      const isOfflineMode = localStorage.getItem('SONIC_OFFLINE_MODE') === 'true';
+      if (forceReloadFromDrive && !isOfflineMode) {
         await removeCachedAudio(mediaCacheId);
       } else {
         const cachedBlob = await getCachedAudio(mediaCacheId);
@@ -59,6 +60,10 @@ export const loadTrackAudioUrl = async ({
           blobCache.set(trackId, cachedUrl);
           return cachedUrl;
         }
+      }
+      
+      if (isOfflineMode) {
+        return ''; // Block remote fetching when offline mode is ON
       }
 
       const token = driveToken || await fetchDriveToken?.();

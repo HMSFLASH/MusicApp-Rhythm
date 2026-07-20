@@ -16,7 +16,8 @@ import {
   Key,
   Menu,
   Languages,
-  X as CloseIcon
+  X as CloseIcon,
+  WifiOff
 } from 'lucide-react';
 import { useState, useEffect } from 'react';
 import { useTranslation } from 'react-i18next';
@@ -33,6 +34,7 @@ import { clearCovers } from '../utils/idb';
 import { useGlobalAudio } from '../context/AudioContext';
 import { BACKEND_URL } from '../api/axiosClient';
 import { LOCAL_STORAGE_KEY, PLAYBACK_STORAGE_KEY } from '../hooks/audioStorage';
+import { useOffline } from '../context/OfflineContext';
 
 // parseJwt removed as user data is now fetched from /me
 
@@ -42,6 +44,7 @@ export function Layout() {
   const navigate = useNavigate();
   const { isAuthenticated, setIsAuthenticated, user } = useAuth();
   const { playerState } = useGlobalAudio();
+  const { isOfflineMode, toggleOfflineMode } = useOffline();
   const [syncing, setSyncing] = useState(false);
   const [isLoggingOut, setIsLoggingOut] = useState(false);
   const [isPasswordModalOpen, setIsPasswordModalOpen] = useState(false);
@@ -264,6 +267,15 @@ export function Layout() {
               <h2 className="text-xs font-mono text-white/40 uppercase tracking-widest mb-4 px-2">{t('layout.localFiles', 'Local Files')}</h2>
               <div className="flex flex-col gap-1">
                 <LocalFilePicker />
+                
+                <button
+                  onClick={toggleOfflineMode}
+                  className={`flex items-center gap-3 px-3 py-2.5 rounded-lg transition-colors text-left ${isOfflineMode ? 'bg-primary/20 text-primary font-medium' : 'text-white/60 hover:text-white hover:bg-white/5'}`}
+                >
+                  <WifiOff size={20} />
+                  <span>{t('offline.offlineMode', 'Offline Mode')}</span>
+                  {isOfflineMode && <span className="ml-auto text-[10px] uppercase font-bold bg-primary text-black px-1.5 py-0.5 rounded-sm">ON</span>}
+                </button>
               </div>
             </div>
 
@@ -275,7 +287,7 @@ export function Layout() {
                     <>
                       <button
                         onClick={() => setShowBackupConfirm(true)}
-                        disabled={syncing}
+                        disabled={syncing || isOfflineMode}
                         className="flex items-center gap-3 px-3 py-2.5 rounded-lg text-white/60 hover:text-white hover:bg-white/5 transition-colors text-left disabled:opacity-50"
                       >
                         {syncing ? <Loader2 size={20} className="animate-spin" /> : <CloudUpload size={20} />}
@@ -283,7 +295,7 @@ export function Layout() {
                       </button>
                       <button
                         onClick={() => setShowRestoreConfirm(true)}
-                        disabled={syncing}
+                        disabled={syncing || isOfflineMode}
                         className="flex items-center gap-3 px-3 py-2.5 rounded-lg text-white/60 hover:text-white hover:bg-white/5 transition-colors text-left disabled:opacity-50"
                       >
                         {syncing ? <Loader2 size={20} className="animate-spin" /> : <CloudDownload size={20} />}

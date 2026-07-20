@@ -1,6 +1,7 @@
 import { useState, useRef } from 'react';
 import { useNavigate, useSearchParams } from 'react-router-dom';
-import { Heart, ListMusic, Cloud, Star, Clock, ListPlus, Play, ArrowLeft, Shuffle, MoreHorizontal, Info, X, ListEnd, ListStart, RefreshCw, Trash2, Cpu, Tags, ChevronDown, CheckSquare, Square } from 'lucide-react';
+import { Heart, ListMusic, Cloud, Star, Clock, ListPlus, Play, ArrowLeft, Shuffle, MoreHorizontal, Info, X, ListEnd, ListStart, RefreshCw, Trash2, Cpu, Tags, ChevronDown, CheckSquare, Square, Download, DownloadCloud, Loader2, CheckCircle2, CloudOff } from 'lucide-react';
+import { useTranslation } from 'react-i18next';
 import { AddToPlaylistModal } from '../components/AddToPlaylistModal';
 import { useGlobalAudio } from '../context/AudioContext';
 import { useAuth } from '../context/AuthContext';
@@ -9,15 +10,18 @@ import { useLibrary } from '../context/LibraryContext';
 import { useConfirm } from '../context/ConfirmContext';
 import { getAudioExtension } from '../hooks/audioMime';
 import { ActionMenu } from '../components/ActionMenu';
+import { useOffline } from '../context/OfflineContext';
 
 type SortMode = 'default' | 'leastPlayed' | 'mostPlayed';
 
 export function TracksPage() {
+  const { t } = useTranslation();
   const navigate = useNavigate();
   const confirm = useConfirm();
   const [searchParams] = useSearchParams();
   const { isAuthenticated } = useAuth();
   const { playerState } = useGlobalAudio();
+  const { isOfflineMode, isCached, downloadTrack, downloadingTrackIds } = useOffline();
   const { tracks, favorites, toggleFavorite: ctxToggleFavorite, deleteTrack, syncLibrary, isLoading } = useLibrary();
   const activeTab = searchParams.get('tab') === 'favorites' ? 'favorites' : 'all';
   const [trackToPlaylist, setTrackToPlaylist] = useState<Track | null>(null);
@@ -248,8 +252,25 @@ export function TracksPage() {
           </h1>
           <p className="text-secondary/60 text-sm font-mono mt-1 sm:ml-12">
             {displayTracks.length} {activeTab === 'all' ? 'songs in your library' : 'favorite songs'}.
+            {isOfflineMode && <span className="ml-2 text-primary">({t('offline.offlineOnly', 'Showing downloaded tracks only')})</span>}
           </p>
         </div>
+        {!isOfflineMode && (
+          <div className="flex items-center gap-2">
+            <button
+              onClick={async () => {
+                const uncached = displayTracks.filter(t => !isCached(t));
+                for (const t of uncached) {
+                  await downloadTrack(t);
+                }
+              }}
+              className="flex items-center gap-2 bg-primary/20 hover:bg-primary/30 text-primary px-4 py-2 rounded-xl transition-colors shrink-0 whitespace-nowrap text-sm font-medium"
+            >
+              <DownloadCloud size={18} />
+              <span className="hidden sm:inline">{t('offline.downloadAll', 'Download All')}</span>
+            </button>
+          </div>
+        )}
       </div>
 
       <AddToPlaylistModal
@@ -389,7 +410,10 @@ export function TracksPage() {
         {currentTracks.map((track, idx) => (
           <div
             key={track.id}
-            onPointerDown={(e) => handlePointerDown(String(track.id), e)}
+            onPointerDown={(e) => {
+              if (isOfflineMode && !isCached(track)) return;
+              handlePointerDown(String(track.id), e);
+            }}
             onPointerUp={handlePointerUpOrLeave}
             onPointerCancel={handlePointerUpOrLeave}
             onMouseLeave={() => {
@@ -401,8 +425,13 @@ export function TracksPage() {
                 e.preventDefault();
               }
             }}
-            onClick={(e) => handleTrackClick(track, e)}
-            className={`flex items-center gap-3 sm:gap-4 p-3 rounded-xl border transition-colors group cursor-pointer select-none ${playerState.currentTrack?.id === track.id
+            onClick={(e) => {
+              if (isOfflineMode && !isCached(track)) return;
+              handleTrackClick(track, e);
+            }}
+            className={`flex items-center gap-3 sm:gap-4 p-3 rounded-xl border transition-colors group cursor-pointer select-none ${
+              isOfflineMode && !isCached(track) ? 'opacity-40 grayscale pointer-events-none' :
+              playerState.currentTrack?.id === track.id
               ? 'bg-primary/10 border-primary/30'
               : 'bg-white/[0.02] border-white/5 hover:bg-white/5 hover:border-white/10'
               }`}
@@ -443,10 +472,29 @@ export function TracksPage() {
               </div>
             </div>
             <div className={`relative flex items-center gap-2 transition-opacity ${openMenuId === track.id ? 'opacity-100' : 'opacity-100 lg:opacity-0 lg:group-hover:opacity-100'}`}>
+              {!isOfflineMode && track.sourceType !== 'LOCAL' && (
+                <button
+                  aria-label="Download track"
+                  onClick={async (e) => {
+                    e.stopPropagation();
+                    if (!isCached(track) && !downloadingTrackIds.has(String(track.id))) {
+                      await downloadTrack(track);
+                    }
+                  }}
+                  className={`p-1.5 rounded-full transition-colors ${
+                    isCached(track) ? 'text-green-400' : 
+                    downloadingTrackIds.has(String(track.id)) ? 'text-primary' : 'text-white/40 hover:text-white hover:bg-white/10'
+                  }`}
+                  title={isCached(track) ? t('offline.downloaded', 'Downloaded') : downloadingTrackIds.has(String(track.id)) ? t('offline.downloading', 'Downloading...') : t('offline.downloadTrack', 'Download')}
+                >
+                  {isCached(track) ? <CheckCircle2 size={16} /> : downloadingTrackIds.has(String(track.id)) ? <Loader2 size={16} className="animate-spin" /> : <Download size={16} />}
+                </button>
+              )}
+
               <button
                 aria-label="More options"
                 onClick={(e) => { e.stopPropagation(); setOpenMenuId(openMenuId === track.id ? null : track.id); }}
-                className="p-1.5 text-white/40 hover:text-white hover:bg-white/10 rounded-full transition-colors"
+                className="p-1.5 text-white/40 hover:text-white hover:bg-white/10 rounded-full transition-colors pointer-events-auto"
                 title="More options"
               >
                 <MoreHorizontal size={18} />

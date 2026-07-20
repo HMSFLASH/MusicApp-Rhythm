@@ -1,5 +1,5 @@
 import { useState, useRef, useEffect } from 'react';
-import { useNavigate } from 'react-router-dom';
+import { useNavigate, useLocation } from 'react-router-dom';
 import { Search, Plus, Users, Music, Disc, X, Check, Play, Cloud, ListPlus, Trash2, ListMusic } from 'lucide-react';
 import { useGlobalAudio } from '../context/AudioContext';
 import { useAuth } from '../context/AuthContext';
@@ -8,12 +8,15 @@ import type { Track } from '../hooks/useAudioPlayer';
 import { useLibrary } from '../context/LibraryContext';
 import { useConfirm } from '../context/ConfirmContext';
 import { ActionMenu } from '../components/ActionMenu';
+import { useOffline } from '../context/OfflineContext';
 
 export function SearchPage() {
   const navigate = useNavigate();
+  const location = useLocation();
   const confirm = useConfirm();
   const { isAuthenticated } = useAuth();
   const { playerState } = useGlobalAudio();
+  const { isOfflineMode, isCached } = useOffline();
   const { tracks: allTracks, deleteTrack } = useLibrary();
   const [searchQuery, setSearchQuery] = useState('');
   const [trackToPlaylist, setTrackToPlaylist] = useState<Track | null>(null);
@@ -312,13 +315,18 @@ export function SearchPage() {
                 <h3 className="text-sm font-semibold text-white/40 uppercase tracking-widest mb-3">Songs</h3>
                 <div className="flex flex-col gap-1.5">
                   {searchResults.map((track, idx) => (
-                    <div key={track.id} onClick={() => playerState.playTrack(track, searchResults)} className={`flex items-center gap-3 sm:gap-4 p-3 rounded-xl border transition-colors group cursor-pointer ${playerState.currentTrack?.id === track.id
+                    <div key={track.id} onClick={(e) => {
+                      if (isOfflineMode && !isCached(track)) return;
+                      playerState.playTrack(track, searchResults);
+                    }} className={`flex items-center gap-3 sm:gap-4 p-3 rounded-xl border transition-colors group cursor-pointer ${
+                        isOfflineMode && !isCached(track) ? 'opacity-40 grayscale pointer-events-none' :
+                        playerState.currentTrack?.id === track.id
                         ? 'bg-primary/10 border-primary/30'
                         : 'bg-white/[0.02] border-white/5 hover:bg-white/5 hover:border-white/10'
                       }`}>
                       <span className="hidden sm:block text-xs text-white/20 w-5 text-right lg:group-hover:hidden">{idx + 1}</span>
                       <button onClick={(e) => { e.stopPropagation(); playerState.playTrack(track, searchResults); }}
-                        className="hidden lg:group-hover:flex w-5 items-center justify-center text-white">
+                        className="hidden lg:group-hover:flex w-5 items-center justify-center text-white pointer-events-auto">
                         <Play size={13} fill="currentColor" />
                       </button>
                       <div className="flex flex-col truncate flex-1">

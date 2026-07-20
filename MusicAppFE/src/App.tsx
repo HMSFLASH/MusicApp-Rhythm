@@ -23,6 +23,7 @@ import { UploadProvider } from './context/UploadContext';
 import { LibraryProvider } from './context/LibraryContext';
 import { Navigate } from 'react-router-dom';
 import { ConfirmProvider } from './context/ConfirmContext';
+import { OfflineProvider } from './context/OfflineContext';
 
 function ProtectedRoute({ children }: { children: React.ReactNode }) {
   const { isAuthenticated, isAuthResolved } = useAuth();
@@ -84,9 +85,11 @@ function AppProviders() {
     <AudioProvider key={audioScope}>
       <LibraryProvider>
         <UploadProvider>
-          <ConfirmProvider>
-            <App />
-          </ConfirmProvider>
+          <OfflineProvider>
+            <ConfirmProvider>
+              <App />
+            </ConfirmProvider>
+          </OfflineProvider>
         </UploadProvider>
       </LibraryProvider>
     </AudioProvider>
