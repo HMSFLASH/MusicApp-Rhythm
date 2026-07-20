@@ -64,11 +64,24 @@ export const loadTrackAudioUrl = async ({
       const token = driveToken || await fetchDriveToken?.();
       if (!token) return '';
       const url = `https://www.googleapis.com/drive/v3/files/${encodeURIComponent(driveFileId)}?alt=media`;
-      const response = await fetch(url, {
+      let response = await fetch(url, {
         mode: 'cors',
         cache: forceReloadFromDrive ? 'reload' : 'default',
         headers: { Authorization: `Bearer ${token}` },
       });
+      
+      if (response.status === 401) {
+        // Token might be expired in memory. Fetch a fresh one from backend and retry once.
+        const freshToken = await fetchDriveToken?.();
+        if (freshToken) {
+          response = await fetch(url, {
+            mode: 'cors',
+            cache: forceReloadFromDrive ? 'reload' : 'default',
+            headers: { Authorization: `Bearer ${freshToken}` },
+          });
+        }
+      }
+
       if (!response.ok) {
         throw new Error(`Drive audio fetch failed: HTTP ${response.status}`);
       }
