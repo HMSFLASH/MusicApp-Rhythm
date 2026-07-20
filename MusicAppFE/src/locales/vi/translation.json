@@ -34,7 +34,8 @@
     "restoreSuccess": "Khôi phục thành công! Ứng dụng sẽ tải lại.",
     "restoreFail": "Khôi phục từ Google Drive thất bại.",
     "downloadingTrack": "Đang tải nhạc về...",
-    "processingTrack": "Đang tính toán âm thanh..."
+    "processingTrack": "Đang tính toán âm thanh...",
+    "driveTokenExpired": "Phiên kết nối Google Drive đã hết hạn. Đang tự động chuyển hướng..."
   },
   "studio": {
     "pageTitle": "Studio Âm Thanh",

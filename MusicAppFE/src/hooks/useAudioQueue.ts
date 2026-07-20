@@ -126,7 +126,7 @@ export function useAudioQueue(
         if (saved) {
           let parsedQueue = saved.queue || [];
           let parsedTrack = saved.currentTrack || null;
-        
+
           parsedQueue = parsedQueue.filter((track) => track.sourceType !== 'LOCAL');
           parsedQueue.forEach((track) => {
             if (track.imageUrl?.startsWith('blob:')) track.imageUrl = '';
@@ -139,7 +139,7 @@ export function useAudioQueue(
               parsedTrack.imageUrl = '';
             }
           }
-        
+
           setQueue(parsedQueue);
           setCurrentTrack(parsedTrack);
         }
@@ -193,13 +193,11 @@ export function useAudioQueue(
       void getCover(trackId)
         .then((cover) => {
           if (!cover) {
-            console.log(`[AudioQueue] No IndexedDB cover found for queued track ${trackId}.`);
             return;
           }
 
           const imageUrl = URL.createObjectURL(new Blob([new Uint8Array(cover.data)], { type: cover.mimeType }));
           queueCoverObjectUrlsRef.current.set(trackId, imageUrl);
-          console.log(`[AudioQueue] Hydrated cover for queued track ${trackId} from IndexedDB.`);
 
           setCurrentTrack(prev => (
             prev && String(prev.id) === trackId && !prev.imageUrl

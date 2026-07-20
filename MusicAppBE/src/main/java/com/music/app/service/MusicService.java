@@ -133,7 +133,15 @@ public class MusicService {
                 } catch (Exception e) {
                     log.error("Failed to delete related records during sync", e);
                 }
-                musicLibraryRepository.deleteAll(toDelete);
+                
+                try {
+                    entityManager.createQuery("DELETE FROM MusicLibrary m WHERE m.id IN :ids")
+                            .setParameter("ids", idsToDelete)
+                            .executeUpdate();
+                } catch (Exception e) {
+                    log.warn("Concurrent delete encountered for MusicLibrary, ignoring: {}", e.getMessage());
+                }
+                
                 log.info("Synced with Drive: deleted {} missing files from DB for user {}", toDelete.size(), userId);
             }
 
@@ -141,6 +149,14 @@ public class MusicService {
             return listMusic(userId);
         } catch (Exception e) {
             log.error("Failed to sync with drive", e);
+            String msg = e.getMessage();
+            if (msg != null && (msg.contains("invalid_grant") || msg.contains("Token has been expired"))) {
+                userRepository.findById(userId).ifPresent(u -> {
+                    u.setRefreshToken(null);
+                    userRepository.save(u);
+                });
+                throw new AppException(ErrorCode.DRIVE_NOT_LINKED, "Phiên kết nối Google Drive đã hết hạn hoặc bị thu hồi. Vui lòng kết nối lại.");
+            }
             return listMusic(userId); // fallback to db list
         }
     }
@@ -223,6 +239,14 @@ public class MusicService {
             throw exception;
         } catch (Exception exception) {
             log.error("Failed to register direct Drive upload", exception);
+            String msg = exception.getMessage();
+            if (msg != null && (msg.contains("invalid_grant") || msg.contains("Token has been expired"))) {
+                userRepository.findById(userId).ifPresent(u -> {
+                    u.setRefreshToken(null);
+                    userRepository.save(u);
+                });
+                throw new AppException(ErrorCode.DRIVE_NOT_LINKED, "Phiên kết nối Google Drive đã hết hạn hoặc bị thu hồi. Vui lòng kết nối lại.");
+            }
             throw new AppException(ErrorCode.UNCATEGORIZED_EXCEPTION, "Failed to register Drive upload");
         }
     }
@@ -262,6 +286,14 @@ public class MusicService {
             throw exception;
         } catch (Exception exception) {
             log.error("Failed to obtain Google Drive access token", exception);
+            String msg = exception.getMessage();
+            if (msg != null && (msg.contains("invalid_grant") || msg.contains("Token has been expired"))) {
+                userRepository.findById(userId).ifPresent(u -> {
+                    u.setRefreshToken(null);
+                    userRepository.save(u);
+                });
+                throw new AppException(ErrorCode.DRIVE_NOT_LINKED, "Phiên kết nối Google Drive đã hết hạn hoặc bị thu hồi. Vui lòng kết nối lại.");
+            }
             throw new AppException(ErrorCode.UNCATEGORIZED_EXCEPTION, "Failed to connect to Google Drive");
         }
     }

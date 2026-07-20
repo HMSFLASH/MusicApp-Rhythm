@@ -34,7 +34,8 @@
     "restoreSuccess": "Restore successful! The app will now reload to apply changes.",
     "restoreFail": "Failed to restore from Google Drive. No backup found or account not linked.",
     "downloadingTrack": "Downloading music...",
-    "processingTrack": "Processing audio..."
+    "processingTrack": "Processing audio...",
+    "driveTokenExpired": "Google Drive connection session has expired. Redirecting automatically..."
   },
   "studio": {
     "pageTitle": "Audio Studio",

@@ -517,7 +517,7 @@ export function EqRack() {
                       value={band.frequency}
                       min={20}
                       max={20000}
-                      step={0.1}
+                      step={0.01}
                       onChange={(value) => playerState.updateEqBandFreq(band.id, value)}
                       ariaLabel="Band frequency"
                       className="w-full bg-transparent border-b border-white/20 text-center text-[11px] text-white/70 font-mono outline-none focus:border-[#00E5FF] pb-1"
@@ -566,7 +566,7 @@ export function EqRack() {
 
                     <span className="text-[9px] text-white/65 uppercase font-sans mt-1">Q</span>
                     <NumberInput
-                      step={0.1}
+                      step={0.01}
                       min={0.1}
                       max={18}
                       value={band.q}

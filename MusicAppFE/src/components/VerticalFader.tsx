@@ -39,7 +39,7 @@ export function VerticalFader({
     const pct = 1 - (newY / rect.height);
     const newValue = min + (pct * range);
     
-    onChange(Math.round(newValue));
+    onChange(Number(newValue.toFixed(2)));
   }, [isDragging, min, range, onChange]);
 
   const handlePointerMove = useCallback((e: PointerEvent) => {

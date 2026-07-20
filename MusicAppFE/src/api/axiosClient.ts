@@ -1,4 +1,6 @@
 import axios from 'axios';
+import i18n from '../i18n';
+
 let envUrl = import.meta.env.VITE_API_URL || 'http://localhost:8000';
 if (typeof window !== 'undefined' && envUrl.includes('localhost')) {
   envUrl = envUrl.replace('localhost', window.location.hostname);
@@ -97,7 +99,26 @@ axiosClient.interceptors.response.use(
       }
     }
 
+    if (error.response?.status === 500 || error.message === 'Network Error' || error.code === 'ECONNABORTED') {
+      return Promise.reject(new Error('No connection'));
+    }
+
+    const apiCode = error.response?.data?.code;
     const apiMessage = error.response?.data?.message;
+    
+    if (apiCode === 2001) {
+      window.dispatchEvent(new CustomEvent('app-notification', {
+        detail: {
+          type: 'error',
+          message: i18n.t('layout.driveTokenExpired'),
+        },
+      }));
+      setTimeout(() => {
+        window.location.href = `${BACKEND_URL}/oauth2/authorization/google`;
+      }, 3000);
+      return Promise.reject(new Error(apiMessage || 'Google Drive Token Expired'));
+    }
+
     if (apiMessage) {
       return Promise.reject(new Error(apiMessage));
     }
