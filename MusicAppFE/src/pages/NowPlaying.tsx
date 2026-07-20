@@ -493,9 +493,12 @@ export function NowPlaying() {
                         )}
                         {(getAudioExtension(currentTrack.fileName) === 'm4a' || getAudioExtension(currentTrack.fileName) === 'aac') && (
                           <button
-                            onClick={() => {
+                            onClick={async () => {
                               playerState.toggleM4aWasmForTrack(currentTrack);
                               setShowMenu(false);
+                              if (currentTrack.sourceType !== 'LOCAL') {
+                                await playerState.reloadCurrentTrackFromDrive();
+                              }
                             }}
                             className="w-full flex items-center gap-3 px-4 py-3 text-sm text-white/80 hover:bg-white/5 transition-colors border-b border-white/5"
                           >
@@ -505,9 +508,12 @@ export function NowPlaying() {
                         )}
                         {currentTrack && (
                           <button
-                            onClick={() => {
+                            onClick={async () => {
                               playerState.toggleLegacyMetadataForTrack(currentTrack);
                               setShowMenu(false);
+                              if (currentTrack.sourceType !== 'LOCAL') {
+                                await playerState.reloadCurrentTrackFromDrive();
+                              }
                             }}
                             className="w-full flex items-center gap-3 px-4 py-3 text-sm text-white/80 hover:bg-white/5 transition-colors border-b border-white/5"
                           >

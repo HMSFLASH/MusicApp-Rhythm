@@ -496,10 +496,13 @@ export function TracksPage() {
                   )}
                   {(getAudioExtension(track.fileName) === 'm4a' || getAudioExtension(track.fileName) === 'aac') && (
                     <button
-                      onClick={(e) => {
+                      onClick={async (e) => {
                         e.stopPropagation();
                         playerState.toggleM4aWasmForTrack(track);
                         setOpenMenuId(null);
+                        if (playerState.currentTrack?.id === track.id && track.sourceType !== 'LOCAL') {
+                          await playerState.reloadCurrentTrackFromDrive();
+                        }
                       }}
                       className="w-full flex items-center gap-3 px-4 py-2 text-sm text-left text-white/80 hover:bg-white/10"
                     >
@@ -508,10 +511,13 @@ export function TracksPage() {
                     </button>
                   )}
                   <button
-                    onClick={(e) => {
+                    onClick={async (e) => {
                       e.stopPropagation();
                       playerState.toggleLegacyMetadataForTrack(track);
                       setOpenMenuId(null);
+                      if (playerState.currentTrack?.id === track.id && track.sourceType !== 'LOCAL') {
+                        await playerState.reloadCurrentTrackFromDrive();
+                      }
                     }}
                     className="w-full flex items-center gap-3 px-4 py-2 text-sm text-left text-white/80 hover:bg-white/10"
                   >
