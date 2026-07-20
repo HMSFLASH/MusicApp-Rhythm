@@ -242,6 +242,8 @@ export function TracksPage() {
   const infoTrackChannels = infoTrack?.numberOfChannels ?? infoTrackMetadata?.numberOfChannels;
   const infoTrackSampleRate = infoTrack?.sampleRate ?? infoTrackMetadata?.sampleRate;
   const infoTrackBitsPerSample = infoTrack?.bitsPerSample ?? infoTrackMetadata?.bitsPerSample;
+  
+  const uncachedCount = displayTracks.filter(t => !isCached(t) && t.sourceType !== 'LOCAL').length;
 
   return (
     <div className="w-full h-full flex flex-col max-w-6xl 2xl:max-w-none mx-auto pb-28 md:pb-32 overflow-y-auto">
@@ -257,7 +259,7 @@ export function TracksPage() {
             {displayTracks.length} {activeTab === 'all' ? 'songs in your library' : 'favorite songs'}.
           </p>
         </div>
-        {!isOfflineMode && (
+        {!isOfflineMode && uncachedCount > 0 && (
           <div className="flex items-center gap-2">
             {downloadProgress ? (
               <button

@@ -221,7 +221,6 @@
     "downloadAll": "Download All",
     "downloading": "Downloading...",
     "downloaded": "Downloaded",
-    "notCached": "Not downloaded",
-    "offlineOnly": "Showing downloaded tracks only"
+    "notCached": "Not downloaded"
   }
 }

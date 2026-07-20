@@ -222,7 +222,6 @@
     "downloadAll": "Tải tất cả",
     "downloading": "Đang tải...",
     "downloaded": "Đã tải",
-    "notCached": "Chưa tải về",
-    "offlineOnly": "Chỉ hiển thị bài đã tải"
+    "notCached": "Chưa tải về"
   }
 }
