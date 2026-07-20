@@ -1,10 +1,11 @@
 package com.music.app.repository;
 
-import com.music.app.model.InvalidatedToken;
+import java.time.LocalDateTime;
+
 import org.springframework.data.jpa.repository.JpaRepository;
 import org.springframework.stereotype.Repository;
 
-import java.time.LocalDateTime;
+import com.music.app.model.InvalidatedToken;
 
 @Repository
 public interface InvalidatedTokenRepository extends JpaRepository<InvalidatedToken, String> {

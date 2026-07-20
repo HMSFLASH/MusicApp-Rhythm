@@ -1,5 +1,15 @@
 package com.music.app.service;
 
+import java.util.List;
+import java.util.stream.Collectors;
+
+import jakarta.persistence.EntityNotFoundException;
+
+import org.hibernate.FetchNotFoundException;
+import org.hibernate.ObjectNotFoundException;
+import org.springframework.stereotype.Service;
+import org.springframework.transaction.annotation.Transactional;
+
 import com.music.app.dto.CreatePlaylistRequest;
 import com.music.app.dto.MusicItemDto;
 import com.music.app.dto.PlaylistDto;
@@ -10,20 +20,11 @@ import com.music.app.model.Playlist;
 import com.music.app.model.PlaylistItem;
 import com.music.app.model.User;
 import com.music.app.repository.MusicLibraryRepository;
-import com.music.app.repository.PlaylistRepository;
 import com.music.app.repository.PlaylistItemRepository;
+import com.music.app.repository.PlaylistRepository;
 import com.music.app.repository.UserRepository;
 
-import jakarta.persistence.EntityNotFoundException;
 import lombok.RequiredArgsConstructor;
-
-import org.hibernate.FetchNotFoundException;
-import org.hibernate.ObjectNotFoundException;
-import org.springframework.stereotype.Service;
-import org.springframework.transaction.annotation.Transactional;
-
-import java.util.List;
-import java.util.stream.Collectors;
 
 @Service
 @RequiredArgsConstructor
@@ -61,20 +62,21 @@ public class PlaylistService {
     }
 
     public List<PlaylistDto> getPlaylists(String userId) {
-        return playlistRepository.findByUserIdOrderByCreatedAtDesc(userId)
-                .stream().map(p -> toDto(p, false)).collect(Collectors.toList());
+        return playlistRepository.findByUserIdOrderByCreatedAtDesc(userId).stream()
+                .map(p -> toDto(p, false))
+                .collect(Collectors.toList());
     }
 
     public PlaylistDto getPlaylist(String id, String userId) {
-        return playlistRepository.findByIdAndUserIdWithItems(id, userId)
+        return playlistRepository
+                .findByIdAndUserIdWithItems(id, userId)
                 .map(p -> toDto(p, true))
                 .orElseThrow(() -> new AppException(ErrorCode.NOT_FOUND));
     }
 
     @Transactional
     public PlaylistDto createPlaylist(CreatePlaylistRequest req, String userId) {
-        User user = userRepository.findById(userId)
-                .orElseThrow(() -> new AppException(ErrorCode.USER_NOT_EXISTED));
+        User user = userRepository.findById(userId).orElseThrow(() -> new AppException(ErrorCode.USER_NOT_EXISTED));
 
         Playlist playlist = Playlist.builder()
                 .name(req.getName())
@@ -88,29 +90,31 @@ public class PlaylistService {
 
     @Transactional
     public PlaylistDto updatePlaylist(String id, CreatePlaylistRequest req, String userId) {
-        Playlist p = playlistRepository.findByIdAndUserId(id, userId)
+        Playlist p = playlistRepository
+                .findByIdAndUserId(id, userId)
                 .orElseThrow(() -> new AppException(ErrorCode.NOT_FOUND));
 
-        if (req.getName() != null)
-            p.setName(req.getName());
-        if (req.getImageUrl() != null)
-            p.setImageUrl(req.getImageUrl());
+        if (req.getName() != null) p.setName(req.getName());
+        if (req.getImageUrl() != null) p.setImageUrl(req.getImageUrl());
         return toDto(playlistRepository.save(p), false);
     }
 
     @Transactional
     public void deletePlaylist(String id, String userId) {
-        Playlist p = playlistRepository.findByIdAndUserId(id, userId)
+        Playlist p = playlistRepository
+                .findByIdAndUserId(id, userId)
                 .orElseThrow(() -> new AppException(ErrorCode.NOT_FOUND));
         playlistRepository.delete(p);
     }
 
     @Transactional
     public void addTrack(String id, String trackId, String name, String userId) {
-        Playlist p = playlistRepository.findByIdAndUserId(id, userId)
+        Playlist p = playlistRepository
+                .findByIdAndUserId(id, userId)
                 .orElseThrow(() -> new AppException(ErrorCode.NOT_FOUND));
 
-        MusicLibrary lib = musicLibraryRepository.findByIdAndUserId(trackId, userId)
+        MusicLibrary lib = musicLibraryRepository
+                .findByIdAndUserId(trackId, userId)
                 .or(() -> musicLibraryRepository.findByDriveFileIdAndUserId(trackId, userId))
                 .orElseThrow(() -> new AppException(ErrorCode.NOT_FOUND));
 
@@ -121,15 +125,17 @@ public class PlaylistService {
 
         int maxPos = playlistItemRepository.getMaxPosition(id);
         PlaylistItem item = PlaylistItem.builder()
-                .playlist(p).musicLibrary(lib).position(maxPos + 1).build();
+                .playlist(p)
+                .musicLibrary(lib)
+                .position(maxPos + 1)
+                .build();
         playlistItemRepository.save(item);
     }
 
     @Transactional
     public void removeTrack(String id, String trackId, String userId) {
         // verify playlist exists and belongs to user
-        playlistRepository.findByIdAndUserId(id, userId)
-                .orElseThrow(() -> new AppException(ErrorCode.NOT_FOUND));
+        playlistRepository.findByIdAndUserId(id, userId).orElseThrow(() -> new AppException(ErrorCode.NOT_FOUND));
 
         if (playlistItemRepository.existsByPlaylistIdAndMusicLibraryId(id, trackId)) {
             playlistItemRepository.deleteByPlaylistIdAndMusicLibraryId(id, trackId);

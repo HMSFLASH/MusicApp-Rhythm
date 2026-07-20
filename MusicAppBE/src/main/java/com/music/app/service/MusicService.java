@@ -1,5 +1,16 @@
 package com.music.app.service;
 
+import java.util.Base64;
+import java.util.List;
+import java.util.Map;
+import java.util.stream.Collectors;
+
+import jakarta.persistence.EntityManager;
+import jakarta.persistence.PersistenceContext;
+
+import org.jaudiotagger.tag.Tag;
+import org.springframework.stereotype.Service;
+
 import com.google.api.services.drive.model.File;
 import com.music.app.dto.MusicItemDto;
 import com.music.app.dto.RegisterDriveUploadRequest;
@@ -10,21 +21,8 @@ import com.music.app.model.User;
 import com.music.app.repository.MusicLibraryRepository;
 import com.music.app.repository.UserRepository;
 
-import jakarta.persistence.EntityManager;
-import jakarta.persistence.PersistenceContext;
 import lombok.RequiredArgsConstructor;
 import lombok.extern.slf4j.Slf4j;
-import org.springframework.stereotype.Service;
-import org.springframework.web.multipart.MultipartFile;
-import org.jaudiotagger.audio.AudioFile;
-import org.jaudiotagger.audio.AudioFileIO;
-import org.jaudiotagger.tag.Tag;
-import org.jaudiotagger.tag.FieldKey;
-import java.io.FileInputStream;
-import java.util.Base64;
-import java.util.List;
-import java.util.Map;
-import java.util.stream.Collectors;
 
 @Service
 @RequiredArgsConstructor
@@ -91,11 +89,10 @@ public class MusicService {
                 .collect(Collectors.toList());
     }
 
-
-
     @org.springframework.transaction.annotation.Transactional
     public MusicItemDto recordPlay(String id, String userId) {
-        MusicLibrary lib = musicLibraryRepository.findByIdAndUserId(id, userId)
+        MusicLibrary lib = musicLibraryRepository
+                .findByIdAndUserId(id, userId)
                 .orElseThrow(() -> new AppException(ErrorCode.NOT_FOUND));
         lib.setPlayCount((lib.getPlayCount() == null ? 0L : lib.getPlayCount()) + 1);
         return toDto(lib);
@@ -103,45 +100,47 @@ public class MusicService {
 
     @org.springframework.transaction.annotation.Transactional
     public List<MusicItemDto> syncWithDrive(String userId) {
-        User user = userRepository.findById(userId)
-                .orElseThrow(() -> new AppException(ErrorCode.USER_NOT_EXISTED));
+        User user = userRepository.findById(userId).orElseThrow(() -> new AppException(ErrorCode.USER_NOT_EXISTED));
         if (user.getRefreshToken() == null) {
             return listMusic(userId);
         }
 
         try {
             List<File> driveFiles = googleDriveService.listFiles(user.getRefreshToken());
-            List<String> driveFileIds = driveFiles.stream()
-                    .map(File::getId)
-                    .collect(Collectors.toList());
+            List<String> driveFileIds = driveFiles.stream().map(File::getId).collect(Collectors.toList());
 
             List<MusicLibrary> dbFiles = musicLibraryRepository.findByUserId(userId);
             List<MusicLibrary> toDelete = dbFiles.stream()
-                    .filter(lib -> "DRIVE".equals(lib.getSourceType()) && lib.getDriveFileId() != null
+                    .filter(lib -> "DRIVE".equals(lib.getSourceType())
+                            && lib.getDriveFileId() != null
                             && !driveFileIds.contains(lib.getDriveFileId()))
                     .collect(Collectors.toList());
 
             if (!toDelete.isEmpty()) {
-                List<String> idsToDelete = toDelete.stream().map(MusicLibrary::getId).collect(Collectors.toList());
+                List<String> idsToDelete =
+                        toDelete.stream().map(MusicLibrary::getId).collect(Collectors.toList());
                 try {
-                    entityManager.createQuery("DELETE FROM PlaylistItem p WHERE p.musicLibrary.id IN :ids")
+                    entityManager
+                            .createQuery("DELETE FROM PlaylistItem p WHERE p.musicLibrary.id IN :ids")
                             .setParameter("ids", idsToDelete)
                             .executeUpdate();
-                    entityManager.createQuery("DELETE FROM Favorite f WHERE f.musicLibrary.id IN :ids")
+                    entityManager
+                            .createQuery("DELETE FROM Favorite f WHERE f.musicLibrary.id IN :ids")
                             .setParameter("ids", idsToDelete)
                             .executeUpdate();
                 } catch (Exception e) {
                     log.error("Failed to delete related records during sync", e);
                 }
-                
+
                 try {
-                    entityManager.createQuery("DELETE FROM MusicLibrary m WHERE m.id IN :ids")
+                    entityManager
+                            .createQuery("DELETE FROM MusicLibrary m WHERE m.id IN :ids")
                             .setParameter("ids", idsToDelete)
                             .executeUpdate();
                 } catch (Exception e) {
                     log.warn("Concurrent delete encountered for MusicLibrary, ignoring: {}", e.getMessage());
                 }
-                
+
                 log.info("Synced with Drive: deleted {} missing files from DB for user {}", toDelete.size(), userId);
             }
 
@@ -155,7 +154,9 @@ public class MusicService {
                     u.setRefreshToken(null);
                     userRepository.save(u);
                 });
-                throw new AppException(ErrorCode.DRIVE_NOT_LINKED, "Phiên kết nối Google Drive đã hết hạn hoặc bị thu hồi. Vui lòng kết nối lại.");
+                throw new AppException(
+                        ErrorCode.DRIVE_NOT_LINKED,
+                        "Phiên kết nối Google Drive đã hết hạn hoặc bị thu hồi. Vui lòng kết nối lại.");
             }
             return listMusic(userId); // fallback to db list
         }
@@ -163,16 +164,19 @@ public class MusicService {
 
     @org.springframework.transaction.annotation.Transactional
     public void deleteMusic(String id, String userId) {
-        MusicLibrary lib = musicLibraryRepository.findByIdAndUserId(id, userId)
+        MusicLibrary lib = musicLibraryRepository
+                .findByIdAndUserId(id, userId)
                 .orElseThrow(() -> new AppException(ErrorCode.NOT_FOUND));
 
         // Fix logic error when deleting songs that are in favorites or playlists
         try {
-            entityManager.createQuery("DELETE FROM PlaylistItem p WHERE p.musicLibrary.id = :id")
+            entityManager
+                    .createQuery("DELETE FROM PlaylistItem p WHERE p.musicLibrary.id = :id")
                     .setParameter("id", id)
                     .executeUpdate();
 
-            entityManager.createQuery("DELETE FROM Favorite f WHERE f.musicLibrary.id = :id")
+            entityManager
+                    .createQuery("DELETE FROM Favorite f WHERE f.musicLibrary.id = :id")
                     .setParameter("id", id)
                     .executeUpdate();
         } catch (Exception e) {
@@ -181,7 +185,8 @@ public class MusicService {
 
         if ("DRIVE".equals(lib.getSourceType()) && lib.getDriveFileId() != null) {
             try {
-                googleDriveService.deleteFile(lib.getDriveFileId(), lib.getUser().getRefreshToken());
+                googleDriveService.deleteFile(
+                        lib.getDriveFileId(), lib.getUser().getRefreshToken());
             } catch (Exception e) {
                 log.error("Failed to delete file from Google Drive, proceeding to delete from DB anyway", e);
             }
@@ -190,21 +195,26 @@ public class MusicService {
         musicLibraryRepository.delete(lib);
     }
 
-
     private boolean isSupportedAudioFile(String filename) {
         String lower = filename.toLowerCase(java.util.Locale.ROOT);
-        return lower.endsWith(".mp3") || lower.endsWith(".m4a") || lower.endsWith(".flac")
-                || lower.endsWith(".wav") || lower.endsWith(".ogg") || lower.endsWith(".opus")
-                || lower.endsWith(".aac") || lower.endsWith(".wma");
+        return lower.endsWith(".mp3")
+                || lower.endsWith(".m4a")
+                || lower.endsWith(".flac")
+                || lower.endsWith(".wav")
+                || lower.endsWith(".ogg")
+                || lower.endsWith(".opus")
+                || lower.endsWith(".aac")
+                || lower.endsWith(".wma");
     }
 
     public MusicItemDto registerDirectDriveUpload(RegisterDriveUploadRequest request, String userId) {
-        if (request == null || request.getDriveFileId() == null || request.getDriveFileId().isBlank()) {
+        if (request == null
+                || request.getDriveFileId() == null
+                || request.getDriveFileId().isBlank()) {
             throw new AppException(ErrorCode.NOT_FOUND, "Drive file id is required");
         }
 
-        User user = userRepository.findById(userId)
-                .orElseThrow(() -> new AppException(ErrorCode.USER_NOT_EXISTED));
+        User user = userRepository.findById(userId).orElseThrow(() -> new AppException(ErrorCode.USER_NOT_EXISTED));
 
         if (user.getRefreshToken() == null) {
             throw new AppException(ErrorCode.FORBIDDEN, "User Google Drive not linked");
@@ -222,7 +232,8 @@ public class MusicService {
             }
 
             boolean exists = musicLibraryRepository.findByUserId(userId).stream()
-                    .anyMatch(lib -> request.getDriveFileId().equals(lib.getDriveFileId()) || fileName.equals(lib.getName()));
+                    .anyMatch(lib ->
+                            request.getDriveFileId().equals(lib.getDriveFileId()) || fileName.equals(lib.getName()));
             if (exists) {
                 throw new AppException(ErrorCode.DUPLICATE_FILE, "File already exists in library");
             }
@@ -245,7 +256,9 @@ public class MusicService {
                     u.setRefreshToken(null);
                     userRepository.save(u);
                 });
-                throw new AppException(ErrorCode.DRIVE_NOT_LINKED, "Phiên kết nối Google Drive đã hết hạn hoặc bị thu hồi. Vui lòng kết nối lại.");
+                throw new AppException(
+                        ErrorCode.DRIVE_NOT_LINKED,
+                        "Phiên kết nối Google Drive đã hết hạn hoặc bị thu hồi. Vui lòng kết nối lại.");
             }
             throw new AppException(ErrorCode.UNCATEGORIZED_EXCEPTION, "Failed to register Drive upload");
         }
@@ -276,8 +289,7 @@ public class MusicService {
 
     public String getDriveToken(String userId) {
         try {
-            User user = userRepository.findById(userId)
-                    .orElseThrow(() -> new AppException(ErrorCode.USER_NOT_EXISTED));
+            User user = userRepository.findById(userId).orElseThrow(() -> new AppException(ErrorCode.USER_NOT_EXISTED));
             if (user.getRefreshToken() == null) {
                 throw new AppException(ErrorCode.FORBIDDEN, "User Google Drive not linked");
             }
@@ -292,12 +304,11 @@ public class MusicService {
                     u.setRefreshToken(null);
                     userRepository.save(u);
                 });
-                throw new AppException(ErrorCode.DRIVE_NOT_LINKED, "Phiên kết nối Google Drive đã hết hạn hoặc bị thu hồi. Vui lòng kết nối lại.");
+                throw new AppException(
+                        ErrorCode.DRIVE_NOT_LINKED,
+                        "Phiên kết nối Google Drive đã hết hạn hoặc bị thu hồi. Vui lòng kết nối lại.");
             }
             throw new AppException(ErrorCode.UNCATEGORIZED_EXCEPTION, "Failed to connect to Google Drive");
         }
     }
-
-
-
 }

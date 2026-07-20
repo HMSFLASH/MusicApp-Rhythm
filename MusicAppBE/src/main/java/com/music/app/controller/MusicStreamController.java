@@ -1,13 +1,10 @@
 package com.music.app.controller;
 
-import com.music.app.dto.DriveStreamResponse;
-import com.music.app.model.MusicLibrary;
-import com.music.app.model.User;
-import com.music.app.repository.MusicLibraryRepository;
-import com.music.app.repository.UserRepository;
-import com.music.app.service.GoogleDriveService;
-import lombok.RequiredArgsConstructor;
-import lombok.extern.slf4j.Slf4j;
+import java.io.InputStream;
+import java.net.URLEncoder;
+import java.nio.charset.StandardCharsets;
+import java.security.Principal;
+
 import org.springframework.http.HttpHeaders;
 import org.springframework.http.HttpStatus;
 import org.springframework.http.MediaType;
@@ -15,10 +12,16 @@ import org.springframework.http.ResponseEntity;
 import org.springframework.security.oauth2.server.resource.authentication.JwtAuthenticationToken;
 import org.springframework.web.bind.annotation.*;
 import org.springframework.web.servlet.mvc.method.annotation.StreamingResponseBody;
-import java.io.InputStream;
-import java.net.URLEncoder;
-import java.nio.charset.StandardCharsets;
-import java.security.Principal;
+
+import com.music.app.dto.DriveStreamResponse;
+import com.music.app.model.MusicLibrary;
+import com.music.app.model.User;
+import com.music.app.repository.MusicLibraryRepository;
+import com.music.app.repository.UserRepository;
+import com.music.app.service.GoogleDriveService;
+
+import lombok.RequiredArgsConstructor;
+import lombok.extern.slf4j.Slf4j;
 
 @RestController
 @RequestMapping("/api/music")
@@ -60,7 +63,7 @@ public class MusicStreamController {
             @PathVariable String fileId,
             @RequestHeader(value = HttpHeaders.RANGE, required = false) String rangeHeader,
             Principal principal) {
-        
+
         try {
             String driveFileIdToUse;
             String fileName = null;
@@ -76,19 +79,21 @@ public class MusicStreamController {
 
             String userId = userIdStr;
             User user = userRepository.findById(userId).orElse(null);
-            
+
             if (user == null || user.getRefreshToken() == null) {
                 return ResponseEntity.status(HttpStatus.FORBIDDEN).build();
             }
 
-            MusicLibrary lib = musicLibraryRepository.findByIdAndUserId(fileId, userId).orElse(null);
+            MusicLibrary lib =
+                    musicLibraryRepository.findByIdAndUserId(fileId, userId).orElse(null);
             if (lib == null || !"DRIVE".equals(lib.getSourceType()) || lib.getDriveFileId() == null) {
                 return ResponseEntity.status(HttpStatus.NOT_FOUND).build();
             }
             fileName = lib.getName();
             driveFileIdToUse = lib.getDriveFileId();
 
-            DriveStreamResponse driveResponse = googleDriveService.streamFile(driveFileIdToUse, rangeHeader, user.getRefreshToken());
+            DriveStreamResponse driveResponse =
+                    googleDriveService.streamFile(driveFileIdToUse, rangeHeader, user.getRefreshToken());
 
             StreamingResponseBody responseBody = outputStream -> {
                 try (InputStream is = driveResponse.getInputStream()) {
@@ -99,11 +104,11 @@ public class MusicStreamController {
                     }
                 } catch (Exception e) {
                     String msg = e.getMessage() != null ? e.getMessage().toLowerCase() : "";
-                    if (e.getClass().getName().contains("ClientAbortException") || 
-                        e.getClass().getName().contains("AsyncRequestNotUsableException") ||
-                        msg.contains("broken pipe") || 
-                        msg.contains("connection reset") ||
-                        msg.contains("an established connection was aborted")) {
+                    if (e.getClass().getName().contains("ClientAbortException")
+                            || e.getClass().getName().contains("AsyncRequestNotUsableException")
+                            || msg.contains("broken pipe")
+                            || msg.contains("connection reset")
+                            || msg.contains("an established connection was aborted")) {
                         log.debug("Client aborted connection during Drive stream (expected)");
                     } else {
                         log.error("Error streaming data to client", e);
@@ -118,10 +123,10 @@ public class MusicStreamController {
                     HttpHeaders.ACCEPT_RANGES,
                     HttpHeaders.CONTENT_LENGTH,
                     HttpHeaders.CONTENT_RANGE,
-                    HttpHeaders.CONTENT_TYPE
-            ));
-             
-            if (driveResponse.getContentType() != null && !driveResponse.getContentType().equalsIgnoreCase(MediaType.APPLICATION_OCTET_STREAM_VALUE)) {
+                    HttpHeaders.CONTENT_TYPE));
+
+            if (driveResponse.getContentType() != null
+                    && !driveResponse.getContentType().equalsIgnoreCase(MediaType.APPLICATION_OCTET_STREAM_VALUE)) {
                 responseHeaders.setContentType(MediaType.parseMediaType(driveResponse.getContentType()));
             } else {
                 responseHeaders.setContentType(MediaType.parseMediaType(determineAudioMimeType(fileName)));
@@ -135,8 +140,9 @@ public class MusicStreamController {
                 responseHeaders.set(HttpHeaders.CONTENT_RANGE, driveResponse.getContentRange());
             }
 
-            return new ResponseEntity<>(responseBody, responseHeaders, HttpStatus.valueOf(driveResponse.getStatusCode()));
-            
+            return new ResponseEntity<>(
+                    responseBody, responseHeaders, HttpStatus.valueOf(driveResponse.getStatusCode()));
+
         } catch (com.google.api.client.http.HttpResponseException e) {
             log.error("Google Drive API Error: {}", e.getMessage());
             return ResponseEntity.status(e.getStatusCode()).build();

@@ -1,8 +1,9 @@
 package com.music.app.config.security;
 
-import com.music.app.repository.InvalidatedTokenRepository;
-import com.music.app.repository.UserRepository;
-import lombok.RequiredArgsConstructor;
+import java.text.ParseException;
+import java.util.Objects;
+import javax.crypto.spec.SecretKeySpec;
+
 import org.springframework.beans.factory.annotation.Value;
 import org.springframework.security.oauth2.jose.jws.MacAlgorithm;
 import org.springframework.security.oauth2.jwt.BadJwtException;
@@ -12,9 +13,10 @@ import org.springframework.security.oauth2.jwt.JwtException;
 import org.springframework.security.oauth2.jwt.NimbusJwtDecoder;
 import org.springframework.stereotype.Component;
 
-import javax.crypto.spec.SecretKeySpec;
-import java.text.ParseException;
-import java.util.Objects;
+import com.music.app.repository.InvalidatedTokenRepository;
+import com.music.app.repository.UserRepository;
+
+import lombok.RequiredArgsConstructor;
 
 @Component
 @RequiredArgsConstructor
@@ -42,9 +44,13 @@ public class CustomJwtDecoder implements JwtDecoder {
             }
             String userId = signedJWT.getJWTClaimsSet().getStringClaim("userId");
             Number tokenVersion = (Number) signedJWT.getJWTClaimsSet().getClaim("token_version");
-            if (userId == null || tokenVersion == null || userRepository.findById(userId)
-                    .map(user -> user.getAuthTokenVersion() == null || user.getAuthTokenVersion().longValue() != tokenVersion.longValue())
-                    .orElse(true)) {
+            if (userId == null
+                    || tokenVersion == null
+                    || userRepository
+                            .findById(userId)
+                            .map(user -> user.getAuthTokenVersion() == null
+                                    || user.getAuthTokenVersion().longValue() != tokenVersion.longValue())
+                            .orElse(true)) {
                 throw new BadJwtException("Token has been superseded");
             }
         } catch (ParseException e) {

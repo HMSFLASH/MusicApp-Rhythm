@@ -1,5 +1,16 @@
 package com.music.app.service;
 
+import java.util.List;
+import java.util.Map;
+import java.util.UUID;
+import java.util.stream.Collectors;
+
+import jakarta.persistence.EntityNotFoundException;
+
+import org.hibernate.ObjectNotFoundException;
+import org.springframework.stereotype.Service;
+import org.springframework.transaction.annotation.Transactional;
+
 import com.fasterxml.jackson.databind.ObjectMapper;
 import com.music.app.dto.BackupDataDto;
 import com.music.app.dto.MusicItemDto;
@@ -16,18 +27,8 @@ import com.music.app.repository.MusicLibraryRepository;
 import com.music.app.repository.PlaylistRepository;
 import com.music.app.repository.UserRepository;
 
-import jakarta.persistence.EntityNotFoundException;
 import lombok.RequiredArgsConstructor;
 import lombok.extern.slf4j.Slf4j;
-
-import org.hibernate.ObjectNotFoundException;
-import org.springframework.stereotype.Service;
-import org.springframework.transaction.annotation.Transactional;
-
-import java.util.List;
-import java.util.Map;
-import java.util.UUID;
-import java.util.stream.Collectors;
 
 @Service
 @RequiredArgsConstructor
@@ -55,8 +56,8 @@ public class BackupService {
 
         try {
             List<Playlist> playlists = playlistRepository.findByUserIdWithItemsOrderByCreatedAtDesc(userId);
-            List<PlaylistDto> playlistDtos = playlists.stream().map(p -> playlistService.toDto(p, true))
-                    .collect(Collectors.toList());
+            List<PlaylistDto> playlistDtos =
+                    playlists.stream().map(p -> playlistService.toDto(p, true)).collect(Collectors.toList());
 
             List<Favorite> favorites = favoriteRepository.findByUserIdWithMusicLibrary(userId);
             List<MusicItemDto> favoriteDtos = new java.util.ArrayList<>();
@@ -71,9 +72,8 @@ public class BackupService {
             }
 
             List<MusicLibrary> libraries = musicLibraryRepository.findByUserId(userId);
-            List<MusicItemDto> libraryDtos = libraries.stream()
-                    .map(musicService::toDto)
-                    .collect(Collectors.toList());
+            List<MusicItemDto> libraryDtos =
+                    libraries.stream().map(musicService::toDto).collect(Collectors.toList());
 
             BackupDataDto backupData = new BackupDataDto();
             backupData.setConfig(config);
@@ -174,9 +174,13 @@ public class BackupService {
         if (driveFileId == null || driveFileId.isBlank()) {
             return null;
         }
-        MusicLibrary lib = musicLibraryRepository.findByDriveFileIdAndUserId(driveFileId, user.getId())
-                .orElseGet(
-                        () -> MusicLibrary.builder().driveFileId(driveFileId).sourceType("DRIVE").user(user).build());
+        MusicLibrary lib = musicLibraryRepository
+                .findByDriveFileIdAndUserId(driveFileId, user.getId())
+                .orElseGet(() -> MusicLibrary.builder()
+                        .driveFileId(driveFileId)
+                        .sourceType("DRIVE")
+                        .user(user)
+                        .build());
         lib.setName(trackDto.getName() != null ? trackDto.getName() : "Drive File");
         if (trackDto.getPlayCount() != null) {
             lib.setPlayCount(trackDto.getPlayCount());

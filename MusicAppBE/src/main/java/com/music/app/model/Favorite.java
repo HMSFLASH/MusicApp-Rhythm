@@ -1,14 +1,15 @@
 package com.music.app.model;
 
-import jakarta.persistence.*;
-import lombok.*;
-import org.hibernate.annotations.CreationTimestamp;
-
 import java.time.LocalDateTime;
 
+import jakarta.persistence.*;
+
+import org.hibernate.annotations.CreationTimestamp;
+
+import lombok.*;
+
 @Entity
-@Table(name = "favorites",
-    uniqueConstraints = @UniqueConstraint(columnNames = {"user_id", "music_library_id"}))
+@Table(name = "favorites", uniqueConstraints = @UniqueConstraint(columnNames = {"user_id", "music_library_id"}))
 @Getter
 @Setter
 @NoArgsConstructor

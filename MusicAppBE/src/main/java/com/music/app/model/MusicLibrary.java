@@ -1,18 +1,25 @@
 package com.music.app.model;
 
-import jakarta.persistence.*;
-import lombok.*;
-import org.hibernate.annotations.CreationTimestamp;
-
 import java.time.LocalDateTime;
 
+import jakarta.persistence.*;
+
+import org.hibernate.annotations.CreationTimestamp;
+
+import lombok.*;
+
 @Entity
-@Table(name = "music_library", indexes = {
-        @Index(name = "idx_user_id", columnList = "user_id"),
-        @Index(name = "idx_drive_file_id", columnList = "drive_file_id"),
-        @Index(name = "idx_name", columnList = "name")
-}, uniqueConstraints = @UniqueConstraint(name = "uk_music_library_user_drive_file", columnNames = { "user_id",
-        "drive_file_id" }))
+@Table(
+        name = "music_library",
+        indexes = {
+            @Index(name = "idx_user_id", columnList = "user_id"),
+            @Index(name = "idx_drive_file_id", columnList = "drive_file_id"),
+            @Index(name = "idx_name", columnList = "name")
+        },
+        uniqueConstraints =
+                @UniqueConstraint(
+                        name = "uk_music_library_user_drive_file",
+                        columnNames = {"user_id", "drive_file_id"}))
 @Getter
 @Setter
 @NoArgsConstructor

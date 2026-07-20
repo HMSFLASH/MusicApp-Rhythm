@@ -1,12 +1,15 @@
 package com.music.app.config.security;
 
-import com.music.app.dto.AuthenticationResponse;
-import com.music.app.service.AuthService;
+import java.io.IOException;
+
 import jakarta.servlet.ServletException;
 import jakarta.servlet.http.HttpServletRequest;
 import jakarta.servlet.http.HttpServletResponse;
-import lombok.RequiredArgsConstructor;
-import lombok.extern.slf4j.Slf4j;
+
+import org.springframework.beans.factory.annotation.Value;
+import org.springframework.context.annotation.Lazy;
+import org.springframework.http.HttpStatus;
+import org.springframework.http.ResponseCookie;
 import org.springframework.security.core.Authentication;
 import org.springframework.security.oauth2.client.OAuth2AuthorizedClient;
 import org.springframework.security.oauth2.client.OAuth2AuthorizedClientService;
@@ -15,12 +18,10 @@ import org.springframework.security.oauth2.core.user.OAuth2User;
 import org.springframework.security.web.authentication.SimpleUrlAuthenticationSuccessHandler;
 import org.springframework.stereotype.Component;
 
-import java.io.IOException;
+import com.music.app.dto.AuthenticationResponse;
+import com.music.app.service.AuthService;
 
-import org.springframework.context.annotation.Lazy;
-import org.springframework.beans.factory.annotation.Value;
-import org.springframework.http.ResponseCookie;
-import org.springframework.http.HttpStatus;
+import lombok.extern.slf4j.Slf4j;
 
 @Component
 @Slf4j
@@ -31,7 +32,9 @@ public class OAuth2LoginSuccessHandler extends SimpleUrlAuthenticationSuccessHan
     private final String frontendUrl;
     private final boolean secureCookies;
 
-    public OAuth2LoginSuccessHandler(@Lazy AuthService authService, OAuth2AuthorizedClientService authorizedClientService,
+    public OAuth2LoginSuccessHandler(
+            @Lazy AuthService authService,
+            OAuth2AuthorizedClientService authorizedClientService,
             @Value("${app.frontend-url}") String frontendUrl,
             @Value("${app.cookie.secure:true}") boolean secureCookies) {
         this.authService = authService;
@@ -41,7 +44,9 @@ public class OAuth2LoginSuccessHandler extends SimpleUrlAuthenticationSuccessHan
     }
 
     @Override
-    public void onAuthenticationSuccess(HttpServletRequest request, HttpServletResponse response, Authentication authentication) throws IOException, ServletException {
+    public void onAuthenticationSuccess(
+            HttpServletRequest request, HttpServletResponse response, Authentication authentication)
+            throws IOException, ServletException {
         if (authentication instanceof OAuth2AuthenticationToken) {
             OAuth2AuthenticationToken oauthToken = (OAuth2AuthenticationToken) authentication;
             OAuth2User oAuth2User = oauthToken.getPrincipal();
@@ -56,10 +61,10 @@ public class OAuth2LoginSuccessHandler extends SimpleUrlAuthenticationSuccessHan
                 response.sendError(HttpStatus.UNAUTHORIZED.value(), "Google account email is not verified");
                 return;
             }
-            
+
             OAuth2AuthorizedClient client = authorizedClientService.loadAuthorizedClient(
                     oauthToken.getAuthorizedClientRegistrationId(), oauthToken.getName());
-            
+
             String refreshToken = null;
             if (client != null && client.getRefreshToken() != null) {
                 refreshToken = client.getRefreshToken().getTokenValue();
@@ -70,22 +75,37 @@ public class OAuth2LoginSuccessHandler extends SimpleUrlAuthenticationSuccessHan
                 log.info("Received refresh token for Google Drive integration");
             }
 
-            AuthenticationResponse authResponse = authService.loginWithGoogleAndSaveRefresh(googleId, email, name, picture, refreshToken);
+            AuthenticationResponse authResponse =
+                    authService.loginWithGoogleAndSaveRefresh(googleId, email, name, picture, refreshToken);
 
             String targetUrl = frontendUrl.replaceAll("/$", "") + "/oauth2/callback";
-            
+
             String token = authResponse.getAccessToken();
-            response.addHeader("Set-Cookie", ResponseCookie.from("music_app_token", token)
-                    .httpOnly(true).secure(secureCookies).sameSite("Strict").path("/")
-                    .maxAge(7 * 24 * 60 * 60).build().toString());
-            
+            response.addHeader(
+                    "Set-Cookie",
+                    ResponseCookie.from("music_app_token", token)
+                            .httpOnly(true)
+                            .secure(secureCookies)
+                            .sameSite("Strict")
+                            .path("/")
+                            .maxAge(7 * 24 * 60 * 60)
+                            .build()
+                            .toString());
+
             String backendRefreshToken = authResponse.getRefreshToken();
             if (backendRefreshToken != null) {
-                response.addHeader("Set-Cookie", ResponseCookie.from("music_app_refresh_token", backendRefreshToken)
-                        .httpOnly(true).secure(secureCookies).sameSite("Strict").path("/api/auth/refresh")
-                        .maxAge(30 * 24 * 60 * 60).build().toString());
+                response.addHeader(
+                        "Set-Cookie",
+                        ResponseCookie.from("music_app_refresh_token", backendRefreshToken)
+                                .httpOnly(true)
+                                .secure(secureCookies)
+                                .sameSite("Strict")
+                                .path("/api/auth/refresh")
+                                .maxAge(30 * 24 * 60 * 60)
+                                .build()
+                                .toString());
             }
-            
+
             getRedirectStrategy().sendRedirect(request, response, targetUrl);
         } else {
             super.onAuthenticationSuccess(request, response, authentication);

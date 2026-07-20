@@ -1,8 +1,9 @@
 package com.music.app.dto;
 
+import java.io.InputStream;
+
 import lombok.Builder;
 import lombok.Data;
-import java.io.InputStream;
 
 @Data
 @Builder

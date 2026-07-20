@@ -1,6 +1,7 @@
 package com.music.app.model;
 
 import jakarta.persistence.*;
+
 import lombok.*;
 
 @Entity

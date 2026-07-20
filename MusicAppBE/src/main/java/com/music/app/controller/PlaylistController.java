@@ -1,16 +1,18 @@
 package com.music.app.controller;
 
-import com.music.app.dto.CreatePlaylistRequest;
-import com.music.app.dto.PlaylistDto;
-import com.music.app.dto.ApiResponse;
-import com.music.app.service.PlaylistService;
-import com.music.app.util.SecurityUtils;
-import lombok.RequiredArgsConstructor;
-import lombok.extern.slf4j.Slf4j;
-import org.springframework.web.bind.annotation.*;
-
 import java.security.Principal;
 import java.util.List;
+
+import org.springframework.web.bind.annotation.*;
+
+import com.music.app.dto.ApiResponse;
+import com.music.app.dto.CreatePlaylistRequest;
+import com.music.app.dto.PlaylistDto;
+import com.music.app.service.PlaylistService;
+import com.music.app.util.SecurityUtils;
+
+import lombok.RequiredArgsConstructor;
+import lombok.extern.slf4j.Slf4j;
 
 @RestController
 @RequestMapping("/api/playlists")
@@ -45,9 +47,8 @@ public class PlaylistController {
     }
 
     @PutMapping("/{id}")
-    public ApiResponse<PlaylistDto> updatePlaylist(@PathVariable String id,
-                                                   @RequestBody CreatePlaylistRequest req,
-                                                   Principal principal) {
+    public ApiResponse<PlaylistDto> updatePlaylist(
+            @PathVariable String id, @RequestBody CreatePlaylistRequest req, Principal principal) {
         String userId = SecurityUtils.extractUserId(principal);
         return ApiResponse.<PlaylistDto>builder()
                 .result(playlistService.updatePlaylist(id, req, userId))
@@ -58,26 +59,24 @@ public class PlaylistController {
     public ApiResponse<String> deletePlaylist(@PathVariable String id, Principal principal) {
         String userId = SecurityUtils.extractUserId(principal);
         playlistService.deletePlaylist(id, userId);
-        return ApiResponse.<String>builder()
-                .result("Deleted")
-                .build();
+        return ApiResponse.<String>builder().result("Deleted").build();
     }
 
     @PostMapping("/{id}/tracks/{trackId}")
-    public ApiResponse<String> addTrack(@PathVariable String id, @PathVariable String trackId, @RequestParam(required = false) String name, Principal principal) {
+    public ApiResponse<String> addTrack(
+            @PathVariable String id,
+            @PathVariable String trackId,
+            @RequestParam(required = false) String name,
+            Principal principal) {
         String userId = SecurityUtils.extractUserId(principal);
         playlistService.addTrack(id, trackId, name, userId);
-        return ApiResponse.<String>builder()
-                .result("Added")
-                .build();
+        return ApiResponse.<String>builder().result("Added").build();
     }
 
     @DeleteMapping("/{id}/tracks/{trackId}")
     public ApiResponse<String> removeTrack(@PathVariable String id, @PathVariable String trackId, Principal principal) {
         String userId = SecurityUtils.extractUserId(principal);
         playlistService.removeTrack(id, trackId, userId);
-        return ApiResponse.<String>builder()
-                .result("Removed")
-                .build();
+        return ApiResponse.<String>builder().result("Removed").build();
     }
 }

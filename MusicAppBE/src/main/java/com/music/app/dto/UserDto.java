@@ -19,8 +19,10 @@ public class UserDto {
     private RoleDto role;
     private String fullName;
     private String avatarUrl;
+
     @JsonProperty("isGoogleLinked")
     private boolean isGoogleLinked;
+
     @JsonProperty("hasPassword")
     private boolean hasPassword;
 }

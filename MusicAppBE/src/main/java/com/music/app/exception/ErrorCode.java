@@ -1,6 +1,7 @@
 package com.music.app.exception;
 
 import org.springframework.http.HttpStatus;
+
 import lombok.Getter;
 
 @Getter

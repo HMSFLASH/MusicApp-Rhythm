@@ -1,14 +1,26 @@
 package com.music.app.service;
 
-import com.music.app.exception.AppException;
-import com.music.app.exception.ErrorCode;
+import java.text.ParseException;
+import java.time.Instant;
+import java.time.LocalDateTime;
+import java.time.ZoneId;
+import java.time.temporal.ChronoUnit;
+import java.util.Date;
+import java.util.UUID;
+
+import org.springframework.beans.factory.annotation.Value;
+import org.springframework.security.crypto.password.PasswordEncoder;
+import org.springframework.stereotype.Service;
+
 import com.music.app.dto.AuthenticationResponse;
 import com.music.app.dto.RefreshRequest;
 import com.music.app.dto.UserDto;
+import com.music.app.exception.AppException;
+import com.music.app.exception.ErrorCode;
 import com.music.app.mapper.UserMapper;
 import com.music.app.model.InvalidatedToken;
-import com.music.app.model.User;
 import com.music.app.model.PasswordResetToken;
+import com.music.app.model.User;
 import com.music.app.repository.InvalidatedTokenRepository;
 import com.music.app.repository.PasswordResetTokenRepository;
 import com.music.app.repository.UserRepository;
@@ -17,19 +29,9 @@ import com.nimbusds.jose.crypto.MACSigner;
 import com.nimbusds.jose.crypto.MACVerifier;
 import com.nimbusds.jwt.JWTClaimsSet;
 import com.nimbusds.jwt.SignedJWT;
+
 import lombok.RequiredArgsConstructor;
 import lombok.extern.slf4j.Slf4j;
-import org.springframework.beans.factory.annotation.Value;
-import org.springframework.security.crypto.password.PasswordEncoder;
-import org.springframework.stereotype.Service;
-
-import java.text.ParseException;
-import java.time.Instant;
-import java.time.ZoneId;
-import java.time.temporal.ChronoUnit;
-import java.util.Date;
-import java.util.UUID;
-import java.time.LocalDateTime;
 
 @Service
 @RequiredArgsConstructor
@@ -56,9 +58,9 @@ public class AuthService {
     private String frontendUrl;
 
     public User getUserBySubject(String subject) {
-        return userRepository.findByUsername(subject)
-                .orElseGet(() -> userRepository.findByEmail(subject)
-                        .orElseThrow(() -> new RuntimeException("User not found: " + subject)));
+        return userRepository.findByUsername(subject).orElseGet(() -> userRepository
+                .findByEmail(subject)
+                .orElseThrow(() -> new RuntimeException("User not found: " + subject)));
     }
 
     public UserDto getUserDtoByLoginId(String loginId) {
@@ -67,7 +69,8 @@ public class AuthService {
     }
 
     public AuthenticationResponse registerUser(String username, String password, String email) {
-        if (userRepository.findByUsername(username).isPresent() || userRepository.findByEmail(email).isPresent()) {
+        if (userRepository.findByUsername(username).isPresent()
+                || userRepository.findByEmail(email).isPresent()) {
             throw new AppException(ErrorCode.USER_EXISTED);
         }
         User user = User.builder()
@@ -86,7 +89,8 @@ public class AuthService {
     }
 
     public AuthenticationResponse login(String loginId, String password) {
-        User user = userRepository.findByUsername(loginId).orElseGet(() -> userRepository.findByEmail(loginId)
+        User user = userRepository.findByUsername(loginId).orElseGet(() -> userRepository
+                .findByEmail(loginId)
                 .orElseThrow(() -> new AppException(ErrorCode.INVALID_CREDENTIALS)));
 
         if (!passwordEncoder.matches(password, user.getPassword())) {
@@ -107,8 +111,8 @@ public class AuthService {
         return loginWithGoogleAndSaveRefresh(googleId, email, name, picture, null);
     }
 
-    public AuthenticationResponse loginWithGoogleAndSaveRefresh(String googleId, String email, String name,
-            String picture, String refreshToken) {
+    public AuthenticationResponse loginWithGoogleAndSaveRefresh(
+            String googleId, String email, String name, String picture, String refreshToken) {
         User user = userRepository.findByGoogleId(googleId).orElseGet(() -> {
             User newUser = User.builder()
                     .googleId(googleId)
@@ -148,7 +152,8 @@ public class AuthService {
 
     public AuthenticationResponse changePassword(String currentSubject, String oldPassword, String newPassword) {
         User user = userRepository.findByUsername(currentSubject).orElseGet(() -> userRepository
-                .findByEmail(currentSubject).orElseThrow(() -> new RuntimeException("User not found")));
+                .findByEmail(currentSubject)
+                .orElseThrow(() -> new RuntimeException("User not found")));
 
         if (!passwordEncoder.matches(oldPassword, user.getPassword())) {
             throw new RuntimeException("Incorrect old password");
@@ -169,18 +174,25 @@ public class AuthService {
 
     public AuthenticationResponse setLocalCredentials(String currentSubject, String newLoginId, String newPassword) {
         User user = userRepository.findByUsername(currentSubject).orElseGet(() -> userRepository
-                .findByEmail(currentSubject).orElseThrow(() -> new RuntimeException("User not found")));
+                .findByEmail(currentSubject)
+                .orElseThrow(() -> new RuntimeException("User not found")));
         String currentUserId = user.getId();
 
         // If they want to set a custom username or update their email
         if (newLoginId != null && !newLoginId.trim().isEmpty()) {
             if (newLoginId.contains("@")) {
-                if (userRepository.findByEmail(newLoginId).filter(existing -> !existing.getId().equals(currentUserId)).isPresent()) {
+                if (userRepository
+                        .findByEmail(newLoginId)
+                        .filter(existing -> !existing.getId().equals(currentUserId))
+                        .isPresent()) {
                     throw new AppException(ErrorCode.USER_EXISTED);
                 }
                 user.setEmail(newLoginId);
             } else {
-                if (userRepository.findByUsername(newLoginId).filter(existing -> !existing.getId().equals(currentUserId)).isPresent()) {
+                if (userRepository
+                        .findByUsername(newLoginId)
+                        .filter(existing -> !existing.getId().equals(currentUserId))
+                        .isPresent()) {
                     throw new AppException(ErrorCode.USER_EXISTED);
                 }
                 user.setUsername(newLoginId);
@@ -221,7 +233,8 @@ public class AuthService {
     }
 
     public void resetPassword(String token, String newPassword) {
-        PasswordResetToken resetToken = passwordResetTokenRepository.findByToken(token)
+        PasswordResetToken resetToken = passwordResetTokenRepository
+                .findByToken(token)
                 .orElseThrow(() -> new RuntimeException("Invalid token"));
 
         if (resetToken.isExpired()) {
@@ -250,7 +263,10 @@ public class AuthService {
 
             InvalidatedToken invalidatedToken = InvalidatedToken.builder()
                     .id(jit)
-                    .expiryTime(expiryTime.toInstant().atZone(ZoneId.systemDefault()).toLocalDateTime())
+                    .expiryTime(expiryTime
+                            .toInstant()
+                            .atZone(ZoneId.systemDefault())
+                            .toLocalDateTime())
                     .build();
 
             invalidatedTokenRepository.save(invalidatedToken);
@@ -273,7 +289,8 @@ public class AuthService {
                 throw new RuntimeException("Unauthenticated: Invalid or expired token");
             }
 
-            if (invalidatedTokenRepository.existsById(signedJWT.getJWTClaimsSet().getJWTID())) {
+            if (invalidatedTokenRepository.existsById(
+                    signedJWT.getJWTClaimsSet().getJWTID())) {
                 throw new RuntimeException("Unauthenticated: Token has been invalidated");
             }
 
@@ -284,17 +301,22 @@ public class AuthService {
 
             String usernameOrEmail = signedJWT.getJWTClaimsSet().getSubject();
             User user = userRepository.findByUsername(usernameOrEmail).orElseGet(() -> userRepository
-                    .findByEmail(usernameOrEmail).orElseThrow(() -> new RuntimeException("User not found")));
+                    .findByEmail(usernameOrEmail)
+                    .orElseThrow(() -> new RuntimeException("User not found")));
 
             Number tokenVersion = (Number) signedJWT.getJWTClaimsSet().getClaim("token_version");
-            if (tokenVersion == null || user.getAuthTokenVersion() == null
+            if (tokenVersion == null
+                    || user.getAuthTokenVersion() == null
                     || user.getAuthTokenVersion().longValue() != tokenVersion.longValue()) {
                 throw new RuntimeException("Unauthenticated: Token has been superseded");
             }
 
             invalidatedTokenRepository.save(InvalidatedToken.builder()
                     .id(signedJWT.getJWTClaimsSet().getJWTID())
-                    .expiryTime(expiryTime.toInstant().atZone(ZoneId.systemDefault()).toLocalDateTime())
+                    .expiryTime(expiryTime
+                            .toInstant()
+                            .atZone(ZoneId.systemDefault())
+                            .toLocalDateTime())
                     .build());
 
             String accessToken = generateAccessToken(user);
@@ -321,7 +343,8 @@ public class AuthService {
                 .claim("token_type", "ACCESS")
                 .claim("token_version", user.getAuthTokenVersion())
                 .issueTime(new Date())
-                .expirationTime(new Date(Instant.now().plus(validDuration, ChronoUnit.SECONDS).toEpochMilli()))
+                .expirationTime(new Date(
+                        Instant.now().plus(validDuration, ChronoUnit.SECONDS).toEpochMilli()))
                 .jwtID(UUID.randomUUID().toString());
 
         if (user.getFullName() != null) {
@@ -339,8 +362,11 @@ public class AuthService {
         if (user.getRole() != null) {
             claimsBuilder.claim("role", user.getRole().getName());
         }
-        claimsBuilder.claim("hasPassword", user.getPassword() != null && !user.getPassword().isEmpty());
-        claimsBuilder.claim("isGoogleLinked", user.getGoogleId() != null && !user.getGoogleId().isEmpty());
+        claimsBuilder.claim(
+                "hasPassword", user.getPassword() != null && !user.getPassword().isEmpty());
+        claimsBuilder.claim(
+                "isGoogleLinked",
+                user.getGoogleId() != null && !user.getGoogleId().isEmpty());
 
         JWTClaimsSet jwtClaimsSet = claimsBuilder.build();
 
@@ -366,7 +392,9 @@ public class AuthService {
                 .claim("token_type", "REFRESH")
                 .claim("token_version", user.getAuthTokenVersion())
                 .issueTime(new Date())
-                .expirationTime(new Date(Instant.now().plus(refreshableDuration, ChronoUnit.SECONDS).toEpochMilli()))
+                .expirationTime(new Date(Instant.now()
+                        .plus(refreshableDuration, ChronoUnit.SECONDS)
+                        .toEpochMilli()))
                 .jwtID(UUID.randomUUID().toString())
                 .build();
 

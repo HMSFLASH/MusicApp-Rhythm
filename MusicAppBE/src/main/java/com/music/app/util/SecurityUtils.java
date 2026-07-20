@@ -1,11 +1,12 @@
 package com.music.app.util;
 
-import com.music.app.exception.AppException;
-import com.music.app.exception.ErrorCode;
+import java.security.Principal;
+
 import org.springframework.security.core.Authentication;
 import org.springframework.security.core.context.SecurityContextHolder;
 
-import java.security.Principal;
+import com.music.app.exception.AppException;
+import com.music.app.exception.ErrorCode;
 
 public class SecurityUtils {
 
@@ -13,7 +14,10 @@ public class SecurityUtils {
         if (principal == null) {
             throw new AppException(ErrorCode.UNAUTHORIZED);
         }
-        if (principal instanceof org.springframework.security.oauth2.server.resource.authentication.JwtAuthenticationToken jwtAuth) {
+        if (principal
+                instanceof
+                org.springframework.security.oauth2.server.resource.authentication.JwtAuthenticationToken
+                jwtAuth) {
             String userId = jwtAuth.getToken().getClaimAsString("userId");
             if (userId != null) {
                 return userId;
@@ -31,7 +35,10 @@ public class SecurityUtils {
         if (auth == null || !auth.isAuthenticated()) {
             throw new AppException(ErrorCode.UNAUTHORIZED);
         }
-        if (auth instanceof org.springframework.security.oauth2.server.resource.authentication.JwtAuthenticationToken jwtAuth) {
+        if (auth
+                instanceof
+                org.springframework.security.oauth2.server.resource.authentication.JwtAuthenticationToken
+                jwtAuth) {
             String userId = jwtAuth.getToken().getClaimAsString("userId");
             if (userId != null) {
                 return userId;

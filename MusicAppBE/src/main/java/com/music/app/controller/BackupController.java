@@ -1,15 +1,17 @@
 package com.music.app.controller;
 
+import java.security.Principal;
+import java.util.Map;
+
+import org.springframework.web.bind.annotation.*;
+
 import com.music.app.dto.ApiResponse;
 import com.music.app.dto.BackupRequest;
 import com.music.app.service.BackupService;
 import com.music.app.util.SecurityUtils;
+
 import lombok.RequiredArgsConstructor;
 import lombok.extern.slf4j.Slf4j;
-import org.springframework.web.bind.annotation.*;
-
-import java.security.Principal;
-import java.util.Map;
 
 @RestController
 @RequestMapping("/api/backup")
@@ -23,9 +25,7 @@ public class BackupController {
     public ApiResponse<String> backupToDrive(@RequestBody BackupRequest request, Principal principal) {
         String userId = SecurityUtils.extractUserId(principal);
         backupService.backupToDrive(request.getConfig(), request.getIdbData(), userId);
-        return ApiResponse.<String>builder()
-                .result("Backup successful")
-                .build();
+        return ApiResponse.<String>builder().result("Backup successful").build();
     }
 
     @GetMapping("/drive")
