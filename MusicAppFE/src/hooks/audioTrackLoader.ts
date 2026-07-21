@@ -54,7 +54,16 @@ export const loadTrackAudioUrl = async ({
       if (forceReloadFromDrive && !isOfflineMode) {
         await removeCachedAudio(mediaCacheId);
       } else {
-        const cachedBlob = await getCachedAudio(mediaCacheId);
+        let cachedBlob = await getCachedAudio(mediaCacheId);
+        if (!cachedBlob && driveFileId && driveFileId !== 'undefined' && driveFileId !== 'null') {
+          const oldCacheId = `drive:${driveFileId}`;
+          cachedBlob = await getCachedAudio(oldCacheId);
+          if (cachedBlob) {
+            await cacheAudio(mediaCacheId, cachedBlob);
+            await removeCachedAudio(oldCacheId);
+          }
+        }
+        
         if (cachedBlob) {
           const cachedUrl = URL.createObjectURL(cachedBlob);
           blobCache.set(trackId, cachedUrl);

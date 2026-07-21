@@ -274,9 +274,12 @@ export function useAudioMetadata(isAuthenticated: boolean, queueState: any, sett
                 let blobUrl = blobCacheRef.current.get(trackId);
                 let cachedBlob: Blob | undefined;
 
-                if (!blobUrl && track.driveFileId) {
-                    cachedBlob = await getCachedAudio(`drive:${track.driveFileId}`);
-                    console.log(`[Metadata Debug] getCachedAudio for drive:${track.driveFileId} returned:`, !!cachedBlob);
+                if (!blobUrl) {
+                    cachedBlob = await getCachedAudio(trackId);
+                    if (!cachedBlob && track.driveFileId && track.driveFileId !== 'undefined' && track.driveFileId !== 'null') {
+                        cachedBlob = await getCachedAudio(`drive:${track.driveFileId}`);
+                        console.log(`[Metadata Debug] getCachedAudio for drive:${track.driveFileId} fallback returned:`, !!cachedBlob);
+                    }
                     if (cachedBlob) {
                         blobUrl = URL.createObjectURL(cachedBlob);
                     }
