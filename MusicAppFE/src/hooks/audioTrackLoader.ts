@@ -41,7 +41,7 @@ export const loadTrackAudioUrl = async ({
       driveFileId = library.find((item) => String(item.id) === trackId)?.driveFileId;
     }
     if (!driveFileId) return '';
-    const mediaCacheId = `drive:${driveFileId}`;
+    const mediaCacheId = String(track.id); // Use track.id for reliable caching
 
     const pendingBlobUrl = blobLoadingPromises.get(trackId);
     if (pendingBlobUrl && !forceReloadFromDrive) return pendingBlobUrl;

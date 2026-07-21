@@ -47,7 +47,7 @@ export function SpatialEffects() {
 
       <AudioEffectPanel
         title={t('studio.spatial.stereoTitle', 'Stereo Imager')}
-        description={t('studio.spatial.stereoDesc', 'Widen your stereo image using Mid/Side processing. 100% is normal, up to 400% is extra wide.')}
+        description={t('studio.spatial.stereoDesc', 'Widen your stereo image using Mid/Side processing. 100% is normal, up to 200% is extra wide.')}
         trailing={(
           <EffectPowerButton
             size="lg"

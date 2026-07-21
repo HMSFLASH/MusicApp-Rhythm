@@ -22,11 +22,12 @@ export default defineConfig({
     VitePWA({
       registerType: 'autoUpdate',
       devOptions: {
-        enabled: true
+        enabled: true,
+        suppressWarnings: true
       },
       workbox: {
         globPatterns: ['**/*.{js,css,html,ico,png,svg}'],
-        maximumFileSizeToCacheInBytes: 10 * 1024 * 1024 // 10MB limit for WASM files
+        maximumFileSizeToCacheInBytes: 500 * 1024 * 1024 // 500MB limit for WASM files
       },
       manifest: {
         name: 'Sonic Music',

@@ -341,6 +341,7 @@ export function LibraryProvider({ children }: { children: ReactNode }) {
       void Promise.all([
         removeCachedMetadataForTrack(trackId),
         removeCover(trackId),
+        removeCachedAudio(trackId),
         ...(track.driveFileId ? [removeCachedAudio(`drive:${track.driveFileId}`)] : []),
       ]);
       setTracks(prev => {

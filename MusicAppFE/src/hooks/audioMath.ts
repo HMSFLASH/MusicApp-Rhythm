@@ -9,10 +9,12 @@ export const compressorAttackSeconds = (attackMs: number, rmsSizeMs: number) =>
 
 export const percentToPan = (value: number) => clamp(value / 100, -1, 1);
 
-export const STEREO_WIDTH_MAX_PERCENT = 400;
+export const STEREO_WIDTH_MAX_PERCENT = 200;
 
-export const percentToStereoWidth = (value: number) =>
-  clamp(value / 100, 0, STEREO_WIDTH_MAX_PERCENT / 100);
+export const percentToStereoWidth = (value: number) => {
+  const effectiveValue = value <= 100 ? value : 100 + (value - 100) * 3;
+  return clamp(effectiveValue / 100, 0, 4);
+};
 
 export const percentToStereoBaseWidth = (value: number) => {
   const width = percentToStereoWidth(value);

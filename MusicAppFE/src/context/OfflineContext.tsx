@@ -47,8 +47,10 @@ export function OfflineProvider({ children }: { children: ReactNode }) {
 
   const isCached = (track: Track) => {
     if (track.sourceType === 'LOCAL') return true;
-    if (!track.driveFileId) return false;
-    return cachedMediaIds.has(`drive:${track.driveFileId}`);
+    const hasNewCache = cachedMediaIds.has(String(track.id));
+    const isValidDriveId = track.driveFileId && track.driveFileId !== 'undefined' && track.driveFileId !== 'null';
+    const hasOldCache = isValidDriveId ? cachedMediaIds.has(`drive:${track.driveFileId}`) : false;
+    return hasNewCache || hasOldCache;
   };
 
   const downloadTrack = async (track: Track) => {
