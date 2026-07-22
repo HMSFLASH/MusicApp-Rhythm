@@ -16,7 +16,6 @@ interface OfflineContextType {
 
 const OfflineContext = createContext<OfflineContextType | undefined>(undefined);
 
-const OFFLINE_STORAGE_KEY = 'SONIC_OFFLINE_MODE';
 
 export function OfflineProvider({ children }: { children: ReactNode }) {
   const [isOfflineMode, setIsOfflineMode] = useState(!navigator.onLine);

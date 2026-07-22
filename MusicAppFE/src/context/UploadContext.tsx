@@ -240,36 +240,6 @@ export function UploadProvider({ children }: { children: ReactNode }) {
     scheduleAutoClearFinishedTasks();
   };
 
-  const processServerQueue = async () => {
-    if (isServerProcessingRef.current) return;
-    isServerProcessingRef.current = true;
-
-    try {
-      while (uploadQueueRef.current.some(t => t.mode === 'server' && t.status === 'pending')) {
-        const taskIndex = uploadQueueRef.current.findIndex(t => t.mode === 'server' && t.status === 'pending');
-        if (taskIndex === -1) break;
-
-        const task = uploadQueueRef.current[taskIndex];
-        uploadQueueRef.current[taskIndex].status = 'uploading';
-        setUploadTasks([...uploadQueueRef.current]);
-
-        try {
-          await uploadServerTask(task.file);
-          finishTask(task.id, 'success');
-        } catch (e: any) {
-          console.error(`Error uploading ${task.file.name}:`, e);
-          if (e?.message === 'File already exists in library' || e?.response?.data?.message === 'File already exists in library' || e?.response?.status === 409) {
-            finishTask(task.id, 'skipped');
-          } else {
-            finishTask(task.id, 'error');
-          }
-        }
-      }
-    } finally {
-      isServerProcessingRef.current = false;
-      scheduleAutoClearFinishedTasks();
-    }
-  };
 
   const processDirectQueue = () => {
     while (directActiveCountRef.current < DIRECT_UPLOAD_CONCURRENCY) {

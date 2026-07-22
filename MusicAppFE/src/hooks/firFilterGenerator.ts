@@ -86,7 +86,6 @@ export function generateGraphicEqImpulseResponse(bands: EqBand[], sampleRate: nu
   const real = new Float32Array(N);
   const imag = new Float32Array(N);
   
-  const nyquist = sampleRate / 2;
   const df = sampleRate / N;
 
   for (let i = 0; i <= N / 2; i++) {

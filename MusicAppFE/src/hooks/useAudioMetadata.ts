@@ -3,7 +3,6 @@ import type { Track } from './audioTypes';
 import { getCover, removeCover, saveCover } from '../utils/idb';
 import { getCachedAudio } from '../utils/mediaCache';
 import { db } from '../lib/db';
-import { axiosClient } from '../api/axiosClient';
 import { BACKEND_URL } from '../api/axiosClient';
 import { parseLocalAudioMetadata } from '../utils/localAudioFiles';
 import { getAudioMimeType, shouldUseLegacyMetadataParser } from './audioMime';
@@ -52,7 +51,6 @@ type ExtractMetadataOptions = {
 };
 
 const LEGACY_COVER_FALLBACK_BYTES = 1024 * 1024;
-const MAX_BACKEND_COVER_BYTES = 2 * 1024 * 1024;
 
 const refreshableMetadataFields: Array<keyof Track> = [
     'title',
@@ -95,15 +93,7 @@ const withoutBackendImageUrl = (track: Track): Track => {
     return rest;
 };
 
-const toBase64 = (data: Uint8Array) => {
-    let binary = '';
-    const chunkSize = 8192;
-    for (let i = 0; i < data.length; i += chunkSize) {
-        const chunk = data.subarray(i, Math.min(i + chunkSize, data.length));
-        binary += String.fromCharCode(...chunk);
-    }
-    return btoa(binary);
-};
+
 
 async function parseMetadataBuffer(
     buffer: Uint8Array,
@@ -232,7 +222,6 @@ export function useAudioMetadata(isAuthenticated: boolean, queueState: any, sett
         const up: Partial<Track> = {};
         let extractedPicture = false;
         let extractedCoverStored = false;
-        let backendImageUrl: string | undefined;
 
         try {
             let metadata: ParsedAudioMetadata;
@@ -272,7 +261,7 @@ export function useAudioMetadata(isAuthenticated: boolean, queueState: any, sett
 
                 // eslint-disable-next-line prefer-const
                 let blobUrl = blobCacheRef.current.get(trackId);
-                let cachedBlob: Blob | undefined;
+                let cachedBlob: Blob | null | undefined;
 
                 if (!blobUrl) {
                     cachedBlob = await getCachedAudio(trackId);
@@ -437,11 +426,6 @@ export function useAudioMetadata(isAuthenticated: boolean, queueState: any, sett
                 const imgUrl = URL.createObjectURL(new Blob([new Uint8Array(pictureData)], { type: mime }));
                 up.imageUrl = imgUrl;
                 imageCacheRef.current.set(trackId, imgUrl);
-                if (pictureData.byteLength <= MAX_BACKEND_COVER_BYTES) {
-                    backendImageUrl = `data:${mime};base64,${toBase64(new Uint8Array(pictureData))}`;
-                } else {
-                    console.warn(`[Metadata] Cover for ${trackId} is too large to save to backend (${pictureData.byteLength} bytes)`);
-                }
 
                 if (track.sourceType !== 'LOCAL') {
                     extractedCoverStored = await saveCover(trackId, new Uint8Array(pictureData), mime);

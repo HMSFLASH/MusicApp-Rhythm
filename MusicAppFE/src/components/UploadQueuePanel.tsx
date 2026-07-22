@@ -13,8 +13,7 @@ export function UploadQueuePanel() {
   const errorCount = uploadTasks.filter(task => task.status === 'error').length;
   const completedCount = successCount + errorCount;
   const progressPercent = uploadTasks.length > 0 ? Math.round((completedCount / uploadTasks.length) * 100) : 0;
-  const directTasks = uploadTasks.filter(task => task.mode === 'direct');
-  const serverTasks = uploadTasks.filter(task => task.mode === 'server');
+  const directTasks = uploadTasks;
 
   const renderTask = (task: typeof uploadTasks[number]) => (
     <div key={task.id} className="flex items-center justify-between p-2.5 rounded-lg hover:bg-white/5 transition-colors group">
@@ -37,16 +36,11 @@ export function UploadQueuePanel() {
     </div>
   );
 
-  const renderSection = (title: string, tasks: typeof uploadTasks) => {
+  const renderSection = (_title: string, tasks: typeof uploadTasks) => {
     if (tasks.length === 0) return null;
 
     return (
       <div className="flex flex-col gap-1">
-        {(directTasks.length > 0 && serverTasks.length > 0) && (
-          <div className="px-2.5 pb-1 pt-2 text-[11px] font-semibold uppercase tracking-wide text-white/35">
-            {title}
-          </div>
-        )}
         {tasks.map(renderTask)}
       </div>
     );
@@ -100,7 +94,6 @@ export function UploadQueuePanel() {
       </div>
       <div className="max-h-80 overflow-y-auto p-2 flex flex-col gap-1">
         {renderSection(t('uploadQueue.directQueue', 'Direct to Drive'), directTasks)}
-        {renderSection(t('uploadQueue.serverQueue', 'Via Backend'), serverTasks)}
       </div>
     </div>
   );

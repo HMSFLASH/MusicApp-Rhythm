@@ -1,5 +1,5 @@
 import { useState, useRef, useEffect } from 'react';
-import { useNavigate, useLocation } from 'react-router-dom';
+import { useNavigate } from 'react-router-dom';
 import { Search, Plus, Users, Music, Disc, X, Check, Play, Cloud, ListPlus, Trash2, ListMusic } from 'lucide-react';
 import { useGlobalAudio } from '../context/AudioContext';
 import { useAuth } from '../context/AuthContext';
@@ -12,7 +12,6 @@ import { useOffline } from '../context/OfflineContext';
 
 export function SearchPage() {
   const navigate = useNavigate();
-  const location = useLocation();
   const confirm = useConfirm();
   const { isAuthenticated } = useAuth();
   const { playerState } = useGlobalAudio();
@@ -315,7 +314,7 @@ export function SearchPage() {
                 <h3 className="text-sm font-semibold text-white/40 uppercase tracking-widest mb-3">Songs</h3>
                 <div className="flex flex-col gap-1.5">
                   {searchResults.map((track, idx) => (
-                    <div key={track.id} onClick={(e) => {
+                    <div key={track.id} onClick={() => {
                       if (isOfflineMode && !isCached(track)) return;
                       playerState.playTrack(track, searchResults);
                     }} className={`flex items-center gap-3 sm:gap-4 p-3 rounded-xl border transition-colors group cursor-pointer ${

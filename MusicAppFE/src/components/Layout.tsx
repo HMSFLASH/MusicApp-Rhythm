@@ -16,8 +16,7 @@ import {
   Key,
   Menu,
   Languages,
-  X as CloseIcon,
-  WifiOff
+  X as CloseIcon
 } from 'lucide-react';
 import { useState, useEffect } from 'react';
 import { useTranslation } from 'react-i18next';
