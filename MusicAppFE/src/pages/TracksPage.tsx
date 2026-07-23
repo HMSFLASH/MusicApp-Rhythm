@@ -502,24 +502,6 @@ export function TracksPage() {
               </div>
             </div>
             <div className={`relative flex items-center gap-2 transition-opacity ${openMenuId === track.id ? 'opacity-100' : 'opacity-100 lg:opacity-0 lg:group-hover:opacity-100'}`}>
-              {!isOfflineMode && track.sourceType !== 'LOCAL' && (
-                <button
-                  aria-label="Lưu offline"
-                  onClick={async (e) => {
-                    e.stopPropagation();
-                    if (!isCached(track) && !downloadingTrackIds.has(String(track.id))) {
-                      await downloadTrack(track);
-                    }
-                  }}
-                  className={`p-1.5 rounded-full transition-colors ${isCached(track) ? 'text-green-400' :
-                      downloadingTrackIds.has(String(track.id)) ? 'text-primary' : 'text-white/40 hover:text-white hover:bg-white/10'
-                    }`}
-                  title={isCached(track) ? t('offline.downloaded', 'Downloaded') : downloadingTrackIds.has(String(track.id)) ? t('offline.downloading', 'Downloading...') : t('offline.downloadTrack', 'Cache Offline')}
-                >
-                  {isCached(track) ? <CheckCircle2 size={16} /> : downloadingTrackIds.has(String(track.id)) ? <Loader2 size={16} className="animate-spin" /> : <DownloadCloud size={16} />}
-                </button>
-              )}
-
               <button
                 aria-label="More options"
                 onClick={(e) => { e.stopPropagation(); setOpenMenuId(openMenuId === track.id ? null : track.id); }}
@@ -555,6 +537,20 @@ export function TracksPage() {
                       className="w-full flex items-center gap-3 px-4 py-2 text-sm text-left text-white/80 hover:bg-white/10"
                     >
                       <Download size={14} /> Download File
+                    </button>
+                  )}
+                  {!isOfflineMode && track.sourceType !== 'LOCAL' && (
+                    <button
+                      onClick={async (e) => {
+                        e.stopPropagation();
+                        if (!isCached(track) && !downloadingTrackIds.has(String(track.id))) {
+                          await downloadTrack(track);
+                        }
+                      }}
+                      className="w-full flex items-center gap-3 px-4 py-2 text-sm text-left text-white/80 hover:bg-white/10"
+                    >
+                      {isCached(track) ? <CheckCircle2 size={14} className="text-green-400" /> : downloadingTrackIds.has(String(track.id)) ? <Loader2 size={14} className="animate-spin text-primary" /> : <DownloadCloud size={14} />}
+                      <span>{isCached(track) ? t('offline.downloaded', 'Downloaded (Offline)') : downloadingTrackIds.has(String(track.id)) ? t('offline.downloading', 'Downloading...') : t('offline.downloadTrack', 'Save for Offline')}</span>
                     </button>
                   )}
                   {track.sourceType !== 'LOCAL' && (
