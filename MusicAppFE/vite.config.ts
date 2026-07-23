@@ -19,15 +19,38 @@ export default defineConfig({
     nodePolyfills({
       include: ['buffer', 'process']
     }),
+    {
+      name: 'dev-sw-unregister',
+      apply: 'serve',
+      transformIndexHtml() {
+        return [
+          {
+            tag: 'script',
+            attrs: { type: 'text/javascript' },
+            children: `
+              if ('serviceWorker' in navigator) {
+                navigator.serviceWorker.getRegistrations().then((registrations) => {
+                  for (const registration of registrations) {
+                    registration.unregister();
+                  }
+                });
+              }
+            `,
+            injectTo: 'head-prepend',
+          },
+        ];
+      }
+    },
     VitePWA({
       registerType: 'autoUpdate',
       devOptions: {
-        enabled: true,
+        enabled: false,
         suppressWarnings: true
       },
       workbox: {
         globPatterns: ['**/*.{js,css,html,ico,png,svg}'],
-        maximumFileSizeToCacheInBytes: 500 * 1024 * 1024 // 500MB limit for WASM files
+        maximumFileSizeToCacheInBytes: 500 * 1024 * 1024, // 500MB limit for WASM files
+        navigateFallbackDenylist: [/^\/api/, /^\/@/, /^\/src\//, /^\/node_modules\//]
       },
       manifest: {
         name: 'Sonic Music',

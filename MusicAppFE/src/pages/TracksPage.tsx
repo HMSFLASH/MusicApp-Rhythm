@@ -11,6 +11,7 @@ import { useConfirm } from '../context/ConfirmContext';
 import { getAudioExtension } from '../hooks/audioMime';
 import { ActionMenu } from '../components/ActionMenu';
 import { useOffline } from '../context/OfflineContext';
+import { downloadTrackFile } from '../utils/downloadUtils';
 
 type SortMode = 'default' | 'leastPlayed' | 'mostPlayed';
 
@@ -548,6 +549,14 @@ export function TracksPage() {
                   >
                     <ListPlus size={14} /> Add to Playlist
                   </button>
+                  {track.sourceType !== 'LOCAL' && (
+                    <button
+                      onClick={(e) => { e.stopPropagation(); downloadTrackFile(track); setOpenMenuId(null); }}
+                      className="w-full flex items-center gap-3 px-4 py-2 text-sm text-left text-white/80 hover:bg-white/10"
+                    >
+                      <Download size={14} /> Download File
+                    </button>
+                  )}
                   {track.sourceType !== 'LOCAL' && (
                     <button
                       onClick={(e) => toggleFavorite(track, e)}

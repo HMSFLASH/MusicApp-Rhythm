@@ -1,12 +1,13 @@
 import { useState, useEffect, useMemo, useRef } from 'react';
 import { useGlobalAudio } from '../context/AudioContext';
 import { useLibrary } from '../context/LibraryContext';
-import { Play, Pause, Trash2, GripVertical, MoreHorizontal, ArrowUp, ArrowDown, ListPlus, Heart, Info, X, ChevronsUp, ChevronsDown, CheckSquare, Square } from 'lucide-react';
+import { Play, Pause, Trash2, GripVertical, MoreHorizontal, ArrowUp, ArrowDown, ListPlus, Heart, Info, X, ChevronsUp, ChevronsDown, CheckSquare, Square, Download } from 'lucide-react';
 import type { Track } from '../hooks/useAudioPlayer';
 import { useVirtualList } from '../hooks/useVirtualList';
 import { AddToPlaylistModal } from '../components/AddToPlaylistModal';
 import { ActionMenu } from '../components/ActionMenu';
 import { useAuth } from '../context/AuthContext';
+import { downloadTrackFile } from '../utils/downloadUtils';
 
 const QUEUE_ITEM_HEIGHT = 84;
 
@@ -386,6 +387,14 @@ export function QueuePage() {
                           >
                             <ChevronsDown size={14} /> Move to Bottom
                           </button>
+                          {track.sourceType !== 'LOCAL' && (
+                            <button
+                              onClick={(e) => { e.stopPropagation(); downloadTrackFile(track); setOpenMenuIndex(null); }}
+                              className="w-full flex items-center gap-3 px-4 py-2 text-sm text-left text-white/80 hover:bg-white/10"
+                            >
+                              <Download size={14} /> Download File
+                            </button>
+                          )}
                           {track.sourceType !== 'LOCAL' && (
                             <button
                               onClick={(e) => handleToggleFavorite(track, e)}

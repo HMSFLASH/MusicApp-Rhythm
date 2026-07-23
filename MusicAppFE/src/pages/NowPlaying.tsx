@@ -1,7 +1,7 @@
 import { useState, useRef, useEffect, useCallback } from 'react';
 import { useGlobalAudio } from '../context/AudioContext';
 import { useAuth } from '../context/AuthContext';
-import { Disc, Play, Pause, SkipBack, SkipForward, Shuffle, Repeat, Heart, Info, ListPlus, MoreHorizontal, Repeat1, User, Volume2, VolumeX, BarChart2, Gauge, Music, Check, X, ArrowRight, Square, PauseCircle, ListX, Loader2, Trash2, Cpu, Tags, RefreshCw, MonitorSpeaker } from 'lucide-react';
+import { Disc, Play, Pause, SkipBack, SkipForward, Shuffle, Repeat, Heart, Info, ListPlus, MoreHorizontal, Repeat1, User, Volume2, VolumeX, BarChart2, Gauge, Music, Check, X, ArrowRight, Square, PauseCircle, ListX, Loader2, Trash2, Cpu, Tags, RefreshCw, MonitorSpeaker, Download } from 'lucide-react';
 import { HorizontalSlider } from '../components/HorizontalSlider';
 import { SpeedPitchPanel } from '../components/SpeedPitchPanel';
 import { useLibrary } from '../context/LibraryContext';
@@ -11,6 +11,7 @@ import { useNavigate } from 'react-router-dom';
 import { useTranslation } from 'react-i18next';
 import { useConfirm } from '../context/ConfirmContext';
 import { getAudioExtension } from '../hooks/audioMime';
+import { downloadTrackFile } from '../utils/downloadUtils';
 
 const formatTime = (time: number) => {
   const m = Math.floor(time / 60);
@@ -479,6 +480,18 @@ export function NowPlaying() {
                             }
                           </span>
                         </button>
+                        {currentTrack && currentTrack.sourceType !== 'LOCAL' && (
+                          <button
+                            onClick={() => {
+                              downloadTrackFile(currentTrack);
+                              setShowMenu(false);
+                            }}
+                            className="w-full flex items-center gap-3 px-4 py-3 text-sm text-white/80 hover:bg-white/5 transition-colors border-b border-white/5"
+                          >
+                            <Download size={16} />
+                            <span>Download File</span>
+                          </button>
+                        )}
                         {getAudioExtension(currentTrack.fileName) === 'flac' && (
                           <button
                             onClick={() => {

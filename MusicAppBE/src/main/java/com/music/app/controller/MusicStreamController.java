@@ -49,19 +49,21 @@ public class MusicStreamController {
         return "audio/mpeg";
     }
 
-    private String buildInlineContentDisposition(String fileName) {
+    private String buildContentDisposition(String fileName, boolean download) {
+        String mode = download ? "attachment" : "inline";
         if (fileName == null || fileName.isBlank()) {
-            return "inline";
+            return mode;
         }
 
         String encoded = URLEncoder.encode(fileName, StandardCharsets.UTF_8).replace("+", "%20");
-        return "inline; filename*=UTF-8''" + encoded;
+        return mode + "; filename*=UTF-8''" + encoded;
     }
 
     @GetMapping("/stream/{fileId}")
     public ResponseEntity<StreamingResponseBody> streamMusic(
             @PathVariable String fileId,
             @RequestHeader(value = HttpHeaders.RANGE, required = false) String rangeHeader,
+            @RequestParam(value = "download", defaultValue = "false") boolean download,
             Principal principal) {
 
         try {
@@ -118,7 +120,7 @@ public class MusicStreamController {
 
             HttpHeaders responseHeaders = new HttpHeaders();
             responseHeaders.set(HttpHeaders.ACCEPT_RANGES, "bytes");
-            responseHeaders.set(HttpHeaders.CONTENT_DISPOSITION, buildInlineContentDisposition(fileName));
+            responseHeaders.set(HttpHeaders.CONTENT_DISPOSITION, buildContentDisposition(fileName, download));
             responseHeaders.setAccessControlExposeHeaders(java.util.List.of(
                     HttpHeaders.ACCEPT_RANGES,
                     HttpHeaders.CONTENT_LENGTH,

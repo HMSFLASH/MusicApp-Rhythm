@@ -2,7 +2,7 @@ import { useState, useEffect } from 'react';
 import { useSearchParams } from 'react-router-dom';
 import { useTranslation } from 'react-i18next';
 import type { Track } from '../hooks/useAudioPlayer';
-import { Cloud, Play, Plus, ListMusic, ChevronLeft, Trash2, ListPlus, X, Shuffle, Pencil, Check, MoreHorizontal, Heart, Info, ListStart, ListEnd } from 'lucide-react';
+import { Cloud, Play, Plus, ListMusic, ChevronLeft, Trash2, ListPlus, X, Shuffle, Pencil, Check, MoreHorizontal, Heart, Info, ListStart, ListEnd, Download } from 'lucide-react';
 import { CreatePlaylistModal } from './CreatePlaylistModal';
 import { AddTracksModal } from './AddTracksModal';
 import { axiosClient } from '../api/axiosClient';
@@ -11,6 +11,7 @@ import { db } from '../lib/db';
 import { useLibrary } from '../context/LibraryContext';
 import { useConfirm } from '../context/ConfirmContext';
 import { ActionMenu } from './ActionMenu';
+import { downloadTrackFile } from '../utils/downloadUtils';
 
 interface PlaylistProps {
   isAuthenticated: boolean;
@@ -595,6 +596,14 @@ export function Playlist({ isAuthenticated, onPlay, currentTrackId }: PlaylistPr
                         >
                           <ListEnd size={14} /> Add to Queue
                         </button>
+                        {track.sourceType !== 'LOCAL' && (
+                          <button
+                            onClick={(e) => { e.stopPropagation(); downloadTrackFile(track); setOpenMenuId(null); }}
+                            className="w-full flex items-center gap-3 px-4 py-2 text-sm text-left text-white/80 hover:bg-white/10"
+                          >
+                            <Download size={14} /> Download File
+                          </button>
+                        )}
                         {track.sourceType !== 'LOCAL' && (
                           <button
                             onClick={(e) => handleToggleFavorite(track, e)}

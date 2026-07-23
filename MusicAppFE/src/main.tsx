@@ -7,7 +7,15 @@ import { ErrorBoundary } from './components/ErrorBoundary'
 import { registerSW } from 'virtual:pwa-register'
 
 if ('serviceWorker' in navigator) {
-  registerSW({ immediate: true })
+  if (import.meta.env.DEV) {
+    navigator.serviceWorker.getRegistrations().then((registrations) => {
+      for (const registration of registrations) {
+        registration.unregister();
+      }
+    });
+  } else {
+    registerSW({ immediate: true });
+  }
 }
 
 ReactDOM.createRoot(document.getElementById('root')!).render(
