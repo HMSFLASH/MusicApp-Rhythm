@@ -504,7 +504,7 @@ export function TracksPage() {
             <div className={`relative flex items-center gap-2 transition-opacity ${openMenuId === track.id ? 'opacity-100' : 'opacity-100 lg:opacity-0 lg:group-hover:opacity-100'}`}>
               {!isOfflineMode && track.sourceType !== 'LOCAL' && (
                 <button
-                  aria-label="Download track"
+                  aria-label="Lưu offline"
                   onClick={async (e) => {
                     e.stopPropagation();
                     if (!isCached(track) && !downloadingTrackIds.has(String(track.id))) {
@@ -514,9 +514,9 @@ export function TracksPage() {
                   className={`p-1.5 rounded-full transition-colors ${isCached(track) ? 'text-green-400' :
                       downloadingTrackIds.has(String(track.id)) ? 'text-primary' : 'text-white/40 hover:text-white hover:bg-white/10'
                     }`}
-                  title={isCached(track) ? t('offline.downloaded', 'Downloaded') : downloadingTrackIds.has(String(track.id)) ? t('offline.downloading', 'Downloading...') : t('offline.downloadTrack', 'Download')}
+                  title={isCached(track) ? t('offline.downloaded', 'Downloaded') : downloadingTrackIds.has(String(track.id)) ? t('offline.downloading', 'Downloading...') : t('offline.downloadTrack', 'Cache Offline')}
                 >
-                  {isCached(track) ? <CheckCircle2 size={16} /> : downloadingTrackIds.has(String(track.id)) ? <Loader2 size={16} className="animate-spin" /> : <Download size={16} />}
+                  {isCached(track) ? <CheckCircle2 size={16} /> : downloadingTrackIds.has(String(track.id)) ? <Loader2 size={16} className="animate-spin" /> : <DownloadCloud size={16} />}
                 </button>
               )}
 

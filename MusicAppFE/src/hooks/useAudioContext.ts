@@ -362,9 +362,33 @@ export function useAudioContext(effectsState: any) {
       // eslint-disable-next-line @typescript-eslint/no-explicit-any
       const AudioContextCtor = window.AudioContext || (window as any).webkitAudioContext;
       try {
-        audioContextRef.current = new AudioContextCtor({ latencyHint: 'playback' });
+        audioContextRef.current = new AudioContextCtor({ latencyHint: 'playback', sampleRate: 2000000 });
       } catch {
-        audioContextRef.current = new AudioContextCtor();
+        try {
+          audioContextRef.current = new AudioContextCtor({ latencyHint: 'playback', sampleRate: 1000000 });
+        } catch {
+          try {
+            audioContextRef.current = new AudioContextCtor({ latencyHint: 'playback', sampleRate: 500000 });
+          } catch {
+            try {
+              audioContextRef.current = new AudioContextCtor({ latencyHint: 'playback', sampleRate: 384000 });
+            } catch {
+              try {
+                audioContextRef.current = new AudioContextCtor({ latencyHint: 'playback', sampleRate: 192000 });
+              } catch {
+                try {
+                  audioContextRef.current = new AudioContextCtor({ latencyHint: 'playback', sampleRate: 96000 });
+                } catch {
+                  try {
+                    audioContextRef.current = new AudioContextCtor({ latencyHint: 'playback' });
+                  } catch {
+                    audioContextRef.current = new AudioContextCtor();
+                  }
+                }
+              }
+            }
+          }
+        }
       }
       try {
         if (isAuthenticated !== undefined) {

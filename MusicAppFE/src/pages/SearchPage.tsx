@@ -1,6 +1,6 @@
 import { useState, useRef, useEffect } from 'react';
 import { useNavigate } from 'react-router-dom';
-import { Search, Plus, Users, Music, Disc, X, Check, Play, Cloud, ListPlus, Trash2, ListMusic } from 'lucide-react';
+import { Search, Plus, Users, Music, Disc, X, Check, Play, Cloud, ListPlus, Trash2, ListMusic, Download } from 'lucide-react';
 import { useGlobalAudio } from '../context/AudioContext';
 import { useAuth } from '../context/AuthContext';
 import { AddToPlaylistModal } from '../components/AddToPlaylistModal';
@@ -9,6 +9,7 @@ import { useLibrary } from '../context/LibraryContext';
 import { useConfirm } from '../context/ConfirmContext';
 import { ActionMenu } from '../components/ActionMenu';
 import { useOffline } from '../context/OfflineContext';
+import { downloadTrackFile } from '../utils/downloadUtils';
 
 export function SearchPage() {
   const navigate = useNavigate();
@@ -343,7 +344,8 @@ export function SearchPage() {
                         actions={[
                           { label: 'Add to Playlist', icon: <ListPlus size={14} />, onSelect: () => setTrackToPlaylist(track) },
                           ...(track.sourceType !== 'LOCAL'
-                            ? [{ label: 'Delete', icon: <Trash2 size={14} />, tone: 'danger' as const, onSelect: () => void handleDeleteTrack(track) }]
+                            ? [{ label: 'Download File', icon: <Download size={14} />, onSelect: () => downloadTrackFile(track) },
+                               { label: 'Delete', icon: <Trash2 size={14} />, tone: 'danger' as const, onSelect: () => void handleDeleteTrack(track) }]
                             : []),
                         ]}
                       />

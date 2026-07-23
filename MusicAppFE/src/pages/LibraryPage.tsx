@@ -1,4 +1,4 @@
-import { Heart, ListMusic, Album, Mic2, Music, Disc, CloudUpload, RefreshCw, Play, TrendingUp, Cloud, ListPlus } from 'lucide-react';
+import { Heart, ListMusic, Album, Mic2, Music, Disc, CloudUpload, RefreshCw, Play, TrendingUp, Cloud, ListPlus, Download } from 'lucide-react';
 import { useNavigate } from 'react-router-dom';
 import { useEffect, useMemo, useState } from 'react';
 import { useGlobalAudio } from '../context/AudioContext';
@@ -8,6 +8,7 @@ import { useLibrary } from '../context/LibraryContext';
 import { ActionMenu } from '../components/ActionMenu';
 import { AddToPlaylistModal } from '../components/AddToPlaylistModal';
 import type { Track } from '../hooks/useAudioPlayer';
+import { downloadTrackFile } from '../utils/downloadUtils';
 
 export function LibraryPage() {
   const navigate = useNavigate();
@@ -245,6 +246,10 @@ export function LibraryPage() {
                     { label: 'Add to Playlist', icon: <ListPlus size={14} />, onSelect: () => setTrackToPlaylist(track) },
                     ...(track.sourceType !== 'LOCAL'
                       ? [{
+                          label: 'Download File',
+                          icon: <Download size={14} />,
+                          onSelect: () => downloadTrackFile(track)
+                        }, {
                           label: favorites.some(f => f.id === track.id) ? 'Remove Favorite' : 'Add to Favorite',
                           icon: <Heart size={14} fill={favorites.some(f => f.id === track.id) ? "currentColor" : "none"} className={favorites.some(f => f.id === track.id) ? "text-primary" : ""} />,
                           onSelect: () => void toggleFavorite(track)

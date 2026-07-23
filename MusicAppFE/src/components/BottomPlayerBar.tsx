@@ -3,11 +3,12 @@ import { useNavigate, useLocation } from 'react-router-dom';
 import { useGlobalAudio } from '../context/AudioContext';
 import { useAuth } from '../context/AuthContext';
 import { useLibrary } from '../context/LibraryContext';
-import { Play, Pause, SkipForward, SkipBack, Cloud, Disc, Heart, Shuffle, Repeat, Repeat1, Square, PauseCircle, ListX, ListPlus, Maximize2, Info, ListMusic, Volume2, VolumeX, X, ArrowRight, Loader2, RefreshCw } from 'lucide-react';
+import { Play, Pause, SkipForward, SkipBack, Cloud, Disc, Heart, Shuffle, Repeat, Repeat1, Square, PauseCircle, ListX, ListPlus, Maximize2, Info, ListMusic, Volume2, VolumeX, X, ArrowRight, Loader2, RefreshCw, Download } from 'lucide-react';
 import { HorizontalSlider } from './HorizontalSlider';
 import { useTranslation } from 'react-i18next';
 import { ActionMenu } from './ActionMenu';
 import { useVirtualList } from '../hooks/useVirtualList';
+import { downloadTrackFile } from '../utils/downloadUtils';
 
 const QUEUE_POPOVER_ITEM_HEIGHT = 58;
 
@@ -404,7 +405,10 @@ export function BottomPlayerBar() {
           menuClassName="w-56"
           actions={[
             { label: t('nav.nowPlaying', 'Now Playing'), icon: <Maximize2 size={14} />, onSelect: openNowPlaying },
-            ...(currentTrack.sourceType === 'DRIVE'
+            ...(currentTrack && currentTrack.sourceType !== 'LOCAL'
+              ? [{ label: 'Download File', icon: <Download size={14} />, onSelect: () => downloadTrackFile(currentTrack) }]
+              : []),
+            ...(currentTrack && currentTrack.sourceType === 'DRIVE'
               ? [{
                   label: t('bottomPlayer.reloadFromDrive', 'Reload from Drive'),
                   icon: <RefreshCw size={14} className={isLoadingTrack ? 'animate-spin' : ''} />,
