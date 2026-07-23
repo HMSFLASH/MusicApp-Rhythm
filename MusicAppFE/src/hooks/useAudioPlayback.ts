@@ -116,6 +116,12 @@ export function useAudioPlayback(
   const { audioContextRef, audioRef, bufferSourceRef, bufferVolumeNodeRef, initializeAudioContext, irBufferRef, setTrackLoudnessGain } = contextState;
   const { blobCacheRef } = metadataState;
 
+  const ensureAudioContextResumed = useCallback(() => {
+    if (audioContextRef.current && audioContextRef.current.state !== 'running' && audioContextRef.current.state !== 'closed') {
+      audioContextRef.current.resume().catch((e: unknown) => console.warn('[Audio] AudioContext resume failed:', e));
+    }
+  }, [audioContextRef]);
+
   const [isPlaying, setIsPlaying] = useState(false);
   const [isLoadingTrack, setIsLoadingTrack] = useState(false);
   const [loadingTrackId, setLoadingTrackId] = useState<string | null>(null);
@@ -1415,6 +1421,7 @@ export function useAudioPlayback(
 
 
   const playCurrentBuffer = (offset = 0) => {
+    ensureAudioContextResumed();
     if (renderedAudioRef.current && renderedAudioUrlRef.current) {
       usingBufferPlaybackRef.current = true;
       const safeOffset = audioBufferRef.current
@@ -1460,6 +1467,7 @@ export function useAudioPlayback(
 
   // eslint-disable-next-line @typescript-eslint/no-explicit-any
   const playTrack = async (startingTrack: Track | null, currentQueue?: Track[], autoPlay = true, ..._args: any[]) => {
+    ensureAudioContextResumed();
     if (!precalculateOnIdleRef.current) {
       initializeAudioContext();
     }
@@ -2002,6 +2010,7 @@ export function useAudioPlayback(
   const togglePlay = () => {
     if (isLoadingTrack) return;
     if (!audioRef.current && !renderedAudioRef.current) return;
+    ensureAudioContextResumed();
     if (!precalculateOnIdle) {
       initializeAudioContext();
     }
@@ -2035,6 +2044,7 @@ export function useAudioPlayback(
 
 
   const seek = (time: number) => {
+    ensureAudioContextResumed();
     if ((precalculateOnIdle || usingBufferPlaybackRef.current) && renderedAudioRef.current && renderedAudioUrlRef.current) {
       const safeTime = audioBufferRef.current
         ? clamp(time, 0, Math.max(0, audioBufferRef.current.duration - 0.05))

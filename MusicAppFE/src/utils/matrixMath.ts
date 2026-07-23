@@ -109,13 +109,16 @@ export function invertMatrix(A: number[][]): number[][] {
     aug[pivot] = temp;
 
     const pivotVal = aug[i][i];
-    if (Math.abs(pivotVal) < 1e-9) {
+    if (!Number.isFinite(pivotVal) || Math.abs(pivotVal) < 1e-9) {
       throw new Error('Matrix is singular or nearly singular');
     }
 
     // Normalize row
     for (let j = 0; j < 2 * n; j++) {
       aug[i][j] /= pivotVal;
+      if (!Number.isFinite(aug[i][j])) {
+        throw new Error('Matrix normalization produced non-finite values');
+      }
     }
 
     // Eliminate other rows
@@ -124,6 +127,9 @@ export function invertMatrix(A: number[][]): number[][] {
         const factor = aug[j][i];
         for (let k = 0; k < 2 * n; k++) {
           aug[j][k] -= factor * aug[i][k];
+          if (!Number.isFinite(aug[j][k])) {
+            throw new Error('Matrix elimination produced non-finite values');
+          }
         }
       }
     }
@@ -133,7 +139,11 @@ export function invertMatrix(A: number[][]): number[][] {
   const inv = createMatrix(n, n);
   for (let i = 0; i < n; i++) {
     for (let j = 0; j < n; j++) {
-      inv[i][j] = aug[i][n + j];
+      const val = aug[i][n + j];
+      if (!Number.isFinite(val)) {
+        throw new Error('Matrix inverse contains non-finite values');
+      }
+      inv[i][j] = val;
     }
   }
   return inv;

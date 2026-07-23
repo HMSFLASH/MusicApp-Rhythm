@@ -310,16 +310,19 @@ export function expandResonantEqBands(bands: EqBand[]): EqBand[] {
     if ((band.type === 'lowshelf' || band.type === 'highshelf') && band.q && band.q > 0.707) {
       const q = Number(band.q);
       const gain = Number(band.gain) || 0;
-      if (Math.abs(gain) < 0.001) return [band];
+      const freq = Number(band.frequency) || 1000;
+      if (!Number.isFinite(q) || !Number.isFinite(gain) || !Number.isFinite(freq) || Math.abs(gain) < 0.001) return [band];
 
       const qExcess = Math.max(0, q - 0.707);
 
-      let peakGain = Math.sign(gain) * qExcess * Math.abs(gain) * 1.0;
+      const peakGain = Math.sign(gain) * qExcess * Math.abs(gain) * 1.0;
 
       const offset = 1 + qExcess * 0.15;
       const peakFreq = band.type === 'lowshelf'
-        ? band.frequency / offset
-        : band.frequency * offset;
+        ? freq / (offset || 1)
+        : freq * offset;
+
+      if (!Number.isFinite(peakGain) || !Number.isFinite(peakFreq)) return [band];
 
       return [
         { ...band, q: 1, id: `${band.id}_shelf` },

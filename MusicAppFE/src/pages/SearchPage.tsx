@@ -1,15 +1,16 @@
 import { useState, useRef, useEffect } from 'react';
 import { useNavigate } from 'react-router-dom';
-import { Search, Plus, Users, Music, Disc, X, Check, Play, Cloud, ListPlus, Trash2, ListMusic, Download } from 'lucide-react';
+import { Search, Plus, Users, Music, Disc, X, Check, Play, Cloud, ListPlus, Trash2, ListMusic, Download, Info } from 'lucide-react';
 import { useGlobalAudio } from '../context/AudioContext';
 import { useAuth } from '../context/AuthContext';
 import { AddToPlaylistModal } from '../components/AddToPlaylistModal';
-import type { Track } from '../hooks/useAudioPlayer';
+import type { Track } from '../hooks/audioTypes';
 import { useLibrary } from '../context/LibraryContext';
 import { useConfirm } from '../context/ConfirmContext';
 import { ActionMenu } from '../components/ActionMenu';
 import { useOffline } from '../context/OfflineContext';
 import { downloadTrackFile } from '../utils/downloadUtils';
+import { TrackInfoModal } from '../components/TrackInfoModal';
 
 export function SearchPage() {
   const navigate = useNavigate();
@@ -20,6 +21,7 @@ export function SearchPage() {
   const { tracks: allTracks, deleteTrack } = useLibrary();
   const [searchQuery, setSearchQuery] = useState('');
   const [trackToPlaylist, setTrackToPlaylist] = useState<Track | null>(null);
+  const [infoTrack, setInfoTrack] = useState<Track | null>(null);
   const [searchResults, setSearchResults] = useState<Track[]>([]);
   const [isSearching, setIsSearching] = useState(false);
 
@@ -342,6 +344,7 @@ export function SearchPage() {
                         ariaLabel={`Song actions for ${track.title || track.fileName}`}
                         buttonClassName="p-1.5 text-white/40 hover:text-white hover:bg-white/10 rounded-full transition-colors"
                         actions={[
+                          { label: 'Info', icon: <Info size={14} />, onSelect: () => setInfoTrack(track) },
                           { label: 'Add to Playlist', icon: <ListPlus size={14} />, onSelect: () => setTrackToPlaylist(track) },
                           ...(track.sourceType !== 'LOCAL'
                             ? [{ label: 'Download File', icon: <Download size={14} />, onSelect: () => downloadTrackFile(track) },
@@ -468,6 +471,13 @@ export function SearchPage() {
         )}
       </div>
 
+      {infoTrack && (
+        <TrackInfoModal 
+          track={infoTrack} 
+          trackMetadata={playerState.getTrackMetadata(infoTrack.id)}
+          onClose={() => setInfoTrack(null)} 
+        />
+      )}
     </div>
   );
 }

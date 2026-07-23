@@ -110,7 +110,15 @@ export function buildPrecomputedInverse(B: number[][], lambda: number, weights?:
   const lambda_LT_L = multiplyMatrixScalar(LT_L, lambda);
 
   const A = addMatrix(BT_B, lambda_LT_L);
-  const A_inv = invertMatrix(A);
+  let A_inv: number[][];
+  try {
+    A_inv = invertMatrix(A);
+  } catch {
+    A_inv = createMatrix(numBands, numBands);
+    for (let i = 0; i < numBands; i++) {
+      A_inv[i][i] = 1 / Math.max(1e-6, A[i][i] || 1);
+    }
+  }
   
   const M = multiplyMatrix(A_inv, BT_W ? BT_W : BT);
 
@@ -120,9 +128,10 @@ export function buildPrecomputedInverse(B: number[][], lambda: number, weights?:
 export function computeCascadeResponseDb(freqGrid: number[], centerFreqs: number[], gains: number[], q: number, sampleRate: number): number[] {
   const response = new Float64Array(freqGrid.length);
   for (let i = 0; i < centerFreqs.length; i++) {
-    if (gains[i] === 0) continue;
+    const gain = Number.isFinite(gains[i]) ? gains[i] : 0;
+    if (gain === 0) continue;
     for (let j = 0; j < freqGrid.length; j++) {
-      response[j] += calculatePeakingMagnitudeDb(freqGrid[j], centerFreqs[i], q, gains[i], sampleRate);
+      response[j] += calculatePeakingMagnitudeDb(freqGrid[j], centerFreqs[i], q, gain, sampleRate);
     }
   }
   return Array.from(response);
@@ -171,14 +180,18 @@ export function solveLocalCorrection(residual: number[], B: number[][], lambda: 
   
   const delta = new Array(numBands).fill(0);
   for (let k = 0; k < freeIndices.length; k++) {
-    delta[freeIndices[k]] = delta_free[k];
+    const dVal = delta_free[k];
+    delta[freeIndices[k]] = Number.isFinite(dVal) ? dVal : 0;
   }
   
   return delta;
 }
 
 export function clampArray(arr: number[], min: number, max: number): number[] {
-  return arr.map(v => Math.max(min, Math.min(max, v)));
+  return arr.map(v => {
+    if (!Number.isFinite(v)) return 0;
+    return Math.max(min, Math.min(max, v));
+  });
 }
 
 export function subtractArrays(a: number[], b: number[]): number[] {

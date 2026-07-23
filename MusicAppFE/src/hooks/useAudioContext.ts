@@ -511,6 +511,8 @@ export function useAudioContext(effectsState: any) {
     // 2. EQ
     if (activity.eq && rawEqBands && rawEqBands.length > 0) {
       if (!isParametricPreset) {
+        eqNodesRef.current.forEach(disconnectNode);
+        eqNodesRef.current = [];
         // Graphic EQ -> FIR Convolver
         if (!eqConvolverRef.current) eqConvolverRef.current = ctx.createConvolver();
         eqConvolverRef.current.normalize = false; // Important: Do not normalize EQ impulse response!
@@ -523,6 +525,7 @@ export function useAudioContext(effectsState: any) {
         
         connectStage(eqConvolverRef.current);
       } else {
+        eqConvolverRef.current = null;
         // Parametric EQ -> Biquads
         const expandedEqBands = expandResonantEqBands(eqBands || []);
         if (eqNodesRef.current.length !== expandedEqBands.length) {
@@ -534,12 +537,15 @@ export function useAudioContext(effectsState: any) {
           const filter = eqNodesRef.current[i];
           filter.type = band.type || 'peaking';
           const now = ctx.currentTime;
+          const freq = Number.isFinite(band.frequency) ? band.frequency : 1000;
+          const qVal = Number.isFinite(band.q) ? band.q : 1;
+          const gainVal = Number.isFinite(band.gain) ? band.gain : 0;
           filter.frequency.cancelScheduledValues(now);
-          filter.frequency.setTargetAtTime(band.frequency, now, 0.015);
+          filter.frequency.setTargetAtTime(freq, now, 0.015);
           filter.Q.cancelScheduledValues(now);
-          filter.Q.setTargetAtTime(band.q, now, 0.015);
+          filter.Q.setTargetAtTime(qVal, now, 0.015);
           filter.gain.cancelScheduledValues(now);
-          filter.gain.setTargetAtTime(band.gain, now, 0.015);
+          filter.gain.setTargetAtTime(gainVal, now, 0.015);
         });
 
         const hasChannelSpecificBands = expandedEqBands.some((band: { channel?: string }) =>
@@ -837,8 +843,8 @@ export function useAudioContext(effectsState: any) {
     currentNode.connect(masterAnalyserRef.current);
 
     currentNode.connect(ctx.destination);
-    if (audioContextRef.current && audioContextRef.current.state === 'suspended') {
-      audioContextRef.current.resume();
+    if (audioContextRef.current && audioContextRef.current.state !== 'running' && audioContextRef.current.state !== 'closed') {
+      audioContextRef.current.resume().catch((e) => console.warn('Failed to resume AudioContext', e));
     }
 
 
@@ -936,18 +942,19 @@ export function useAudioContext(effectsState: any) {
   }, [bassGain, trebleGain, fxEnabled.tone]);
 
   useEffect(() => {
-    // eslint-disable-next-line @typescript-eslint/no-explicit-any
-    const isParametricPreset = eqBands?.some((b: any) => b.q !== undefined);
-
     if (isParametricPreset) {
       if (eqNodesRef.current && eqBands) {
         // eslint-disable-next-line @typescript-eslint/no-explicit-any
         eqBands.forEach((band: any, i: number) => {
           if (eqNodesRef.current[i]) {
+            const freq = Number.isFinite(band.frequency) ? band.frequency : 1000;
+            const qVal = Number.isFinite(band.q) ? band.q : 1;
+            const gainVal = Number.isFinite(band.gain) ? (fxEnabled.eq ? band.gain : 0) : 0;
+
             eqNodesRef.current[i].type = band.type || 'peaking';
-            eqNodesRef.current[i].frequency.value = band.frequency;
-            eqNodesRef.current[i].Q.value = band.q;
-            eqNodesRef.current[i].gain.value = fxEnabled.eq ? band.gain : 0;
+            eqNodesRef.current[i].frequency.value = freq;
+            eqNodesRef.current[i].Q.value = qVal;
+            eqNodesRef.current[i].gain.value = gainVal;
           }
         });
       }
@@ -968,7 +975,7 @@ export function useAudioContext(effectsState: any) {
         eqConvolverRef.current.buffer = buffer;
       }
     }
-  }, [eqBands, rawEqBands, fxEnabled.eq]);
+  }, [eqBands, rawEqBands, fxEnabled.eq, isParametricPreset]);
 
   useEffect(() => {
     if (compressorNodeRef.current && compMakeupNodeRef.current) {

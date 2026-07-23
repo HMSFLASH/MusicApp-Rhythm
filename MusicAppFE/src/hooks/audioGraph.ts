@@ -183,12 +183,21 @@ export const applyCustomDynamicsCompressorSettings = (
   node: AudioWorkletNode,
   settings: CustomDynamicsCompressorSettings
 ) => {
-  node.parameters.get('threshold')!.value = settings.threshold;
-  node.parameters.get('ratio')!.value = settings.ratio;
-  node.parameters.get('knee')!.value = settings.knee;
-  node.parameters.get('attack')!.value = settings.attack;
-  node.parameters.get('release')!.value = settings.release;
-  node.parameters.get('rmsSize')!.value = settings.rmsSize;
+  const params = node.parameters as unknown as Map<string, AudioParam>;
+  const setParam = (name: keyof CustomDynamicsCompressorSettings, defaultVal: number) => {
+    const param = params.get(name);
+    if (param) {
+      const val = settings[name];
+      param.value = Number.isFinite(val) ? val : defaultVal;
+    }
+  };
+
+  setParam('threshold', -18);
+  setParam('ratio', 3);
+  setParam('knee', 12);
+  setParam('attack', 0.005);
+  setParam('release', 0.18);
+  setParam('rmsSize', 0.005);
 };
 
 export const createCustomDynamicsCompressorNode = (
@@ -213,15 +222,17 @@ const setAudioParam = (
   smooth: boolean
 ) => {
   const now = ctx.currentTime;
+  const safeVal = Number.isFinite(value) ? value : 0;
   param.cancelScheduledValues(now);
 
   if (smooth) {
-    param.setValueAtTime(param.value, now);
-    param.linearRampToValueAtTime(value, now + MASTER_LIMITER_RAMP_SECONDS);
+    const currentVal = Number.isFinite(param.value) ? param.value : 0;
+    param.setValueAtTime(currentVal, now);
+    param.linearRampToValueAtTime(safeVal, now + MASTER_LIMITER_RAMP_SECONDS);
     return;
   }
 
-  param.value = value;
+  param.value = safeVal;
 };
 
 export const applyMasterLimiterCompressorState = (

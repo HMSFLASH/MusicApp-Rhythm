@@ -76,7 +76,7 @@ export const renderOfflineAudio = async ({
 
   let autoPreamp = 0;
   let processedEqBands = eqBands;
-  const isParametricPreset = paramPresetOpt ?? eqBands.some((band: any) => band.q !== undefined);
+  const isParametricPreset = paramPresetOpt ?? eqBands.some((band: any) => (band.type && band.type !== 'peaking') || band.channel !== 'L+R');
   if (!isParametricPreset) {
     const result = processGraphicEqBands(eqBands, sampleRate, true);
     processedEqBands = result.fittedBands;
@@ -178,9 +178,9 @@ export const renderOfflineAudio = async ({
         const filters = activeEqBands.map((band) => {
           const filter = offlineCtx.createBiquadFilter();
           filter.type = band.type || 'peaking';
-          filter.frequency.value = band.frequency;
-          filter.Q.value = band.q;
-          filter.gain.value = band.gain;
+          filter.frequency.value = Number.isFinite(band.frequency) ? band.frequency : 1000;
+          filter.Q.value = Number.isFinite(band.q) ? band.q : 1;
+          filter.gain.value = Number.isFinite(band.gain) ? band.gain : 0;
           return filter;
         });
 

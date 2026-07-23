@@ -112,12 +112,16 @@ const calculateGraphicEqQ = (frequencies: number[], index: number) => {
 
   // 5. Asymmetry Protection (Soft Transition)
   const asymmetry = Math.max(leftBW, rightBW) / Math.max(0.001, Math.min(leftBW, rightBW));
-  q *= asymmetryQFactor(asymmetry);
+  const asymFactor = asymmetryQFactor(asymmetry);
+  if (Number.isFinite(asymFactor)) {
+    q *= asymFactor;
+  }
 
   // Smooth EQ Clamping
   const minQ = 0.5;
   const maxQ = 6;
-  return Math.round(clamp(q, minQ, maxQ) * 100) / 100;
+  const finalQ = Math.round(clamp(q, minQ, maxQ) * 100) / 100;
+  return Number.isFinite(finalQ) ? finalQ : DEFAULT_PARAMETRIC_Q;
 };
 
 const createEqBands = (frequencies: number[], gains?: number[]): EqBand[] =>
