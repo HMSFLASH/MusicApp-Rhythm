@@ -407,7 +407,23 @@ export function useAudioMetadata(isAuthenticated: boolean, queueState: any, sett
 
                 if (metadata.format.container) { up.fileFormat = metadata.format.container; cachePayload.fileFormat = metadata.format.container; }
                 if (metadata.format.codec) { up.codec = metadata.format.codec; cachePayload.codec = metadata.format.codec; }
-                if (metadata.format.bitrate) { up.bitrate = metadata.format.bitrate; cachePayload.bitrate = metadata.format.bitrate; }
+                if (metadata.format.bitrate) {
+                    let br = metadata.format.bitrate;
+                    if (up.fileSize && metadata.format.duration && metadata.format.duration > 0) {
+                        let totalPictureSize = 0;
+                        if (metadata.common.picture) {
+                            totalPictureSize = metadata.common.picture.reduce((sum, pic) => sum + pic.data.length, 0);
+                        }
+                        const audioSize = Math.max(0, up.fileSize - totalPictureSize);
+                        const estimatedBps = (audioSize * 8) / metadata.format.duration;
+
+                        if (br < estimatedBps * 0.75) {
+                            br = estimatedBps;
+                        }
+                    }
+                    up.bitrate = br;
+                    cachePayload.bitrate = br;
+                }
                 if (metadata.format.sampleRate) { up.sampleRate = metadata.format.sampleRate; cachePayload.sampleRate = metadata.format.sampleRate; }
                 if (metadata.format.numberOfChannels) { up.numberOfChannels = metadata.format.numberOfChannels; cachePayload.numberOfChannels = metadata.format.numberOfChannels; }
                 if (metadata.format.bitsPerSample) { up.bitsPerSample = metadata.format.bitsPerSample; cachePayload.bitsPerSample = metadata.format.bitsPerSample; }
