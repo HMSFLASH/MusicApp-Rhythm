@@ -4,6 +4,40 @@ import { useTranslation } from 'react-i18next';
 import { AudioEffectPanel, EffectControlsGate, EffectPowerButton } from './AudioEffectPanel';
 import { STEREO_WIDTH_MAX_PERCENT } from '../../hooks/audioMath';
 
+interface DryWetBadgeProps {
+  dryLabel?: string;
+  wetLabel?: string;
+  dryValue: string | number;
+  wetValue: string | number;
+  dryColor?: string;
+  wetColor?: string;
+  active?: boolean;
+  defaultDryValue?: string | number;
+  defaultWetValue?: string | number;
+}
+
+function DryWetBadge({
+  dryLabel = 'Dry',
+  wetLabel = 'Wet',
+  dryValue,
+  wetValue,
+  dryColor = '#00f5ff',
+  wetColor = '#ff00ff',
+  active = true,
+  defaultDryValue = '1.0',
+  defaultWetValue = '0.0'
+}: DryWetBadgeProps) {
+  return (
+    <div className={`inline-flex items-center gap-1.5 px-2.5 py-1 rounded-md bg-white/5 border border-white/10 text-xs font-mono font-medium shrink-0 self-start sm:self-auto transition-opacity duration-300 ${!active ? 'opacity-50 grayscale' : ''}`}>
+      <span className="text-white/60">{dryLabel}:</span>
+      <span className="font-semibold" style={{ color: dryColor }}>{active ? dryValue : defaultDryValue}</span>
+      <span className="text-white/20">|</span>
+      <span className="text-white/60">{wetLabel}:</span>
+      <span className="font-bold" style={{ color: wetColor }}>{active ? wetValue : defaultWetValue}</span>
+    </div>
+  );
+}
+
 export function SpatialEffects() {
   const { playerState } = useGlobalAudio();
   const { t } = useTranslation();
@@ -20,13 +54,11 @@ export function SpatialEffects() {
         description={
           <div className="flex flex-col sm:flex-row sm:items-center gap-2 mt-1">
             <span>{t('studio.spatial.reverbDesc', 'Add space and depth using Convolution Reverb.')}</span>
-            <div className="inline-flex items-center gap-1.5 px-2.5 py-1 rounded-md bg-white/5 border border-white/10 text-xs font-mono font-medium shrink-0 self-start sm:self-auto">
-              <span className="text-white/60">Dry:</span>
-              <span className="text-[#00f5ff] font-semibold">{reverbDryFactor}</span>
-              <span className="text-white/20">|</span>
-              <span className="text-white/60">Wet:</span>
-              <span className="text-[#ff00ff] font-bold">{reverbWetFactor}</span>
-            </div>
+            <DryWetBadge
+              dryValue={reverbDryFactor}
+              wetValue={reverbWetFactor}
+              active={playerState.fxEnabled.reverb}
+            />
           </div>
         }
         leading={(
@@ -65,13 +97,15 @@ export function SpatialEffects() {
         description={
           <div className="flex flex-col sm:flex-row sm:items-center gap-2 mt-1">
             <span>{t('studio.spatial.stereoDesc', 'Widen your stereo image using Mid/Side processing. 100% is normal, up to 200% is extra wide.')}</span>
-            <div className="inline-flex items-center gap-1.5 px-2.5 py-1 rounded-md bg-white/5 border border-white/10 text-xs font-mono font-medium shrink-0 self-start sm:self-auto">
-              <span className="text-white/60">{t('studio.spatial.dryLabel', 'Dry (Mid)')}:</span>
-              <span className="text-[#00f5ff] font-semibold">1.0</span>
-              <span className="text-white/20">|</span>
-              <span className="text-white/60">{t('studio.spatial.wetLabel', 'Wet (Side)')}:</span>
-              <span className="text-[#9d00ff] font-bold">{stereoWetFactor}</span>
-            </div>
+            <DryWetBadge
+              dryLabel={t('studio.spatial.dryLabel', 'Dry (Mid)')}
+              wetLabel={t('studio.spatial.wetLabel', 'Wet (Side)')}
+              dryValue="1.0"
+              wetValue={stereoWetFactor}
+              wetColor="#9d00ff"
+              active={playerState.fxEnabled.stereo}
+              defaultWetValue="1.0"
+            />
           </div>
         }
         trailing={(
