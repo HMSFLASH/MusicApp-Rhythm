@@ -936,7 +936,7 @@ export function NowPlaying() {
         </div>
 
         {/* Right Side: Playlist */}
-        <div className="w-full lg:w-[400px] flex-shrink-0">
+        <div className="hidden lg:block lg:w-[400px] flex-shrink-0">
           <div className="w-full bg-white/5 rounded-2xl p-4 md:p-6 border border-white/10 h-full max-h-[65vh] lg:max-h-[80vh] flex flex-col">
             <div className="flex items-center gap-6 mb-6 border-b border-white/10 pb-1">
               <div className="font-bold pb-2 border-b-2 border-primary text-primary flex items-center gap-2">
