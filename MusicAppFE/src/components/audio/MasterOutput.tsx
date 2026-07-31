@@ -20,6 +20,12 @@ export function MasterOutput() {
     { label: t('studio.masterOutput.fft16384', '16384 (Tối đa / Cực nặng)'), value: 16384 },
   ];
 
+  const latencyOptions: { label: string; value: AudioContextLatencyCategory }[] = [
+    { label: t('studio.masterOutput.latencyInteractive', 'Interactive (Rất thấp / Gây giật)'), value: 'interactive' },
+    { label: t('studio.masterOutput.latencyBalanced', 'Balanced (Trung bình)'), value: 'balanced' },
+    { label: t('studio.masterOutput.latencyPlayback', 'Playback (Cao / An toàn nhất)'), value: 'playback' },
+  ];
+
   return (
     <AudioEffectPanel
       title={t('studio.masterOutput.title', 'Master Output')}
@@ -51,6 +57,14 @@ export function MasterOutput() {
         value={playerState.masterFftSize || 2048}
         options={fftSizeOptions}
         onChange={playerState.updateMasterFftSize}
+      />
+
+      <AudioSelectRow
+        title={t('studio.masterOutput.latencyTitle', 'Audio Buffer Size (Latency Mode)')}
+        description={t('studio.masterOutput.latencyDesc', 'Tương tự Block Size trong DAW. Chọn Playback để giảm tải CPU tối đa, tránh âm thanh bị ngắt quãng. (Cần tải lại trang hoặc đổi bài hát để áp dụng).')}
+        value={playerState.audioLatencyHint || 'playback'}
+        options={latencyOptions}
+        onChange={playerState.updateAudioLatencyHint}
       />
 
       <AudioToggleRow

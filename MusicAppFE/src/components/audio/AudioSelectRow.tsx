@@ -1,17 +1,17 @@
 import type { ReactNode } from 'react';
 
-type AudioSelectRowProps = {
+type AudioSelectRowProps<T extends string | number> = {
   title: ReactNode;
   description: ReactNode;
-  value: number;
-  options: { label: string; value: number }[];
-  onChange: (val: number) => void;
+  value: T;
+  options: { label: string; value: T }[];
+  onChange: (val: T) => void;
   tone?: 'default' | 'amber';
   titleClassName?: string;
   descriptionClassName?: string;
 };
 
-export function AudioSelectRow({
+export function AudioSelectRow<T extends string | number>({
   title,
   description,
   value,
@@ -20,7 +20,7 @@ export function AudioSelectRow({
   tone = 'default',
   titleClassName,
   descriptionClassName,
-}: AudioSelectRowProps) {
+}: AudioSelectRowProps<T>) {
   const containerStyle = tone === 'amber'
     ? 'bg-amber-500/5 border-amber-500/20'
     : 'bg-white/5 border-white/10';
@@ -36,7 +36,14 @@ export function AudioSelectRow({
       <div className="relative w-full">
         <select
           value={value}
-          onChange={(e) => onChange(Number(e.target.value))}
+          onChange={(e) => {
+            const val = e.target.value;
+            if (options.length > 0 && typeof options[0].value === 'number') {
+              onChange(Number(val) as T);
+            } else {
+              onChange(val as T);
+            }
+          }}
           className="w-full bg-black/70 text-[#00E5FF] font-mono text-xs font-bold border border-white/20 rounded-lg px-3 py-2 outline-none cursor-pointer hover:border-[#00E5FF]/60 focus:border-[#00E5FF] transition-colors truncate"
         >
           {options.map((opt) => (

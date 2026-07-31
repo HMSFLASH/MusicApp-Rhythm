@@ -175,6 +175,7 @@ export function useAudioPlayer(
       fullQueueCacheEnabled: effectsState.fullQueueCacheEnabled,
       masterFftSize: effectsState.masterFftSize,
       stereoFftSize: effectsState.stereoFftSize,
+      audioLatencyHint: effectsState.audioLatencyHint,
       fxEnabled: effectsState.fxEnabled
     };
     
@@ -190,11 +191,10 @@ export function useAudioPlayer(
     queueState.cycleQueues, queueState.upcomingQueues,
     effectsState.eqPresetName, effectsState.eqBands, effectsState.customEqPresets,
     effectsState.preampGain, effectsState.bassGain, effectsState.trebleGain,
-    effectsState.compThreshold, effectsState.compRatio, effectsState.compKnee,
-    effectsState.compAttack, effectsState.compRelease, effectsState.compRmsSize, effectsState.compMakeupGain,
+    effectsState.compThreshold, effectsState.compRatio, effectsState.compKnee, effectsState.compAttack, effectsState.compRelease, effectsState.compRmsSize, effectsState.compMakeupGain,
     effectsState.panValue, effectsState.stereoWidth, effectsState.reverbMix, effectsState.reverbTime,
     effectsState.loudnessNormalization, effectsState.useOversample, effectsState.precalculateOnIdle,
-    effectsState.fullQueueCacheEnabled, effectsState.masterFftSize, effectsState.stereoFftSize, effectsState.fxEnabled
+    effectsState.fullQueueCacheEnabled, effectsState.masterFftSize, effectsState.stereoFftSize, effectsState.audioLatencyHint, effectsState.fxEnabled
   ]);
 
   return {

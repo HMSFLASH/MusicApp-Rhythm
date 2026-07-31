@@ -51,7 +51,7 @@ const disconnectNode = (node: AudioNode | null) => {
 
 // eslint-disable-next-line @typescript-eslint/no-explicit-any
 export function useAudioContext(effectsState: any) {
-  const { eqBands: rawEqBands, isParametricPreset, preampGain, bassGain, trebleGain, compThreshold, compRatio, compKnee, compAttack, compRelease, compRmsSize, compMakeupGain, panValue, stereoWidth, reverbMix, reverbTime, useOversample, loudnessNormalization, masterFftSize = 2048, stereoFftSize = 1024, fxEnabled, audioIsStereo = true, isAuthenticated } = effectsState;
+  const { eqBands: rawEqBands, isParametricPreset, preampGain, bassGain, trebleGain, compThreshold, compRatio, compKnee, compAttack, compRelease, compRmsSize, compMakeupGain, panValue, stereoWidth, reverbMix, reverbTime, useOversample, loudnessNormalization, masterFftSize = 2048, stereoFftSize = 1024, audioLatencyHint = 'playback', fxEnabled, audioIsStereo = true, isAuthenticated } = effectsState;
   const [audioSampleRate, setAudioSampleRate] = useState(44100);
 
   // Audio Context and Core Nodes
@@ -363,25 +363,25 @@ export function useAudioContext(effectsState: any) {
       // eslint-disable-next-line @typescript-eslint/no-explicit-any
       const AudioContextCtor = globalThis.AudioContext || (window as any).webkitAudioContext;
       try {
-        audioContextRef.current = new AudioContextCtor({ latencyHint: 'playback', sampleRate: 2000000 });
+        audioContextRef.current = new AudioContextCtor({ latencyHint: audioLatencyHint, sampleRate: 2000000 });
       } catch {
         try {
-          audioContextRef.current = new AudioContextCtor({ latencyHint: 'playback', sampleRate: 1000000 });
+          audioContextRef.current = new AudioContextCtor({ latencyHint: audioLatencyHint, sampleRate: 1000000 });
         } catch {
           try {
-            audioContextRef.current = new AudioContextCtor({ latencyHint: 'playback', sampleRate: 500000 });
+            audioContextRef.current = new AudioContextCtor({ latencyHint: audioLatencyHint, sampleRate: 500000 });
           } catch {
             try {
-              audioContextRef.current = new AudioContextCtor({ latencyHint: 'playback', sampleRate: 384000 });
+              audioContextRef.current = new AudioContextCtor({ latencyHint: audioLatencyHint, sampleRate: 384000 });
             } catch {
               try {
-                audioContextRef.current = new AudioContextCtor({ latencyHint: 'playback', sampleRate: 192000 });
+                audioContextRef.current = new AudioContextCtor({ latencyHint: audioLatencyHint, sampleRate: 192000 });
               } catch {
                 try {
-                  audioContextRef.current = new AudioContextCtor({ latencyHint: 'playback', sampleRate: 96000 });
+                  audioContextRef.current = new AudioContextCtor({ latencyHint: audioLatencyHint, sampleRate: 96000 });
                 } catch {
                   try {
-                    audioContextRef.current = new AudioContextCtor({ latencyHint: 'playback' });
+                    audioContextRef.current = new AudioContextCtor({ latencyHint: audioLatencyHint });
                   } catch {
                     audioContextRef.current = new AudioContextCtor();
                   }
