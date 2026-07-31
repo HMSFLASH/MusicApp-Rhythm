@@ -115,6 +115,7 @@ export function useAudioPlayback(
     stereoWidth,
     panValue,
     loudnessNormalization,
+    eqBlockSize,
     fullQueueCacheEnabled,
     flacWasmOverrides,
     m4aWasmOverrides,
@@ -566,6 +567,7 @@ export function useAudioPlayback(
     panValue,
     useOversample,
     loudnessNormalization,
+    eqBlockSize,
   });
   const fxEnabledRef = useRef<FxEnabledFlags>(fxEnabled || {});
 
@@ -592,6 +594,7 @@ export function useAudioPlayback(
       panValue,
       useOversample,
       loudnessNormalization,
+      eqBlockSize,
     };
   }, [
     bassGain,
@@ -611,6 +614,7 @@ export function useAudioPlayback(
     trebleGain,
     useOversample,
     loudnessNormalization,
+    eqBlockSize,
   ]);
 
   useEffect(() => {

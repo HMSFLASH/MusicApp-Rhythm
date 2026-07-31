@@ -30,6 +30,7 @@ type SavedAudioEffectsState = Partial<{
   fullQueueCacheEnabled: boolean;
   masterFftSize: number;
   stereoFftSize: number;
+  eqBlockSize: number;
   audioLatencyHint: AudioContextLatencyCategory;
   fxEnabled: Partial<FxEnabledState>;
 }>;
@@ -207,6 +208,7 @@ export function useAudioEffectsState(savedState: SavedAudioEffectsState = {}) {
   const [fullQueueCacheEnabled, setFullQueueCacheEnabled] = useState<boolean>(savedState.fullQueueCacheEnabled ?? false);
   const [masterFftSize, setMasterFftSize] = useState<number>(savedState.masterFftSize ?? 2048);
   const [stereoFftSize, setStereoFftSize] = useState<number>(savedState.stereoFftSize ?? 1024);
+  const [eqBlockSize, setEqBlockSize] = useState<number>(savedState.eqBlockSize ?? 4096);
   const [audioLatencyHint, setAudioLatencyHint] = useState<AudioContextLatencyCategory>(savedState.audioLatencyHint ?? 'playback');
 
   const initialFxEnabled: FxEnabledState = {
@@ -400,6 +402,7 @@ export function useAudioEffectsState(savedState: SavedAudioEffectsState = {}) {
     fullQueueCacheEnabled, setFullQueueCacheEnabled,
     masterFftSize, setMasterFftSize, updateMasterFftSize: setMasterFftSize,
     stereoFftSize, setStereoFftSize, updateStereoFftSize: setStereoFftSize,
+    eqBlockSize, setEqBlockSize, updateEqBlockSize: setEqBlockSize,
     audioLatencyHint, setAudioLatencyHint, updateAudioLatencyHint: setAudioLatencyHint,
     fxEnabled, setFxEnabled, toggleFx, fxEnabledRef,
     applyPreset, applyStylisticPreset, setCustomPreset, setParametricPreset,

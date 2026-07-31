@@ -50,7 +50,7 @@ const disconnectNode = (node: AudioNode | null) => {
 };
 
 export function useAudioContext(effectsState: any) {
-  const { eqBands: rawEqBands, isParametricPreset, preampGain, bassGain, trebleGain, compThreshold, compRatio, compKnee, compAttack, compRelease, compRmsSize, compMakeupGain, panValue, stereoWidth, reverbMix, reverbTime, useOversample, loudnessNormalization, masterFftSize = 2048, stereoFftSize = 1024, audioLatencyHint = 'playback', fxEnabled, audioIsStereo = true, isAuthenticated } = effectsState;
+  const { eqBands: rawEqBands, isParametricPreset, preampGain, bassGain, trebleGain, compThreshold, compRatio, compKnee, compAttack, compRelease, compRmsSize, compMakeupGain, panValue, stereoWidth, reverbMix, reverbTime, useOversample, loudnessNormalization, masterFftSize = 2048, stereoFftSize = 1024, eqBlockSize = 4096, audioLatencyHint = 'playback', fxEnabled, audioIsStereo = true, isAuthenticated } = effectsState;
   const [audioSampleRate, setAudioSampleRate] = useState(44100);
 
   // Audio Context and Core Nodes
@@ -518,7 +518,7 @@ export function useAudioContext(effectsState: any) {
         if (!eqConvolverRef.current) eqConvolverRef.current = ctx.createConvolver();
         eqConvolverRef.current.normalize = false; // Important: Do not normalize EQ impulse response!
 
-        const ir = generateGraphicEqImpulseResponse(rawEqBands, ctx.sampleRate, 4096);
+        const ir = generateGraphicEqImpulseResponse(rawEqBands, ctx.sampleRate, eqBlockSize);
         const buffer = ctx.createBuffer(2, ir.length, ctx.sampleRate);
         buffer.copyToChannel(ir as any, 0);
         buffer.copyToChannel(ir as any, 1);
@@ -971,7 +971,7 @@ export function useAudioContext(effectsState: any) {
         const audioCtx = audioContextRef.current;
         timeoutId = window.setTimeout(() => {
           if (!eqConvolverRef.current || !audioCtx) return;
-          const ir = generateGraphicEqImpulseResponse(rawEqBands, audioCtx.sampleRate, 4096);
+          const ir = generateGraphicEqImpulseResponse(rawEqBands, audioCtx.sampleRate, eqBlockSize);
           const buffer = audioCtx.createBuffer(2, ir.length, audioCtx.sampleRate);
           // eslint-disable-next-line @typescript-eslint/no-explicit-any
           buffer.copyToChannel(ir as any, 0);
@@ -981,8 +981,8 @@ export function useAudioContext(effectsState: any) {
         }, 50);
       } else {
         // Bypassed: Impulse response is just a single pulse at N/2
-        const ir = new Float32Array(4096);
-        ir[2048] = 1.0;
+        const ir = new Float32Array(eqBlockSize);
+        ir[Math.floor(eqBlockSize / 2)] = 1.0;
         const buffer = audioContextRef.current.createBuffer(2, ir.length, audioContextRef.current.sampleRate);
         buffer.copyToChannel(ir, 0);
         buffer.copyToChannel(ir, 1);

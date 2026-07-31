@@ -72,6 +72,7 @@ export const renderOfflineAudio = async ({
     stereoWidth,
     panValue,
     loudnessNormalization,
+    eqBlockSize,
   } = params;
 
   let autoPreamp = 0;
@@ -163,7 +164,7 @@ export const renderOfflineAudio = async ({
     if (!isParametricPreset && eqBands && eqBands.length > 0) {
       const convolver = offlineCtx.createConvolver();
       convolver.normalize = false;
-      const ir = generateGraphicEqImpulseResponse(eqBands, offlineCtx.sampleRate, 4096);
+      const ir = generateGraphicEqImpulseResponse(eqBands, offlineCtx.sampleRate, eqBlockSize);
       const buffer = offlineCtx.createBuffer(2, ir.length, offlineCtx.sampleRate);
       buffer.copyToChannel(ir as any, 0);
       buffer.copyToChannel(ir as any, 1);

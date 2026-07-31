@@ -18,6 +18,7 @@ export type AudioRenderParams = {
   panValue: number;
   useOversample: boolean;
   loudnessNormalization: boolean;
+  eqBlockSize: number;
 };
 
 export type FxEnabledFlags = Partial<Record<
@@ -40,6 +41,7 @@ export const createRenderSignature = (
     limiter: Boolean(enabled.limiter),
     interpolate: Boolean(enabled.interpolate),
   },
+  eqBlockSize: params.eqBlockSize,
   preampGain: params.preampGain,
   eqBands: Array.isArray(params.eqBands)
     ? params.eqBands.map((band: EqBand) => ({

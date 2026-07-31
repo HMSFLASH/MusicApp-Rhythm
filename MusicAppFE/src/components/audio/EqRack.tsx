@@ -7,6 +7,7 @@ import type { CustomEqPreset, EqBand } from '../../hooks/audioTypes';
 import { useGlobalAudio } from '../../context/AudioContext';
 import { useTranslation } from 'react-i18next';
 import { EffectPowerButton } from './AudioEffectPanel';
+import { AudioSelectRow } from './AudioSelectRow';
 import { NumberInput } from '../NumberInput';
 import { createEqResponseChartData, type EqResponsePoint } from '../../hooks/audioEqResponse';
 
@@ -602,6 +603,25 @@ export function EqRack() {
           </div>
         </div>
       </div>
+
+      {!isParametricPreset && (
+        <div className="px-4 pb-4 mt-2">
+          <AudioSelectRow<number>
+            title={t('studio.eq.blockSizeTitle', 'Chất lượng xử lý EQ (Block Size)')}
+            description={t('studio.eq.blockSizeDesc', 'Quyết định độ chính xác của EQ (nhất là ở âm trầm). Tăng lên để âm thanh mượt mà và chính xác hơn, giảm xuống (512 - 1024) nếu máy yếu để tiết kiệm CPU và tránh giật tiếng.')}
+            value={playerState.eqBlockSize || 4096}
+            options={[
+              { label: t('studio.eq.blockSize512', '512 (Thấp / Rất nhẹ CPU)'), value: 512 },
+              { label: t('studio.eq.blockSize1024', '1024 (Trung bình)'), value: 1024 },
+              { label: t('studio.eq.blockSize2048', '2048 (Khá)'), value: 2048 },
+              { label: t('studio.eq.blockSize4096', '4096 (Chất lượng cao)'), value: 4096 },
+              { label: t('studio.eq.blockSize8192', '8192 (Rất cao / Nặng CPU)'), value: 8192 },
+              { label: t('studio.eq.blockSize16384', '16384 (Tối đa / Cực nặng)'), value: 16384 },
+            ]}
+            onChange={(val) => playerState.updateEqBlockSize(val)}
+          />
+        </div>
+      )}
 
       {showEqInfo && (
         <EqResponseModal
