@@ -2,6 +2,7 @@ import { HorizontalSlider } from '../HorizontalSlider';
 import { useGlobalAudio } from '../../context/AudioContext';
 import { useTranslation } from 'react-i18next';
 import { AudioEffectPanel, EffectControlsGate, EffectPowerButton } from './AudioEffectPanel';
+import { AudioSelectRow } from './AudioSelectRow';
 import { STEREO_WIDTH_MAX_PERCENT } from '../../hooks/audioMath';
 import { reverbWetGain } from '../../hooks/audioGraph';
 
@@ -45,6 +46,16 @@ function SpatialSignalRouting({
 export function SpatialEffects() {
   const { playerState } = useGlobalAudio();
   const { t } = useTranslation();
+
+  const stereoFftOptions = [
+    { label: t('studio.spatial.fft256', '256 (Siêu thấp / Cực nhẹ)'), value: 256 },
+    { label: t('studio.spatial.fft512', '512 (Thấp / Nhẹ)'), value: 512 },
+    { label: t('studio.spatial.fft1024', '1024 (Tối ưu khuyên dùng)'), value: 1024 },
+    { label: t('studio.spatial.fft2048', '2048 (Trung bình)'), value: 2048 },
+    { label: t('studio.spatial.fft4096', '4096 (Cao)'), value: 4096 },
+    { label: t('studio.spatial.fft8192', '8192 (Rất cao / Nặng CPU)'), value: 8192 },
+    { label: t('studio.spatial.fft16384', '16384 (Tối đa / Cực nặng)'), value: 16384 },
+  ];
 
   return (
     <div className="flex flex-col gap-8 w-full">
@@ -110,7 +121,7 @@ export function SpatialEffects() {
           />
         )}
       >
-        <EffectControlsGate active={playerState.fxEnabled.stereo}>
+        <EffectControlsGate active={playerState.fxEnabled.stereo} className="flex flex-col gap-6">
           <HorizontalSlider
             value={playerState.stereoWidth}
             min={0}
@@ -120,6 +131,13 @@ export function SpatialEffects() {
             label={t('studio.spatial.stereoWidth', 'Stereo Width')}
             color="#9d00ff"
             unit="%"
+          />
+          <AudioSelectRow
+            title={t('studio.spatial.stereoFftTitle', 'Độ phân giải phân tích Stereo (FFT Size)')}
+            description={t('studio.spatial.stereoFftDesc', 'Tần số lấy mẫu phân tích tương quan kênh L/R. Mặc định 1024 cho độ mượt cao, có thể chỉnh lên 16384 hoặc giảm xuống 256.')}
+            value={playerState.stereoFftSize || 1024}
+            options={stereoFftOptions}
+            onChange={playerState.updateStereoFftSize}
           />
         </EffectControlsGate>
       </AudioEffectPanel>

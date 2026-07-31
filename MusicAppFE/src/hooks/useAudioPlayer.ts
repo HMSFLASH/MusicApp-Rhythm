@@ -173,6 +173,8 @@ export function useAudioPlayer(
       useOversample: effectsState.useOversample,
       precalculateOnIdle: effectsState.precalculateOnIdle,
       fullQueueCacheEnabled: effectsState.fullQueueCacheEnabled,
+      masterFftSize: effectsState.masterFftSize,
+      stereoFftSize: effectsState.stereoFftSize,
       fxEnabled: effectsState.fxEnabled
     };
     
@@ -192,7 +194,7 @@ export function useAudioPlayer(
     effectsState.compAttack, effectsState.compRelease, effectsState.compRmsSize, effectsState.compMakeupGain,
     effectsState.panValue, effectsState.stereoWidth, effectsState.reverbMix, effectsState.reverbTime,
     effectsState.loudnessNormalization, effectsState.useOversample, effectsState.precalculateOnIdle,
-    effectsState.fullQueueCacheEnabled, effectsState.fxEnabled
+    effectsState.fullQueueCacheEnabled, effectsState.masterFftSize, effectsState.stereoFftSize, effectsState.fxEnabled
   ]);
 
   return {

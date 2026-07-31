@@ -51,7 +51,7 @@ const disconnectNode = (node: AudioNode | null) => {
 
 // eslint-disable-next-line @typescript-eslint/no-explicit-any
 export function useAudioContext(effectsState: any) {
-  const { eqBands: rawEqBands, isParametricPreset, preampGain, bassGain, trebleGain, compThreshold, compRatio, compKnee, compAttack, compRelease, compRmsSize, compMakeupGain, panValue, stereoWidth, reverbMix, reverbTime, useOversample, loudnessNormalization, fxEnabled, audioIsStereo = true, isAuthenticated } = effectsState;
+  const { eqBands: rawEqBands, isParametricPreset, preampGain, bassGain, trebleGain, compThreshold, compRatio, compKnee, compAttack, compRelease, compRmsSize, compMakeupGain, panValue, stereoWidth, reverbMix, reverbTime, useOversample, loudnessNormalization, masterFftSize = 2048, stereoFftSize = 1024, fxEnabled, audioIsStereo = true, isAuthenticated } = effectsState;
   const [audioSampleRate, setAudioSampleRate] = useState(44100);
 
   // Audio Context and Core Nodes
@@ -189,8 +189,9 @@ export function useAudioContext(effectsState: any) {
     const splitter = ctx.createChannelSplitter(2);
     const leftAnalyser = ctx.createAnalyser();
     const rightAnalyser = ctx.createAnalyser();
-    leftAnalyser.fftSize = 2048;
-    rightAnalyser.fftSize = 2048;
+    const targetFftSize = stereoFftSize || 1024;
+    leftAnalyser.fftSize = targetFftSize;
+    rightAnalyser.fftSize = targetFftSize;
 
     const leftData = new Float32Array(leftAnalyser.fftSize);
     const rightData = new Float32Array(rightAnalyser.fftSize);
@@ -217,7 +218,7 @@ export function useAudioContext(effectsState: any) {
 
     updatePseudoStereo();
     stereoAnalysisIntervalRef.current = window.setInterval(updatePseudoStereo, 500);
-  }, [stopStereoNearMonoAnalysis]);
+  }, [stopStereoNearMonoAnalysis, stereoFftSize]);
 
   const applyCompressorParams = useCallback((compressor: DynamicsCompressorNode, makeup: GainNode) => {
     if (fxEnabled.comp) {
@@ -837,9 +838,9 @@ export function useAudioContext(effectsState: any) {
 
     if (!masterAnalyserRef.current) {
       masterAnalyserRef.current = ctx.createAnalyser();
-      masterAnalyserRef.current.fftSize = 4096;
       masterAnalyserRef.current.smoothingTimeConstant = 0.4;
     }
+    masterAnalyserRef.current.fftSize = masterFftSize || 2048;
     masterAnalyserRef.current.minDecibels = -130;
     masterAnalyserRef.current.maxDecibels = -10;
 
@@ -1034,6 +1035,16 @@ export function useAudioContext(effectsState: any) {
       panNodeRef.current.pan.value = fxEnabled.master ? percentToPan(panValue) : 0;
     }
   }, [panValue, fxEnabled.master]);
+
+  useEffect(() => {
+    if (masterAnalyserRef.current) {
+      try {
+        masterAnalyserRef.current.fftSize = masterFftSize || 2048;
+      } catch {
+        // Ignore invalid FFT size error if fallback needed
+      }
+    }
+  }, [masterFftSize]);
 
   const prevLimiterDepsRef = useRef({ limiter: fxEnabled.limiter, oversample: useOversample });
   useEffect(() => {

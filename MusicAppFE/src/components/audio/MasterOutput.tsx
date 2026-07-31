@@ -2,12 +2,23 @@ import { HorizontalSlider } from '../HorizontalSlider';
 import { useGlobalAudio } from '../../context/AudioContext';
 import { useTranslation } from 'react-i18next';
 import { AudioToggleRow } from './AudioToggleRow';
+import { AudioSelectRow } from './AudioSelectRow';
 import { QueuePrecalculatePanel } from './QueuePrecalculatePanel';
 import { AudioEffectPanel, EffectControlsGate, EffectPowerButton } from './AudioEffectPanel';
 
 export function MasterOutput() {
   const { playerState } = useGlobalAudio();
   const { t } = useTranslation();
+
+  const fftSizeOptions = [
+    { label: t('studio.masterOutput.fft256', '256 (Siêu thấp / Cực nhẹ)'), value: 256 },
+    { label: t('studio.masterOutput.fft512', '512 (Thấp / Nhẹ CPU)'), value: 512 },
+    { label: t('studio.masterOutput.fft1024', '1024 (Trung bình)'), value: 1024 },
+    { label: t('studio.masterOutput.fft2048', '2048 (Tối ưu khuyên dùng)'), value: 2048 },
+    { label: t('studio.masterOutput.fft4096', '4096 (Chất lượng cao)'), value: 4096 },
+    { label: t('studio.masterOutput.fft8192', '8192 (Rất cao / Nặng CPU)'), value: 8192 },
+    { label: t('studio.masterOutput.fft16384', '16384 (Tối đa / Cực nặng)'), value: 16384 },
+  ];
 
   return (
     <AudioEffectPanel
@@ -33,6 +44,14 @@ export function MasterOutput() {
           unit="%"
         />
       </EffectControlsGate>
+
+      <AudioSelectRow
+        title={t('studio.masterOutput.analyserFftTitle', 'Độ phân giải Master Analyser (FFT Size)')}
+        description={t('studio.masterOutput.analyserFftDesc', 'Tăng lên đến 16384 cho đồ thị tần số mịn nét hơn, hoặc giảm xuống (256 - 1024) để tiết kiệm CPU khi phát nhạc.')}
+        value={playerState.masterFftSize || 2048}
+        options={fftSizeOptions}
+        onChange={playerState.updateMasterFftSize}
+      />
 
       <AudioToggleRow
         title={t('studio.masterOutput.loudnessNorm', 'Loudness Normalization')}

@@ -28,6 +28,8 @@ type SavedAudioEffectsState = Partial<{
   useOversample: boolean;
   precalculateOnIdle: boolean;
   fullQueueCacheEnabled: boolean;
+  masterFftSize: number;
+  stereoFftSize: number;
   fxEnabled: Partial<FxEnabledState>;
 }>;
 
@@ -202,6 +204,8 @@ export function useAudioEffectsState(savedState: SavedAudioEffectsState = {}) {
   const [useOversample, setUseOversample] = useState<boolean>(savedState.useOversample ?? false);
   const [precalculateOnIdle, setPrecalculateOnIdle] = useState<boolean>(savedState.precalculateOnIdle ?? false);
   const [fullQueueCacheEnabled, setFullQueueCacheEnabled] = useState<boolean>(savedState.fullQueueCacheEnabled ?? false);
+  const [masterFftSize, setMasterFftSize] = useState<number>(savedState.masterFftSize ?? 2048);
+  const [stereoFftSize, setStereoFftSize] = useState<number>(savedState.stereoFftSize ?? 1024);
 
   const initialFxEnabled: FxEnabledState = {
     ...DEFAULT_FX_ENABLED,
@@ -392,6 +396,8 @@ export function useAudioEffectsState(savedState: SavedAudioEffectsState = {}) {
     useOversample, setUseOversample,
     precalculateOnIdle, setPrecalculateOnIdle,
     fullQueueCacheEnabled, setFullQueueCacheEnabled,
+    masterFftSize, setMasterFftSize, updateMasterFftSize: setMasterFftSize,
+    stereoFftSize, setStereoFftSize, updateStereoFftSize: setStereoFftSize,
     fxEnabled, setFxEnabled, toggleFx, fxEnabledRef,
     applyPreset, applyStylisticPreset, setCustomPreset, setParametricPreset,
     saveCustomPreset, applyCustomSavedPreset, renameCustomPreset, deleteCustomPreset,
