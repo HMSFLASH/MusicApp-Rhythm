@@ -58,6 +58,15 @@
       "precalcIdleDesc": "Dành cho CPU yếu nhưng còn đủ RAM: render từng bài trước khi phát để hiệu ứng nặng không phải chạy realtime. Chế độ thường này chỉ xử lý từng bài, không xử lý cả hàng chờ. Thay đổi EQ/Hiệu ứng có tác dụng ở bài tiếp theo.",
       "fullQueueCache": "Full Queue RAM Cache",
       "fullQueueCacheDesc": "Giữ toàn bộ buffer đã render của cả hàng chờ trong RAM và mở công cụ tính toán trước toàn bộ hàng chờ. Cho phép phát ngay bất kỳ bài nào đã render, nhưng sẽ tiêu tốn rất nhiều RAM.",
+      "analyserFftTitle": "Độ phân giải Master Analyser (FFT Size)",
+      "analyserFftDesc": "Tăng lên đến 16384 cho đồ thị tần số mịn nét hơn, hoặc giảm xuống (256 - 1024) để tiết kiệm CPU khi phát nhạc.",
+      "fft256": "256 (Siêu thấp / Cực nhẹ)",
+      "fft512": "512 (Thấp / Nhẹ CPU)",
+      "fft1024": "1024 (Trung bình)",
+      "fft2048": "2048 (Tối ưu khuyên dùng)",
+      "fft4096": "4096 (Chất lượng cao)",
+      "fft8192": "8192 (Rất cao / Nặng CPU)",
+      "fft16384": "16384 (Tối đa / Cực nặng)",
       "enableFullQueueFirst": "Bật Full Queue RAM Cache trước",
       "queuePrecalcTitle": "Tính toán trước toàn bộ hàng chờ",
       "queuePrecalcDesc": "Phát hiện {{cores}} nhân CPU. Đề xuất: {{workers}} worker. Tối đa: {{maxWorkers}} worker.",
@@ -106,6 +115,8 @@
       "limiterDesc": "Bắt các peak cuối chuỗi sau soft clip, giảm rè/nổ khi EQ, preamp hoặc hiệu ứng làm âm lượng tăng cao. Khuyến nghị luôn bật nếu CPU đủ mạnh."
     },
     "spatial": {
+      "routingTitle": "Cân Bằng Tín Hiệu Không Gian",
+      "routingDesc": "Tổng trường không gian đã tính toán",
       "reverbTitle": "Hiệu Ứng Vang (Reverb)",
       "reverbDesc": "Thêm không gian và độ sâu bằng Convolution Reverb.",
       "reverbMix": "Tỉ Lệ Vang (Mix)",
@@ -114,7 +125,16 @@
       "stereoDesc": "Mở rộng âm thanh nổi bằng xử lý Mid/Side. 100% là mặc định, tối đa 200% là rất rộng.",
       "stereoWidth": "Độ Rộng (Width)",
       "dryLabel": "Dry (Mid)",
-      "wetLabel": "Wet (Side)"
+      "wetLabel": "Wet (Side)",
+      "stereoFftTitle": "Độ phân giải phân tích Stereo (FFT Size)",
+      "stereoFftDesc": "Tần số lấy mẫu phân tích tương quan kênh L/R. Mặc định 1024 cho độ mượt cao, có thể chỉnh lên 16384 hoặc giảm xuống 256.",
+      "fft256": "256 (Siêu thấp / Cực nhẹ)",
+      "fft512": "512 (Thấp / Nhẹ)",
+      "fft1024": "1024 (Tối ưu khuyên dùng)",
+      "fft2048": "2048 (Trung bình)",
+      "fft4096": "4096 (Cao)",
+      "fft8192": "8192 (Rất cao / Nặng CPU)",
+      "fft16384": "16384 (Tối đa / Cực nặng)"
     }
   },
   "player": {

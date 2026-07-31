@@ -58,6 +58,15 @@
       "precalcIdleDesc": "For weak CPUs with enough RAM: renders each track before playback so heavy effects do not have to run in real time. This normal mode handles one track at a time, not the whole queue. EQ/Effects changes apply on the next track.",
       "fullQueueCache": "Full Queue RAM Cache",
       "fullQueueCacheDesc": "Keep precalculated audio buffers for the entire queue in RAM and unlock full-queue pre-calculation. Allows instant playback of any rendered track, but consumes significantly more memory.",
+      "analyserFftTitle": "Master Analyser Resolution (FFT Size)",
+      "analyserFftDesc": "Increase up to 16384 for a smoother spectrum display, or decrease (256 - 1024) to save CPU during playback.",
+      "fft256": "256 (Ultra Low / Lightest)",
+      "fft512": "512 (Low / Light CPU)",
+      "fft1024": "1024 (Medium)",
+      "fft2048": "2048 (Optimal Recommended)",
+      "fft4096": "4096 (High Quality)",
+      "fft8192": "8192 (Very High / Heavy CPU)",
+      "fft16384": "16384 (Maximum / Very Heavy)",
       "enableFullQueueFirst": "Enable Full Queue RAM Cache First",
       "queuePrecalcTitle": "Full Queue Pre-calculate",
       "queuePrecalcDesc": "Detected {{cores}} CPU cores. Recommended: {{workers}} workers. Max: {{maxWorkers}} workers.",
@@ -106,6 +115,8 @@
       "limiterDesc": "Catches final output peaks after soft clipping, reducing crackling when EQ, preamp, or effects raise the level. Recommended to leave on if CPU is powerful enough."
     },
     "spatial": {
+      "routingTitle": "Spatial Output Balance",
+      "routingDesc": "Total calculated spatial field",
       "reverbTitle": "Reverb FX",
       "reverbDesc": "Add space and depth using Convolution Reverb.",
       "reverbMix": "Reverb Mix",
@@ -114,7 +125,16 @@
       "stereoDesc": "Widen your stereo image using Mid/Side processing. 100% is normal, up to 200% is extra wide.",
       "stereoWidth": "Stereo Width",
       "dryLabel": "Dry (Mid)",
-      "wetLabel": "Wet (Side)"
+      "wetLabel": "Wet (Side)",
+      "stereoFftTitle": "Stereo Analysis Resolution (FFT Size)",
+      "stereoFftDesc": "Sampling resolution for L/R channel correlation analysis. Default 1024 for high smoothness, can be adjusted up to 16384 or down to 256.",
+      "fft256": "256 (Ultra Low / Lightest)",
+      "fft512": "512 (Low / Light)",
+      "fft1024": "1024 (Optimal Recommended)",
+      "fft2048": "2048 (Medium)",
+      "fft4096": "4096 (High)",
+      "fft8192": "8192 (Very High / Heavy CPU)",
+      "fft16384": "16384 (Maximum / Very Heavy)"
     }
   },
   "player": {
