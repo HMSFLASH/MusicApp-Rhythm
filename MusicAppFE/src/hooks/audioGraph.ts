@@ -1,3 +1,5 @@
+import { getSecureRandom } from '../utils/randomUtils';
+
 import {
   clamp,
   percentToPseudoStereoAmount,
@@ -306,7 +308,7 @@ export const generateImpulseResponse = (ctx: BaseAudioContext, duration: number,
       const cutoff = 12000 - progress * 8000;
       const alpha = 1 - Math.exp((-2 * Math.PI * cutoff) / sampleRate);
 
-      const noise = Math.random() * 2 - 1;
+      const noise = getSecureRandom() * 2 - 1;
       last = last + alpha * (noise - last);
 
       // Apply T60 envelope and base decay modifier

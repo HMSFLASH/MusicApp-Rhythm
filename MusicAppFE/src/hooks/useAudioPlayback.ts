@@ -1,3 +1,4 @@
+import { getSecureRandom } from '../utils/randomUtils';
 import { useState, useRef, useEffect, useCallback } from 'react';
 import { useTranslation } from 'react-i18next';
 import type { Track } from './audioTypes';
@@ -56,7 +57,7 @@ const getMusicImageTrackId = (src: string) => {
   if (!src) return null;
 
   try {
-    const url = new URL(src, window.location.origin);
+    const url = new URL(src, globalThis.location.origin);
     const match = url.pathname.match(/^\/api\/music\/([^/]+)\/image$/);
     return match ? decodeURIComponent(match[1]) : null;
   } catch {
@@ -67,9 +68,14 @@ const getMusicImageTrackId = (src: string) => {
 
 const withoutBackendImageUrl = (track: Track): Track => {
   if (!track.imageUrl || !getMusicImageTrackId(track.imageUrl)) return track;
-  const { imageUrl: _imageUrl, ...rest } = track;
+  const rest = { ...track };
+  delete rest.imageUrl;
   return rest;
 };
+
+interface ElementWithSinkId {
+  setSinkId?: (sinkId: string) => Promise<void>;
+}
 
 export function useAudioPlayback(
   isAuthenticated: boolean,
@@ -207,7 +213,7 @@ export function useAudioPlayback(
          }
       } else {
          if (networkRetryIntervalRef.current) {
-            window.clearInterval(networkRetryIntervalRef.current);
+            globalThis.clearInterval(networkRetryIntervalRef.current);
             networkRetryIntervalRef.current = null;
          }
       }
@@ -216,7 +222,7 @@ export function useAudioPlayback(
 
   const handleNetworkFailure = useCallback((track: Track) => {
      pendingNetworkRetryTrackRef.current = track;
-           window.dispatchEvent(new CustomEvent('app-notification', {
+           globalThis.dispatchEvent(new CustomEvent('app-notification', {
               detail: { type: 'error', message: t('network.offline') }
            }));
      startNetworkRetryTimer();
@@ -226,7 +232,7 @@ export function useAudioPlayback(
     const handleOffline = () => {
        wasOfflineRef.current = true;
        if (isLoadingTrackSnapshotRef.current) {
-           window.dispatchEvent(new CustomEvent('app-notification', {
+           globalThis.dispatchEvent(new CustomEvent('app-notification', {
               detail: { type: 'error', message: t('network.offlineDuringLoad') }
            }));
           if (currentTrackSnapshotRef.current) {
@@ -239,7 +245,7 @@ export function useAudioPlayback(
     const handleOnline = () => {
        if (wasOfflineRef.current) {
           wasOfflineRef.current = false;
-           window.dispatchEvent(new CustomEvent('app-notification', {
+           globalThis.dispatchEvent(new CustomEvent('app-notification', {
               detail: { type: 'success', message: t('network.reconnected') }
            }));
        }
@@ -249,11 +255,11 @@ export function useAudioPlayback(
        }
     };
 
-    window.addEventListener('offline', handleOffline);
-    window.addEventListener('online', handleOnline);
+    globalThis.addEventListener('offline', handleOffline);
+    globalThis.addEventListener('online', handleOnline);
     return () => {
-      window.removeEventListener('offline', handleOffline);
-      window.removeEventListener('online', handleOnline);
+      globalThis.removeEventListener('offline', handleOffline);
+      globalThis.removeEventListener('online', handleOnline);
     };
   }, [startNetworkRetryTimer, t]);
 
@@ -295,7 +301,7 @@ export function useAudioPlayback(
   }, [resolveTrustedNativeDuration, setCurrentTrack, setQueue]);
 
   const stopQueuePrecalculateStatusSoon = useCallback(() => {
-    window.setTimeout(() => {
+    globalThis.setTimeout(() => {
       setQueuePrecalculateStatus((previous) => (
         previous.isRunning ? { ...previous, isRunning: false } : previous
       ));
@@ -303,7 +309,7 @@ export function useAudioPlayback(
   }, []);
 
   const resetQueuePrecalculateStatusSoon = useCallback(() => {
-    window.setTimeout(() => {
+    globalThis.setTimeout(() => {
       failedTrackIdsRef.current = [];
       setQueuePrecalculateStatus({ isRunning: false, total: 0, completed: 0, failed: 0, cores: 0, failedTrackIds: [] });
     }, 0);
@@ -329,7 +335,7 @@ export function useAudioPlayback(
 
   const createDecodeContext = useCallback(() => {
     // eslint-disable-next-line @typescript-eslint/no-explicit-any
-    const OfflineAudioContextCtor = window.OfflineAudioContext || (window as any).webkitOfflineAudioContext;
+    const OfflineAudioContextCtor = globalThis.OfflineAudioContext || (window as any).webkitOfflineAudioContext;
     return new OfflineAudioContextCtor(1, 1, 44100) as OfflineAudioContext;
   }, []);
 
@@ -426,8 +432,9 @@ export function useAudioPlayback(
       audioRef.current.crossOrigin = "use-credentials";
       audioRef.current.volume = savedState.volume ?? 1;
 
-      if (savedState.sinkId && typeof (audioRef.current as any).setSinkId === 'function') {
-        (audioRef.current as any).setSinkId(savedState.sinkId).catch((e: any) => console.warn('Failed to restore HTMLAudioElement sinkId', e));
+      const audioElem = audioRef.current as unknown as ElementWithSinkId;
+      if (savedState.sinkId && typeof audioElem.setSinkId === 'function') {
+        audioElem.setSinkId(savedState.sinkId).catch((e: unknown) => console.warn('Failed to restore HTMLAudioElement sinkId', e));
       }
 
       audioRef.current.addEventListener('timeupdate', () => {
@@ -477,8 +484,9 @@ export function useAudioPlayback(
       const renderedAudio = new Audio();
       renderedAudio.volume = savedState.volume ?? 1;
       renderedAudio.preload = 'auto';
-      if (savedState.sinkId && typeof (renderedAudio as any).setSinkId === 'function') {
-        (renderedAudio as any).setSinkId(savedState.sinkId).catch((e: any) => console.warn('Failed to restore rendered HTMLAudioElement sinkId', e));
+      const renderedElem = renderedAudio as unknown as ElementWithSinkId;
+      if (savedState.sinkId && typeof renderedElem.setSinkId === 'function') {
+        renderedElem.setSinkId(savedState.sinkId).catch((e: unknown) => console.warn('Failed to restore rendered HTMLAudioElement sinkId', e));
       }
       renderedAudioRef.current = renderedAudio;
 
@@ -710,7 +718,7 @@ export function useAudioPlayback(
           String(item.id) === String(track.id) ? { ...item, playCount } : item
         )));
       }
-      window.dispatchEvent(new CustomEvent('music-play-counted', {
+      globalThis.dispatchEvent(new CustomEvent('music-play-counted', {
         detail: { trackId: String(track.id), playCount: updatedTrack.playCount }
       }));
     } catch (error) {
@@ -726,7 +734,7 @@ export function useAudioPlayback(
   }, [audioContextRef, bufferVolumeNodeRef]);
 
   const startBufferProgressTimer = useCallback(() => {
-    if (rafRef.current) window.clearInterval(rafRef.current);
+    if (rafRef.current) globalThis.clearInterval(rafRef.current);
 
     const updateTime = () => {
       if (document.hidden) return;
@@ -763,7 +771,7 @@ export function useAudioPlayback(
     }
 
     if (rafRef.current) {
-      window.clearInterval(rafRef.current);
+      globalThis.clearInterval(rafRef.current);
       rafRef.current = null;
     }
 
@@ -1657,7 +1665,7 @@ export function useAudioPlayback(
             clearTrackLoading();
             pendingNetworkRetryTrackRef.current = null;
             if (networkRetryIntervalRef.current) {
-               window.clearInterval(networkRetryIntervalRef.current);
+               globalThis.clearInterval(networkRetryIntervalRef.current);
                networkRetryIntervalRef.current = null;
             }
             try {
@@ -1801,7 +1809,7 @@ export function useAudioPlayback(
       if (autoPlay) {
         pendingNetworkRetryTrackRef.current = null;
         if (networkRetryIntervalRef.current) {
-           window.clearInterval(networkRetryIntervalRef.current);
+           globalThis.clearInterval(networkRetryIntervalRef.current);
            networkRetryIntervalRef.current = null;
         }
         try {
@@ -1851,7 +1859,7 @@ export function useAudioPlayback(
   useEffect(() => {
     const persistLoadedBackendImage = async (trackId: string, src: string) => {
       try {
-        const fetchUrl = new URL(src, BACKEND_URL || window.location.origin).toString();
+        const fetchUrl = new URL(src, BACKEND_URL || globalThis.location.origin).toString();
         const response = await fetch(fetchUrl, { credentials: 'include' });
         if (!response.ok) throw new Error(`HTTP ${response.status}`);
 
@@ -1903,11 +1911,11 @@ export function useAudioPlayback(
       void metadataState.refreshMissingTrackCover?.(withoutBackendImageUrl(activeTrack));
     };
 
-    window.addEventListener('load', handleImageLoad, true);
-    window.addEventListener('error', handleImageLoadError, true);
+    globalThis.addEventListener('load', handleImageLoad, true);
+    globalThis.addEventListener('error', handleImageLoadError, true);
     return () => {
-      window.removeEventListener('load', handleImageLoad, true);
-      window.removeEventListener('error', handleImageLoadError, true);
+      globalThis.removeEventListener('load', handleImageLoad, true);
+      globalThis.removeEventListener('error', handleImageLoadError, true);
     };
   }, []);
 
@@ -1945,7 +1953,6 @@ export function useAudioPlayback(
       } else if (audioRef.current) {
         audioRef.current.pause();
         audioRef.current.currentTime = 0;
-        setIsPlaying(false);
       }
       return;
     }
@@ -1964,7 +1971,7 @@ export function useAudioPlayback(
         // eslint-disable-next-line prefer-const
         let newQueue = [...activeQueue];
         for (let i = newQueue.length - 1; i > 0; i--) {
-          const j = Math.floor(Math.random() * (i + 1));
+          const j = Math.floor(getSecureRandom() * (i + 1));
           [newQueue[i], newQueue[j]] = [newQueue[j], newQueue[i]];
         }
         latestPlayTrack(newQueue[0], newQueue, !isPreload);
@@ -2029,7 +2036,7 @@ export function useAudioPlayback(
     } else {
       if ((precalculateOnIdle || usingBufferPlaybackRef.current) && (renderedAudioUrlRef.current || audioBufferRef.current)) {
         playCurrentBuffer(bufferPausedTimeRef.current);
-      } else if (!precalculateOnIdle && (!audioRef.current.src || audioRef.current.src === window.location.href || audioRef.current.src.endsWith('/'))) {
+      } else if (!precalculateOnIdle && (!audioRef.current.src || audioRef.current.src === globalThis.location.href || audioRef.current.src.endsWith('/'))) {
         if (currentTrack) {
           playTrack(currentTrack, queue, true);
         }
@@ -2186,11 +2193,11 @@ export function useAudioPlayback(
       }
     };
 
-    window.addEventListener('music-deleted', handleMusicDeleted);
-    window.addEventListener('music-library-refreshed', handleLibraryRefreshed);
+    globalThis.addEventListener('music-deleted', handleMusicDeleted);
+    globalThis.addEventListener('music-library-refreshed', handleLibraryRefreshed);
     return () => {
-      window.removeEventListener('music-deleted', handleMusicDeleted);
-      window.removeEventListener('music-library-refreshed', handleLibraryRefreshed);
+      globalThis.removeEventListener('music-deleted', handleMusicDeleted);
+      globalThis.removeEventListener('music-library-refreshed', handleLibraryRefreshed);
     };
   }, [
     blobCacheRef,
@@ -2240,9 +2247,9 @@ export function useAudioPlayback(
       let successCount = 0;
       
       try {
-        if (audioRef.current && typeof (audioRef.current as any).setSinkId === 'function') {
-          // eslint-disable-next-line @typescript-eslint/no-explicit-any
-          await (audioRef.current as any).setSinkId(deviceId);
+        const audioElem = audioRef.current as unknown as ElementWithSinkId | null;
+        if (audioElem && typeof audioElem.setSinkId === 'function') {
+          await audioElem.setSinkId(deviceId);
           successCount++;
         }
       } catch (e) {
@@ -2250,9 +2257,9 @@ export function useAudioPlayback(
       }
 
       try {
-        if (renderedAudioRef.current && typeof (renderedAudioRef.current as any).setSinkId === 'function') {
-          // eslint-disable-next-line @typescript-eslint/no-explicit-any
-          await (renderedAudioRef.current as any).setSinkId(deviceId);
+        const renderedElem = renderedAudioRef.current as unknown as ElementWithSinkId | null;
+        if (renderedElem && typeof renderedElem.setSinkId === 'function') {
+          await renderedElem.setSinkId(deviceId);
           successCount++;
         }
       } catch (e) {
@@ -2260,9 +2267,9 @@ export function useAudioPlayback(
       }
 
       try {
-        if (audioContextRef.current && typeof (audioContextRef.current as any).setSinkId === 'function') {
-          // eslint-disable-next-line @typescript-eslint/no-explicit-any
-          await (audioContextRef.current as any).setSinkId(deviceId);
+        const ctxElem = audioContextRef.current as unknown as ElementWithSinkId | null;
+        if (ctxElem && typeof ctxElem.setSinkId === 'function') {
+          await ctxElem.setSinkId(deviceId);
           successCount++;
         } else if (audioContextRef.current) {
           console.warn('AudioContext does not support setSinkId in this browser');
@@ -2272,7 +2279,7 @@ export function useAudioPlayback(
       }
 
       if (successCount === 0) {
-        window.dispatchEvent(new CustomEvent('app-notification', {
+        globalThis.dispatchEvent(new CustomEvent('app-notification', {
           detail: { type: 'error', message: 'Trình duyệt không hỗ trợ đổi thiết bị phát hoặc có lỗi xảy ra.' }
         }));
       } else {

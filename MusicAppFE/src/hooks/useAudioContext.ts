@@ -1,5 +1,5 @@
 import { useRef, useEffect, useCallback, useState } from 'react';
-import { expandResonantEqBands } from './audioTypes';
+import { expandResonantEqBands, type EqBand } from './audioTypes';
 import { generateGraphicEqImpulseResponse } from './firFilterGenerator';
 import {
   applyCustomDynamicsCompressorSettings,
@@ -137,7 +137,7 @@ export function useAudioContext(effectsState: any) {
 
   const stopStereoNearMonoAnalysis = useCallback(() => {
     if (stereoAnalysisIntervalRef.current != null) {
-      window.clearInterval(stereoAnalysisIntervalRef.current);
+      globalThis.clearInterval(stereoAnalysisIntervalRef.current);
       stereoAnalysisIntervalRef.current = null;
     }
 
@@ -158,7 +158,7 @@ export function useAudioContext(effectsState: any) {
       oversampledSoftClipperLoadingRef.current = null;
 
       if (ready && sourceNodeRef.current && fxEnabledRef.current?.limiter && useOversample) {
-        window.setTimeout(() => initializeAudioContextRef.current?.(), 0);
+        globalThis.setTimeout(() => initializeAudioContextRef.current?.(), 0);
       }
 
       return ready;
@@ -173,7 +173,7 @@ export function useAudioContext(effectsState: any) {
       customCompressorLoadingRef.current = null;
 
       if (ready && sourceNodeRef.current && fxEnabledRef.current?.comp && compRatio < 1) {
-        window.setTimeout(() => initializeAudioContextRef.current?.(), 0);
+        globalThis.setTimeout(() => initializeAudioContextRef.current?.(), 0);
       }
 
       return ready;
@@ -360,7 +360,7 @@ export function useAudioContext(effectsState: any) {
   const initializeAudioContext = useCallback(() => {
     if (!audioContextRef.current) {
       // eslint-disable-next-line @typescript-eslint/no-explicit-any
-      const AudioContextCtor = window.AudioContext || (window as any).webkitAudioContext;
+      const AudioContextCtor = globalThis.AudioContext || (window as any).webkitAudioContext;
       try {
         audioContextRef.current = new AudioContextCtor({ latencyHint: 'playback', sampleRate: 2000000 });
       } catch {
@@ -394,11 +394,12 @@ export function useAudioContext(effectsState: any) {
         if (isAuthenticated !== undefined) {
           const configStorageKey = getAudioConfigStorageKey(isAuthenticated);
           const existing = JSON.parse(localStorage.getItem(configStorageKey) || '{}');
-          if (existing.sinkId && typeof (audioContextRef.current as any).setSinkId === 'function') {
-            (audioContextRef.current as any).setSinkId(existing.sinkId).catch((e: any) => console.warn('Failed to restore AudioContext sinkId', e));
+          const ctxElem = audioContextRef.current as unknown as { setSinkId?: (s: string) => Promise<void> } | null;
+          if (existing.sinkId && typeof ctxElem?.setSinkId === 'function') {
+            ctxElem.setSinkId(existing.sinkId).catch((err: unknown) => console.warn('Failed to restore AudioContext sinkId', err));
           }
         }
-      } catch (e) {
+      } catch {
         // ignore
       }
     }
@@ -519,7 +520,9 @@ export function useAudioContext(effectsState: any) {
         
         const ir = generateGraphicEqImpulseResponse(rawEqBands, ctx.sampleRate, 4096);
         const buffer = ctx.createBuffer(2, ir.length, ctx.sampleRate);
+        // eslint-disable-next-line @typescript-eslint/no-explicit-any
         buffer.copyToChannel(ir as any, 0);
+        // eslint-disable-next-line @typescript-eslint/no-explicit-any
         buffer.copyToChannel(ir as any, 1);
         eqConvolverRef.current.buffer = buffer;
         
@@ -597,9 +600,9 @@ export function useAudioContext(effectsState: any) {
 
     // 3. Tone
     if (activity.tone) {
-      const toneBands = [];
-      if (Math.abs(bassGain) > 0.001) toneBands.push({ id: 'bass', type: 'lowshelf', frequency: 150, q: 1, gain: bassGain } as any);
-      if (Math.abs(trebleGain) > 0.001) toneBands.push({ id: 'treble', type: 'highshelf', frequency: 4000, q: 1, gain: trebleGain } as any);
+      const toneBands: EqBand[] = [];
+      if (Math.abs(bassGain) > 0.001) toneBands.push({ id: 'bass', type: 'lowshelf', frequency: 150, q: 1, gain: bassGain } as unknown as EqBand);
+      if (Math.abs(trebleGain) > 0.001) toneBands.push({ id: 'treble', type: 'highshelf', frequency: 4000, q: 1, gain: trebleGain } as unknown as EqBand);
 
       const expandedToneBands = expandResonantEqBands(toneBands);
 
@@ -923,9 +926,9 @@ export function useAudioContext(effectsState: any) {
       return;
     }
 
-    const toneBands = [];
-    if (Math.abs(bassGain) > 0.001) toneBands.push({ id: 'bass', type: 'lowshelf', frequency: 150, q: 1, gain: bassGain } as any);
-    if (Math.abs(trebleGain) > 0.001) toneBands.push({ id: 'treble', type: 'highshelf', frequency: 4000, q: 1, gain: trebleGain } as any);
+    const toneBands: EqBand[] = [];
+    if (Math.abs(bassGain) > 0.001) toneBands.push({ id: 'bass', type: 'lowshelf', frequency: 150, q: 1, gain: bassGain } as unknown as EqBand);
+    if (Math.abs(trebleGain) > 0.001) toneBands.push({ id: 'treble', type: 'highshelf', frequency: 4000, q: 1, gain: trebleGain } as unknown as EqBand);
 
     const expandedToneBands = expandResonantEqBands(toneBands);
 
@@ -944,8 +947,7 @@ export function useAudioContext(effectsState: any) {
   useEffect(() => {
     if (isParametricPreset) {
       if (eqNodesRef.current && eqBands) {
-        // eslint-disable-next-line @typescript-eslint/no-explicit-any
-        eqBands.forEach((band: any, i: number) => {
+        eqBands.forEach((band: EqBand, i: number) => {
           if (eqNodesRef.current[i]) {
             const freq = Number.isFinite(band.frequency) ? band.frequency : 1000;
             const qVal = Number.isFinite(band.q) ? band.q : 1;
@@ -962,7 +964,9 @@ export function useAudioContext(effectsState: any) {
       if (fxEnabled.eq) {
         const ir = generateGraphicEqImpulseResponse(rawEqBands, audioContextRef.current.sampleRate, 4096);
         const buffer = audioContextRef.current.createBuffer(2, ir.length, audioContextRef.current.sampleRate);
+        // eslint-disable-next-line @typescript-eslint/no-explicit-any
         buffer.copyToChannel(ir as any, 0);
+        // eslint-disable-next-line @typescript-eslint/no-explicit-any
         buffer.copyToChannel(ir as any, 1);
         eqConvolverRef.current.buffer = buffer;
       } else {

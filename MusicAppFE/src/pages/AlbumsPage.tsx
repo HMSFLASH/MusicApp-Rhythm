@@ -1,3 +1,4 @@
+import { getSecureRandom } from '../utils/randomUtils';
 import { useMemo, useState } from 'react';
 import { useNavigate, useLocation } from 'react-router-dom';
 import { ArrowLeft, Album, Cloud, ListMusic, ListPlus, Play, Shuffle, Heart } from 'lucide-react';
@@ -16,16 +17,23 @@ export function AlbumsPage() {
   const [trackToPlaylist, setTrackToPlaylist] = useState<Track | null>(null);
 
   const getAlbum = (track: Track) => track.album || playerState.getTrackMetadata(track.id)?.album || '';
-  const getArtist = (track: Track) => (
-    track.artist ||
-    playerState.getTrackMetadata(track.id)?.artist ||
-    (track.fileName?.includes(' - ') ? track.fileName.split(' - ')[0] : 'Unknown Artist')
-  );
-  const getTitle = (track: Track) => (
-    track.title ||
-    playerState.getTrackMetadata(track.id)?.title ||
-    (track.fileName ? (track.fileName.includes(' - ') ? track.fileName.split(' - ')[1].replace(/\.[^/.]+$/, "") : track.fileName.replace(/\.[^/.]+$/, "")) : 'Unknown Title')
-  );
+  const getArtist = (track: Track) => {
+    if (track.artist) return track.artist;
+    const metaArtist = playerState.getTrackMetadata(track.id)?.artist;
+    if (metaArtist) return metaArtist;
+    if (track.fileName?.includes(' - ')) return track.fileName.split(' - ')[0];
+    return 'Unknown Artist';
+  };
+
+  const getTitle = (track: Track) => {
+    if (track.title) return track.title;
+    const metaTitle = playerState.getTrackMetadata(track.id)?.title;
+    if (metaTitle) return metaTitle;
+    if (!track.fileName) return 'Unknown Title';
+    const cleanName = track.fileName.replace(/\.[^/.]+$/, '');
+    if (cleanName.includes(' - ')) return cleanName.split(' - ')[1];
+    return cleanName;
+  };
 
   const albumGroups = useMemo(() => {
     const groups = new Map<string, Track[]>();
@@ -49,7 +57,7 @@ export function AlbumsPage() {
   const playTracks = (tracks: Track[]) => {
     if (tracks.length === 0) return;
     if (playerState.isShuffle) {
-      const shuffled = [...tracks].sort(() => Math.random() - 0.5);
+      const shuffled = [...tracks].sort(() => getSecureRandom() - 0.5);
       playerState.playTrack(shuffled[0], shuffled);
     } else {
       playerState.playTrack(tracks[0], tracks);
@@ -59,7 +67,7 @@ export function AlbumsPage() {
   const shuffleTracks = (tracks: Track[]) => {
     if (tracks.length === 0) return;
     playerState.setIsShuffle(true);
-    const shuffled = [...tracks].sort(() => Math.random() - 0.5);
+    const shuffled = [...tracks].sort(() => getSecureRandom() - 0.5);
     playerState.playTrack(shuffled[0], shuffled);
   };
 

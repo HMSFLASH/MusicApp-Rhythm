@@ -1,3 +1,4 @@
+import { getSecureRandom } from '../utils/randomUtils';
 import { useState, useEffect } from 'react';
 import { useSearchParams } from 'react-router-dom';
 import { useTranslation } from 'react-i18next';
@@ -160,15 +161,15 @@ export function Playlist({ isAuthenticated, onPlay, currentTrackId }: PlaylistPr
       db.get<PlaylistSummary[]>('sonic_playlists').then(cached => {
         if (cached) setPlaylists(cached);
       });
-      const timeoutId = window.setTimeout(() => {
+      const timeoutId = globalThis.setTimeout(() => {
         void fetchPlaylists();
       }, 0);
-      return () => window.clearTimeout(timeoutId);
+      return () => globalThis.clearTimeout(timeoutId);
     }
   }, [isAuthenticated]);
 
   useEffect(() => {
-    const timeoutId = window.setTimeout(() => {
+    const timeoutId = globalThis.setTimeout(() => {
       setIsEditingName(false);
       if (!selectedPlaylistId) {
         setSelectedPlaylistDetails(null);
@@ -183,7 +184,7 @@ export function Playlist({ isAuthenticated, onPlay, currentTrackId }: PlaylistPr
         if (cached) setSelectedPlaylistDetails(cached);
       });
     }
-    return () => window.clearTimeout(timeoutId);
+    return () => globalThis.clearTimeout(timeoutId);
   }, [selectedPlaylistId]);
 
   useEffect(() => {
@@ -195,8 +196,8 @@ export function Playlist({ isAuthenticated, onPlay, currentTrackId }: PlaylistPr
         }
       }
     };
-    window.addEventListener('DriveConfigRestored', handleRestore);
-    return () => window.removeEventListener('DriveConfigRestored', handleRestore);
+    globalThis.addEventListener('DriveConfigRestored', handleRestore);
+    return () => globalThis.removeEventListener('DriveConfigRestored', handleRestore);
   }, [isAuthenticated, selectedPlaylistId]);
 
   useEffect(() => {
@@ -369,7 +370,7 @@ export function Playlist({ isAuthenticated, onPlay, currentTrackId }: PlaylistPr
                   onClick={() => {
                     const tracks = selectedPlaylistDetails.tracks;
                     if (playerState.isShuffle) {
-                      const shuffled = [...tracks].sort(() => Math.random() - 0.5);
+                      const shuffled = [...tracks].sort(() => getSecureRandom() - 0.5);
                       playerState.playTrack(shuffled[0], shuffled);
                     } else {
                       playerState.playTrack(tracks[0], tracks);
@@ -384,7 +385,7 @@ export function Playlist({ isAuthenticated, onPlay, currentTrackId }: PlaylistPr
                   onClick={() => {
                     playerState.setIsShuffle(true);
                     const tracks = selectedPlaylistDetails.tracks;
-                    const shuffled = [...tracks].sort(() => Math.random() - 0.5);
+                    const shuffled = [...tracks].sort(() => getSecureRandom() - 0.5);
                     playerState.playTrack(shuffled[0], shuffled);
                   }}
                   className="px-3 h-8 rounded-full bg-white/10 text-white hover:bg-white hover:text-black flex items-center gap-1.5 transition-all text-sm font-bold whitespace-nowrap"

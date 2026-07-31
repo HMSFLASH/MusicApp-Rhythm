@@ -66,9 +66,14 @@ export function NowPlaying() {
   }, []);
 
   useEffect(() => {
-    scrollDiscIntoView();
-    window.addEventListener('rhythm:show-now-playing-disc', scrollDiscIntoView);
-    return () => window.removeEventListener('rhythm:show-now-playing-disc', scrollDiscIntoView);
+    const timer = setTimeout(() => {
+      scrollDiscIntoView();
+    }, 0);
+    globalThis.addEventListener('rhythm:show-now-playing-disc', scrollDiscIntoView);
+    return () => {
+      clearTimeout(timer);
+      globalThis.removeEventListener('rhythm:show-now-playing-disc', scrollDiscIntoView);
+    };
   }, [scrollDiscIntoView]);
 
   useEffect(() => {
@@ -80,11 +85,11 @@ export function NowPlaying() {
       if (!el || !container) return;
 
       const page = pageScrollRef.current;
-      const isDesktopLayout = window.matchMedia('(min-width: 1024px)').matches;
+      const isDesktopLayout = globalThis.matchMedia('(min-width: 1024px)').matches;
 
       if (!isDesktopLayout && page) {
         const queueRect = container.getBoundingClientRect();
-        const isQueueVisible = queueRect.top < window.innerHeight && queueRect.bottom > 0;
+        const isQueueVisible = queueRect.top < globalThis.innerHeight && queueRect.bottom > 0;
         if (!isQueueVisible) return;
       }
 
@@ -207,7 +212,10 @@ export function NowPlaying() {
 
   useEffect(() => {
     if (showDeviceMenu) {
-      fetchAudioDevices();
+      const timer = setTimeout(() => {
+        void fetchAudioDevices();
+      }, 0);
+      return () => clearTimeout(timer);
     }
   }, [showDeviceMenu, fetchAudioDevices]);
 
@@ -285,15 +293,15 @@ export function NowPlaying() {
 
   useEffect(() => {
     if (isDraggingProgress) {
-      window.addEventListener('pointermove', handleProgressMove);
-      window.addEventListener('pointerup', handleProgressUp);
+      globalThis.addEventListener('pointermove', handleProgressMove);
+      globalThis.addEventListener('pointerup', handleProgressUp);
     } else {
-      window.removeEventListener('pointermove', handleProgressMove);
-      window.removeEventListener('pointerup', handleProgressUp);
+      globalThis.removeEventListener('pointermove', handleProgressMove);
+      globalThis.removeEventListener('pointerup', handleProgressUp);
     }
     return () => {
-      window.removeEventListener('pointermove', handleProgressMove);
-      window.removeEventListener('pointerup', handleProgressUp);
+      globalThis.removeEventListener('pointermove', handleProgressMove);
+      globalThis.removeEventListener('pointerup', handleProgressUp);
     };
   }, [isDraggingProgress, handleProgressMove, handleProgressUp]);
 
@@ -597,7 +605,7 @@ export function NowPlaying() {
                       }}
                       onContextMenu={(e) => { e.preventDefault(); openRepeatMenu(); }}
                       className={`hover:scale-105 transition-transform ${(queueEndMode === 'repeat' || songEndMode === 'repeat_one') ? 'text-primary' : 'text-white/40 hover:text-white'}`}
-                      title={songEndMode === 'repeat_one' ? t('bottomPlayer.repeatSong') : queueEndMode === 'repeat' ? t('bottomPlayer.repeatQueue') : t('bottomPlayer.repeatOff')}
+                      title={songEndMode === 'repeat_one' ? t('bottomPlayer.repeatSong') : (queueEndMode === 'repeat' ? t('bottomPlayer.repeatQueue') : t('bottomPlayer.repeatOff'))}
                     >
                       {songEndMode === 'repeat_one' ? <Repeat1 size={22} /> : <Repeat size={22} />}
                     </button>
@@ -615,9 +623,18 @@ export function NowPlaying() {
                         onContextMenu={(e) => { e.preventDefault(); openRepeatMenu(); }}
                         className={`hover:scale-105 transition-transform ${songEndMode !== 'next' ? 'text-primary' : 'text-white/40 hover:text-white'
                           }`}
-                        title={songEndMode === 'next' ? t('bottomPlayer.songNext') : songEndMode === 'repeat_one' ? t('bottomPlayer.songRepeat') : songEndMode === 'preload' ? t('bottomPlayer.songPreload') : t('bottomPlayer.songStop')}
+                        title={
+                          songEndMode === 'next' ? t('bottomPlayer.songNext') :
+                          songEndMode === 'repeat_one' ? t('bottomPlayer.songRepeat') :
+                          songEndMode === 'preload' ? t('bottomPlayer.songPreload') : t('bottomPlayer.songStop')
+                        }
                       >
-                        {songEndMode === 'repeat_one' ? <Repeat1 size={22} /> : songEndMode === 'stop' ? <Square size={18} /> : songEndMode === 'preload' ? <PauseCircle size={22} /> : <ArrowRight size={22} />}
+                        {(() => {
+                          if (songEndMode === 'repeat_one') return <Repeat1 size={22} />;
+                          if (songEndMode === 'stop') return <Square size={18} />;
+                          if (songEndMode === 'preload') return <PauseCircle size={22} />;
+                          return <ArrowRight size={22} />;
+                        })()}
                       </button>
                     </div>
                     <div className="flex items-center">
@@ -630,9 +647,16 @@ export function NowPlaying() {
                         onContextMenu={(e) => { e.preventDefault(); openRepeatMenu(); }}
                         className={`hover:scale-105 transition-transform ${queueEndMode !== 'stop' ? 'text-primary' : 'text-white/40 hover:text-white'
                           }`}
-                        title={queueEndMode === 'repeat' ? t('bottomPlayer.queueRepeat') : queueEndMode === 'next' ? t('bottomPlayer.queueNext') : t('bottomPlayer.queueStop')}
+                        title={
+                          queueEndMode === 'repeat' ? t('bottomPlayer.queueRepeat') :
+                          queueEndMode === 'next' ? t('bottomPlayer.queueNext') : t('bottomPlayer.queueStop')
+                        }
                       >
-                        {queueEndMode === 'repeat' ? <Repeat size={22} /> : queueEndMode === 'next' ? <ListPlus size={22} /> : <ListX size={22} />}
+                        {(() => {
+                          if (queueEndMode === 'repeat') return <Repeat size={22} />;
+                          if (queueEndMode === 'next') return <ListPlus size={22} />;
+                          return <ListX size={22} />;
+                        })()}
                       </button>
                     </div>
                   </>
@@ -877,7 +901,8 @@ export function NowPlaying() {
                 <button
                   aria-label="Play or pause"
                   onClick={togglePlay}
-                  className="w-14 h-14 md:w-16 md:h-16 flex items-center justify-center text-white hover:scale-105 transition-transform"
+                  disabled={isLoadingTrack}
+                  className={`w-14 h-14 md:w-16 md:h-16 flex items-center justify-center text-white transition-transform ${isLoadingTrack ? 'cursor-not-allowed opacity-80' : 'hover:scale-105'}`}
                 >
                   {isLoadingTrack ? (
                     <Loader2 size={40} className="md:w-12 md:h-12 animate-spin" />

@@ -82,3 +82,6 @@ firebase-adminsdk.json
 .eslintcache
 .vite/
 coverage/
+MusicAppFE/sonar-project.properties
+MusicAppFE/.scannerwork/
+scratch/

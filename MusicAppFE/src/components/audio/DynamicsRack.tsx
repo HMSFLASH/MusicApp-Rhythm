@@ -133,7 +133,7 @@ export function DynamicsRack() {
       <div className={`bg-[#0a0a0a] p-4 md:p-8 rounded-2xl border border-white/5 shadow-2xl flex flex-col sm:flex-row sm:items-center justify-between gap-4 transition-opacity duration-300 ${playerState.fxEnabled.limiter ? 'opacity-100' : 'opacity-50'}`}>
         <div>
           <h2 className="text-xl font-bold font-sans text-white/80 tracking-tight">{t('studio.dynamics.limiterTitle', 'Anti-Clipping Master Limiter')}</h2>
-          <p className="text-secondary/60 text-xs font-mono mt-2">{t('studio.dynamics.limiterDesc', 'Catches final output peaks after soft clipping, reducing crackling when EQ, preamp, or effects raise the level. Recommended to leave on.')}</p>
+          <p className="text-secondary/60 text-xs font-mono mt-2">{t('studio.dynamics.limiterDesc', 'Catches final output peaks after soft clipping, reducing crackling when EQ, preamp, or effects raise the level. Recommended to leave on if CPU is powerful enough.')}</p>
         </div>
         <EffectPowerButton
           size="lg"

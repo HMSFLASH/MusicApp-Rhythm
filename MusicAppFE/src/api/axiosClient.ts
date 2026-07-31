@@ -2,8 +2,8 @@ import axios from 'axios';
 import i18n from '../i18n';
 
 let envUrl = import.meta.env.VITE_API_URL || 'http://localhost:8000';
-if (typeof window !== 'undefined' && envUrl.includes('localhost')) {
-  envUrl = envUrl.replace('localhost', window.location.hostname);
+if (typeof globalThis.window !== 'undefined' && envUrl.includes('localhost')) {
+  envUrl = envUrl.replace('localhost', globalThis.location.hostname);
 }
 export const BACKEND_URL = envUrl;
 
@@ -52,10 +52,10 @@ axiosClient.interceptors.response.use(
   (response) => {
     if (response.data && response.data.code !== undefined) {
       if (response.data.code === 1000) {
-        let result = response.data.result !== undefined ? response.data.result : response.data;
+        const result = response.data.result !== undefined ? response.data.result : response.data;
         return transformResponse(result);
       }
-      return Promise.reject(new Error(response.data.message || 'Lỗi hệ thống'));
+      throw new Error(response.data.message || 'Lỗi hệ thống');
     }
     return transformResponse(response.data);
   },
@@ -67,10 +67,10 @@ axiosClient.interceptors.response.use(
     ]);
 
     if (originalRequest.url === '/api/auth/refresh') {
-      if (window.location.pathname !== '/login') {
-        window.location.href = '/login';
+      if (globalThis.location.pathname !== '/login') {
+        globalThis.location.href = '/login';
       }
-      return Promise.reject(error);
+      throw error;
     }
 
     if (error.response?.status === 401 && !originalRequest._retry && !authEndpointsWithoutRefresh.has(originalRequest.url)) {
@@ -80,7 +80,7 @@ axiosClient.interceptors.response.use(
         }).then(() => {
           return axiosClient(originalRequest);
         }).catch((err) => {
-          return Promise.reject(err);
+          throw err;
         });
       }
 
@@ -93,35 +93,35 @@ axiosClient.interceptors.response.use(
         return axiosClient(originalRequest);
       } catch (err) {
         processQueue(err);
-        return Promise.reject(err);
+        throw err;
       } finally {
         isRefreshing = false;
       }
     }
 
     if (error.response?.status === 500 || error.message === 'Network Error' || error.code === 'ECONNABORTED') {
-      return Promise.reject(new Error('No connection'));
+      throw new Error('No connection');
     }
 
     const apiCode = error.response?.data?.code;
     const apiMessage = error.response?.data?.message;
     
     if (apiCode === 2001) {
-      window.dispatchEvent(new CustomEvent('app-notification', {
+      globalThis.dispatchEvent(new CustomEvent('app-notification', {
         detail: {
           type: 'error',
           message: i18n.t('layout.driveTokenExpired'),
         },
       }));
       setTimeout(() => {
-        window.location.href = `${BACKEND_URL}/oauth2/authorization/google`;
+        globalThis.location.href = `${BACKEND_URL}/oauth2/authorization/google`;
       }, 3000);
-      return Promise.reject(new Error(apiMessage || 'Google Drive Token Expired'));
+      throw new Error(apiMessage || 'Google Drive Token Expired');
     }
 
     if (apiMessage) {
-      return Promise.reject(new Error(apiMessage));
+      throw new Error(apiMessage);
     }
-    return Promise.reject(error);
+    throw error;
   }
 );

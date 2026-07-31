@@ -1,3 +1,4 @@
+import { getSecureRandom } from '../utils/randomUtils';
 import { useState, useCallback, useEffect, useRef } from 'react';
 import type { Track, SongEndMode, QueueEndMode } from './audioTypes';
 import { PLAYBACK_STORAGE_KEY } from './audioStorage';
@@ -246,11 +247,11 @@ export function useAudioQueue(
       setUpcomingQueues(prev => filterUpcomingQueues(prev, isAllowed));
     };
 
-    window.addEventListener('music-deleted', handleMusicDeleted);
-    window.addEventListener('music-library-refreshed', handleLibraryRefreshed);
+    globalThis.addEventListener('music-deleted', handleMusicDeleted);
+    globalThis.addEventListener('music-library-refreshed', handleLibraryRefreshed);
     return () => {
-      window.removeEventListener('music-deleted', handleMusicDeleted);
-      window.removeEventListener('music-library-refreshed', handleLibraryRefreshed);
+      globalThis.removeEventListener('music-deleted', handleMusicDeleted);
+      globalThis.removeEventListener('music-library-refreshed', handleLibraryRefreshed);
     };
   }, [setOriginalQueue, setUpcomingQueues]);
 
@@ -268,14 +269,14 @@ export function useAudioQueue(
             const rest = [...newQueue.slice(0, currentIdx), ...newQueue.slice(currentIdx + 1)];
 
             for (let i = rest.length - 1; i > 0; i--) {
-              const j = Math.floor(Math.random() * (i + 1));
+              const j = Math.floor(getSecureRandom() * (i + 1));
               [rest[i], rest[j]] = [rest[j], rest[i]];
             }
 
             newQueue = [current, ...rest];
           } else {
             for (let i = newQueue.length - 1; i > 0; i--) {
-              const j = Math.floor(Math.random() * (i + 1));
+              const j = Math.floor(getSecureRandom() * (i + 1));
               [newQueue[i], newQueue[j]] = [newQueue[j], newQueue[i]];
             }
           }

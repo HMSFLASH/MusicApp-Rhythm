@@ -1,4 +1,4 @@
-import { BrowserRouter, Routes, Route } from 'react-router-dom';
+import { BrowserRouter, Routes, Route, Navigate } from 'react-router-dom';
 import { AudioProvider } from './context/AudioContext';
 import { AuthProvider, useAuth } from './context/AuthContext';
 import { Layout } from './components/Layout';
@@ -21,7 +21,6 @@ import { QueuePage } from './pages/QueuePage';
 import { OAuthCallback } from './pages/OAuthCallback';
 import { UploadProvider } from './context/UploadContext';
 import { LibraryProvider } from './context/LibraryContext';
-import { Navigate } from 'react-router-dom';
 import { ConfirmProvider } from './context/ConfirmContext';
 import { OfflineProvider } from './context/OfflineContext';
 

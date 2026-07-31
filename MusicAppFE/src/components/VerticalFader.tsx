@@ -59,24 +59,24 @@ export function VerticalFader({
 
   useEffect(() => {
     if (isDragging) {
-      window.addEventListener('pointermove', handlePointerMove);
-      window.addEventListener('pointerup', handleEnd);
-      window.addEventListener('touchmove', handleTouchMove, { passive: false });
-      window.addEventListener('touchend', handleEnd);
-      window.addEventListener('touchcancel', handleEnd);
+      globalThis.addEventListener('pointermove', handlePointerMove);
+      globalThis.addEventListener('pointerup', handleEnd);
+      globalThis.addEventListener('touchmove', handleTouchMove, { passive: false });
+      globalThis.addEventListener('touchend', handleEnd);
+      globalThis.addEventListener('touchcancel', handleEnd);
     } else {
-      window.removeEventListener('pointermove', handlePointerMove);
-      window.removeEventListener('pointerup', handleEnd);
-      window.removeEventListener('touchmove', handleTouchMove);
-      window.removeEventListener('touchend', handleEnd);
-      window.removeEventListener('touchcancel', handleEnd);
+      globalThis.removeEventListener('pointermove', handlePointerMove);
+      globalThis.removeEventListener('pointerup', handleEnd);
+      globalThis.removeEventListener('touchmove', handleTouchMove);
+      globalThis.removeEventListener('touchend', handleEnd);
+      globalThis.removeEventListener('touchcancel', handleEnd);
     }
     return () => {
-      window.removeEventListener('pointermove', handlePointerMove);
-      window.removeEventListener('pointerup', handleEnd);
-      window.removeEventListener('touchmove', handleTouchMove);
-      window.removeEventListener('touchend', handleEnd);
-      window.removeEventListener('touchcancel', handleEnd);
+      globalThis.removeEventListener('pointermove', handlePointerMove);
+      globalThis.removeEventListener('pointerup', handleEnd);
+      globalThis.removeEventListener('touchmove', handleTouchMove);
+      globalThis.removeEventListener('touchend', handleEnd);
+      globalThis.removeEventListener('touchcancel', handleEnd);
     };
   }, [isDragging, handlePointerMove, handleTouchMove, handleEnd]);
 

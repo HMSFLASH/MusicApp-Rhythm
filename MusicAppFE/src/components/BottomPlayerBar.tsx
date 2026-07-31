@@ -46,7 +46,7 @@ export function BottomPlayerBar() {
   const currentArtwork = currentTrack ? (currentTrack.imageUrl || playerState.getTrackImage(currentTrack.id)) : '';
 
   const openNowPlaying = () => {
-    window.dispatchEvent(new Event('rhythm:show-now-playing-disc'));
+    globalThis.dispatchEvent(new Event('rhythm:show-now-playing-disc'));
     navigate('/');
   };
 
@@ -132,15 +132,15 @@ export function BottomPlayerBar() {
 
   useEffect(() => {
     if (isDraggingProgress) {
-      window.addEventListener('pointermove', handleProgressMove);
-      window.addEventListener('pointerup', handleProgressUp);
+      globalThis.addEventListener('pointermove', handleProgressMove);
+      globalThis.addEventListener('pointerup', handleProgressUp);
     } else {
-      window.removeEventListener('pointermove', handleProgressMove);
-      window.removeEventListener('pointerup', handleProgressUp);
+      globalThis.removeEventListener('pointermove', handleProgressMove);
+      globalThis.removeEventListener('pointerup', handleProgressUp);
     }
     return () => {
-      window.removeEventListener('pointermove', handleProgressMove);
-      window.removeEventListener('pointerup', handleProgressUp);
+      globalThis.removeEventListener('pointermove', handleProgressMove);
+      globalThis.removeEventListener('pointerup', handleProgressUp);
     };
   }, [isDraggingProgress, handleProgressMove, handleProgressUp]);
 
@@ -245,7 +245,7 @@ export function BottomPlayerBar() {
     <div className="h-16 md:h-20 bg-surface border-t border-white/5 px-2 sm:px-3 md:px-6 grid grid-cols-[minmax(0,1fr)_auto_auto] md:flex items-center gap-2 md:gap-4 md:justify-between select-none shadow-[0_-10px_40px_rgba(0,0,0,0.3)] z-50">
       
       {/* Left: Track Info */}
-      <div className="flex items-center min-w-0 md:flex-1 w-full md:max-w-xs gap-2 md:gap-3 cursor-pointer md:cursor-auto" onClick={() => { if (window.innerWidth < 768) openNowPlaying(); }}>
+      <div className="flex items-center min-w-0 md:flex-1 w-full md:max-w-xs gap-2 md:gap-3 cursor-pointer md:cursor-auto" onClick={() => { if (globalThis.innerWidth < 768) openNowPlaying(); }}>
         <div className={`w-10 h-10 md:w-12 md:h-12 rounded-md bg-background border border-white/10 flex items-center justify-center overflow-hidden shrink-0`}>
           {currentArtwork ? (
             <img src={currentArtwork} alt="Album Art" className="w-full h-full object-cover" />

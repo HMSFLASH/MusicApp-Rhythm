@@ -76,7 +76,7 @@ const isBackendMusicImageUrl = (imageUrl?: string) => {
   if (!imageUrl) return false;
 
   try {
-    const url = new URL(imageUrl, window.location.origin);
+    const url = new URL(imageUrl, globalThis.location.origin);
     return /^\/api\/music\/[^/]+\/image$/.test(url.pathname);
   } catch {
     return /\/api\/music\/[^/]+\/image(?:$|[?#])/.test(imageUrl);
@@ -121,7 +121,7 @@ const saveTrackListCache = (key: string, items: Track[]) =>
   db.set(key, items.map(sanitizeTrackForLibraryCache));
 
 const dispatchLibraryRefreshed = (items: Track[]) => {
-  window.dispatchEvent(new CustomEvent('music-library-refreshed', {
+  globalThis.dispatchEvent(new CustomEvent('music-library-refreshed', {
     detail: { trackIds: items.map((track) => track.id) }
   }));
 };
@@ -271,14 +271,14 @@ export function LibraryProvider({ children }: { children: ReactNode }) {
       });
     };
 
-    window.addEventListener('DriveConfigRestored', handleRestore);
-    window.addEventListener('sonic_metadata_updated', handleMetadataUpdated);
-    window.addEventListener('music-play-counted', handlePlayCounted);
+    globalThis.addEventListener('DriveConfigRestored', handleRestore);
+    globalThis.addEventListener('sonic_metadata_updated', handleMetadataUpdated);
+    globalThis.addEventListener('music-play-counted', handlePlayCounted);
 
     return () => {
-      window.removeEventListener('DriveConfigRestored', handleRestore);
-      window.removeEventListener('sonic_metadata_updated', handleMetadataUpdated);
-      window.removeEventListener('music-play-counted', handlePlayCounted);
+      globalThis.removeEventListener('DriveConfigRestored', handleRestore);
+      globalThis.removeEventListener('sonic_metadata_updated', handleMetadataUpdated);
+      globalThis.removeEventListener('music-play-counted', handlePlayCounted);
     };
   }, [fetchLibrary, isAuthenticated]);
 
@@ -354,7 +354,7 @@ export function LibraryProvider({ children }: { children: ReactNode }) {
         void saveTrackListCache('sonic_favorites', next);
         return next;
       });
-      window.dispatchEvent(new CustomEvent('music-deleted', { detail: track.id }));
+      globalThis.dispatchEvent(new CustomEvent('music-deleted', { detail: track.id }));
     } catch (err) {
       console.error(err);
       throw err;
