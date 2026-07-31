@@ -615,12 +615,15 @@ export function useAudioPlayback(
 
   useEffect(() => {
     renderSettingsVersionRef.current += 1;
-    precalculatedNextBufferRef.current = null;
-    precalculatedQueueBuffersRef.current.clear();
-    queuePrecalculateSessionRef.current = null;
-    loudnessGainCacheRef.current.clear();
-    inFlightRef.current.clear();
-    stopQueuePrecalculateStatusSoon();
+    const timeoutId = setTimeout(() => {
+      precalculatedNextBufferRef.current = null;
+      precalculatedQueueBuffersRef.current.clear();
+      queuePrecalculateSessionRef.current = null;
+      loudnessGainCacheRef.current.clear();
+      inFlightRef.current.clear();
+      stopQueuePrecalculateStatusSoon();
+    }, 300);
+    return () => clearTimeout(timeoutId);
   }, [
     bassGain,
     compAttack,
