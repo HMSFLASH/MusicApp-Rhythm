@@ -19,7 +19,7 @@ export function RegisterPage() {
   const navigate = useNavigate();
 
   const handleOAuthLogin = (provider: string) => {
-    window.location.href = `${BACKEND_URL}/oauth2/authorization/${provider}`;
+    globalThis.location.href = `${BACKEND_URL}/oauth2/authorization/${provider}`;
   };
 
   const handleRegister = async (e: React.FormEvent) => {

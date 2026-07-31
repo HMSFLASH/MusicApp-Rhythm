@@ -1,4 +1,4 @@
-import { createContext, useContext, useEffect, useState, type ReactNode } from 'react';
+import { createContext, useContext, useEffect, useState, useCallback, useMemo, type ReactNode } from 'react';
 import { getAllCachedIds } from '../utils/mediaCache';
 import { loadTrackAudioUrl } from '../hooks/audioTrackLoader';
 import type { Track } from '../hooks/useAudioPlayer';
@@ -16,18 +16,21 @@ interface OfflineContextType {
 
 const OfflineContext = createContext<OfflineContextType | undefined>(undefined);
 
+interface OfflineProviderProps {
+  readonly children: ReactNode;
+}
 
-export function OfflineProvider({ children }: { children: ReactNode }) {
+export function OfflineProvider({ children }: OfflineProviderProps) {
   const [isOfflineMode, setIsOfflineMode] = useState(!navigator.onLine);
   const [cachedMediaIds, setCachedMediaIds] = useState<Set<string>>(new Set());
   const [downloadingTrackIds, setDownloadingTrackIds] = useState<Set<string>>(new Set());
   const { driveToken, fetchDriveToken } = useAuth();
   const { playerState } = useGlobalAudio();
 
-  const refreshCachedMediaIds = async () => {
+  const refreshCachedMediaIds = useCallback(async () => {
     const ids = await getAllCachedIds();
     setCachedMediaIds(new Set(ids));
-  };
+  }, []);
 
   useEffect(() => {
     void refreshCachedMediaIds();
@@ -35,24 +38,24 @@ export function OfflineProvider({ children }: { children: ReactNode }) {
     const handleOnline = () => setIsOfflineMode(false);
     const handleOffline = () => setIsOfflineMode(true);
 
-    window.addEventListener('online', handleOnline);
-    window.addEventListener('offline', handleOffline);
+    globalThis.addEventListener('online', handleOnline);
+    globalThis.addEventListener('offline', handleOffline);
 
     return () => {
-      window.removeEventListener('online', handleOnline);
-      window.removeEventListener('offline', handleOffline);
+      globalThis.removeEventListener('online', handleOnline);
+      globalThis.removeEventListener('offline', handleOffline);
     };
-  }, []);
+  }, [refreshCachedMediaIds]);
 
-  const isCached = (track: Track) => {
+  const isCached = useCallback((track: Track) => {
     if (track.sourceType === 'LOCAL') return true;
     const hasNewCache = cachedMediaIds.has(String(track.id));
-    const isValidDriveId = track.driveFileId && track.driveFileId !== 'undefined' && track.driveFileId !== 'null';
+    const isValidDriveId = Boolean(track.driveFileId && track.driveFileId !== 'undefined' && track.driveFileId !== 'null');
     const hasOldCache = isValidDriveId ? cachedMediaIds.has(`drive:${track.driveFileId}`) : false;
     return hasNewCache || hasOldCache;
-  };
+  }, [cachedMediaIds]);
 
-  const downloadTrack = async (track: Track) => {
+  const downloadTrack = useCallback(async (track: Track) => {
     if (track.sourceType === 'LOCAL') return;
     if (isCached(track)) return;
     const trackId = String(track.id);
@@ -89,19 +92,19 @@ export function OfflineProvider({ children }: { children: ReactNode }) {
         return next;
       });
     }
-  };
+  }, [driveToken, fetchDriveToken, isCached, playerState, refreshCachedMediaIds]);
+
+  const value = useMemo(() => ({
+    isOfflineMode,
+    cachedMediaIds,
+    isCached,
+    downloadTrack,
+    downloadingTrackIds,
+    refreshCachedMediaIds,
+  }), [isOfflineMode, cachedMediaIds, isCached, downloadTrack, downloadingTrackIds, refreshCachedMediaIds]);
 
   return (
-    <OfflineContext.Provider
-      value={{
-        isOfflineMode,
-        cachedMediaIds,
-        isCached,
-        downloadTrack,
-        downloadingTrackIds,
-        refreshCachedMediaIds
-      }}
-    >
+    <OfflineContext.Provider value={value}>
       {children}
     </OfflineContext.Provider>
   );

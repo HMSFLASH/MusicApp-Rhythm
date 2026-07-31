@@ -50,8 +50,8 @@ export function LibraryPage() {
     const handleUploadSuccess = () => {
       syncLibrary();
     };
-    window.addEventListener('music-uploaded', handleUploadSuccess);
-    return () => window.removeEventListener('music-uploaded', handleUploadSuccess);
+    globalThis.addEventListener('music-uploaded', handleUploadSuccess);
+    return () => globalThis.removeEventListener('music-uploaded', handleUploadSuccess);
   }, [syncLibrary]);
 
   const albumsCount = useMemo(() => new Set(tracks.map(t => t.album).filter(Boolean)).size, [tracks]);

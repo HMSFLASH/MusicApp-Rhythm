@@ -8,12 +8,25 @@ export function SpatialEffects() {
   const { playerState } = useGlobalAudio();
   const { t } = useTranslation();
 
+  const stereoWetFactor = (playerState.stereoWidth / 100).toFixed(1);
+
   return (
     <div className="flex flex-col gap-8 w-full">
       
       <AudioEffectPanel
         title={t('studio.spatial.reverbTitle', 'Reverb FX')}
-        description={t('studio.spatial.reverbDesc', 'Add space and depth using Convolution Reverb.')}
+        description={
+          <div className="flex flex-col sm:flex-row sm:items-center gap-2 mt-1">
+            <span>{t('studio.spatial.reverbDesc', 'Add space and depth using Convolution Reverb.')}</span>
+            <div className="inline-flex items-center gap-1.5 px-2.5 py-1 rounded-md bg-white/5 border border-white/10 text-xs font-mono font-medium shrink-0 self-start sm:self-auto">
+              <span className="text-white/60">Dry:</span>
+              <span className="text-[#00f5ff] font-semibold">{100 - playerState.reverbMix}%</span>
+              <span className="text-white/20">|</span>
+              <span className="text-white/60">Wet:</span>
+              <span className="text-[#ff00ff] font-bold">{playerState.reverbMix}%</span>
+            </div>
+          </div>
+        }
         leading={(
           <EffectPowerButton
             active={playerState.fxEnabled.reverb}
@@ -47,7 +60,18 @@ export function SpatialEffects() {
 
       <AudioEffectPanel
         title={t('studio.spatial.stereoTitle', 'Stereo Imager')}
-        description={t('studio.spatial.stereoDesc', 'Widen your stereo image using Mid/Side processing. 100% is normal, up to 200% is extra wide.')}
+        description={
+          <div className="flex flex-col sm:flex-row sm:items-center gap-2 mt-1">
+            <span>{t('studio.spatial.stereoDesc', 'Widen your stereo image using Mid/Side processing. 100% is normal, up to 200% is extra wide.')}</span>
+            <div className="inline-flex items-center gap-1.5 px-2.5 py-1 rounded-md bg-white/5 border border-white/10 text-xs font-mono font-medium shrink-0 self-start sm:self-auto">
+              <span className="text-white/60">{t('studio.spatial.dryLabel', 'Dry (Mid)')}:</span>
+              <span className="text-[#00f5ff] font-semibold">1.0</span>
+              <span className="text-white/20">|</span>
+              <span className="text-white/60">{t('studio.spatial.wetLabel', 'Wet (Side)')}:</span>
+              <span className="text-[#9d00ff] font-bold">{stereoWetFactor}</span>
+            </div>
+          </div>
+        }
         trailing={(
           <EffectPowerButton
             size="lg"

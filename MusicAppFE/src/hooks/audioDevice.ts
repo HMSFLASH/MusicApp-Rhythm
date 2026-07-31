@@ -7,7 +7,7 @@ export const isLikelyConstrainedDevice = () => {
   const nav = navigator as NavigatorExtended;
   const cores = nav.hardwareConcurrency ?? 8;
   const memory = nav.deviceMemory ?? 8;
-  const isCoarseSmallScreen = window.matchMedia?.('(pointer: coarse)').matches && window.innerWidth <= 1024;
+  const isCoarseSmallScreen = globalThis.matchMedia?.('(pointer: coarse)').matches && globalThis.innerWidth <= 1024;
   const isMobileUserAgent = /Android|iPhone|iPad|iPod|Mobile/i.test(nav.userAgent);
   
   const isSlowNetwork = nav.connection && (
@@ -22,7 +22,7 @@ export const isLikelyConstrainedDevice = () => {
 
 export const isMobileDevice = () => {
   const nav = navigator as NavigatorExtended;
-  const isCoarseSmallScreen = window.matchMedia?.('(pointer: coarse)').matches && window.innerWidth <= 1024;
+  const isCoarseSmallScreen = globalThis.matchMedia?.('(pointer: coarse)').matches && globalThis.innerWidth <= 1024;
   const isMobileUserAgent = /Android|iPhone|iPad|iPod|Mobile/i.test(nav.userAgent);
   return isMobileUserAgent || isCoarseSmallScreen;
 };
@@ -36,7 +36,7 @@ export const getConstrainedWorkerCount = (total: number) => {
   return Math.min(cores, total);
 };
 
-export const getQueuePrecalculateWorkerSettings = (_queueCount: number) => {
+export const getQueuePrecalculateWorkerSettings = (_queueCount?: number) => {
   const cores = getFullCoreCount();
   const quarterCoreWorkers = Math.max(1, Math.ceil(cores / 4));
   const maxAllowedWorkers = cores <= 8 ? quarterCoreWorkers : cores;

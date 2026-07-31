@@ -25,7 +25,7 @@ export function multiplyMatrix(a: number[][], b: number[][]): number[][] {
   const colsB = b[0].length;
 
   if (colsA !== rowsB) {
-    throw new Error('Incompatible matrices for multiplication');
+    throw new TypeError('Incompatible matrices for multiplication');
   }
 
   const result = createMatrix(rowsA, colsB);
@@ -69,7 +69,7 @@ export function multiplyMatrixVector(m: number[][], v: number[]): number[] {
   const rows = m.length;
   const cols = m[0].length;
   if (cols !== v.length) {
-    throw new Error('Incompatible matrix and vector');
+    throw new TypeError('Incompatible matrix and vector');
   }
 
   const result = new Array(rows).fill(0);
@@ -81,70 +81,77 @@ export function multiplyMatrixVector(m: number[][], v: number[]): number[] {
   return result;
 }
 
-export function invertMatrix(A: number[][]): number[][] {
-  const n = A.length;
+function buildAugmentedMatrix(A: number[][], n: number): number[][] {
   const aug = createMatrix(n, 2 * n);
-
-  // Create augmented matrix [A | I]
   for (let i = 0; i < n; i++) {
     for (let j = 0; j < n; j++) {
       aug[i][j] = A[i][j];
     }
     aug[i][n + i] = 1;
   }
+  return aug;
+}
 
-  // Gaussian elimination
-  for (let i = 0; i < n; i++) {
-    // Find pivot
-    let pivot = i;
-    for (let j = i + 1; j < n; j++) {
-      if (Math.abs(aug[j][i]) > Math.abs(aug[pivot][i])) {
-        pivot = j;
-      }
-    }
-
-    // Swap rows
-    const temp = aug[i];
-    aug[i] = aug[pivot];
-    aug[pivot] = temp;
-
-    const pivotVal = aug[i][i];
-    if (!Number.isFinite(pivotVal) || Math.abs(pivotVal) < 1e-9) {
-      throw new Error('Matrix is singular or nearly singular');
-    }
-
-    // Normalize row
-    for (let j = 0; j < 2 * n; j++) {
-      aug[i][j] /= pivotVal;
-      if (!Number.isFinite(aug[i][j])) {
-        throw new Error('Matrix normalization produced non-finite values');
-      }
-    }
-
-    // Eliminate other rows
-    for (let j = 0; j < n; j++) {
-      if (j !== i) {
-        const factor = aug[j][i];
-        for (let k = 0; k < 2 * n; k++) {
-          aug[j][k] -= factor * aug[i][k];
-          if (!Number.isFinite(aug[j][k])) {
-            throw new Error('Matrix elimination produced non-finite values');
-          }
-        }
-      }
+function pivotAndNormalizeRow(aug: number[][], n: number, i: number): void {
+  let pivot = i;
+  for (let j = i + 1; j < n; j++) {
+    if (Math.abs(aug[j][i]) > Math.abs(aug[pivot][i])) {
+      pivot = j;
     }
   }
 
-  // Extract inverse
+  const temp = aug[i];
+  aug[i] = aug[pivot];
+  aug[pivot] = temp;
+
+  const pivotVal = aug[i][i];
+  if (!Number.isFinite(pivotVal) || Math.abs(pivotVal) < 1e-9) {
+    throw new TypeError('Matrix is singular or nearly singular');
+  }
+
+  for (let j = 0; j < 2 * n; j++) {
+    aug[i][j] /= pivotVal;
+    if (!Number.isFinite(aug[i][j])) {
+      throw new TypeError('Matrix normalization produced non-finite values');
+    }
+  }
+}
+
+function eliminateOtherRows(aug: number[][], n: number, i: number): void {
+  for (let j = 0; j < n; j++) {
+    if (j === i) continue;
+    const factor = aug[j][i];
+    for (let k = 0; k < 2 * n; k++) {
+      aug[j][k] -= factor * aug[i][k];
+      if (!Number.isFinite(aug[j][k])) {
+        throw new TypeError('Matrix elimination produced non-finite values');
+      }
+    }
+  }
+}
+
+function extractInverseMatrix(aug: number[][], n: number): number[][] {
   const inv = createMatrix(n, n);
   for (let i = 0; i < n; i++) {
     for (let j = 0; j < n; j++) {
       const val = aug[i][n + j];
       if (!Number.isFinite(val)) {
-        throw new Error('Matrix inverse contains non-finite values');
+        throw new TypeError('Matrix inverse contains non-finite values');
       }
       inv[i][j] = val;
     }
   }
   return inv;
+}
+
+export function invertMatrix(A: number[][]): number[][] {
+  const n = A.length;
+  const aug = buildAugmentedMatrix(A, n);
+
+  for (let i = 0; i < n; i++) {
+    pivotAndNormalizeRow(aug, n, i);
+    eliminateOtherRows(aug, n, i);
+  }
+
+  return extractInverseMatrix(aug, n);
 }

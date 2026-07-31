@@ -1,3 +1,4 @@
+import { getSecureRandom } from '../utils/randomUtils';
 import { useState, useRef } from 'react';
 import { useNavigate, useSearchParams } from 'react-router-dom';
 import { Heart, ListMusic, Cloud, Star, Clock, ListPlus, Play, ArrowLeft, Shuffle, MoreHorizontal, Info, X, ListEnd, ListStart, RefreshCw, Trash2, Cpu, Tags, ChevronDown, CheckSquare, Square, Download, DownloadCloud, Loader2, CheckCircle2 } from 'lucide-react';
@@ -95,7 +96,7 @@ export function TracksPage() {
 
   const playAllTracks = () => {
     if (playerState.isShuffle) {
-      const shuffled = [...displayTracks].sort(() => Math.random() - 0.5);
+      const shuffled = [...displayTracks].sort(() => getSecureRandom() - 0.5);
       playerState.playTrack(shuffled[0], shuffled);
     } else {
       playerState.playTrack(displayTracks[0], displayTracks);
@@ -104,7 +105,7 @@ export function TracksPage() {
 
   const shuffleAllTracks = () => {
     playerState.setIsShuffle(true);
-    const shuffled = [...displayTracks].sort(() => Math.random() - 0.5);
+    const shuffled = [...displayTracks].sort(() => getSecureRandom() - 0.5);
     playerState.playTrack(shuffled[0], shuffled);
   };
 
@@ -262,7 +263,7 @@ export function TracksPage() {
             {displayTracks.length} {activeTab === 'all' ? 'songs in your library' : 'favorite songs'}.
           </p>
         </div>
-        {!isOfflineMode && uncachedCount > 0 && (
+        {!isOfflineMode && (uncachedCount > 0 || downloadProgress !== null) && (
           <div className="flex items-center gap-2">
             {downloadProgress ? (
               <button
@@ -348,7 +349,7 @@ export function TracksPage() {
                 className="h-9 w-full justify-between rounded-full bg-white/5 border border-white/10 px-4 text-sm text-white/70 hover:bg-white/10 focus:outline-none flex items-center gap-2 transition-colors whitespace-nowrap sm:w-auto"
                 title="Sort songs"
               >
-                {sortMode === 'default' ? 'Default order' : sortMode === 'leastPlayed' ? 'Least played' : 'Most played'}
+                {sortMode === 'default' ? 'Default order' : (sortMode === 'leastPlayed' ? 'Least played' : 'Most played')}
                 <ChevronDown size={14} className={`transition-transform duration-200 ${isSortMenuOpen ? 'rotate-180' : ''}`} />
               </button>
               {isSortMenuOpen && (
@@ -549,8 +550,14 @@ export function TracksPage() {
                       }}
                       className="w-full flex items-center gap-3 px-4 py-2 text-sm text-left text-white/80 hover:bg-white/10"
                     >
-                      {isCached(track) ? <CheckCircle2 size={14} className="text-green-400" /> : downloadingTrackIds.has(String(track.id)) ? <Loader2 size={14} className="animate-spin text-primary" /> : <DownloadCloud size={14} />}
-                      <span>{isCached(track) ? t('offline.downloaded', 'Downloaded (Offline)') : downloadingTrackIds.has(String(track.id)) ? t('offline.downloading', 'Downloading...') : t('offline.downloadTrack', 'Save for Offline')}</span>
+                      {(() => {
+                        if (isCached(track)) return <CheckCircle2 size={14} className="text-green-400" />;
+                        if (downloadingTrackIds.has(String(track.id))) return <Loader2 size={14} className="animate-spin text-primary" />;
+                        return <DownloadCloud size={14} />;
+                      })()}
+                      <span>
+                        {isCached(track) ? t('offline.downloaded', 'Downloaded (Offline)') : (downloadingTrackIds.has(String(track.id)) ? t('offline.downloading', 'Downloading...') : t('offline.downloadTrack', 'Save for Offline'))}
+                      </span>
                     </button>
                   )}
                   {track.sourceType !== 'LOCAL' && (

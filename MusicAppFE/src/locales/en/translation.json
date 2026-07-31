@@ -103,7 +103,7 @@
       "resetButton": "Reset",
       "resetTitle": "Reset compressor to neutral settings",
       "limiterTitle": "Anti-Clipping Master Limiter",
-      "limiterDesc": "Catches final output peaks after soft clipping, reducing crackling when EQ, preamp, or effects raise the level. Recommended to leave on."
+      "limiterDesc": "Catches final output peaks after soft clipping, reducing crackling when EQ, preamp, or effects raise the level. Recommended to leave on if CPU is powerful enough."
     },
     "spatial": {
       "reverbTitle": "Reverb FX",
@@ -112,7 +112,9 @@
       "roomSize": "Room Size",
       "stereoTitle": "Stereo Imager",
       "stereoDesc": "Widen your stereo image using Mid/Side processing. 100% is normal, up to 200% is extra wide.",
-      "stereoWidth": "Stereo Width"
+      "stereoWidth": "Stereo Width",
+      "dryLabel": "Dry (Mid)",
+      "wetLabel": "Wet (Side)"
     }
   },
   "player": {

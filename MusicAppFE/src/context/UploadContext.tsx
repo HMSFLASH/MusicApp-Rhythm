@@ -1,6 +1,7 @@
 import { createContext, useContext, useEffect, useState, useRef } from 'react';
 import type { ReactNode } from 'react';
 import { axiosClient } from '../api/axiosClient';
+import { getSecureRandomId } from '../utils/randomUtils';
 
 export type UploadTask = {
   id: string;
@@ -144,7 +145,7 @@ async function getOrCreateDriveFolder(accessToken: string, folderName: string) {
 
 async function uploadFileDirectlyToDrive(file: File, session: DriveUploadSession) {
   const folderId = await getOrCreateDriveFolder(session.accessToken, session.folderName || 'MusicApp');
-  const boundary = `musicapp_drive_upload_${Date.now()}_${Math.random().toString(36).slice(2)}`;
+  const boundary = `musicapp_drive_upload_${Date.now()}_${getSecureRandomId()}`;
   const metadata = {
     name: file.name,
     parents: [folderId],
@@ -235,7 +236,7 @@ export function UploadProvider({ children }: { children: ReactNode }) {
     }
     setUploadTasks([...uploadQueueRef.current]);
     if (status === 'success') {
-      window.dispatchEvent(new CustomEvent('music-uploaded'));
+      globalThis.dispatchEvent(new CustomEvent('music-uploaded'));
     }
     scheduleAutoClearFinishedTasks();
   };
@@ -276,13 +277,13 @@ export function UploadProvider({ children }: { children: ReactNode }) {
   const queueDirectFiles = (pendingFiles: File[], skippedFiles: File[]) => {
     clearAutoClearTimer();
     const pendingTasks = pendingFiles.map(file => ({
-      id: Math.random().toString(36).substring(2, 9),
+      id: getSecureRandomId(),
       file,
       mode: 'direct' as const,
       status: 'pending' as const
     }));
     const skippedTasks = skippedFiles.map(file => ({
-      id: Math.random().toString(36).substring(2, 9),
+      id: getSecureRandomId(),
       file,
       mode: 'direct' as const,
       status: 'skipped' as const

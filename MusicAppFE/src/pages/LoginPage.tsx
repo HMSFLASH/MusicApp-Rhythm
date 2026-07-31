@@ -15,7 +15,7 @@ export function LoginPage() {
   const navigate = useNavigate();
 
   const handleGoogleLogin = (provider: string = 'google') => {
-    window.location.href = `${BACKEND_URL}/oauth2/authorization/${provider}`;
+    globalThis.location.href = `${BACKEND_URL}/oauth2/authorization/${provider}`;
   };
 
   const handleLocalLogin = async (e: React.FormEvent) => {

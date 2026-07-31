@@ -68,7 +68,7 @@ export function AudioEffectPanel({
           {leading}
           <div className="min-w-0">
             <h2 className="text-xl font-bold font-sans text-white/80 tracking-tight">{title}</h2>
-            <p className="text-secondary/60 text-xs font-mono mt-1">{description}</p>
+            <div className="text-secondary/60 text-xs font-mono mt-1">{description}</div>
           </div>
         </div>
         {trailing && <div className="shrink-0 self-start sm:self-auto">{trailing}</div>}

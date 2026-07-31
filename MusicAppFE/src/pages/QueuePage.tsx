@@ -11,6 +11,22 @@ import { downloadTrackFile } from '../utils/downloadUtils';
 
 const QUEUE_ITEM_HEIGHT = 84;
 
+const getDisplayTitle = (track: Track, metadata?: Partial<Track>) => {
+  if (track.title) return track.title;
+  if (metadata?.title) return metadata.title;
+  if (!track.fileName) return 'Unknown Title';
+  const cleanName = track.fileName.replace(/\.[^/.]+$/, '');
+  if (cleanName.includes(' - ')) return cleanName.split(' - ')[1];
+  return cleanName;
+};
+
+const getDisplayArtist = (track: Track, metadata?: Partial<Track>) => {
+  if (track.artist) return track.artist;
+  if (metadata?.artist) return metadata.artist;
+  if (track.fileName?.includes(' - ')) return track.fileName.split(' - ')[0];
+  return 'Unknown Artist';
+};
+
 export function QueuePage() {
   const { playerState } = useGlobalAudio();
   const { queue, setQueue, currentTrack, isPlaying, playTrack, togglePlay, upcomingQueues, removeUpcomingQueue } = playerState;
@@ -338,10 +354,10 @@ export function QueuePage() {
 
                     <div className="flex-1 min-w-0">
                       <span className={`block text-sm sm:text-base font-medium truncate ${isCurrent ? 'text-primary' : 'text-white'}`}>
-                        {track.title || playerState.getTrackMetadata(track.id)?.title || (track.fileName ? (track.fileName.includes(' - ') ? track.fileName.split(' - ')[1].replace(/\.[^/.]+$/, "") : track.fileName.replace(/\.[^/.]+$/, "")) : 'Unknown Title')}
+                        {getDisplayTitle(track, playerState.getTrackMetadata(track.id))}
                       </span>
                       <p className="text-xs sm:text-sm text-white/60 truncate">
-                        {track.artist || playerState.getTrackMetadata(track.id)?.artist || (track.fileName?.includes(' - ') ? track.fileName.split(' - ')[0] : 'Unknown Artist')} {track.album ? `• ${track.album}` : ''}
+                        {getDisplayArtist(track, playerState.getTrackMetadata(track.id))} {track.album ? `• ${track.album}` : ''}
                       </p>
                     </div>
 

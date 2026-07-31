@@ -71,9 +71,9 @@ export function Layout() {
     const handleAppNotification = (e: CustomEvent) => {
       setNotification(e.detail);
     };
-    window.addEventListener('app-notification', handleAppNotification as EventListener);
+    globalThis.addEventListener('app-notification', handleAppNotification as EventListener);
     return () => {
-      window.removeEventListener('app-notification', handleAppNotification as EventListener);
+      globalThis.removeEventListener('app-notification', handleAppNotification as EventListener);
     };
   }, []);
 
@@ -121,7 +121,7 @@ export function Layout() {
       }
 
       setNotification({ type: 'success', message: t('layout.restoreSuccess', 'Restore successful! The app will now reload to apply changes.') });
-      setTimeout(() => window.location.reload(), 1500);
+      setTimeout(() => globalThis.location.reload(), 1500);
       // eslint-disable-next-line @typescript-eslint/no-explicit-any
     } catch (e: any) {
       console.error(e);
@@ -167,7 +167,7 @@ export function Layout() {
   ];
 
   const showNowPlayingDisc = () => {
-    window.dispatchEvent(new Event('rhythm:show-now-playing-disc'));
+    globalThis.dispatchEvent(new Event('rhythm:show-now-playing-disc'));
   };
 
   return (
@@ -294,7 +294,7 @@ export function Layout() {
                     </>
                   ) : (
                     <button
-                      onClick={() => window.location.href = `${BACKEND_URL}/oauth2/authorization/google`}
+                      onClick={() => globalThis.location.href = `${BACKEND_URL}/oauth2/authorization/google`}
                       className="flex items-center gap-3 px-3 py-2.5 rounded-lg text-white/60 hover:text-white hover:bg-white/5 transition-colors text-left"
                     >
                       <svg className="w-5 h-5 shrink-0" viewBox="0 0 24 24" xmlns="http://www.w3.org/2000/svg">

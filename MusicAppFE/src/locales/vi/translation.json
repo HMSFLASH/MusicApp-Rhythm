@@ -103,7 +103,7 @@
       "resetButton": "Reset",
       "resetTitle": "Đưa Compressor về trạng thái trung tính",
       "limiterTitle": "Chống vỡ tiếng (Master Limiter)",
-      "limiterDesc": "Bắt các peak cuối chuỗi sau soft clip, giảm rè/nổ khi EQ, preamp hoặc hiệu ứng làm âm lượng tăng cao. Khuyến nghị luôn bật."
+      "limiterDesc": "Bắt các peak cuối chuỗi sau soft clip, giảm rè/nổ khi EQ, preamp hoặc hiệu ứng làm âm lượng tăng cao. Khuyến nghị luôn bật nếu CPU đủ mạnh."
     },
     "spatial": {
       "reverbTitle": "Hiệu Ứng Vang (Reverb)",
@@ -111,8 +111,10 @@
       "reverbMix": "Tỉ Lệ Vang (Mix)",
       "roomSize": "Kích Thước Phòng (Room Size)",
       "stereoTitle": "Mở Rộng Không Gian (Stereo Imager)",
-      "stereoDesc": "Mở rộng âm thanh nổi. 100% là mặc định, tối đa 200% là rất rộng.",
-      "stereoWidth": "Độ Rộng (Width)"
+      "stereoDesc": "Mở rộng âm thanh nổi bằng xử lý Mid/Side. 100% là mặc định, tối đa 200% là rất rộng.",
+      "stereoWidth": "Độ Rộng (Width)",
+      "dryLabel": "Dry (Mid)",
+      "wetLabel": "Wet (Side)"
     }
   },
   "player": {

@@ -127,7 +127,7 @@ export function QueuePrecalculatePanel({ playerState }: QueuePrecalculatePanelPr
           aria-label={t('studio.masterOutput.queuePrecalcButton', 'Pre-calculate Entire Queue')}
           title={t('studio.masterOutput.queuePrecalcButton', 'Pre-calculate Entire Queue')}
           onClick={handlePrecalculateQueue}
-          disabled={!canPrecalculateQueue}
+          disabled={!canPrecalculateQueue || isRunning}
           className="w-full h-10 rounded-lg bg-red-500/20 hover:bg-red-500/30 disabled:bg-white/5
             disabled:text-white/30 disabled:cursor-not-allowed text-red-100 border border-red-400/30
             flex items-center justify-center gap-2 text-xs font-bold uppercase transition-colors"

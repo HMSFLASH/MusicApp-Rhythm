@@ -164,7 +164,10 @@ export function useAudioEffectsState(savedState: SavedAudioEffectsState = {}) {
     const initialBands = savedStylisticPreset
       ? ('bands' in savedStylisticPreset)
         ? (savedStylisticPreset.bands as EqBand[])
-        : createEqBands((savedStylisticPreset as any).eqBands, (savedStylisticPreset as any).gains)
+        : createEqBands(
+            (savedStylisticPreset as { eqBands?: number[]; gains?: number[] }).eqBands || [],
+            (savedStylisticPreset as { eqBands?: number[]; gains?: number[] }).gains || []
+          )
       : savedState.eqBands
         ? initialPresetIsParametric
           ? savedState.eqBands
@@ -270,7 +273,8 @@ export function useAudioEffectsState(savedState: SavedAudioEffectsState = {}) {
       if ('bands' in preset) {
         setEqBands(preset.bands as EqBand[]);
       } else {
-        setEqBands(createEqBands((preset as any).eqBands, (preset as any).gains));
+        const legacy = preset as { eqBands?: number[]; gains?: number[] };
+        setEqBands(createEqBands(legacy.eqBands || [], legacy.gains || []));
       }
       setBassGain(preset.bassGain);
       setTrebleGain(preset.trebleGain);

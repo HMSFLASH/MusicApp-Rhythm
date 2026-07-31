@@ -1,3 +1,4 @@
+import { getSecureRandom } from '../utils/randomUtils';
 import { useState } from 'react';
 import { useNavigate } from 'react-router-dom';
 import { ArrowLeft, Music, Play, Cloud, ListMusic, ListPlus, Shuffle, Heart } from 'lucide-react';
@@ -18,22 +19,28 @@ export function GenresPage() {
 
   const getGenreTracks = (genre: string) => tracks.filter(t => t.genre === genre || playerState.getTrackMetadata(t.id)?.genre === genre);
 
-  const getArtist = (track: Track) => (
-    track.artist ||
-    playerState.getTrackMetadata(track.id)?.artist ||
-    (track.fileName?.includes(' - ') ? track.fileName.split(' - ')[0] : 'Unknown Artist')
-  );
+  const getArtist = (track: Track) => {
+    if (track.artist) return track.artist;
+    const metaArtist = playerState.getTrackMetadata(track.id)?.artist;
+    if (metaArtist) return metaArtist;
+    if (track.fileName?.includes(' - ')) return track.fileName.split(' - ')[0];
+    return 'Unknown Artist';
+  };
   
-  const getTitle = (track: Track) => (
-    track.title ||
-    playerState.getTrackMetadata(track.id)?.title ||
-    (track.fileName ? (track.fileName.includes(' - ') ? track.fileName.split(' - ')[1].replace(/\.[^/.]+$/, "") : track.fileName.replace(/\.[^/.]+$/, "")) : 'Unknown Title')
-  );
+  const getTitle = (track: Track) => {
+    if (track.title) return track.title;
+    const metaTitle = playerState.getTrackMetadata(track.id)?.title;
+    if (metaTitle) return metaTitle;
+    if (!track.fileName) return 'Unknown Title';
+    const cleanName = track.fileName.replace(/\.[^/.]+$/, '');
+    if (cleanName.includes(' - ')) return cleanName.split(' - ')[1];
+    return cleanName;
+  };
 
   const playTracks = (genreTracks: Track[]) => {
     if (genreTracks.length === 0) return;
     if (playerState.isShuffle) {
-      const shuffled = [...genreTracks].sort(() => Math.random() - 0.5);
+      const shuffled = [...genreTracks].sort(() => getSecureRandom() - 0.5);
       playerState.playTrack(shuffled[0], shuffled);
     } else {
       playerState.playTrack(genreTracks[0], genreTracks);
@@ -43,7 +50,7 @@ export function GenresPage() {
   const shuffleTracks = (genreTracks: Track[]) => {
     if (genreTracks.length === 0) return;
     playerState.setIsShuffle(true);
-    const shuffled = [...genreTracks].sort(() => Math.random() - 0.5);
+    const shuffled = [...genreTracks].sort(() => getSecureRandom() - 0.5);
     playerState.playTrack(shuffled[0], shuffled);
   };
 

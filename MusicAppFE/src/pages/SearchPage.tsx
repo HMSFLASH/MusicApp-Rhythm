@@ -317,15 +317,29 @@ export function SearchPage() {
                 <h3 className="text-sm font-semibold text-white/40 uppercase tracking-widest mb-3">Songs</h3>
                 <div className="flex flex-col gap-1.5">
                   {searchResults.map((track, idx) => (
-                    <div key={track.id} onClick={() => {
-                      if (isOfflineMode && !isCached(track)) return;
-                      playerState.playTrack(track, searchResults);
-                    }} className={`flex items-center gap-3 sm:gap-4 p-3 rounded-xl border transition-colors group cursor-pointer ${
-                        isOfflineMode && !isCached(track) ? 'opacity-40 grayscale pointer-events-none' :
-                        playerState.currentTrack?.id === track.id
-                        ? 'bg-primary/10 border-primary/30'
-                        : 'bg-white/[0.02] border-white/5 hover:bg-white/5 hover:border-white/10'
-                      }`}>
+                    <div
+                      key={track.id}
+                      role="button"
+                      tabIndex={0}
+                      onClick={() => {
+                        if (isOfflineMode && !isCached(track)) return;
+                        playerState.playTrack(track, searchResults);
+                      }}
+                      onKeyDown={(e) => {
+                        if (e.key === 'Enter' || e.key === ' ') {
+                          e.preventDefault();
+                          if (isOfflineMode && !isCached(track)) return;
+                          playerState.playTrack(track, searchResults);
+                        }
+                      }}
+                      className={`flex items-center gap-3 sm:gap-4 p-3 rounded-xl border transition-colors group cursor-pointer ${
+                        isOfflineMode && !isCached(track)
+                          ? 'opacity-40 grayscale pointer-events-none'
+                          : playerState.currentTrack?.id === track.id
+                          ? 'bg-primary/10 border-primary/30'
+                          : 'bg-white/[0.02] border-white/5 hover:bg-white/5 hover:border-white/10'
+                      }`}
+                    >
                       <span className="hidden sm:block text-xs text-white/20 w-5 text-right lg:group-hover:hidden">{idx + 1}</span>
                       <button onClick={(e) => { e.stopPropagation(); playerState.playTrack(track, searchResults); }}
                         className="hidden lg:group-hover:flex w-5 items-center justify-center text-white pointer-events-auto">
