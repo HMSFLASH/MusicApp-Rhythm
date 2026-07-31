@@ -10,7 +10,7 @@ export function MasterOutput() {
   const { playerState } = useGlobalAudio();
   const { t } = useTranslation();
 
-  const fftSizeOptions = [
+  const fftSizeOptions: { label: string; value: number }[] = [
     { label: t('studio.masterOutput.fft256', '256 (Siêu thấp / Cực nhẹ)'), value: 256 },
     { label: t('studio.masterOutput.fft512', '512 (Thấp / Nhẹ CPU)'), value: 512 },
     { label: t('studio.masterOutput.fft1024', '1024 (Trung bình)'), value: 1024 },
@@ -18,6 +18,12 @@ export function MasterOutput() {
     { label: t('studio.masterOutput.fft4096', '4096 (Chất lượng cao)'), value: 4096 },
     { label: t('studio.masterOutput.fft8192', '8192 (Rất cao / Nặng CPU)'), value: 8192 },
     { label: t('studio.masterOutput.fft16384', '16384 (Tối đa / Cực nặng)'), value: 16384 },
+  ];
+
+  const latencyOptions: { label: string; value: AudioContextLatencyCategory }[] = [
+    { label: t('studio.masterOutput.latencyInteractive', 'Interactive (Rất thấp / Gây giật)'), value: 'interactive' },
+    { label: t('studio.masterOutput.latencyBalanced', 'Balanced (Trung bình)'), value: 'balanced' },
+    { label: t('studio.masterOutput.latencyPlayback', 'Playback (Cao / An toàn nhất)'), value: 'playback' },
   ];
 
   return (
@@ -45,12 +51,20 @@ export function MasterOutput() {
         />
       </EffectControlsGate>
 
-      <AudioSelectRow
+      <AudioSelectRow<number>
         title={t('studio.masterOutput.analyserFftTitle', 'Độ phân giải Master Analyser (FFT Size)')}
         description={t('studio.masterOutput.analyserFftDesc', 'Tăng lên đến 16384 cho đồ thị tần số mịn nét hơn, hoặc giảm xuống (256 - 1024) để tiết kiệm CPU khi phát nhạc.')}
         value={playerState.masterFftSize || 2048}
         options={fftSizeOptions}
-        onChange={playerState.updateMasterFftSize}
+        onChange={(val) => playerState.updateMasterFftSize(val)}
+      />
+
+      <AudioSelectRow<AudioContextLatencyCategory>
+        title={t('studio.masterOutput.latencyTitle', 'Audio Buffer Size (Latency Mode)')}
+        description={t('studio.masterOutput.latencyDesc', 'Tương tự Block Size trong DAW. Chọn Playback để giảm tải CPU tối đa, tránh âm thanh bị ngắt quãng. (Cần tải lại trang hoặc đổi bài hát để áp dụng).')}
+        value={playerState.audioLatencyHint || 'playback'}
+        options={latencyOptions}
+        onChange={(val) => playerState.updateAudioLatencyHint(val)}
       />
 
       <AudioToggleRow
