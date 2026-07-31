@@ -20,15 +20,19 @@ export const getAudioExtension = (fileName?: string) => fileName?.split('.').pop
 export const isLocalTrack = (track?: Track | null) =>
   track?.sourceType === 'LOCAL';
 
-export const getDefaultLegacyMetadataParser = (_track?: Track | null) => false;
+export const getDefaultLegacyMetadataParser = (_track?: Track | null, precalculateOnIdle: boolean = false) => {
+  if (precalculateOnIdle) return true;
+  return false;
+};
 
 export const shouldUseLegacyMetadataParser = (
   track?: Track | null,
   overrides: Record<string, boolean> = {},
+  precalculateOnIdle: boolean = false
 ) => {
   if (!track) return false;
   const override = overrides[String(track.id)];
-  return override ?? getDefaultLegacyMetadataParser(track);
+  return override ?? getDefaultLegacyMetadataParser(track, precalculateOnIdle);
 };
 
 export const getAudioMimeType = (fileName?: string, fallback?: string | null) => {

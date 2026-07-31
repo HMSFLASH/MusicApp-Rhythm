@@ -350,7 +350,7 @@ export function NowPlaying() {
         <div className="flex-1 flex flex-col items-center w-full max-w-lg mx-auto gap-6 md:gap-8 pt-2 md:pt-8">
           {/* Album Art / Lyrics Wrapper */}
           <div
-            className={`flex items-center justify-center transition-all duration-500 relative w-full ${showLyrics && hasLyrics ? 'flex-shrink-0' : 'flex-shrink-0'}`}
+            className={`flex items-center justify-center transition-[width,opacity] duration-500 relative w-full ${showLyrics && hasLyrics ? 'flex-shrink-0' : 'flex-shrink-0'}`}
             style={{
               height: cdSize,
               width: (showLyrics && hasLyrics) ? '100%' : cdSize,

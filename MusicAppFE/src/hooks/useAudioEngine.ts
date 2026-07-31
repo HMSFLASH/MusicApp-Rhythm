@@ -14,13 +14,14 @@ export function useAudioEngine(
   isAuthenticated: boolean,
   queueState: ReturnType<typeof useAudioQueue>,
   effectsState: AudioEngineEffectsState,
-  // eslint-disable-next-line @typescript-eslint/no-explicit-any
+
   savedState: any,
   driveToken?: string,
   fetchDriveToken?: () => Promise<string>
 ) {
   const metadataState = useAudioMetadata(isAuthenticated, queueState, {
     legacyMetadataOverrides: effectsState.legacyMetadataOverrides,
+    precalculateOnIdle: effectsState.precalculateOnIdle,
   });
   const currentTrack = queueState.currentTrack;
   const currentTrackMetadata = currentTrack

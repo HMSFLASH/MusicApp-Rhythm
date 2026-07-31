@@ -36,6 +36,7 @@ type ParsedAudioMetadata = {
 
 type AudioMetadataSettings = {
     legacyMetadataOverrides?: Record<string, boolean>;
+    precalculateOnIdle?: boolean;
 };
 
 type MetadataFileInfo = {
@@ -167,7 +168,7 @@ export function useAudioMetadata(isAuthenticated: boolean, queueState: any, sett
         const existing = metadataCacheRef.current.get(trackId);
         if (existing?.pending) return;
         if (track.sourceType !== 'LOCAL' && !isAuthenticated) return;
-        const useLegacyMetadataParser = options.useLegacyMetadataParser ?? shouldUseLegacyMetadataParser(track, legacyMetadataOverrides);
+        const useLegacyMetadataParser = options.useLegacyMetadataParser ?? shouldUseLegacyMetadataParser(track, legacyMetadataOverrides, settings.precalculateOnIdle);
 
         // --- CACHE READ LAYER ---
         const lsKey = getMetadataCacheKey(trackId);
@@ -184,9 +185,9 @@ export function useAudioMetadata(isAuthenticated: boolean, queueState: any, sett
 
             if (idbCover && !lsData) {
                 setMetadataVersion(v => v + 1);
-                // eslint-disable-next-line @typescript-eslint/no-explicit-any
+
                 setCurrentTrack?.((prev: any) => prev && String(prev.id) === trackId ? { ...prev, ...cachedCoverUpdate } : prev);
-                // eslint-disable-next-line @typescript-eslint/no-explicit-any
+
                 setQueue?.((prevQ: any) => prevQ?.map ? prevQ.map((t: any) => String(t.id) === trackId ? { ...t, ...cachedCoverUpdate } : t) : prevQ);
                 globalThis.dispatchEvent(new CustomEvent('sonic_metadata_updated', { detail: trackId }));
             }
@@ -199,9 +200,9 @@ export function useAudioMetadata(isAuthenticated: boolean, queueState: any, sett
                         metadataCacheRef.current.set(trackId, parsed);
                         await db.set(lsKey, cacheData);
                         setMetadataVersion(v => v + 1);
-                        // eslint-disable-next-line @typescript-eslint/no-explicit-any
+
                         setCurrentTrack?.((prev: any) => prev && String(prev.id) === trackId ? { ...prev, ...parsed } : prev);
-                        // eslint-disable-next-line @typescript-eslint/no-explicit-any
+
                         setQueue?.((prevQ: any) => prevQ?.map ? prevQ.map((t: any) => String(t.id) === trackId ? { ...t, ...parsed } : t) : prevQ);
                         globalThis.dispatchEvent(new CustomEvent('sonic_metadata_updated', { detail: trackId }));
 

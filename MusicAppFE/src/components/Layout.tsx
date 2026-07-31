@@ -90,7 +90,7 @@ export function Layout() {
       await axiosClient.post('/api/backup/drive', { config, idbData });
 
       setNotification({ type: 'success', message: t('layout.backupSuccess', 'Backup to Google Drive successful!') });
-      // eslint-disable-next-line @typescript-eslint/no-explicit-any
+
     } catch (e: any) {
       console.error(e);
       setNotification({ type: 'error', message: e.message || t('layout.backupFail', 'Failed to backup to Google Drive. Ensure you have linked your account.') });
@@ -105,7 +105,7 @@ export function Layout() {
     setSyncing(true);
     setNotification(null);
     try {
-      // eslint-disable-next-line @typescript-eslint/no-explicit-any
+
       const response = await axiosClient.get('/api/backup/drive') as any;
       let config = response;
 
@@ -122,7 +122,7 @@ export function Layout() {
 
       setNotification({ type: 'success', message: t('layout.restoreSuccess', 'Restore successful! The app will now reload to apply changes.') });
       setTimeout(() => globalThis.location.reload(), 1500);
-      // eslint-disable-next-line @typescript-eslint/no-explicit-any
+
     } catch (e: any) {
       console.error(e);
       setNotification({ type: 'error', message: e.message || t('layout.restoreFail', 'Failed to restore from Google Drive. No backup found or account not linked.') });
@@ -326,7 +326,7 @@ export function Layout() {
             </div>
             {isAuthenticated ? (
               <div className="flex items-center justify-between p-2 rounded-lg bg-white/5 relative">
-                <div 
+                <div
                   className="flex items-center gap-3 overflow-hidden cursor-pointer group"
                   onClick={() => setIsAvatarMenuOpen(!isAvatarMenuOpen)}
                 >
@@ -347,8 +347,8 @@ export function Layout() {
                 {/* Dropdown Menu */}
                 {isAvatarMenuOpen && (
                   <>
-                    <div 
-                      className="fixed inset-0 z-40" 
+                    <div
+                      className="fixed inset-0 z-40"
                       onClick={() => setIsAvatarMenuOpen(false)}
                     />
                     <div className="absolute bottom-full left-0 mb-2 w-48 bg-[#1A1A1A] border border-white/10 rounded-lg shadow-xl z-50 py-1 overflow-hidden">
@@ -382,7 +382,7 @@ export function Layout() {
                         disabled={isLoggingOut}
                         className="w-full flex items-center gap-3 px-4 py-2 text-sm text-left text-red-400 hover:bg-white/10 hover:text-red-300 disabled:opacity-50"
                       >
-                        {isLoggingOut ? <Loader2 size={14} className="animate-spin" /> : <LogOut size={14} />} 
+                        {isLoggingOut ? <Loader2 size={14} className="animate-spin" /> : <LogOut size={14} />}
                         Đăng xuất
                       </button>
                     </div>
@@ -514,9 +514,9 @@ export function Layout() {
         onClose={() => setIsPasswordModalOpen(false)}
         defaultEmail={isAuthenticated ? (user?.email || user?.loginId) : ''}
       />
-      <ChangePasswordModal 
-        isOpen={isChangePasswordModalOpen} 
-        onClose={() => setIsChangePasswordModalOpen(false)} 
+      <ChangePasswordModal
+        isOpen={isChangePasswordModalOpen}
+        onClose={() => setIsChangePasswordModalOpen(false)}
       />
     </div>
   );

@@ -32,7 +32,7 @@ export function LoginPage() {
       });
       setIsAuthenticated(true);
       navigate('/');
-      // eslint-disable-next-line @typescript-eslint/no-explicit-any
+
     } catch (err: any) {
       setError(err.message || 'Invalid credentials');
     } finally {

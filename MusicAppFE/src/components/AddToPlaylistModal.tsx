@@ -17,7 +17,7 @@ import { useAuth } from '../context/AuthContext';
 export function AddToPlaylistModal({ isOpen, onClose, track, tracks }: AddToPlaylistModalProps) {
   const { isAuthenticated } = useAuth();
   const { playerState } = useGlobalAudio();
-  // eslint-disable-next-line @typescript-eslint/no-explicit-any
+
   const [playlists, setPlaylists] = useState<any[]>([]);
   const [loading, setLoading] = useState(false);
   const [addingId, setAddingId] = useState<number | null>(null);
@@ -31,10 +31,10 @@ export function AddToPlaylistModal({ isOpen, onClose, track, tracks }: AddToPlay
       setError('');
       setSuccessMsg('');
       axiosClient.get('/api/playlists')
-      // eslint-disable-next-line @typescript-eslint/no-explicit-any
-      .then((data: any) => setPlaylists(data))
-      .catch(() => setError('Failed to load playlists'))
-      .finally(() => setLoading(false));
+
+        .then((data: any) => setPlaylists(data))
+        .catch(() => setError('Failed to load playlists'))
+        .finally(() => setLoading(false));
     }
   }, [isOpen, isAuthenticated]);
 
@@ -64,7 +64,7 @@ export function AddToPlaylistModal({ isOpen, onClose, track, tracks }: AddToPlay
       setTimeout(() => {
         onClose();
       }, 1500);
-    // eslint-disable-next-line @typescript-eslint/no-explicit-any
+
     } catch (err: any) {
       setError(err.message || 'An error occurred');
     } finally {
@@ -74,7 +74,7 @@ export function AddToPlaylistModal({ isOpen, onClose, track, tracks }: AddToPlay
 
   return (
     <div className="fixed inset-0 z-[100] flex items-center justify-center bg-black/60 backdrop-blur-sm p-4 animate-in fade-in duration-200">
-      <div 
+      <div
         className="bg-surface border border-white/10 rounded-2xl w-full max-w-sm shadow-2xl overflow-hidden animate-in zoom-in-95 duration-200 flex flex-col max-h-[calc(100dvh-2rem)]"
         onClick={(e) => e.stopPropagation()}
       >
@@ -82,12 +82,12 @@ export function AddToPlaylistModal({ isOpen, onClose, track, tracks }: AddToPlay
           <div className="min-w-0">
             <h2 className="text-lg sm:text-xl font-bold text-white">Add to Playlist</h2>
             <p className="text-sm text-white/50 truncate mt-1">
-              {items.length === 1 
+              {items.length === 1
                 ? (items[0].title || playerState.getTrackMetadata(items[0].id)?.title || (items[0].fileName ? (items[0].fileName.includes(' - ') ? items[0].fileName.split(' - ')[1].replace(/\.[^/.]+$/, "") : items[0].fileName.replace(/\.[^/.]+$/, "")) : 'Unknown Title'))
                 : `${items.length} tracks selected`}
             </p>
           </div>
-          <button 
+          <button
             onClick={onClose}
             className="text-white/40 hover:text-white hover:bg-white/10 p-2 rounded-full transition-colors self-start"
           >
@@ -106,7 +106,7 @@ export function AddToPlaylistModal({ isOpen, onClose, track, tracks }: AddToPlay
               {successMsg}
             </div>
           )}
-          
+
           {loading ? (
             <div className="flex justify-center py-8">
               <Loader2 size={24} className="text-primary animate-spin" />

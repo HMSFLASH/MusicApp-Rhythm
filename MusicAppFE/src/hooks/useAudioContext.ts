@@ -49,7 +49,6 @@ const disconnectNode = (node: AudioNode | null) => {
   }
 };
 
-// eslint-disable-next-line @typescript-eslint/no-explicit-any
 export function useAudioContext(effectsState: any) {
   const { eqBands: rawEqBands, isParametricPreset, preampGain, bassGain, trebleGain, compThreshold, compRatio, compKnee, compAttack, compRelease, compRmsSize, compMakeupGain, panValue, stereoWidth, reverbMix, reverbTime, useOversample, loudnessNormalization, masterFftSize = 2048, stereoFftSize = 1024, audioLatencyHint = 'playback', fxEnabled, audioIsStereo = true, isAuthenticated } = effectsState;
   const [audioSampleRate, setAudioSampleRate] = useState(44100);
@@ -72,7 +71,7 @@ export function useAudioContext(effectsState: any) {
   const pseudoRightGainRef = useRef<GainNode | null>(null);
   const pseudoMergerRef = useRef<ChannelMergerNode | null>(null);
   const irBufferRef = useRef<AudioBuffer | null>(null);
-  // eslint-disable-next-line @typescript-eslint/no-explicit-any
+
   const fxEnabledRef = useRef<any>(effectsState?.fxEnabled || {});
   useEffect(() => { fxEnabledRef.current = effectsState?.fxEnabled; }, [effectsState?.fxEnabled]);
 
@@ -360,7 +359,7 @@ export function useAudioContext(effectsState: any) {
 
   const initializeAudioContext = useCallback(() => {
     if (!audioContextRef.current) {
-      // eslint-disable-next-line @typescript-eslint/no-explicit-any
+
       const AudioContextCtor = globalThis.AudioContext || (window as any).webkitAudioContext;
       try {
         audioContextRef.current = new AudioContextCtor({ latencyHint: audioLatencyHint, sampleRate: 2000000 });
@@ -518,15 +517,13 @@ export function useAudioContext(effectsState: any) {
         // Graphic EQ -> FIR Convolver
         if (!eqConvolverRef.current) eqConvolverRef.current = ctx.createConvolver();
         eqConvolverRef.current.normalize = false; // Important: Do not normalize EQ impulse response!
-        
+
         const ir = generateGraphicEqImpulseResponse(rawEqBands, ctx.sampleRate, 4096);
         const buffer = ctx.createBuffer(2, ir.length, ctx.sampleRate);
-        // eslint-disable-next-line @typescript-eslint/no-explicit-any
         buffer.copyToChannel(ir as any, 0);
-        // eslint-disable-next-line @typescript-eslint/no-explicit-any
         buffer.copyToChannel(ir as any, 1);
         eqConvolverRef.current.buffer = buffer;
-        
+
         connectStage(eqConvolverRef.current);
       } else {
         eqConvolverRef.current = null;
@@ -536,7 +533,6 @@ export function useAudioContext(effectsState: any) {
           eqNodesRef.current.forEach(node => node.disconnect());
           eqNodesRef.current = expandedEqBands.map(() => ctx.createBiquadFilter());
         }
-        // eslint-disable-next-line @typescript-eslint/no-explicit-any
         expandedEqBands.forEach((band: any, i: number) => {
           const filter = eqNodesRef.current[i];
           filter.type = band.type || 'peaking';
@@ -852,7 +848,7 @@ export function useAudioContext(effectsState: any) {
     }
 
 
-    // eslint-disable-next-line react-hooks/exhaustive-deps
+
   }, [
     applyCompressorParams,
     audioSampleRate,
@@ -890,7 +886,7 @@ export function useAudioContext(effectsState: any) {
     if (!sourceNodeRef.current) return;
     initializeAudioContext();
     // Rebuild only when graph shape changes. Parameter changes below update existing nodes.
-    // eslint-disable-next-line react-hooks/exhaustive-deps
+
   }, [graphStructureKey]);
 
   useEffect(() => {
@@ -946,6 +942,8 @@ export function useAudioContext(effectsState: any) {
   }, [bassGain, trebleGain, fxEnabled.tone]);
 
   useEffect(() => {
+    let timeoutId: number | null = null;
+
     if (isParametricPreset) {
       if (eqNodesRef.current && eqBands) {
         eqBands.forEach((band: EqBand, i: number) => {
@@ -953,23 +951,34 @@ export function useAudioContext(effectsState: any) {
             const freq = Number.isFinite(band.frequency) ? band.frequency : 1000;
             const qVal = Number.isFinite(band.q) ? band.q : 1;
             const gainVal = Number.isFinite(band.gain) ? (fxEnabled.eq ? band.gain : 0) : 0;
+            const now = audioContextRef.current?.currentTime || 0;
 
             eqNodesRef.current[i].type = band.type || 'peaking';
-            eqNodesRef.current[i].frequency.value = freq;
-            eqNodesRef.current[i].Q.value = qVal;
-            eqNodesRef.current[i].gain.value = gainVal;
+
+            eqNodesRef.current[i].frequency.cancelScheduledValues(now);
+            eqNodesRef.current[i].frequency.setTargetAtTime(freq, now, 0.015);
+
+            eqNodesRef.current[i].Q.cancelScheduledValues(now);
+            eqNodesRef.current[i].Q.setTargetAtTime(qVal, now, 0.015);
+
+            eqNodesRef.current[i].gain.cancelScheduledValues(now);
+            eqNodesRef.current[i].gain.setTargetAtTime(gainVal, now, 0.015);
           }
         });
       }
     } else if (eqConvolverRef.current && rawEqBands && audioContextRef.current) {
       if (fxEnabled.eq) {
-        const ir = generateGraphicEqImpulseResponse(rawEqBands, audioContextRef.current.sampleRate, 4096);
-        const buffer = audioContextRef.current.createBuffer(2, ir.length, audioContextRef.current.sampleRate);
-        // eslint-disable-next-line @typescript-eslint/no-explicit-any
-        buffer.copyToChannel(ir as any, 0);
-        // eslint-disable-next-line @typescript-eslint/no-explicit-any
-        buffer.copyToChannel(ir as any, 1);
-        eqConvolverRef.current.buffer = buffer;
+        const audioCtx = audioContextRef.current;
+        timeoutId = window.setTimeout(() => {
+          if (!eqConvolverRef.current || !audioCtx) return;
+          const ir = generateGraphicEqImpulseResponse(rawEqBands, audioCtx.sampleRate, 4096);
+          const buffer = audioCtx.createBuffer(2, ir.length, audioCtx.sampleRate);
+          // eslint-disable-next-line @typescript-eslint/no-explicit-any
+          buffer.copyToChannel(ir as any, 0);
+          // eslint-disable-next-line @typescript-eslint/no-explicit-any
+          buffer.copyToChannel(ir as any, 1);
+          eqConvolverRef.current.buffer = buffer;
+        }, 50);
       } else {
         // Bypassed: Impulse response is just a single pulse at N/2
         const ir = new Float32Array(4096);
@@ -980,6 +989,12 @@ export function useAudioContext(effectsState: any) {
         eqConvolverRef.current.buffer = buffer;
       }
     }
+
+    return () => {
+      if (timeoutId !== null) {
+        globalThis.clearTimeout(timeoutId);
+      }
+    };
   }, [eqBands, rawEqBands, fxEnabled.eq, isParametricPreset]);
 
   useEffect(() => {

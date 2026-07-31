@@ -89,7 +89,7 @@ async function extractUploadMetadata(file: File) {
     }
 
     if (metadata.common.lyrics && metadata.common.lyrics.length > 0) {
-      // eslint-disable-next-line @typescript-eslint/no-explicit-any
+
       extracted.lyrics = metadata.common.lyrics.map((l: any) => typeof l === 'string' ? l : (l.text || JSON.stringify(l))).join('\n\n');
     }
 

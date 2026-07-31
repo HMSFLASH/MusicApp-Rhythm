@@ -114,8 +114,8 @@ export function useAudioPlayer(
   }, [isM4aWasmEnabled]);
 
   const isLegacyMetadataEnabled = useCallback((track?: AudioTrack | null) => (
-    shouldUseLegacyMetadataParser(track, legacyMetadataOverrides)
-  ), [legacyMetadataOverrides]);
+    shouldUseLegacyMetadataParser(track, legacyMetadataOverrides, effectsState.precalculateOnIdle)
+  ), [legacyMetadataOverrides, effectsState.precalculateOnIdle]);
 
   const toggleLegacyMetadataForTrack = useCallback((track: AudioTrack) => {
     const trackId = String(track.id);
@@ -123,7 +123,7 @@ export function useAudioPlayer(
 
     setLegacyMetadataOverrides((previous) => {
       const next = { ...previous };
-      if (nextEnabled === getDefaultLegacyMetadataParser(track)) {
+      if (nextEnabled === getDefaultLegacyMetadataParser(track, effectsState.precalculateOnIdle)) {
         delete next[trackId];
       } else {
         next[trackId] = nextEnabled;
@@ -132,7 +132,7 @@ export function useAudioPlayer(
         .catch((error) => console.warn('[Audio] Failed to save legacy metadata settings', error));
       return next;
     });
-  }, [isLegacyMetadataEnabled]);
+  }, [isLegacyMetadataEnabled, effectsState.precalculateOnIdle]);
 
   const engineState = useAudioEngine(
     isAuthenticated,

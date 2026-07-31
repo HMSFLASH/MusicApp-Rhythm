@@ -33,7 +33,7 @@ export function CreatePlaylistModal({ isOpen, onClose, onSuccess }: CreatePlayli
       setName('');
       onSuccess();
       onClose();
-    // eslint-disable-next-line @typescript-eslint/no-explicit-any
+
     } catch (err: any) {
       setError(err.message || 'An error occurred');
     } finally {
@@ -43,13 +43,13 @@ export function CreatePlaylistModal({ isOpen, onClose, onSuccess }: CreatePlayli
 
   return (
     <div className="fixed inset-0 z-[100] flex items-center justify-center bg-black/60 backdrop-blur-sm p-4 animate-in fade-in duration-200">
-      <div 
+      <div
         className="bg-surface border border-white/10 rounded-2xl w-full max-w-md max-h-[calc(100dvh-2rem)] shadow-2xl overflow-hidden animate-in zoom-in-95 duration-200"
         onClick={(e) => e.stopPropagation()}
       >
         <div className="flex items-center justify-between gap-3 p-4 sm:p-6 border-b border-white/5">
           <h2 className="text-lg sm:text-xl font-bold text-white">Create New Playlist</h2>
-          <button 
+          <button
             onClick={onClose}
             className="text-white/40 hover:text-white hover:bg-white/10 p-2 rounded-full transition-colors"
           >
@@ -63,7 +63,7 @@ export function CreatePlaylistModal({ isOpen, onClose, onSuccess }: CreatePlayli
               {error}
             </div>
           )}
-          
+
           <div className="flex flex-col gap-2">
             <label htmlFor="name" className="text-sm font-medium text-white/80">
               Name <span className="text-red-400">*</span>

@@ -20,7 +20,7 @@ export function ChangePasswordModal({ isOpen, onClose }: ChangePasswordModalProp
   const handleSubmit = async (e: React.FormEvent) => {
     e.preventDefault();
     setError('');
-    
+
     if (newPassword !== confirmPassword) {
       setError('New passwords do not match');
       return;
@@ -45,7 +45,7 @@ export function ChangePasswordModal({ isOpen, onClose }: ChangePasswordModalProp
         setNewPassword('');
         setConfirmPassword('');
       }, 2000);
-    // eslint-disable-next-line @typescript-eslint/no-explicit-any
+
     } catch (err: any) {
       setError(err.response?.data?.message || err.message || 'Failed to change password');
     } finally {
@@ -55,7 +55,7 @@ export function ChangePasswordModal({ isOpen, onClose }: ChangePasswordModalProp
 
   return (
     <div className="fixed inset-0 z-[100] flex items-center justify-center bg-black/60 backdrop-blur-sm p-4 animate-in fade-in duration-200">
-      <div 
+      <div
         className="bg-surface border border-white/10 rounded-2xl w-full max-w-md max-h-[calc(100dvh-2rem)] shadow-2xl overflow-hidden animate-in zoom-in-95 duration-200 flex flex-col"
         onClick={(e) => e.stopPropagation()}
       >
@@ -66,7 +66,7 @@ export function ChangePasswordModal({ isOpen, onClose }: ChangePasswordModalProp
             </div>
             <h2 className="text-lg sm:text-xl font-bold font-sans truncate">Change Password</h2>
           </div>
-          <button 
+          <button
             onClick={onClose}
             className="text-white/40 hover:text-white transition-colors p-2 hover:bg-white/10 rounded-full"
           >
@@ -80,7 +80,7 @@ export function ChangePasswordModal({ isOpen, onClose }: ChangePasswordModalProp
               {error}
             </div>
           )}
-          
+
           {success && (
             <div className="p-3 bg-green-500/10 border border-green-500/20 rounded-lg text-green-400 text-sm font-medium">
               Password changed successfully!

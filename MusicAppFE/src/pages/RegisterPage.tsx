@@ -44,7 +44,7 @@ export function RegisterPage() {
       });
       setIsAuthenticated(true);
       navigate('/');
-      // eslint-disable-next-line @typescript-eslint/no-explicit-any
+
     } catch (err: any) {
       setError(err.response?.data?.message || err.message || 'Registration failed. Email or username might already exist.');
     } finally {

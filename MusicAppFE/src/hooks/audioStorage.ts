@@ -12,11 +12,11 @@ export const getInitialState = (isAuthenticated = true) => {
     if (saved) {
       const parsed = JSON.parse(saved);
       if (parsed.upcomingQueues) {
-        // eslint-disable-next-line @typescript-eslint/no-explicit-any
+
         parsed.upcomingQueues = parsed.upcomingQueues.map((upQueue: any[]) => {
-          // eslint-disable-next-line @typescript-eslint/no-explicit-any
+
           const filtered = upQueue.filter((t: any) => t.sourceType !== 'LOCAL');
-          // eslint-disable-next-line @typescript-eslint/no-explicit-any
+
           filtered.forEach((t: any) => {
             if (t.imageUrl?.startsWith('blob:')) t.imageUrl = '';
           });

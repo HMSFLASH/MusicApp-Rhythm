@@ -58,7 +58,7 @@ export function LibraryPage() {
   const genresCount = useMemo(() => new Set(tracks.map(t => t.genre).filter(Boolean)).size, [tracks]);
   const artistsCount = useMemo(() => {
     return new Set(tracks.map(t => t.artist || playerState.getTrackMetadata(t.id)?.artist || (t.fileName?.includes(' - ') ? t.fileName.split(' - ')[0] : null)).filter(Boolean)).size;
-    // eslint-disable-next-line react-hooks/exhaustive-deps
+
   }, [tracks]);
 
   return (
@@ -246,14 +246,14 @@ export function LibraryPage() {
                     { label: 'Add to Playlist', icon: <ListPlus size={14} />, onSelect: () => setTrackToPlaylist(track) },
                     ...(track.sourceType !== 'LOCAL'
                       ? [{
-                          label: 'Download File',
-                          icon: <Download size={14} />,
-                          onSelect: () => downloadTrackFile(track)
-                        }, {
-                          label: favorites.some(f => f.id === track.id) ? 'Remove Favorite' : 'Add to Favorite',
-                          icon: <Heart size={14} fill={favorites.some(f => f.id === track.id) ? "currentColor" : "none"} className={favorites.some(f => f.id === track.id) ? "text-primary" : ""} />,
-                          onSelect: () => void toggleFavorite(track)
-                        }]
+                        label: 'Download File',
+                        icon: <Download size={14} />,
+                        onSelect: () => downloadTrackFile(track)
+                      }, {
+                        label: favorites.some(f => f.id === track.id) ? 'Remove Favorite' : 'Add to Favorite',
+                        icon: <Heart size={14} fill={favorites.some(f => f.id === track.id) ? "currentColor" : "none"} className={favorites.some(f => f.id === track.id) ? "text-primary" : ""} />,
+                        onSelect: () => void toggleFavorite(track)
+                      }]
                       : [])
                   ]}
                 />

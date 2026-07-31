@@ -16,7 +16,7 @@ export function SetLocalPasswordModal({ isOpen, onClose, defaultEmail = '' }: Se
   const [loading, setLoading] = useState(false);
   const [error, setError] = useState('');
   const [success, setSuccess] = useState(false);
-  
+
   const { refreshUser } = useAuth();
 
   if (!isOpen) return null;
@@ -49,7 +49,7 @@ export function SetLocalPasswordModal({ isOpen, onClose, defaultEmail = '' }: Se
         setPassword('');
         setConfirmPassword('');
       }, 2000);
-    // eslint-disable-next-line @typescript-eslint/no-explicit-any
+
     } catch (err: any) {
       setError(err.message || 'Failed to set password');
     } finally {
@@ -60,7 +60,7 @@ export function SetLocalPasswordModal({ isOpen, onClose, defaultEmail = '' }: Se
   return (
     <div className="fixed inset-0 z-[100] flex items-center justify-center bg-black/60 backdrop-blur-sm p-4">
       <div className="bg-[#050914] border border-white/10 rounded-2xl w-full max-w-md shadow-2xl overflow-hidden relative">
-        <button 
+        <button
           onClick={onClose}
           className="absolute top-4 right-4 text-white/40 hover:text-white transition-colors"
         >
@@ -95,8 +95,8 @@ export function SetLocalPasswordModal({ isOpen, onClose, defaultEmail = '' }: Se
                 <div className="absolute inset-y-0 left-0 pl-3 flex items-center pointer-events-none">
                   <User size={16} className="text-white/50 group-focus-within/input:text-[#00E5FF] transition-colors" />
                 </div>
-                <input 
-                  type="text" 
+                <input
+                  type="text"
                   value={loginId}
                   onChange={(e) => setLoginId(e.target.value)}
                   className="w-full bg-black/20 border border-white/10 hover:border-white/30 focus:border-[#00E5FF] text-white text-sm py-3.5 pl-10 pr-2 rounded-lg outline-none transition-all"
@@ -112,8 +112,8 @@ export function SetLocalPasswordModal({ isOpen, onClose, defaultEmail = '' }: Se
                 <div className="absolute inset-y-0 left-0 pl-3 flex items-center pointer-events-none">
                   <Lock size={16} className="text-white/50 group-focus-within/input:text-[#00E5FF] transition-colors" />
                 </div>
-                <input 
-                  type="password" 
+                <input
+                  type="password"
                   value={password}
                   onChange={(e) => setPassword(e.target.value)}
                   className="w-full bg-black/20 border border-white/10 hover:border-white/30 focus:border-[#00E5FF] text-white text-sm py-3.5 pl-10 pr-2 rounded-lg outline-none transition-all"
@@ -128,8 +128,8 @@ export function SetLocalPasswordModal({ isOpen, onClose, defaultEmail = '' }: Se
                 <div className="absolute inset-y-0 left-0 pl-3 flex items-center pointer-events-none">
                   <Lock size={16} className="text-white/50 group-focus-within/input:text-[#00E5FF] transition-colors" />
                 </div>
-                <input 
-                  type="password" 
+                <input
+                  type="password"
                   value={confirmPassword}
                   onChange={(e) => setConfirmPassword(e.target.value)}
                   className="w-full bg-black/20 border border-white/10 hover:border-white/30 focus:border-[#00E5FF] text-white text-sm py-3.5 pl-10 pr-2 rounded-lg outline-none transition-all"
@@ -137,7 +137,7 @@ export function SetLocalPasswordModal({ isOpen, onClose, defaultEmail = '' }: Se
                 />
               </div>
 
-              <button 
+              <button
                 type="submit"
                 disabled={loading}
                 className="w-full flex items-center justify-center gap-2 bg-[#00E5FF] hover:bg-[#00E5FF]/90 text-black font-bold py-3.5 rounded-xl shadow-[0_0_20px_rgba(0,229,255,0.3)] transition-all mt-4 disabled:opacity-50"

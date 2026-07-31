@@ -1,4 +1,4 @@
-import { useCallback, useEffect, useRef, useMemo, useState } from 'react';
+import { useCallback, useEffect, useRef, useMemo, useState, memo } from 'react';
 
 interface LyricsViewProps {
   lyrics: string;
@@ -12,6 +12,27 @@ interface LyricLine {
   text: string;
 }
 
+interface LyricLineItemProps {
+  line: LyricLine;
+  idx: number;
+  isActive: boolean;
+  isPassed: boolean;
+  canSeek: boolean;
+  onSeekLine: (idx: number, time: number) => void;
+}
+
+const LyricLineItem = memo(function LyricLineItem({ line, idx, isActive, isPassed, canSeek, onSeekLine }: LyricLineItemProps) {
+  return (
+    <div 
+      data-index={idx}
+      onClick={() => onSeekLine(idx, line.time)}
+      className={`max-w-[85%] mx-auto transition-all duration-500 text-center md:text-lg font-bold ${canSeek ? 'cursor-pointer hover:text-white/80' : ''} ${isActive ? 'text-primary scale-110 [text-shadow:0_0_8px_rgba(0,229,255,0.8)]' : isPassed ? 'text-white/40' : 'text-white/20'}`}
+    >
+      {line.text || '...'}
+    </div>
+  );
+});
+
 export function LyricsView({ lyrics, currentTime, duration = 0, onSeek }: LyricsViewProps) {
   const containerRef = useRef<HTMLDivElement>(null);
   const [isUserScrolling, setIsUserScrolling] = useState(false);
@@ -21,6 +42,11 @@ export function LyricsView({ lyrics, currentTime, duration = 0, onSeek }: Lyrics
   const lastSeekTimeRef = useRef(0);
   const isAutoScrollingRef = useRef(false);
   const layoutScrollTimeoutRef = useRef<ReturnType<typeof setTimeout> | null>(null);
+  
+  const currentTimeRef = useRef(currentTime);
+  useEffect(() => {
+    currentTimeRef.current = currentTime;
+  }, [currentTime]);
 
   const handleUserInteraction = () => {
     if (isAutoScrollingRef.current) return;
@@ -76,12 +102,23 @@ export function LyricsView({ lyrics, currentTime, duration = 0, onSeek }: Lyrics
 
   const activeIndex = useMemo(() => {
     if (parsedLyrics.isSynced) {
-      for (let i = parsedLyrics.lines.length - 1; i >= 0; i--) {
-        if (parsedLyrics.lines[i].time >= 0 && currentTime >= parsedLyrics.lines[i].time) {
-          return i;
+      const lines = parsedLyrics.lines;
+      if (lines.length === 0) return -1;
+      
+      let low = 0;
+      let high = lines.length - 1;
+      let bestMatch = -1;
+
+      while (low <= high) {
+        const mid = Math.floor((low + high) / 2);
+        if (lines[mid].time >= 0 && lines[mid].time <= currentTime) {
+          bestMatch = mid;
+          low = mid + 1; // Tiêp tục tìm ở nửa sau xem có dòng nào gần với currentTime hơn không
+        } else {
+          high = mid - 1;
         }
       }
-      return -1;
+      return bestMatch;
     }
     if (!duration || duration <= 0 || unsyncedLines.length === 0) return -1;
     const progress = Math.min(0.999, Math.max(0, currentTime / duration));
@@ -100,7 +137,7 @@ export function LyricsView({ lyrics, currentTime, duration = 0, onSeek }: Lyrics
     const activeEl = container.querySelector(`[data-index="${activeIndex}"]`) as HTMLElement | null;
     if (!activeEl) {
       if (!parsedLyrics.isSynced && duration > 0 && container.scrollHeight > container.clientHeight) {
-        const progress = Math.min(1, Math.max(0, currentTime / duration));
+        const progress = Math.min(1, Math.max(0, currentTimeRef.current / duration));
         const targetTop = progress * (container.scrollHeight - container.clientHeight);
         isAutoScrollingRef.current = true;
         container.scrollTo({ top: targetTop, behavior });
@@ -122,7 +159,12 @@ export function LyricsView({ lyrics, currentTime, duration = 0, onSeek }: Lyrics
     autoScrollTimeoutRef.current = setTimeout(() => {
       isAutoScrollingRef.current = false;
     }, behavior === 'smooth' ? 500 : 80);
-  }, [activeIndex, parsedLyrics.isSynced, duration, currentTime]);
+  }, [activeIndex, parsedLyrics.isSynced, duration]);
+
+  const scrollToActiveLineRef = useRef(scrollToActiveLine);
+  useEffect(() => {
+    scrollToActiveLineRef.current = scrollToActiveLine;
+  }, [scrollToActiveLine]);
 
   useEffect(() => {
     if (isUserScrolling || activeIndex === -1 || !containerRef.current) {
@@ -164,7 +206,7 @@ export function LyricsView({ lyrics, currentTime, duration = 0, onSeek }: Lyrics
 
   useEffect(() => {
     const container = containerRef.current;
-    if (!container || activeIndex === -1 || isUserScrolling || typeof ResizeObserver === 'undefined') {
+    if (!container || activeIndex === -1 || typeof ResizeObserver === 'undefined') {
       return;
     }
 
@@ -172,7 +214,9 @@ export function LyricsView({ lyrics, currentTime, duration = 0, onSeek }: Lyrics
     const observer = new ResizeObserver(() => {
       if (frameId !== null) cancelAnimationFrame(frameId);
       frameId = requestAnimationFrame(() => {
-        if (!isUserScrolling) scrollToActiveLine('auto');
+        if (!isUserScrolling) {
+          scrollToActiveLineRef.current('auto');
+        }
       });
     });
 
@@ -181,7 +225,7 @@ export function LyricsView({ lyrics, currentTime, duration = 0, onSeek }: Lyrics
       observer.disconnect();
       if (frameId !== null) cancelAnimationFrame(frameId);
     };
-  }, [activeIndex, isUserScrolling, scrollToActiveLine]);
+  }, [activeIndex, isUserScrolling]);
 
   useEffect(() => {
     return () => {
@@ -191,9 +235,24 @@ export function LyricsView({ lyrics, currentTime, duration = 0, onSeek }: Lyrics
     };
   }, []);
 
-  const linesToRender = parsedLyrics.isSynced 
-    ? parsedLyrics.lines 
-    : unsyncedLines.map((text) => ({ time: -1, text }));
+  const handleSeekLine = useCallback((idx: number, lineTime: number) => {
+    if (onSeek) {
+      lastSeekTimeRef.current = performance.now();
+      setIsUserScrolling(false);
+      if (parsedLyrics.isSynced && lineTime >= 0) {
+        onSeek(lineTime);
+      } else if (!parsedLyrics.isSynced && duration > 0 && unsyncedLines.length > 0) {
+        const targetTime = (idx / unsyncedLines.length) * duration;
+        onSeek(targetTime);
+      }
+    }
+  }, [onSeek, parsedLyrics.isSynced, duration, unsyncedLines.length]);
+
+  const linesToRender = useMemo(() => (
+    parsedLyrics.isSynced 
+      ? parsedLyrics.lines 
+      : unsyncedLines.map((text) => ({ time: -1, text }))
+  ), [parsedLyrics.isSynced, parsedLyrics.lines, unsyncedLines]);
 
   return (
     <div 
@@ -210,25 +269,15 @@ export function LyricsView({ lyrics, currentTime, duration = 0, onSeek }: Lyrics
         const canSeek = parsedLyrics.isSynced ? (line.time >= 0) : (!!onSeek && duration > 0 && unsyncedLines.length > 0);
 
         return (
-          <div 
-            key={idx} 
-            data-index={idx}
-            onClick={() => {
-              if (onSeek) {
-                lastSeekTimeRef.current = performance.now();
-                setIsUserScrolling(false);
-                if (parsedLyrics.isSynced && line.time >= 0) {
-                  onSeek(line.time);
-                } else if (!parsedLyrics.isSynced && duration > 0 && unsyncedLines.length > 0) {
-                  const targetTime = (idx / unsyncedLines.length) * duration;
-                  onSeek(targetTime);
-                }
-              }
-            }}
-            className={`max-w-[85%] mx-auto transition-all duration-500 text-center md:text-lg font-bold ${canSeek ? 'cursor-pointer hover:text-white/80' : ''} ${isActive ? 'text-primary scale-110 drop-shadow-[0_0_8px_rgba(0,229,255,0.8)]' : isPassed ? 'text-white/40' : 'text-white/20'}`}
-          >
-            {line.text || '...'}
-          </div>
+          <LyricLineItem
+            key={idx}
+            line={line}
+            idx={idx}
+            isActive={isActive}
+            isPassed={isPassed}
+            canSeek={canSeek}
+            onSeekLine={handleSeekLine}
+          />
         );
       })}
     </div>
