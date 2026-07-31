@@ -120,7 +120,7 @@ export function useAudioPlayback(
     m4aWasmOverrides,
   } = effectsState || {};
   const { audioContextRef, audioRef, bufferSourceRef, bufferVolumeNodeRef, initializeAudioContext, irBufferRef, setTrackLoudnessGain } = contextState;
-  const { blobCacheRef } = metadataState;
+  const { blobCacheRef, extractMetadata, metadataCacheRef } = metadataState;
 
   const ensureAudioContextResumed = useCallback(() => {
     if (audioContextRef.current && audioContextRef.current.state !== 'running' && audioContextRef.current.state !== 'closed') {
@@ -1285,6 +1285,13 @@ export function useAudioPlayback(
         try {
           await precalculateTrackBuffer(track, true, () => queuePrecalculateSessionRef.current !== sessionId);
           completed += 1;
+          // Prefetch metadata (bao gồm ảnh bìa) cho track vừa xong — fire-and-forget
+          const tid = String(track.id);
+          if (extractMetadata && !metadataCacheRef?.current?.get(tid)) {
+            extractMetadata(track).catch((e: unknown) =>
+              console.warn('[Queue Precalculate] Failed to prefetch metadata:', e)
+            );
+          }
         } catch (e) {
           failed += 1;
           localFailedIds.push(String(track.id));
@@ -1381,6 +1388,13 @@ export function useAudioPlayback(
       const nextTrackId = String(nextTrack.id);
       cachePrecalculatedQueueBuffer(nextTrackId, finalRenderedBuffer);
       precalculatedNextBufferRef.current = { trackId: nextTrackId, buffer: finalRenderedBuffer };
+
+      // Prefetch metadata (bao gồm ảnh bìa) cho bài kế — fire-and-forget
+      if (extractMetadata && !metadataCacheRef?.current?.get(nextTrackId)) {
+        extractMetadata(nextTrack).catch((e: unknown) =>
+          console.warn('[Lookahead] Failed to prefetch metadata for next track:', e)
+        );
+      }
     } catch (e) {
       console.error("[Lookahead] Failed to precalculate:", e);
     } finally {

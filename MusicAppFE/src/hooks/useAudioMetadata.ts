@@ -36,7 +36,6 @@ type ParsedAudioMetadata = {
 
 type AudioMetadataSettings = {
     legacyMetadataOverrides?: Record<string, boolean>;
-    precalculateOnIdle?: boolean;
 };
 
 type MetadataFileInfo = {
@@ -168,7 +167,7 @@ export function useAudioMetadata(isAuthenticated: boolean, queueState: any, sett
         const existing = metadataCacheRef.current.get(trackId);
         if (existing?.pending) return;
         if (track.sourceType !== 'LOCAL' && !isAuthenticated) return;
-        const useLegacyMetadataParser = options.useLegacyMetadataParser ?? shouldUseLegacyMetadataParser(track, legacyMetadataOverrides, settings.precalculateOnIdle);
+        const useLegacyMetadataParser = options.useLegacyMetadataParser ?? shouldUseLegacyMetadataParser(track, legacyMetadataOverrides);
 
         // --- CACHE READ LAYER ---
         const lsKey = getMetadataCacheKey(trackId);

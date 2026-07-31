@@ -21,7 +21,6 @@ export function useAudioEngine(
 ) {
   const metadataState = useAudioMetadata(isAuthenticated, queueState, {
     legacyMetadataOverrides: effectsState.legacyMetadataOverrides,
-    precalculateOnIdle: effectsState.precalculateOnIdle,
   });
   const currentTrack = queueState.currentTrack;
   const currentTrackMetadata = currentTrack
