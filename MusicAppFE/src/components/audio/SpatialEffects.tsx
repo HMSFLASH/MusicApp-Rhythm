@@ -5,21 +5,30 @@ import { AudioEffectPanel, EffectControlsGate, EffectPowerButton } from './Audio
 import { STEREO_WIDTH_MAX_PERCENT } from '../../hooks/audioMath';
 import { reverbWetGain } from '../../hooks/audioGraph';
 
-function SpatialSignalRouting() {
-  const { playerState } = useGlobalAudio();
+function SpatialSignalRouting({
+  reverbMix,
+  stereoWidth,
+  reverbEnabled,
+  stereoEnabled
+}: {
+  reverbMix: number;
+  stereoWidth: number;
+  reverbEnabled: boolean;
+  stereoEnabled: boolean;
+}) {
   const { t } = useTranslation();
 
-  const reverbWet = playerState.fxEnabled.reverb ? reverbWetGain(playerState.reverbMix) : 0;
-  const stereoWet = playerState.fxEnabled.stereo ? (playerState.stereoWidth / 100) : 1.0;
+  const reverbWet = reverbEnabled ? reverbWetGain(reverbMix) : 0;
+  const stereoWet = stereoEnabled ? (stereoWidth / 100) : 1.0;
   
   // Total combined spatial field values
   const totalDry = 1.0;
   const totalWet = reverbWet + stereoWet;
 
-  const isActive = playerState.fxEnabled.reverb || playerState.fxEnabled.stereo;
+  const isActive = reverbEnabled || stereoEnabled;
 
   return (
-    <div className={`flex items-center justify-between p-4 rounded-xl border transition-all duration-300 ${isActive ? 'bg-black/40 border-[#ff00ff]/30 shadow-[0_0_15px_rgba(255,0,255,0.1)]' : 'bg-white/5 border-white/10 opacity-60 grayscale'}`}>
+    <div className={`flex items-center justify-between p-4 rounded-xl border ${isActive ? 'bg-black/40 border-[#ff00ff]/30 shadow-[0_0_15px_rgba(255,0,255,0.1)]' : 'bg-white/5 border-white/10 opacity-60 grayscale'}`}>
       <div className="flex flex-col">
         <span className="text-white/90 font-semibold">{t('studio.spatial.routingTitle', 'Spatial Output Balance')}</span>
         <span className="text-white/50 text-xs mt-0.5">{t('studio.spatial.routingDesc', 'Total calculated spatial field')}</span>
@@ -40,7 +49,12 @@ export function SpatialEffects() {
   return (
     <div className="flex flex-col gap-8 w-full">
       
-      <SpatialSignalRouting />
+      <SpatialSignalRouting
+        reverbMix={playerState.reverbMix}
+        stereoWidth={playerState.stereoWidth}
+        reverbEnabled={playerState.fxEnabled.reverb}
+        stereoEnabled={playerState.fxEnabled.stereo}
+      />
 
       <AudioEffectPanel
         title={t('studio.spatial.reverbTitle', 'Reverb FX')}
