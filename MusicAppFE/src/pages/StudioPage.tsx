@@ -9,7 +9,7 @@ import { MasterOutput } from '../components/audio/MasterOutput';
 
 export function StudioPage() {
   const { t } = useTranslation();
-  const [activeTab, setActiveTab] = useState<'eq' | 'tone' | 'dynamics' | 'spatial' | 'master'>('eq');
+  const [activeTab, setActiveTab] = useState<'eq' | 'dynamics' | 'spatial' | 'master'>('eq');
 
   return (
     <div className="flex flex-col h-full max-w-7xl 2xl:max-w-none mx-auto pb-28 md:pb-32">
@@ -41,15 +41,7 @@ export function StudioPage() {
               activeTab === 'eq' ? 'bg-[#00E5FF]/20 text-[#00E5FF]' : 'text-white/80 hover:text-white hover:bg-white/10'
             }`}
           >
-            {t('studio.tabEqOnly', 'EQ')}
-          </button>
-          <button aria-label="Action"
-            onClick={() => setActiveTab('tone')}
-            className={`grow shrink-0 lg:flex-none px-4 lg:px-6 py-2 rounded-lg text-xs lg:text-sm font-bold transition-all whitespace-nowrap ${
-              activeTab === 'tone' ? 'bg-[#00f5ff]/20 text-[#00f5ff]' : 'text-white/80 hover:text-white hover:bg-white/10'
-            }`}
-          >
-            {t('studio.tabTone', 'Tone & Preamp')}
+            {t('studio.tabEq', 'EQ & Tone')}
           </button>
           <button aria-label="Action"
             onClick={() => setActiveTab('dynamics')}
@@ -82,11 +74,10 @@ export function StudioPage() {
         {/* Main Content Area */}
         <div className="flex-1 flex flex-col gap-8">
           {activeTab === 'eq' && (
-            <EqRack />
-          )}
-
-          {activeTab === 'tone' && (
-            <ToneControls />
+            <>
+              <EqRack />
+              <ToneControls />
+            </>
           )}
 
           {activeTab === 'dynamics' && (
