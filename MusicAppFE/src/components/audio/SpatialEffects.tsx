@@ -10,35 +10,24 @@ function SpatialSignalRouting() {
   const { t } = useTranslation();
 
   const reverbWet = playerState.fxEnabled.reverb ? reverbWetGain(playerState.reverbMix) : 0;
-  const reverbDry = 1.0;
   const stereoWet = playerState.fxEnabled.stereo ? (playerState.stereoWidth / 100) : 1.0;
+  
+  // Total combined spatial field values
+  const totalDry = 1.0;
+  const totalWet = reverbWet + stereoWet;
+
+  const isActive = playerState.fxEnabled.reverb || playerState.fxEnabled.stereo;
 
   return (
-    <div className="flex flex-col gap-3 p-4 rounded-xl bg-white/5 border border-white/10 w-full">
+    <div className={`flex items-center justify-between p-4 rounded-xl border transition-all duration-300 ${isActive ? 'bg-black/40 border-[#ff00ff]/30 shadow-[0_0_15px_rgba(255,0,255,0.1)]' : 'bg-white/5 border-white/10 opacity-60 grayscale'}`}>
       <div className="flex flex-col">
-        <span className="text-white/90 font-semibold">{t('studio.spatial.routingTitle', 'Spatial Signal Routing Monitor')}</span>
-        <span className="text-white/50 text-xs mt-0.5">{t('studio.spatial.routingDesc', 'Real-time calculation of actual output gain factors')}</span>
+        <span className="text-white/90 font-semibold">{t('studio.spatial.routingTitle', 'Spatial Output Balance')}</span>
+        <span className="text-white/50 text-xs mt-0.5">{t('studio.spatial.routingDesc', 'Total calculated spatial field')}</span>
       </div>
-      <div className="flex flex-wrap gap-4 mt-2">
-        {/* Reverb Monitor */}
-        <div className={`flex flex-col flex-1 min-w-[200px] bg-black/40 rounded-lg p-3 border transition-all duration-300 ${playerState.fxEnabled.reverb ? 'border-[#ff00ff]/40 shadow-[0_0_15px_rgba(255,0,255,0.1)]' : 'border-white/10 opacity-50 grayscale'}`}>
-          <span className="text-white/70 text-xs font-medium mb-2">{t('studio.spatial.reverbGain', 'Reverb Gain')}</span>
-          <div className="flex items-center justify-between font-mono text-sm">
-            <span className="text-white/60">Dry: <span className="text-[#00f5ff] font-semibold">{reverbDry.toFixed(2)}</span></span>
-            <span className="text-white/20">|</span>
-            <span className="text-white/60">Wet: <span className="text-[#ff00ff] font-bold">{reverbWet.toFixed(2)}</span></span>
-          </div>
-        </div>
-        
-        {/* Stereo Monitor */}
-        <div className={`flex flex-col flex-1 min-w-[200px] bg-black/40 rounded-lg p-3 border transition-all duration-300 ${playerState.fxEnabled.stereo ? 'border-[#9d00ff]/40 shadow-[0_0_15px_rgba(157,0,255,0.1)]' : 'border-white/10 opacity-50 grayscale'}`}>
-          <span className="text-white/70 text-xs font-medium mb-2">{t('studio.spatial.stereoGain', 'Stereo Gain Matrix')}</span>
-          <div className="flex items-center justify-between font-mono text-sm">
-            <span className="text-white/60">Mid: <span className="text-[#00f5ff] font-semibold">1.00</span></span>
-            <span className="text-white/20">|</span>
-            <span className="text-white/60">Side: <span className="text-[#9d00ff] font-bold">{stereoWet.toFixed(2)}</span></span>
-          </div>
-        </div>
+      <div className="flex items-center gap-3 font-mono text-sm bg-white/5 px-4 py-2 rounded-lg border border-white/5">
+        <span className="text-white/60">Dry: <span className="text-[#00f5ff] font-semibold">{totalDry.toFixed(2)}</span></span>
+        <span className="text-white/20">|</span>
+        <span className="text-white/60">Wet: <span className="text-[#ff00ff] font-bold">{totalWet.toFixed(2)}</span></span>
       </div>
     </div>
   );
