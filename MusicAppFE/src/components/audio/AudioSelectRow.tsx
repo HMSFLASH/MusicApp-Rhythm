@@ -26,18 +26,18 @@ export function AudioSelectRow({
     : 'bg-white/5 border-white/10';
 
   return (
-    <div className={`flex flex-col md:flex-row md:items-center justify-between gap-3 sm:gap-4 mt-2 p-4 rounded-xl border ${containerStyle} w-full`}>
-      <div className="flex flex-col flex-1 min-w-0">
+    <div className={`flex flex-col gap-3 mt-2 p-4 rounded-xl border ${containerStyle} w-full`}>
+      <div className="flex flex-col w-full">
         <span className={`text-sm font-bold block leading-snug break-words ${titleClassName || 'text-white/80'}`}>{title}</span>
         <span className={`text-xs font-mono mt-1 block leading-normal break-words ${descriptionClassName || 'text-white/50'}`}>
           {description}
         </span>
       </div>
-      <div className="relative w-full md:w-auto shrink-0 mt-1 md:mt-0">
+      <div className="relative w-full">
         <select
           value={value}
           onChange={(e) => onChange(Number(e.target.value))}
-          className="w-full md:w-auto bg-black/70 text-[#00E5FF] font-mono text-xs font-bold border border-white/20 rounded-lg px-3 py-2 outline-none cursor-pointer hover:border-[#00E5FF]/60 focus:border-[#00E5FF] transition-colors truncate max-w-full"
+          className="w-full bg-black/70 text-[#00E5FF] font-mono text-xs font-bold border border-white/20 rounded-lg px-3 py-2 outline-none cursor-pointer hover:border-[#00E5FF]/60 focus:border-[#00E5FF] transition-colors truncate"
         >
           {options.map((opt) => (
             <option key={opt.value} value={opt.value} className="bg-[#121212] text-white font-mono py-1">
