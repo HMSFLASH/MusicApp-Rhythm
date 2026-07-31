@@ -114,6 +114,7 @@ export function useAudioPlayback(
     stereoWidth,
     panValue,
     loudnessNormalization,
+    useOversample,
     eqBlockSize,
     fullQueueCacheEnabled,
     flacWasmOverrides,
@@ -565,6 +566,7 @@ export function useAudioPlayback(
     stereoWidth,
     panValue,
     loudnessNormalization,
+    useOversample,
     eqBlockSize,
   });
   const fxEnabledRef = useRef<FxEnabledFlags>(fxEnabled || {});
@@ -591,6 +593,7 @@ export function useAudioPlayback(
       stereoWidth,
       panValue,
       loudnessNormalization,
+      useOversample,
       eqBlockSize,
     };
   }, [
@@ -610,6 +613,7 @@ export function useAudioPlayback(
     stereoWidth,
     trebleGain,
     loudnessNormalization,
+    useOversample,
     eqBlockSize,
   ]);
 
@@ -643,6 +647,7 @@ export function useAudioPlayback(
     stopQueuePrecalculateStatusSoon,
     stereoWidth,
     trebleGain,
+    useOversample,
   ]);
 
   const setVolume = useCallback((newVolume: number) => {

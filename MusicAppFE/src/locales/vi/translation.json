@@ -68,10 +68,10 @@
       "fft8192": "8192 (Rất cao / Nặng CPU)",
       "fft16384": "16384 (Tối đa / Cực nặng)",
       "latencyTitle": "Audio Buffer Size (Latency Mode)",
-      "latencyDesc": "Tương tự Block Size trong DAW. Quyết định kích thước bộ đệm âm thanh. Nên chọn Playback để máy có nhiều thời gian xử lý EQ, tránh bị nổ tiếng/ngắt quãng. (Lưu ý: Thay đổi sẽ áp dụng ở bài hát tiếp theo hoặc khi F5 trang).",
-      "latencyInteractive": "Interactive (Độ trễ thấp nhất / Dễ bị giật tiếng trên máy yếu)",
-      "latencyBalanced": "Balanced (Cân bằng giữa độ trễ và hiệu năng)",
-      "latencyPlayback": "Playback (Độ trễ cao / An toàn nhất / Không lo giật tiếng)",
+      "latencyDesc": "Xác định kích thước bộ đệm âm thanh. Khuyên dùng 'Playback' để giảm tải CPU, tránh bị giật hoặc nổ tiếng. (Thay đổi có hiệu lực khi tải lại trang hoặc sang bài mới).",
+      "latencyInteractive": "Interactive (Siêu thấp / Dễ giật tiếng)",
+      "latencyBalanced": "Balanced (Trung bình)",
+      "latencyPlayback": "Playback (Cao / An toàn nhất)",
       "enableFullQueueFirst": "Bật Full Queue RAM Cache trước",
       "queuePrecalcTitle": "Tính toán trước toàn bộ hàng chờ",
       "queuePrecalcDesc": "Phát hiện {{cores}} nhân CPU. Đề xuất: {{workers}} worker. Tối đa: {{maxWorkers}} worker.",
@@ -125,7 +125,9 @@
       "resetButton": "Reset",
       "resetTitle": "Đưa Compressor về trạng thái trung tính",
       "limiterTitle": "Chống vỡ tiếng (Master Limiter)",
-      "limiterDesc": "Bắt các peak cuối chuỗi sau soft clip, giảm rè/nổ khi EQ, preamp hoặc hiệu ứng làm âm lượng tăng cao. Khuyến nghị luôn bật nếu CPU đủ mạnh."
+      "limiterDesc": "Xử lý triệt để các đỉnh âm thanh cuối cùng, giảm thiểu tiếng lẹt đẹt khi EQ, preamp hay các hiệu ứng khác làm tăng âm lượng. Nên bật nếu thiết bị đủ mạnh.",
+      "hqOversampleTitle": "Lấy mẫu chất lượng cao (4x Oversampling)",
+      "hqOversampleDesc": "Giảm đáng kể hiện tượng méo tiếng (aliasing) khi chống vỡ tiếng hoạt động mạnh, nhưng tiêu tốn khá nhiều CPU."
     },
     "spatial": {
       "routingTitle": "Cân Bằng Tín Hiệu Không Gian",

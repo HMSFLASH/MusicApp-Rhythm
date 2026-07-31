@@ -125,7 +125,9 @@
       "resetButton": "Reset",
       "resetTitle": "Reset compressor to neutral settings",
       "limiterTitle": "Anti-Clipping Master Limiter",
-      "limiterDesc": "Catches final output peaks after soft clipping, reducing crackling when EQ, preamp, or effects raise the level. Recommended to leave on if CPU is powerful enough."
+      "limiterDesc": "Catches final output peaks after soft clipping, reducing crackling when EQ, preamp, or effects raise the level. Recommended to leave on if CPU is powerful enough.",
+      "hqOversampleTitle": "High Quality Oversampling (4x)",
+      "hqOversampleDesc": "Greatly reduces aliasing distortion during heavy limiting, but consumes significant CPU."
     },
     "spatial": {
       "routingTitle": "Spatial Output Balance",

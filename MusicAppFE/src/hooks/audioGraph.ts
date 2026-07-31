@@ -238,11 +238,12 @@ export const applyMasterLimiterState = (
   limiter: DynamicsCompressorNode,
   softClip: WaveShaperNode,
   enabled: boolean,
+  useOversample: boolean = false,
   smooth = false
 ) => {
   applyMasterLimiterCompressorState(ctx, limiter, enabled, smooth);
   softClip.curve = (enabled ? createSoftClipCurve() : createIdentityCurve()) as any;
-  softClip.oversample = '4x';
+  softClip.oversample = useOversample ? '4x' : 'none';
 };
 
 export const configureLoudnessNormalization = (

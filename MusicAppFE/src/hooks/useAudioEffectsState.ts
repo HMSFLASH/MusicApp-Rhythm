@@ -238,6 +238,7 @@ export function useAudioEffectsState(savedState: SavedAudioEffectsState = {}) {
     setStereoWidthState(clamp(value, 0, STEREO_WIDTH_MAX_PERCENT));
   }, []);
   const toggleLoudnessNormalization = useCallback(() => setLoudnessNormalization(prev => !prev), []);
+  const toggleUseOversample = useCallback(() => setUseOversample(prev => !prev), []);
   const setPreampGain = useCallback((value: number) => setPreampGainState(clampPreampGain(value)), []);
 
   const setCompressorSettings = useCallback((settings: typeof COMPRESSOR_DEFAULTS, enabled = true) => {
@@ -397,7 +398,7 @@ export function useAudioEffectsState(savedState: SavedAudioEffectsState = {}) {
     reverbMix, setReverbMix, updateReverbMix: setReverbMix,
     reverbTime, setReverbTime, updateReverbTime: setReverbTime,
     loudnessNormalization, setLoudnessNormalization, toggleLoudnessNormalization,
-    useOversample, setUseOversample,
+    useOversample, setUseOversample, toggleUseOversample,
     precalculateOnIdle, setPrecalculateOnIdle,
     fullQueueCacheEnabled, setFullQueueCacheEnabled,
     masterFftSize, setMasterFftSize, updateMasterFftSize: setMasterFftSize,

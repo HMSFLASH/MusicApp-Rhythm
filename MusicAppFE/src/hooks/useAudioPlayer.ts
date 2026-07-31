@@ -170,6 +170,7 @@ export function useAudioPlayer(
       reverbMix: effectsState.reverbMix,
       reverbTime: effectsState.reverbTime,
       loudnessNormalization: effectsState.loudnessNormalization,
+      useOversample: effectsState.useOversample,
       precalculateOnIdle: effectsState.precalculateOnIdle,
       fullQueueCacheEnabled: effectsState.fullQueueCacheEnabled,
       masterFftSize: effectsState.masterFftSize,
@@ -193,7 +194,7 @@ export function useAudioPlayer(
     effectsState.preampGain, effectsState.bassGain, effectsState.trebleGain,
     effectsState.compThreshold, effectsState.compRatio, effectsState.compKnee, effectsState.compAttack, effectsState.compRelease, effectsState.compRmsSize, effectsState.compMakeupGain,
     effectsState.panValue, effectsState.stereoWidth, effectsState.reverbMix, effectsState.reverbTime,
-    effectsState.loudnessNormalization, effectsState.precalculateOnIdle,
+    effectsState.loudnessNormalization, effectsState.useOversample, effectsState.precalculateOnIdle,
     effectsState.fullQueueCacheEnabled, effectsState.masterFftSize, effectsState.stereoFftSize, effectsState.eqBlockSize, effectsState.audioLatencyHint, effectsState.fxEnabled
   ]);
 

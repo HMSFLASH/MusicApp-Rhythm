@@ -17,6 +17,7 @@ export type AudioRenderParams = {
   stereoWidth: number;
   panValue: number;
   loudnessNormalization: boolean;
+  useOversample: boolean;
   eqBlockSize: number;
 };
 
@@ -41,6 +42,7 @@ export const createRenderSignature = (
     interpolate: Boolean(enabled.interpolate),
   },
   eqBlockSize: params.eqBlockSize,
+  useOversample: Boolean(params.useOversample),
   preampGain: params.preampGain,
   eqBands: Array.isArray(params.eqBands)
     ? params.eqBands.map((band: EqBand) => ({

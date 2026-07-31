@@ -70,6 +70,7 @@ export const renderOfflineAudio = async ({
     stereoWidth,
     panValue,
     loudnessNormalization,
+    useOversample,
     eqBlockSize,
   } = params;
 
@@ -348,7 +349,7 @@ export const renderOfflineAudio = async ({
   if (activity.limiter) {
     const waveShaper = offlineCtx.createWaveShaper();
     waveShaper.curve = createSoftClipCurve() as any;
-    waveShaper.oversample = '4x';
+    waveShaper.oversample = useOversample ? '4x' : 'none';
     connectToNext(waveShaper);
 
     const limiter = offlineCtx.createDynamicsCompressor();
