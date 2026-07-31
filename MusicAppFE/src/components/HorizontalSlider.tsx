@@ -213,7 +213,7 @@ export function HorizontalSlider({
 
         {/* Active Track (Colored from 0 to value) */}
         <div 
-          className="absolute h-[4px] rounded-full pointer-events-none transition-all duration-75"
+          className={`absolute h-[4px] rounded-full pointer-events-none ${!isDragging ? 'transition-all duration-75' : ''}`}
           style={{ 
             left: `${fillLeft}%`,
             width: `${fillWidth}%`,
@@ -224,7 +224,7 @@ export function HorizontalSlider({
 
         {/* Thumb */}
         <div 
-          className="absolute w-4 h-8 bg-[#1a1a1a] rounded-md border border-white/20 shadow-lg pointer-events-none flex flex-col items-center justify-center transition-transform duration-75 group-hover:border-white/40"
+          className={`absolute w-4 h-8 bg-[#1a1a1a] rounded-md border border-white/20 shadow-lg pointer-events-none flex flex-col items-center justify-center group-hover:border-white/40 ${!isDragging ? 'transition-transform duration-75' : ''}`}
           style={{ 
             left: `${percentage}%`,
             transform: 'translateX(-50%)'
