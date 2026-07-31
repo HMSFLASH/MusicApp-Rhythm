@@ -10,12 +10,10 @@ import {
   configureMasterLimiter,
   createCustomDynamicsCompressorNode,
   connectStereoWidthMatrix,
-  createOversampledSoftClipperNode,
   createSoftClipCurve,
   generateImpulseResponse,
   isAudioBufferNearMono,
   loadCustomDynamicsCompressorWorklet,
-  loadOversampledSoftClipperWorklet,
   REVERB_WET_HIGHPASS_HZ,
   REVERB_WET_LOWPASS_HZ,
   reverbPreDelaySeconds,
@@ -348,21 +346,10 @@ export const renderOfflineAudio = async ({
   connectToNext(headroomRecover);
 
   if (activity.limiter) {
-    let softClip: AudioNode;
-    const canUseWorklet =
-      params.useOversample &&
-      await loadOversampledSoftClipperWorklet(offlineCtx);
-
-    if (canUseWorklet) {
-      softClip = createOversampledSoftClipperNode(offlineCtx);
-    } else {
-      const waveShaper = offlineCtx.createWaveShaper();
-      waveShaper.curve = createSoftClipCurve();
-      waveShaper.oversample = params.useOversample ? '4x' : 'none';
-      softClip = waveShaper;
-    }
-
-    connectToNext(softClip);
+    const waveShaper = offlineCtx.createWaveShaper();
+    waveShaper.curve = createSoftClipCurve() as any;
+    waveShaper.oversample = '4x';
+    connectToNext(waveShaper);
 
     const limiter = offlineCtx.createDynamicsCompressor();
     configureMasterLimiter(limiter);

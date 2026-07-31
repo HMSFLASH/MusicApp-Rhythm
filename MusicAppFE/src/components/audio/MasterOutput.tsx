@@ -75,13 +75,6 @@ export function MasterOutput() {
       />
 
       <AudioToggleRow
-        title={t('studio.masterOutput.hqOversample', 'High Quality Oversampling')}
-        description={t('studio.masterOutput.hqOversampleDesc', 'Reduces aliasing in the limiter soft clip stage. Warning: May cause lag on mobile devices.')}
-        checked={playerState.useOversample}
-        onToggle={() => playerState.setUseOversample(!playerState.useOversample)}
-      />
-
-      <AudioToggleRow
         tone="amber"
         title={t('studio.masterOutput.precalcIdle', 'Pre-calculate for Weak CPUs')}
         description={t('studio.masterOutput.precalcIdleDesc', 'For weak CPUs with enough RAM: renders each track before playback so heavy effects do not have to run in real time. This normal mode handles one track at a time, not the whole queue. EQ/Effects changes apply on the next track.')}

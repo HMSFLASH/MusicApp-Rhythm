@@ -27,7 +27,7 @@ export function StudioPage() {
                 {t('studio.warningDesc', 'Heavy effects can overload weak CPUs and make playback stutter or crackle, even after pre-calculation if the device cannot keep the audio buffer filled.')}
               </p>
               <p className="text-amber-500/80 text-xs mt-1">
-                {t('studio.warningRecommendWeak', 'Recommended for weak devices: enable pre-calculation, keep the limiter on, turn off high quality oversampling, and reduce reverb/stereo widening or very large EQ presets.')}
+                {t('studio.warningRecommendWeak', 'Recommended for weak devices: enable pre-calculation, keep the limiter on, and reduce reverb/stereo widening or very large EQ presets.')}
               </p>
             </div>
           </div>

@@ -96,7 +96,6 @@ export function useAudioPlayback(
   const configStorageKey = getAudioConfigStorageKey(isAuthenticated);
   const { currentTrack, setCurrentTrack, queue, setQueue, isShuffleState, songEndMode, queueEndMode, upcomingQueues, cycleQueues, setUpcomingQueues } = queueState || {};
   const {
-    useOversample,
     precalculateOnIdle,
     fxEnabled,
     preampGain,
@@ -565,7 +564,6 @@ export function useAudioPlayback(
     reverbTime,
     stereoWidth,
     panValue,
-    useOversample,
     loudnessNormalization,
     eqBlockSize,
   });
@@ -592,7 +590,6 @@ export function useAudioPlayback(
       reverbTime,
       stereoWidth,
       panValue,
-      useOversample,
       loudnessNormalization,
       eqBlockSize,
     };
@@ -612,7 +609,6 @@ export function useAudioPlayback(
     reverbTime,
     stereoWidth,
     trebleGain,
-    useOversample,
     loudnessNormalization,
     eqBlockSize,
   ]);
@@ -647,7 +643,6 @@ export function useAudioPlayback(
     stopQueuePrecalculateStatusSoon,
     stereoWidth,
     trebleGain,
-    useOversample,
   ]);
 
   const setVolume = useCallback((newVolume: number) => {

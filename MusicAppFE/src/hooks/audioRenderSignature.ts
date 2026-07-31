@@ -16,7 +16,6 @@ export type AudioRenderParams = {
   reverbTime: number;
   stereoWidth: number;
   panValue: number;
-  useOversample: boolean;
   loudnessNormalization: boolean;
   eqBlockSize: number;
 };
@@ -65,6 +64,5 @@ export const createRenderSignature = (
   reverbTime: params.reverbTime,
   stereoWidth: params.stereoWidth,
   panValue: params.panValue,
-  useOversample: Boolean(params.useOversample),
   loudnessNormalization: Boolean(params.loudnessNormalization),
 });

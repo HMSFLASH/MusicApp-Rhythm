@@ -3,14 +3,11 @@ import { expandResonantEqBands, type EqBand } from './audioTypes';
 import { generateGraphicEqImpulseResponse } from './firFilterGenerator';
 import {
   applyCustomDynamicsCompressorSettings,
-  applyMasterLimiterCompressorState,
   applyMasterLimiterState,
   createCustomDynamicsCompressorNode,
-  createOversampledSoftClipperNode,
   generateImpulseResponse,
   getStereoSimilarity,
   loadCustomDynamicsCompressorWorklet,
-  loadOversampledSoftClipperWorklet,
   pseudoStereoWetGain,
   REVERB_WET_HIGHPASS_HZ,
   REVERB_WET_LOWPASS_HZ,
@@ -50,7 +47,7 @@ const disconnectNode = (node: AudioNode | null) => {
 };
 
 export function useAudioContext(effectsState: any) {
-  const { eqBands: rawEqBands, isParametricPreset, preampGain, bassGain, trebleGain, compThreshold, compRatio, compKnee, compAttack, compRelease, compRmsSize, compMakeupGain, panValue, stereoWidth, reverbMix, reverbTime, useOversample, loudnessNormalization, masterFftSize = 2048, stereoFftSize = 1024, eqBlockSize = 4096, audioLatencyHint = 'playback', fxEnabled, audioIsStereo = true, isAuthenticated } = effectsState;
+  const { eqBands: rawEqBands, isParametricPreset, preampGain, bassGain, trebleGain, compThreshold, compRatio, compKnee, compAttack, compRelease, compRmsSize, compMakeupGain, panValue, stereoWidth, reverbMix, reverbTime, loudnessNormalization, masterFftSize = 2048, stereoFftSize = 1024, eqBlockSize = 4096, audioLatencyHint = 'playback', fxEnabled, audioIsStereo = true, isAuthenticated } = effectsState;
   const [audioSampleRate, setAudioSampleRate] = useState(44100);
 
   // Audio Context and Core Nodes
@@ -99,10 +96,7 @@ export function useAudioContext(effectsState: any) {
   const eqSplitterRef = useRef<ChannelSplitterNode | null>(null);
   const eqMergerRef = useRef<ChannelMergerNode | null>(null);
   const limiterNodeRef = useRef<DynamicsCompressorNode | null>(null);
-  const softClipNodeRef = useRef<AudioNode | null>(null);
   const softClipWaveShaperRef = useRef<WaveShaperNode | null>(null);
-  const oversampledSoftClipperReadyRef = useRef(false);
-  const oversampledSoftClipperLoadingRef = useRef<Promise<boolean> | null>(null);
   const panNodeRef = useRef<StereoPannerNode | null>(null);
   const trackLoudnessGainRef = useRef<GainNode | null>(null);
   const trackLoudnessGainValueRef = useRef(1);
@@ -149,20 +143,7 @@ export function useAudioContext(effectsState: any) {
     stereoRightAnalyserRef.current = null;
   }, []);
 
-  const ensureOversampledSoftClipperWorklet = useCallback((ctx: BaseAudioContext) => {
-    if (oversampledSoftClipperReadyRef.current || oversampledSoftClipperLoadingRef.current) return;
 
-    oversampledSoftClipperLoadingRef.current = loadOversampledSoftClipperWorklet(ctx).then((ready) => {
-      oversampledSoftClipperReadyRef.current = ready;
-      oversampledSoftClipperLoadingRef.current = null;
-
-      if (ready && sourceNodeRef.current && fxEnabledRef.current?.limiter && useOversample) {
-        globalThis.setTimeout(() => initializeAudioContextRef.current?.(), 0);
-      }
-
-      return ready;
-    });
-  }, [useOversample]);
 
   const ensureCustomDynamicsCompressorWorklet = useCallback((ctx: BaseAudioContext) => {
     if (customCompressorReadyRef.current || customCompressorLoadingRef.current) return;
@@ -282,7 +263,7 @@ export function useAudioContext(effectsState: any) {
     audioIsStereo: currentGraphActivity.stereo ? Boolean(audioIsStereo) : null,
     master: currentGraphActivity.master,
     limiter: currentGraphActivity.limiter,
-    useOversample: currentGraphActivity.limiter ? Boolean(useOversample) : null,
+
     compMode: currentGraphActivity.comp ? (compRatio < 1 ? 'custom' : 'native') : null,
   });
 
@@ -457,10 +438,7 @@ export function useAudioContext(effectsState: any) {
     disconnectNode(haasWetGainRef.current);
     disconnectNode(headroomRecoverRef.current);
     disconnectNode(limiterNodeRef.current);
-    disconnectNode(softClipNodeRef.current);
-    if (softClipWaveShaperRef.current && softClipWaveShaperRef.current !== softClipNodeRef.current) {
-      disconnectNode(softClipWaveShaperRef.current);
-    }
+    disconnectNode(softClipWaveShaperRef.current);
     disconnectNode(panNodeRef.current);
     disconnectNode(masterAnalyserRef.current);
 
@@ -798,35 +776,18 @@ export function useAudioContext(effectsState: any) {
       if (!limiterNodeRef.current) {
         limiterNodeRef.current = ctx.createDynamicsCompressor();
       }
-      if (useOversample) {
-        ensureOversampledSoftClipperWorklet(ctx);
-      }
 
-      const useWorkletSoftClipper = useOversample && oversampledSoftClipperReadyRef.current;
+      const waveShaper = ctx.createWaveShaper();
+      applyMasterLimiterState(
+        ctx,
+        limiterNodeRef.current,
+        waveShaper,
+        true
+      );
+      softClipWaveShaperRef.current = waveShaper;
 
-      softClipWaveShaperRef.current = null;
-      if (useWorkletSoftClipper) {
-        softClipNodeRef.current = createOversampledSoftClipperNode(ctx);
-        applyMasterLimiterCompressorState(
-          ctx,
-          limiterNodeRef.current,
-          true
-        );
-      } else {
-        const waveShaper = ctx.createWaveShaper();
-        applyMasterLimiterState(
-          ctx,
-          limiterNodeRef.current,
-          waveShaper,
-          true,
-          useOversample
-        );
-        softClipWaveShaperRef.current = waveShaper;
-        softClipNodeRef.current = waveShaper;
-      }
-
-      currentNode.connect(softClipNodeRef.current);
-      softClipNodeRef.current.connect(limiterNodeRef.current);
+      currentNode.connect(softClipWaveShaperRef.current);
+      softClipWaveShaperRef.current.connect(limiterNodeRef.current);
       currentNode = limiterNodeRef.current;
     } else {
       softClipWaveShaperRef.current = null;
@@ -876,7 +837,6 @@ export function useAudioContext(effectsState: any) {
     reverbTime,
     stereoWidth,
     trebleGain,
-    useOversample,
   ]);
   useEffect(() => {
     initializeAudioContextRef.current = initializeAudioContext;
@@ -1061,12 +1021,10 @@ export function useAudioContext(effectsState: any) {
     }
   }, [masterFftSize]);
 
-  const prevLimiterDepsRef = useRef({ limiter: fxEnabled.limiter, oversample: useOversample });
+  const prevLimiterEnabledRef = useRef(fxEnabled.limiter);
   useEffect(() => {
-    const isChanged = prevLimiterDepsRef.current.limiter !== fxEnabled.limiter ||
-      prevLimiterDepsRef.current.oversample !== useOversample;
-    if (!isChanged) return;
-    prevLimiterDepsRef.current = { limiter: fxEnabled.limiter, oversample: useOversample };
+    if (prevLimiterEnabledRef.current === fxEnabled.limiter) return;
+    prevLimiterEnabledRef.current = fxEnabled.limiter;
 
     if (sourceNodeRef.current) {
       initializeAudioContext();
@@ -1082,10 +1040,9 @@ export function useAudioContext(effectsState: any) {
       limiterNodeRef.current,
       softClipWaveShaperRef.current,
       Boolean(fxEnabled.limiter),
-      useOversample,
       true
     );
-  }, [fxEnabled.limiter, initializeAudioContext, useOversample]);
+  }, [fxEnabled.limiter, initializeAudioContext]);
 
   const eqBandsLength = eqBands ? eqBands.length : 0;
   const prevEqBandsLengthRef = useRef(eqBandsLength);
@@ -1123,7 +1080,7 @@ export function useAudioContext(effectsState: any) {
     bufferVolumeNodeRef,
     eqNodesRef,
     limiterNodeRef,
-    softClipNodeRef,
+    softClipWaveShaperRef,
     panNodeRef,
     trackLoudnessGainRef,
     setTrackLoudnessGain,
