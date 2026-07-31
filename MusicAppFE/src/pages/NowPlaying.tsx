@@ -359,7 +359,7 @@ export function NowPlaying() {
           >
             <div className={`w-full h-full flex flex-col min-h-0 relative overflow-hidden animate-fade-in ${showLyrics && hasLyrics ? 'block' : 'hidden'}`}>
               {showLyrics && hasLyrics && (
-                <LyricsView lyrics={trackLyrics!} currentTime={currentTime} onSeek={playerState.seek} />
+                <LyricsView lyrics={trackLyrics!} currentTime={currentTime} duration={duration} onSeek={playerState.seek} />
               )}
             </div>
 
