@@ -67,6 +67,14 @@ export function MasterOutput() {
         onChange={(val) => playerState.updateAudioLatencyHint(val)}
       />
 
+      <AudioSelectRow
+        title={t('studio.masterOutput.latencyTitle', 'Audio Buffer Size (Latency Mode)')}
+        description={t('studio.masterOutput.latencyDesc', 'Tương tự Block Size trong DAW. Chọn Playback để giảm tải CPU tối đa, tránh âm thanh bị ngắt quãng. (Cần tải lại trang hoặc đổi bài hát để áp dụng).')}
+        value={playerState.audioLatencyHint || 'playback'}
+        options={latencyOptions}
+        onChange={playerState.updateAudioLatencyHint}
+      />
+
       <AudioToggleRow
         title={t('studio.masterOutput.loudnessNorm', 'Loudness Normalization')}
         description={t('studio.masterOutput.loudnessDesc', 'Measures each track and applies fixed LUFS gain with peak-safe headroom. Best quality when pre-calculation is enabled.')}
