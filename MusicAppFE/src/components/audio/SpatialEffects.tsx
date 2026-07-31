@@ -28,7 +28,7 @@ function SpatialSignalRouting({
   const isActive = reverbEnabled || stereoEnabled;
 
   return (
-    <div className={`flex items-center justify-between p-4 rounded-xl border ${isActive ? 'bg-black/40 border-[#ff00ff]/30 shadow-[0_0_15px_rgba(255,0,255,0.1)]' : 'bg-white/5 border-white/10 opacity-60 grayscale'}`}>
+    <div className={`flex items-center justify-between p-4 rounded-xl border ${isActive ? 'bg-black/40 border-[#ff00ff]/30' : 'bg-white/5 border-white/10 opacity-60 grayscale'}`}>
       <div className="flex flex-col">
         <span className="text-white/90 font-semibold">{t('studio.spatial.routingTitle', 'Spatial Output Balance')}</span>
         <span className="text-white/50 text-xs mt-0.5">{t('studio.spatial.routingDesc', 'Total calculated spatial field')}</span>
