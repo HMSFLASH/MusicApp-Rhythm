@@ -3,37 +3,43 @@ import { useGlobalAudio } from '../../context/AudioContext';
 import { useTranslation } from 'react-i18next';
 import { AudioEffectPanel, EffectControlsGate, EffectPowerButton } from './AudioEffectPanel';
 import { STEREO_WIDTH_MAX_PERCENT } from '../../hooks/audioMath';
+import { reverbWetGain } from '../../hooks/audioGraph';
 
-interface DryWetBadgeProps {
-  dryLabel?: string;
-  wetLabel?: string;
-  dryValue: string | number;
-  wetValue: string | number;
-  dryColor?: string;
-  wetColor?: string;
-  active?: boolean;
-  defaultDryValue?: string | number;
-  defaultWetValue?: string | number;
-}
+function SpatialSignalRouting() {
+  const { playerState } = useGlobalAudio();
+  const { t } = useTranslation();
 
-function DryWetBadge({
-  dryLabel = 'Dry',
-  wetLabel = 'Wet',
-  dryValue,
-  wetValue,
-  dryColor = '#00f5ff',
-  wetColor = '#ff00ff',
-  active = true,
-  defaultDryValue = '1.0',
-  defaultWetValue = '0.0'
-}: DryWetBadgeProps) {
+  const reverbWet = playerState.fxEnabled.reverb ? reverbWetGain(playerState.reverbMix) : 0;
+  const reverbDry = 1.0;
+  const stereoWet = playerState.fxEnabled.stereo ? (playerState.stereoWidth / 100) : 1.0;
+
   return (
-    <div className={`inline-flex items-center gap-1.5 px-2.5 py-1 rounded-md bg-white/5 border border-white/10 text-xs font-mono font-medium shrink-0 self-start sm:self-auto transition-opacity duration-300 ${!active ? 'opacity-50 grayscale' : ''}`}>
-      <span className="text-white/60">{dryLabel}:</span>
-      <span className="font-semibold" style={{ color: dryColor }}>{active ? dryValue : defaultDryValue}</span>
-      <span className="text-white/20">|</span>
-      <span className="text-white/60">{wetLabel}:</span>
-      <span className="font-bold" style={{ color: wetColor }}>{active ? wetValue : defaultWetValue}</span>
+    <div className="flex flex-col gap-3 p-4 rounded-xl bg-white/5 border border-white/10 w-full">
+      <div className="flex flex-col">
+        <span className="text-white/90 font-semibold">{t('studio.spatial.routingTitle', 'Spatial Signal Routing Monitor')}</span>
+        <span className="text-white/50 text-xs mt-0.5">{t('studio.spatial.routingDesc', 'Real-time calculation of actual output gain factors')}</span>
+      </div>
+      <div className="flex flex-wrap gap-4 mt-2">
+        {/* Reverb Monitor */}
+        <div className={`flex flex-col flex-1 min-w-[200px] bg-black/40 rounded-lg p-3 border transition-all duration-300 ${playerState.fxEnabled.reverb ? 'border-[#ff00ff]/40 shadow-[0_0_15px_rgba(255,0,255,0.1)]' : 'border-white/10 opacity-50 grayscale'}`}>
+          <span className="text-white/70 text-xs font-medium mb-2">{t('studio.spatial.reverbGain', 'Reverb Gain')}</span>
+          <div className="flex items-center justify-between font-mono text-sm">
+            <span className="text-white/60">Dry: <span className="text-[#00f5ff] font-semibold">{reverbDry.toFixed(2)}</span></span>
+            <span className="text-white/20">|</span>
+            <span className="text-white/60">Wet: <span className="text-[#ff00ff] font-bold">{reverbWet.toFixed(2)}</span></span>
+          </div>
+        </div>
+        
+        {/* Stereo Monitor */}
+        <div className={`flex flex-col flex-1 min-w-[200px] bg-black/40 rounded-lg p-3 border transition-all duration-300 ${playerState.fxEnabled.stereo ? 'border-[#9d00ff]/40 shadow-[0_0_15px_rgba(157,0,255,0.1)]' : 'border-white/10 opacity-50 grayscale'}`}>
+          <span className="text-white/70 text-xs font-medium mb-2">{t('studio.spatial.stereoGain', 'Stereo Gain Matrix')}</span>
+          <div className="flex items-center justify-between font-mono text-sm">
+            <span className="text-white/60">Mid: <span className="text-[#00f5ff] font-semibold">1.00</span></span>
+            <span className="text-white/20">|</span>
+            <span className="text-white/60">Side: <span className="text-[#9d00ff] font-bold">{stereoWet.toFixed(2)}</span></span>
+          </div>
+        </div>
+      </div>
     </div>
   );
 }
@@ -42,23 +48,16 @@ export function SpatialEffects() {
   const { playerState } = useGlobalAudio();
   const { t } = useTranslation();
 
-  const stereoWetFactor = (playerState.stereoWidth / 100).toFixed(1);
-  const reverbWetFactor = (playerState.reverbMix / 100).toFixed(1);
-  const reverbDryFactor = (1 - playerState.reverbMix / 100).toFixed(1);
-
   return (
     <div className="flex flex-col gap-8 w-full">
       
+      <SpatialSignalRouting />
+
       <AudioEffectPanel
         title={t('studio.spatial.reverbTitle', 'Reverb FX')}
         description={
           <div className="flex flex-col sm:flex-row sm:items-center gap-2 mt-1">
             <span>{t('studio.spatial.reverbDesc', 'Add space and depth using Convolution Reverb.')}</span>
-            <DryWetBadge
-              dryValue={reverbDryFactor}
-              wetValue={reverbWetFactor}
-              active={playerState.fxEnabled.reverb}
-            />
           </div>
         }
         leading={(
@@ -97,15 +96,6 @@ export function SpatialEffects() {
         description={
           <div className="flex flex-col sm:flex-row sm:items-center gap-2 mt-1">
             <span>{t('studio.spatial.stereoDesc', 'Widen your stereo image using Mid/Side processing. 100% is normal, up to 200% is extra wide.')}</span>
-            <DryWetBadge
-              dryLabel={t('studio.spatial.dryLabel', 'Dry (Mid)')}
-              wetLabel={t('studio.spatial.wetLabel', 'Wet (Side)')}
-              dryValue="1.0"
-              wetValue={stereoWetFactor}
-              wetColor="#9d00ff"
-              active={playerState.fxEnabled.stereo}
-              defaultWetValue="1.0"
-            />
           </div>
         }
         trailing={(
