@@ -129,34 +129,6 @@ export function DynamicsRack() {
         </EffectControlsGate>
       </div>
 
-      {/* Master Limiter */}
-      <div className={`bg-[#0a0a0a] p-4 md:p-8 rounded-2xl border border-white/5 shadow-2xl flex flex-col sm:flex-row sm:items-center justify-between gap-4 transition-opacity duration-300 ${playerState.fxEnabled.limiter ? 'opacity-100' : 'opacity-50'}`}>
-        <div>
-          <h2 className="text-xl font-bold font-sans text-white/80 tracking-tight">{t('studio.dynamics.limiterTitle', 'Anti-Clipping Master Limiter')}</h2>
-          <p className="text-secondary/60 text-xs font-mono mt-2">{t('studio.dynamics.limiterDesc', 'Catches final output peaks after soft clipping, reducing crackling when EQ, preamp, or effects raise the level. Recommended to leave on if CPU is powerful enough.')}</p>
-        </div>
-        <EffectPowerButton
-          size="lg"
-          active={playerState.fxEnabled.limiter}
-          onClick={() => playerState.toggleFx('limiter')}
-          activeClassName="bg-[#00e5ff]/20 text-[#00e5ff] shadow-[0_0_15px_rgba(0,229,255,0.4)]"
-        />
-      </div>
-
-      {/* High Quality Oversampling */}
-      <div className={`bg-[#0a0a0a] p-4 md:p-8 rounded-2xl border border-white/5 shadow-2xl flex flex-col sm:flex-row sm:items-center justify-between gap-4 transition-opacity duration-300 ${playerState.useOversample ? 'opacity-100' : 'opacity-50'}`}>
-        <div>
-          <h2 className="text-xl font-bold font-sans text-white/80 tracking-tight">{t('studio.dynamics.hqOversampleTitle', 'High Quality Oversampling (4x)')}</h2>
-          <p className="text-secondary/60 text-xs font-mono mt-2">{t('studio.dynamics.hqOversampleDesc', 'Greatly reduces aliasing distortion during heavy limiting, but consumes significant CPU.')}</p>
-        </div>
-        <EffectPowerButton
-          size="lg"
-          active={playerState.useOversample}
-          onClick={playerState.toggleUseOversample}
-          activeClassName="bg-[#00e5ff]/20 text-[#00e5ff] shadow-[0_0_15px_rgba(0,229,255,0.4)]"
-        />
-      </div>
-
     </div>
   );
 }

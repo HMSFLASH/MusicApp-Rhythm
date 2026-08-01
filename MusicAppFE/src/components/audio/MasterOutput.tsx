@@ -61,10 +61,25 @@ export function MasterOutput() {
 
       <AudioSelectRow<AudioContextLatencyCategory>
         title={t('studio.masterOutput.latencyTitle', 'Audio Buffer Size (Latency Mode)')}
-        description={t('studio.masterOutput.latencyDesc', 'Tương tự Block Size trong DAW. Quyết định kích thước bộ đệm âm thanh. Nên chọn Playback để máy có nhiều thời gian xử lý EQ, tránh bị nổ tiếng/ngắt quãng. (Lưu ý: Thay đổi sẽ áp dụng ở bài hát tiếp theo hoặc khi F5 trang).')}
+        description={t('studio.masterOutput.latencyDesc', 'Tương tự Block Size trong DAW. Quyết định kích thước bộ đệm âm thanh. Nên chọn Playback để máy có nhiều thời gian xử lý EQ, tránh bị nổ tiếng/ngắt quãng. (Lưu ý: Thay đổi chỉ áp dụng khi tải lại trang (F5)).')}
         value={playerState.audioLatencyHint || 'playback'}
         options={latencyOptions}
         onChange={(val) => playerState.updateAudioLatencyHint(val)}
+      />
+
+      <AudioToggleRow
+        title={t('studio.dynamics.limiterTitle', 'Anti-Clipping Master Limiter')}
+        description={t('studio.dynamics.limiterDesc', 'Catches final output peaks after soft clipping, reducing crackling when EQ, preamp, or effects raise the level. Recommended to leave on if CPU is powerful enough.')}
+        checked={playerState.fxEnabled.limiter}
+        onToggle={() => playerState.toggleFx('limiter')}
+      />
+
+      <AudioToggleRow
+        title={t('studio.masterOutput.hqOversample', 'High Quality Oversampling')}
+        description={t('studio.masterOutput.hqOversampleDesc', 'Uses a 4x FIR oversampled soft clipper to reduce clipping aliasing. May be heavy on weak phones.')}
+        checked={playerState.useOversample}
+        onToggle={playerState.toggleUseOversample}
+        disabled={!playerState.fxEnabled.limiter}
       />
 
       <AudioToggleRow

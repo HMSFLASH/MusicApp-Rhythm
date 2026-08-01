@@ -186,7 +186,6 @@ export function NowPlaying() {
   const [audioDevices, setAudioDevices] = useState<MediaDeviceInfo[]>([]);
   const [selectedDeviceId, setSelectedDeviceId] = useState<string>('default');
   const [hasDeviceLabels, setHasDeviceLabels] = useState(true);
-  const deviceMenuRef = useRef<HTMLDivElement>(null);
 
   const fetchAudioDevices = useCallback(async () => {
     if (!navigator.mediaDevices?.enumerateDevices) return;
@@ -247,15 +246,13 @@ export function NowPlaying() {
       if (menuRef.current && !menuRef.current.contains(e.target as Node)) {
         setShowMenu(false);
         setShowSpeedPitch(false);
+        setShowDeviceMenu(false);
       }
       if (repeatRef.current && !repeatRef.current.contains(e.target as Node)) {
         setShowRepeatMenu(false);
       }
       if (volumeRef.current && !volumeRef.current.contains(e.target as Node)) {
         setShowVolume(false);
-      }
-      if (deviceMenuRef.current && !deviceMenuRef.current.contains(e.target as Node)) {
-        setShowDeviceMenu(false);
       }
     };
     document.addEventListener('mousedown', handler);
@@ -470,6 +467,48 @@ export function NowPlaying() {
                         t={t}
                         onBack={() => setShowSpeedPitch(false)}
                       />
+                    ) : showDeviceMenu ? (
+                      <div className="flex flex-col max-h-[65vh] overflow-y-auto">
+                        <div className="flex items-center gap-3 px-4 py-3 border-b border-white/5 sticky top-0 bg-[#1e1e1e] z-10">
+                          <button onClick={() => setShowDeviceMenu(false)} className="hover:bg-white/10 p-1.5 -ml-1.5 rounded-full transition-colors">
+                            <ArrowRight size={16} className="rotate-180 text-white/80" />
+                          </button>
+                          <span className="text-sm font-bold text-white/90">{t('nowPlaying.outputDevice') || 'Output Device'}</span>
+                        </div>
+                        
+                        {!hasDeviceLabels && (
+                          <div className="p-4 border-b border-white/5">
+                            <p className="text-xs text-white/70 mb-3 leading-tight">
+                              {t('nowPlaying.devicePermissionReason') || 'Trình duyệt ẩn tên thiết bị cho đến khi bạn cấp quyền Audio.'}
+                            </p>
+                            <button
+                              onClick={requestAudioPermission}
+                              className="w-full text-xs font-medium bg-primary/20 text-primary py-2 rounded-lg hover:bg-primary/30 transition-colors"
+                            >
+                              {t('nowPlaying.grantPermission') || 'Hiện tên thiết bị'}
+                            </button>
+                          </div>
+                        )}
+
+                        {audioDevices.length > 0 ? audioDevices.map(device => (
+                          <button
+                            key={device.deviceId || 'default'}
+                            onClick={() => {
+                              const id = device.deviceId || '';
+                              setSelectedDeviceId(id);
+                              if (playerState.setAudioOutputDevice) {
+                                playerState.setAudioOutputDevice(id);
+                              }
+                            }}
+                            className={`w-full text-left px-4 py-3 text-sm transition-colors flex items-center justify-between border-b border-white/5 ${selectedDeviceId === (device.deviceId || '') ? 'bg-primary/10 text-primary font-medium' : 'text-white/80 hover:bg-white/5'}`}
+                          >
+                            <span className="truncate pr-2">{device.label || `Device (${device.deviceId ? device.deviceId.slice(0, 5) : 'default'}...)`}</span>
+                            {selectedDeviceId === (device.deviceId || '') && <Check size={14} className="flex-shrink-0" />}
+                          </button>
+                        )) : (
+                          <p className="text-sm text-white/50 px-4 py-4 text-center">No devices found</p>
+                        )}
+                      </div>
                     ) : (
                       <>
                         {/* Speed & Pitch Button */}
@@ -486,6 +525,19 @@ export function NowPlaying() {
                               ? `${playbackRate}x / ${pitchRate}x`
                               : `${playbackRate}x`
                             }
+                          </span>
+                        </button>
+                        {/* Output Device Button */}
+                        <button
+                          onClick={() => setShowDeviceMenu(true)}
+                          className="w-full flex items-center justify-between px-4 py-3 text-sm text-white/80 hover:bg-white/5 transition-colors border-b border-white/5"
+                        >
+                          <div className="flex items-center gap-3">
+                            <MonitorSpeaker size={16} />
+                            <span>{t('nowPlaying.outputDevice') || 'Output Device'}</span>
+                          </div>
+                          <span className="text-[10px] font-mono text-white/40 truncate max-w-[80px]">
+                            {audioDevices.find(d => d.deviceId === selectedDeviceId)?.label || 'Default'}
                           </span>
                         </button>
                         {currentTrack && currentTrack.sourceType !== 'LOCAL' && (
@@ -813,56 +865,6 @@ export function NowPlaying() {
 
             <div className="flex items-center justify-between px-2 mb-4">
               <div className="flex items-center gap-1 sm:gap-2">
-                <div className="relative" ref={deviceMenuRef}>
-                  <button
-                    aria-label="Output Device"
-                    onClick={() => setShowDeviceMenu(v => !v)}
-                    className={`transition-colors p-2 rounded-full ${showDeviceMenu ? 'text-white bg-white/10' : 'text-white/60 hover:text-white'}`}
-                  >
-                    <MonitorSpeaker size={20} />
-                  </button>
-
-                  {showDeviceMenu && (
-                    <div className="absolute bottom-full left-0 mb-4 bg-[#1e1e1e] border border-white/10 p-2 rounded-xl shadow-2xl z-50 w-64 max-h-64 overflow-y-auto">
-                      <p className="text-xs font-bold text-primary uppercase tracking-wider mb-2 px-2 pt-1">{t('nowPlaying.outputDevice') || 'Output Device'}</p>
-                      
-                      {!hasDeviceLabels && (
-                        <div className="mb-2 px-2 pb-2 border-b border-white/10">
-                          <p className="text-xs text-white/70 mb-2 leading-tight">
-                            {t('nowPlaying.devicePermissionReason') || 'Trình duyệt ẩn tên thiết bị cho đến khi bạn cấp quyền Audio.'}
-                          </p>
-                          <button
-                            onClick={requestAudioPermission}
-                            className="w-full text-xs bg-primary/20 text-primary py-1.5 rounded-lg hover:bg-primary/30 transition-colors"
-                          >
-                            {t('nowPlaying.grantPermission') || 'Hiện tên thiết bị'}
-                          </button>
-                        </div>
-                      )}
-
-                      {audioDevices.length > 0 ? audioDevices.map(device => (
-                        <button
-                          key={device.deviceId || 'default'}
-                          onClick={() => {
-                            const id = device.deviceId || '';
-                            setSelectedDeviceId(id);
-                            if (playerState.setAudioOutputDevice) {
-                              playerState.setAudioOutputDevice(id);
-                            }
-                            setShowDeviceMenu(false);
-                          }}
-                          className={`w-full text-left px-3 py-2 rounded-lg text-sm transition-colors flex items-center justify-between ${selectedDeviceId === (device.deviceId || '') ? 'bg-primary/20 text-primary font-medium' : 'text-white/80 hover:bg-white/10'}`}
-                        >
-                          <span className="truncate pr-2">{device.label || `Device (${device.deviceId ? device.deviceId.slice(0, 5) : 'default'}...)`}</span>
-                          {selectedDeviceId === (device.deviceId || '') && <Check size={14} className="flex-shrink-0" />}
-                        </button>
-                      )) : (
-                        <p className="text-sm text-white/50 px-3 py-2">No devices found</p>
-                      )}
-                    </div>
-                  )}
-                </div>
-
                 <div className="relative" ref={volumeRef}>
                   <button
                     aria-label="Volume"

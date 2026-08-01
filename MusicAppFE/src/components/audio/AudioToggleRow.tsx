@@ -10,6 +10,7 @@ type AudioToggleRowProps = {
   tone?: ToggleTone;
   titleClassName?: string;
   descriptionClassName?: string;
+  disabled?: boolean;
 };
 
 const toneStyles: Record<ToggleTone, {
@@ -40,11 +41,12 @@ export function AudioToggleRow({
   tone = 'default',
   titleClassName,
   descriptionClassName,
+  disabled = false,
 }: AudioToggleRowProps) {
   const styles = toneStyles[tone];
 
   return (
-    <div className={`flex items-center justify-between mt-2 p-4 rounded-xl border ${styles.container}`}>
+    <div className={`flex items-center justify-between mt-2 p-4 rounded-xl border ${styles.container} ${disabled ? 'opacity-50 pointer-events-none grayscale' : ''}`}>
       <div>
         <span className={`text-sm font-bold block ${titleClassName || styles.title}`}>{title}</span>
         <span className={`text-xs font-mono mt-1 block pr-4 ${descriptionClassName || styles.description}`}>
@@ -53,6 +55,7 @@ export function AudioToggleRow({
       </div>
       <button aria-label="Action"
         onClick={onToggle}
+        disabled={disabled}
         className={`shrink-0 w-12 h-6 rounded-full relative transition-colors ${checked ? styles.activeSwitch : 'bg-white/20'}`}
       >
         <div className={`absolute top-0.5 left-0.5 w-5 h-5 rounded-full bg-white transition-transform ${checked ? 'translate-x-6' : 'translate-x-0'}`}></div>
