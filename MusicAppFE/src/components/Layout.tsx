@@ -294,7 +294,16 @@ export function Layout() {
                     </>
                   ) : (
                     <button
-                      onClick={() => globalThis.location.href = `${BACKEND_URL}/oauth2/authorization/google`}
+                      onClick={async () => {
+                        const { supabase } = await import('../lib/supabase');
+                        await supabase.auth.signInWithOAuth({
+                          provider: 'google',
+                          options: {
+                            redirectTo: window.location.origin,
+                            scopes: 'https://www.googleapis.com/auth/drive.file'
+                          }
+                        });
+                      }}
                       className="flex items-center gap-3 px-3 py-2.5 rounded-lg text-white/60 hover:text-white hover:bg-white/5 transition-colors text-left"
                     >
                       <svg className="w-5 h-5 shrink-0" viewBox="0 0 24 24" xmlns="http://www.w3.org/2000/svg">
