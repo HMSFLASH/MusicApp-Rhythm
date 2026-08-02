@@ -172,6 +172,19 @@ public class AuthService {
                 .build();
     }
 
+    public void linkGoogleDrive(String currentSubject, String providerRefreshToken) {
+        User user = userRepository.findByUsername(currentSubject).orElseGet(() -> userRepository
+                .findByEmail(currentSubject)
+                .orElseGet(() -> userRepository
+                        .findById(currentSubject)
+                        .orElseThrow(() -> new RuntimeException("User not found"))));
+                        
+        if (providerRefreshToken != null && !providerRefreshToken.isEmpty()) {
+            user.setRefreshToken(providerRefreshToken);
+            userRepository.save(user);
+        }
+    }
+
     public AuthenticationResponse setLocalCredentials(String currentSubject, String newLoginId, String newPassword) {
         User user = userRepository.findByUsername(currentSubject).orElseGet(() -> userRepository
                 .findByEmail(currentSubject)

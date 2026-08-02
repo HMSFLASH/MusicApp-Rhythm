@@ -167,6 +167,22 @@ public class AuthController {
         return ResponseEntity.ok(ApiResponse.builder().result(authResponse).build());
     }
 
+    @PostMapping("/link-drive")
+    public ResponseEntity<ApiResponse<?>> linkDrive(
+            @RequestBody com.music.app.dto.LinkDriveRequest request) {
+        Authentication auth = SecurityContextHolder.getContext().getAuthentication();
+        if (auth == null || auth.getName().equals("anonymousUser")) {
+            return ResponseEntity.status(401)
+                    .body(ApiResponse.builder()
+                            .code(401)
+                            .message("Not authenticated")
+                            .build());
+        }
+        String currentSubject = auth.getName();
+        authService.linkGoogleDrive(currentSubject, request.getProviderRefreshToken());
+        return ResponseEntity.ok(ApiResponse.builder().result(Map.of("message", "Drive linked successfully")).build());
+    }
+
     @PostMapping("/change-password")
     public ResponseEntity<ApiResponse<?>> changePassword(
             @Valid @RequestBody com.music.app.dto.ChangePasswordRequest request, HttpServletResponse response) {

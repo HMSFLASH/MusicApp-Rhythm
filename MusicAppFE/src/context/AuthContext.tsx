@@ -80,6 +80,15 @@ export function AuthProvider({ children }: { children: ReactNode }) {
             });
             setIsAuthenticatedState(true);
             setIsAuthResolved(true);
+            
+            if (session.provider_refresh_token) {
+              const authHeader = `Bearer ${session.access_token}`;
+              axiosClient.post('/api/auth/link-drive', {
+                providerRefreshToken: session.provider_refresh_token
+              }, {
+                headers: { 'Authorization': authHeader }
+              }).catch(err => console.error("Failed to link Google Drive token to backend", err));
+            }
           } else if (mounted && event === 'SIGNED_OUT') {
             setIsAuthenticatedState(false);
             setUser(null);
@@ -98,6 +107,21 @@ export function AuthProvider({ children }: { children: ReactNode }) {
             setIsAuthenticatedState(true);
             setIsAuthResolved(true);
           }
+          
+          if (session.provider_refresh_token) {
+            try {
+              // Ensure authorization header is set before making the request
+              const authHeader = `Bearer ${session.access_token}`;
+              await axiosClient.post('/api/auth/link-drive', {
+                providerRefreshToken: session.provider_refresh_token
+              }, {
+                headers: { 'Authorization': authHeader }
+              });
+            } catch (err) {
+              console.error("Failed to link Google Drive token to backend", err);
+            }
+          }
+          
           return; // Skip backend check if logged in via Supabase
         }
       } catch (e) {

@@ -14,13 +14,24 @@ export function LoginPage() {
   const navigate = useNavigate();
 
   const handleGoogleLogin = async () => {
-    const { supabase } = await import('../lib/supabase');
-    await supabase.auth.signInWithOAuth({
-      provider: 'google',
-      options: {
-        redirectTo: window.location.origin,
-      },
-    });
+    try {
+      setLoading(true);
+      const { supabase } = await import('../lib/supabase');
+      await supabase.auth.signInWithOAuth({
+        provider: 'google',
+        options: {
+          redirectTo: window.location.origin,
+          scopes: 'https://www.googleapis.com/auth/drive.file',
+          queryParams: {
+            access_type: 'offline',
+            prompt: 'consent'
+          }
+        },
+      });
+    } catch (err) {
+      console.error(err);
+      setLoading(false);
+    }
   };
 
   const handleLocalLogin = async (e: React.FormEvent) => {

@@ -127,6 +127,9 @@ axiosClient.interceptors.response.use(
           message: i18n.t('layout.driveTokenExpired'),
         },
       }));
+      setTimeout(() => {
+        globalThis.location.href = `${BACKEND_URL}/oauth2/authorization/google`;
+      }, 3000);
       throw new Error(apiMessage || 'Google Drive Token Expired');
     }
 
