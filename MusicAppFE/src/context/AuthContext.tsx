@@ -62,15 +62,71 @@ export function AuthProvider({ children }: { children: ReactNode }) {
   }, []);
 
   useEffect(() => {
-    void axiosClient.get('/api/auth/csrf')
-      .then(() => axiosClient.get('/api/auth/me'))
-      .then((res) => {
-        setUser(res as AuthUser);
-        setIsAuthenticatedState(true);
-      })
-      .catch(() => setIsAuthenticatedState(false))
-      .finally(() => setIsAuthResolved(true));
-  }, [isAuthenticated]);
+    let mounted = true;
+
+    const initAuth = async () => {
+      try {
+        // 1. Check Supabase First
+        const { supabase } = await import('../lib/supabase');
+        
+        // Listen for login/logout events from Google OAuth
+        supabase.auth.onAuthStateChange((event, session) => {
+          if (mounted && session && (event === 'SIGNED_IN' || event === 'INITIAL_SESSION')) {
+            setUser({
+              id: session.user.id,
+              email: session.user.email,
+              name: session.user.user_metadata?.full_name || session.user.email,
+              avatarUrl: session.user.user_metadata?.avatar_url,
+            });
+            setIsAuthenticatedState(true);
+            setIsAuthResolved(true);
+          } else if (mounted && event === 'SIGNED_OUT') {
+            setIsAuthenticatedState(false);
+            setUser(null);
+          }
+        });
+
+        const { data: { session } } = await supabase.auth.getSession();
+        if (session) {
+          if (mounted) {
+            setUser({
+              id: session.user.id,
+              email: session.user.email,
+              name: session.user.user_metadata?.full_name || session.user.email,
+              avatarUrl: session.user.user_metadata?.avatar_url,
+            });
+            setIsAuthenticatedState(true);
+            setIsAuthResolved(true);
+          }
+          return; // Skip backend check if logged in via Supabase
+        }
+      } catch (e) {
+        console.error("Supabase auth error:", e);
+      }
+
+      // 2. Fallback to Local Backend Check
+      axiosClient.get('/api/auth/csrf')
+        .then(() => axiosClient.get('/api/auth/me'))
+        .then((res) => {
+          if (mounted) {
+            setUser(res as AuthUser);
+            setIsAuthenticatedState(true);
+          }
+        })
+        .catch(() => {
+          if (mounted) setIsAuthenticatedState(false);
+        })
+        .finally(() => {
+          if (mounted) setIsAuthResolved(true);
+        });
+    };
+
+    void initAuth();
+
+    return () => {
+      mounted = false;
+    };
+  }, []); // Run once on mount
 
   useEffect(() => {
     // eslint-disable-next-line react-hooks/set-state-in-effect

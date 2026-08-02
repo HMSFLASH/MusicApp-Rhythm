@@ -16,6 +16,20 @@ export const axiosClient = axios.create({
   withXSRFToken: true,
 });
 
+// Inject Supabase Token if available
+axiosClient.interceptors.request.use(async (config) => {
+  try {
+    const { supabase } = await import('../lib/supabase');
+    const { data: { session } } = await supabase.auth.getSession();
+    if (session?.access_token) {
+      config.headers['Authorization'] = `Bearer ${session.access_token}`;
+    }
+  } catch (e) {
+    // Ignore error if Supabase client not initialized yet or fails
+  }
+  return config;
+});
+
 let isRefreshing = false;
 let failedQueue: Array<{ resolve: (value?: unknown) => void; reject: (reason?: unknown) => void }> = [];
 

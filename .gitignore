@@ -85,3 +85,4 @@ coverage/
 MusicAppFE/sonar-project.properties
 MusicAppFE/.scannerwork/
 scratch/
+MusicAppBE/termux.env
