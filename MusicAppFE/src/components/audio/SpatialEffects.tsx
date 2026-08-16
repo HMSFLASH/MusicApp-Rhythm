@@ -29,15 +29,15 @@ function SpatialSignalRouting({
   const isActive = reverbEnabled || stereoEnabled;
 
   return (
-    <div className={`flex items-center justify-between p-4 rounded-xl border ${isActive ? 'bg-black/40 border-[#ff00ff]/30' : 'bg-white/5 border-white/10 opacity-60 grayscale'}`}>
+    <div className={`flex items-center justify-between p-4 sm:p-5 rounded-2xl border transition-all ${isActive ? 'bg-[#0c1626]/80 border-purple-500/30 shadow-[0_0_20px_rgba(168,85,247,0.15)]' : 'bg-white/[0.02] border-white/[0.06] opacity-60 grayscale'}`}>
       <div className="flex flex-col">
-        <span className="text-white/90 font-semibold">{t('studio.spatial.routingTitle', 'Spatial Output Balance')}</span>
-        <span className="text-white/50 text-xs mt-0.5">{t('studio.spatial.routingDesc', 'Total calculated spatial field')}</span>
+        <span className="text-slate-100 font-semibold text-sm">{t('studio.spatial.routingTitle', 'Spatial Output Balance')}</span>
+        <span className="text-slate-400 text-xs font-mono mt-0.5">{t('studio.spatial.routingDesc', 'Total calculated spatial field')}</span>
       </div>
-      <div className="flex items-center gap-3 font-mono text-sm bg-white/5 px-4 py-2 rounded-lg border border-white/5">
-        <span className="text-white/60">Dry: <span className="text-[#00f5ff] font-semibold">{totalDry.toFixed(2)}</span></span>
+      <div className="flex items-center gap-3 font-mono text-xs sm:text-sm bg-white/[0.04] px-4 py-2 rounded-xl border border-white/[0.08]">
+        <span className="text-slate-400">Dry: <span className="text-primary font-bold">{totalDry.toFixed(2)}</span></span>
         <span className="text-white/20">|</span>
-        <span className="text-white/60">Wet: <span className="text-[#ff00ff] font-bold">{totalWet.toFixed(2)}</span></span>
+        <span className="text-slate-400">Wet: <span className="text-purple-400 font-bold">{totalWet.toFixed(2)}</span></span>
       </div>
     </div>
   );
@@ -58,7 +58,7 @@ export function SpatialEffects() {
   ];
 
   return (
-    <div className="flex flex-col gap-8 w-full">
+    <div className="flex flex-col gap-6 md:gap-8 w-full">
       
       <SpatialSignalRouting
         reverbMix={playerState.reverbMix}
@@ -78,7 +78,7 @@ export function SpatialEffects() {
           <EffectPowerButton
             active={playerState.fxEnabled.reverb}
             onClick={() => playerState.toggleFx('reverb')}
-            activeClassName="bg-[#ff00ff]/20 text-[#ff00ff] shadow-[0_0_15px_rgba(255,0,255,0.4)]"
+            activeClassName="bg-purple-500/20 text-purple-400 shadow-[0_0_15px_rgba(168,85,247,0.4)] border border-purple-500/40"
           />
         )}
       >
@@ -89,7 +89,7 @@ export function SpatialEffects() {
             max={100}
             onChange={playerState.updateReverbMix}
             label={t('studio.spatial.reverbMix', 'Reverb Mix')}
-            color="#ff00ff"
+            color="#c084fc"
             unit="%"
           />
           <HorizontalSlider
@@ -99,7 +99,7 @@ export function SpatialEffects() {
             step={0.1}
             onChange={playerState.updateReverbTime}
             label={t('studio.spatial.roomSize', 'Room Size')}
-            color="#ff00ff"
+            color="#c084fc"
             unit="s"
           />
         </EffectControlsGate>
@@ -117,7 +117,7 @@ export function SpatialEffects() {
             size="lg"
             active={playerState.fxEnabled.stereo}
             onClick={() => playerState.toggleFx('stereo')}
-            activeClassName="bg-[#9d00ff]/20 text-[#9d00ff] shadow-[0_0_15px_rgba(157,0,255,0.4)]"
+            activeClassName="bg-indigo-500/20 text-indigo-400 shadow-[0_0_15px_rgba(99,102,241,0.4)] border border-indigo-500/40"
           />
         )}
       >
@@ -129,7 +129,7 @@ export function SpatialEffects() {
             step={1}
             onChange={playerState.updateStereoWidth}
             label={t('studio.spatial.stereoWidth', 'Stereo Width')}
-            color="#9d00ff"
+            color="#818cf8"
             unit="%"
           />
           <AudioSelectRow

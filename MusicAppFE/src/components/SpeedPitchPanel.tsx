@@ -38,40 +38,40 @@ export function SpeedPitchPanel({
   const [hoveredAdvanced, setHoveredAdvanced] = useState(false);
 
   return (
-    <div className="flex flex-col w-full bg-[#151515]">
+    <div className="flex flex-col w-full bg-[#0c1626]/95 border border-white/[0.08] rounded-2xl overflow-hidden backdrop-blur-2xl shadow-2xl">
       {/* Header */}
-      <div className="flex items-center gap-3 px-4 py-3.5 border-b border-white/5">
+      <div className="flex items-center gap-3 px-4 py-3.5 border-b border-white/[0.06] bg-white/[0.02]">
         <button
           onClick={onBack}
-          className="p-1 -ml-1 rounded-lg hover:bg-white/5 text-white/60 hover:text-white transition-colors"
+          className="p-1 -ml-1 rounded-lg hover:bg-white/[0.06] text-slate-400 hover:text-white transition-colors"
         >
           <ChevronLeft size={16} />
         </button>
         <div className="flex items-center gap-2">
           <Gauge size={15} className="text-primary" />
-          <span className="text-xs font-semibold uppercase tracking-wider text-white/90">{t('nowPlaying.speedAndPitch')}</span>
+          <span className="text-xs font-bold uppercase tracking-wider text-slate-200 font-display">{t('nowPlaying.speedAndPitch')}</span>
         </div>
       </div>
 
       {/* Scope Selector (Segmented) */}
-      <div className="px-4 pt-3">
-        <div className="flex bg-black/40 p-0.5 rounded-lg border border-white/5">
+      <div className="px-4 pt-3.5">
+        <div className="flex bg-black/40 p-1 rounded-xl border border-white/[0.06]">
           <button
             onClick={() => setSpeedPitchScope('global')}
-            className={`flex-1 text-[11px] py-1 rounded-md transition-all font-medium ${
+            className={`flex-1 text-xs py-1.5 rounded-lg transition-all font-semibold ${
               speedPitchScope === 'global'
-                ? 'bg-white/10 text-white shadow-sm'
-                : 'text-white/40 hover:text-white/70'
+                ? 'bg-primary/20 text-primary border border-primary/30 shadow-sm'
+                : 'text-slate-400 hover:text-slate-200'
             }`}
           >
             {t('nowPlaying.allSongs')}
           </button>
           <button
             onClick={() => setSpeedPitchScope('track')}
-            className={`flex-1 text-[11px] py-1 rounded-md transition-all font-medium ${
+            className={`flex-1 text-xs py-1.5 rounded-lg transition-all font-semibold ${
               speedPitchScope === 'track'
-                ? 'bg-white/10 text-white shadow-sm'
-                : 'text-white/40 hover:text-white/70'
+                ? 'bg-primary/20 text-primary border border-primary/30 shadow-sm'
+                : 'text-slate-400 hover:text-slate-200'
             }`}
           >
             {t('nowPlaying.thisTrack')}
@@ -80,14 +80,14 @@ export function SpeedPitchPanel({
       </div>
 
       {/* Mode Selector (Segmented) */}
-      <div className="px-4 pt-2 pb-4">
-        <div className="flex bg-black/40 p-0.5 rounded-lg border border-white/5">
+      <div className="px-4 pt-2 pb-3.5">
+        <div className="flex bg-black/40 p-1 rounded-xl border border-white/[0.06]">
           <button
             onClick={() => setSpeedPitchMode('simple')}
-            className={`flex-1 text-[11px] py-1 rounded-md transition-all font-medium ${
+            className={`flex-1 text-xs py-1.5 rounded-lg transition-all font-semibold ${
               speedPitchMode === 'simple'
-                ? 'bg-white/10 text-white shadow-sm'
-                : 'text-white/40 hover:text-white/70'
+                ? 'bg-primary/20 text-primary border border-primary/30 shadow-sm'
+                : 'text-slate-400 hover:text-slate-200'
             }`}
           >
             {t('nowPlaying.simple')}
@@ -101,22 +101,22 @@ export function SpeedPitchPanel({
               }}
               onMouseEnter={() => setHoveredAdvanced(true)}
               onMouseLeave={() => setHoveredAdvanced(false)}
-              className={`w-full text-[11px] py-1 rounded-md transition-all font-medium ${
+              className={`w-full text-xs py-1.5 rounded-lg transition-all font-semibold ${
                 !canUseAdvanced
-                  ? 'text-white/20 cursor-not-allowed'
+                  ? 'text-slate-600 cursor-not-allowed'
                   : speedPitchMode === 'advanced'
-                    ? 'bg-white/10 text-white shadow-sm'
-                    : 'text-white/40 hover:text-white/70'
+                    ? 'bg-purple-500/20 text-purple-400 border border-purple-500/30 shadow-sm'
+                    : 'text-slate-400 hover:text-slate-200'
               }`}
             >
               {t('nowPlaying.advanced')}
             </button>
             {/* Premium non-overlapping tooltip */}
             {!canUseAdvanced && hoveredAdvanced && (
-              <div className="absolute right-0 bottom-full mb-2 w-52 p-2.5 bg-[#1e1e1e] border border-white/10 rounded-lg shadow-2xl z-50 text-left pointer-events-none">
-                <div className="flex items-start gap-1.5 text-amber-500">
-                  <AlertTriangle size={13} className="mt-0.5 shrink-0" />
-                  <span className="text-[10px] leading-normal text-white/80 whitespace-normal">
+              <div className="absolute right-0 bottom-full mb-2 w-52 p-3 bg-[#0c1626] border border-amber-500/30 rounded-xl shadow-2xl z-50 text-left pointer-events-none backdrop-blur-2xl">
+                <div className="flex items-start gap-2 text-amber-400">
+                  <AlertTriangle size={14} className="mt-0.5 shrink-0" />
+                  <span className="text-[10px] leading-relaxed text-amber-200/90 whitespace-normal font-mono">
                     {t('nowPlaying.advancedRequiresPrecalculate')}
                   </span>
                 </div>
@@ -127,21 +127,21 @@ export function SpeedPitchPanel({
       </div>
 
       {/* Sliders */}
-      <div className="px-4 pb-4 border-t border-white/5 pt-4">
+      <div className="px-4 pb-4 border-t border-white/[0.06] pt-3.5">
         {speedPitchMode === 'simple' ? (
           /* Simple Mode */
-          <div className="flex flex-col gap-2.5">
+          <div className="flex flex-col gap-3">
             <div className="flex items-center justify-between mb-0.5">
-              <div className="flex items-center gap-1.5">
-                <span className="text-[10px] font-mono text-white/50 uppercase tracking-widest">{t('nowPlaying.tempo')}</span>
-                <span className="text-xs font-mono text-white/95 font-semibold">{playbackRate.toFixed(2)}x</span>
+              <div className="flex items-center gap-1.5 font-mono">
+                <span className="text-[10px] text-slate-400 uppercase tracking-wider">{t('nowPlaying.tempo')}</span>
+                <span className="text-xs text-primary font-bold">{playbackRate.toFixed(2)}x</span>
               </div>
               <button
                 onClick={togglePreservesPitch}
-                className={`text-[10px] px-2.5 py-1 rounded transition-all font-medium border ${
+                className={`text-[10px] px-2.5 py-1 rounded-lg transition-all font-semibold border ${
                   preservesPitch
-                    ? 'bg-primary/10 text-primary border-primary/30 hover:bg-primary/20'
-                    : 'bg-white/5 text-white/40 border-white/10 hover:bg-white/10 hover:text-white'
+                    ? 'bg-primary/15 text-primary border-primary/30 hover:bg-primary/25'
+                    : 'bg-white/[0.04] text-slate-400 border-white/[0.08] hover:bg-white/[0.08] hover:text-white'
                 }`}
               >
                 {preservesPitch ? t('nowPlaying.preservePitch') : t('nowPlaying.vinyl')}
@@ -163,9 +163,9 @@ export function SpeedPitchPanel({
           <div className="flex flex-col gap-4">
             {/* Speed */}
             <div className="flex flex-col gap-2">
-              <div className="flex justify-between items-center mb-0.5">
-                <span className="text-[10px] font-mono text-white/50 uppercase tracking-widest">{t('nowPlaying.speed')}</span>
-                <span className="text-xs font-mono text-white/95 font-semibold">{playbackRate.toFixed(2)}x</span>
+              <div className="flex justify-between items-center mb-0.5 font-mono">
+                <span className="text-[10px] text-slate-400 uppercase tracking-wider">{t('nowPlaying.speed')}</span>
+                <span className="text-xs text-primary font-bold">{playbackRate.toFixed(2)}x</span>
               </div>
               <HorizontalSlider
                 value={playbackRate}
@@ -181,9 +181,9 @@ export function SpeedPitchPanel({
 
             {/* Pitch */}
             <div className="flex flex-col gap-2">
-              <div className="flex justify-between items-center mb-0.5">
-                <span className="text-[10px] font-mono text-white/50 uppercase tracking-widest">{t('nowPlaying.pitch')}</span>
-                <span className="text-xs font-mono text-white/95 font-semibold">{pitchRate.toFixed(2)}x</span>
+              <div className="flex justify-between items-center mb-0.5 font-mono">
+                <span className="text-[10px] text-slate-400 uppercase tracking-wider">{t('nowPlaying.pitch')}</span>
+                <span className="text-xs text-purple-400 font-bold">{pitchRate.toFixed(2)}x</span>
               </div>
               <HorizontalSlider
                 value={pitchRate}

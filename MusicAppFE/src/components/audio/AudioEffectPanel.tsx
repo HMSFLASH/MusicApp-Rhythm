@@ -62,13 +62,13 @@ export function AudioEffectPanel({
   headerClassName = '',
 }: AudioEffectPanelProps) {
   return (
-    <div className={`bg-[#0a0a0a] rounded-2xl border border-white/5 shadow-2xl p-4 md:p-8 flex flex-col gap-6 md:gap-8 w-full ${className}`}>
-      <div className={`flex flex-col gap-3 border-b border-white/10 pb-4 sm:flex-row sm:items-center ${trailing ? 'sm:justify-between' : ''} ${headerClassName}`}>
+    <div className={`bg-[#0c1626]/80 rounded-3xl border border-white/[0.08] shadow-[0_15px_40px_rgba(0,0,0,0.5)] p-4 sm:p-6 md:p-8 flex flex-col gap-6 md:gap-8 w-full backdrop-blur-2xl ${className}`}>
+      <div className={`flex flex-col gap-3 border-b border-white/[0.06] pb-4 sm:flex-row sm:items-center ${trailing ? 'sm:justify-between' : ''} ${headerClassName}`}>
         <div className="flex items-center gap-3 min-w-0">
           {leading}
           <div className="min-w-0">
-            <h2 className="text-xl font-bold font-sans text-white/80 tracking-tight">{title}</h2>
-            <div className="text-secondary/60 text-xs font-mono mt-1">{description}</div>
+            <h2 className="text-lg sm:text-xl font-bold font-display text-white tracking-tight">{title}</h2>
+            <div className="text-slate-400 text-xs font-mono mt-0.5">{description}</div>
           </div>
         </div>
         {trailing && <div className="shrink-0 self-start sm:self-auto">{trailing}</div>}

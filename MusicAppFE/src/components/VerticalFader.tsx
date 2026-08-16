@@ -129,8 +129,8 @@ export function VerticalFader({
   // The image shows the green track from the bottom going up to the thumb.
   
   return (
-    <div className="flex flex-col items-center gap-5 group w-8 select-none">
-      <div className="h-4 flex items-center justify-center">
+    <div className="flex flex-col items-center gap-4 group w-9 select-none">
+      <div className="h-5 flex items-center justify-center">
         {isEditing ? (
           <input
             ref={inputRef}
@@ -139,12 +139,12 @@ export function VerticalFader({
             onChange={(e) => setInputValue(e.target.value.replace(/,/g, '.'))}
             onBlur={handleInputBlur}
             onKeyDown={handleKeyDown}
-            className="w-10 bg-black/50 text-white text-[9px] font-mono text-center border border-[#00E5FF]/50 rounded outline-none h-4"
+            className="w-11 bg-[#0c1626] text-primary text-[10px] font-mono text-center border border-primary/50 rounded-md outline-none h-5 shadow-sm"
           />
         ) : (
           <div 
             onClick={handleEditClick}
-            className="text-[9px] font-mono text-white/50 cursor-pointer hover:text-white transition-colors"
+            className="text-[10px] font-mono font-medium text-slate-400 cursor-pointer hover:text-primary transition-colors"
           >
             {value > 0 ? `+${formatNumberInput(value)}` : (value < 0 ? formatNumberInput(value) : '0')}
           </div>
@@ -159,44 +159,44 @@ export function VerticalFader({
         className="relative h-48 w-full flex justify-center cursor-pointer touch-none"
       >
         {/* Background dark track */}
-        <div className="absolute top-0 bottom-0 w-[2px] bg-white/10 rounded-full"></div>
+        <div className="absolute top-0 bottom-0 w-[3px] bg-white/[0.08] rounded-full"></div>
         
-        {/* Dotted lines for steps (optional detail) */}
-        <div className="absolute top-0 bottom-0 left-1/2 -translate-x-1/2 w-4 flex flex-col justify-between pointer-events-none opacity-20">
+        {/* Step markers */}
+        <div className="absolute top-0 bottom-0 left-1/2 -translate-x-1/2 w-4 flex flex-col justify-between pointer-events-none opacity-25">
           <div className="border-t border-white w-1 mx-auto"></div>
-          <div className="border-t border-white w-4"></div> {/* +15 */}
+          <div className="border-t border-white w-3.5"></div> {/* +15 */}
           <div className="border-t border-white w-1 mx-auto"></div>
-          <div className="border-t border-white w-4"></div> {/* 0 */}
+          <div className="border-t border-white w-3.5"></div> {/* 0 */}
           <div className="border-t border-white w-1 mx-auto"></div>
-          <div className="border-t border-white w-4"></div> {/* -15 */}
+          <div className="border-t border-white w-3.5"></div> {/* -15 */}
           <div className="border-t border-white w-1 mx-auto"></div>
         </div>
 
         {/* Active Track (Colored) */}
         <div 
-          className="absolute bottom-0 w-[2px] rounded-full pointer-events-none transition-all duration-75"
+          className="absolute bottom-0 w-[3px] rounded-full pointer-events-none transition-all duration-75"
           style={{ 
             height: `${percentage}%`,
             backgroundColor: trackColor,
-            boxShadow: `0 0 8px ${trackColor}80` // Glow effect
+            boxShadow: `0 0 10px ${trackColor}` // Glow effect
           }}
         ></div>
 
         {/* Thumb (Pill shape) */}
         <div 
-          className="absolute w-6 h-10 bg-[#1a1a1a] rounded-lg border border-white/20 shadow-lg pointer-events-none flex items-center justify-center transition-transform duration-75 group-hover:border-white/40"
+          className="absolute w-7 h-10 bg-[#0c1626] rounded-xl border border-white/20 shadow-2xl pointer-events-none flex items-center justify-center transition-transform duration-75 group-hover:border-primary/60 group-hover:scale-105"
           style={{ 
             bottom: `${percentage}%`,
             transform: 'translateY(50%)'
           }}
         >
           {/* Thumb horizontal indicator line */}
-          <div className="w-3 h-[2px] bg-white/80 rounded-full"></div>
+          <div className="w-3.5 h-[2px] bg-primary rounded-full shadow-[0_0_6px_rgba(0,245,255,0.8)]"></div>
         </div>
       </div>
       
       {label && (
-        <div className="text-[10px] font-mono text-white/60 mt-2">
+        <div className="text-[10px] font-mono text-slate-400 mt-2 font-medium">
           {label}
         </div>
       )}

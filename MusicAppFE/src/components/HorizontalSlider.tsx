@@ -167,8 +167,8 @@ export function HorizontalSlider({
   return (
     <div className="flex flex-col gap-2 w-full select-none group">
       {!hideLabels && (
-        <div className="flex justify-between items-end mb-1">
-          <span className="text-sm font-mono text-white/80 uppercase tracking-widest">{label}</span>
+        <div className="flex justify-between items-end mb-1.5">
+          <span className="text-xs font-mono font-bold text-slate-300 uppercase tracking-wider">{label}</span>
           {isEditing ? (
             <div className="flex items-center gap-1">
               <input
@@ -178,16 +178,16 @@ export function HorizontalSlider({
                 onChange={(e) => setInputValue(e.target.value.replace(/,/g, '.'))}
                 onBlur={handleInputBlur}
                 onKeyDown={handleKeyDown}
-                className="w-14 bg-black/50 text-white text-xs font-mono text-right border border-white/20 rounded outline-none h-5 px-1"
+                className="w-16 bg-[#0c1626] text-primary text-xs font-mono text-right border border-primary/50 rounded-lg outline-none h-6 px-1.5 shadow-sm"
               />
-              <span className="text-xs font-mono text-white/40">{unit}</span>
+              <span className="text-xs font-mono text-slate-400">{unit}</span>
             </div>
           ) : (
             <span 
               onClick={handleEditClick}
-              className="text-xs font-mono text-white/60 cursor-pointer hover:text-white transition-colors"
+              className="text-xs font-mono font-semibold text-slate-300 cursor-pointer hover:text-primary transition-colors"
             >
-              {formattedValue} {unit}
+              {formattedValue} <span className="text-slate-400 font-normal">{unit}</span>
             </span>
           )}
         </div>
@@ -201,43 +201,42 @@ export function HorizontalSlider({
         className="relative h-6 w-full flex items-center cursor-pointer touch-none"
       >
         {/* Background dark track */}
-        <div className="absolute left-0 right-0 h-[4px] bg-white/10 rounded-full"></div>
+        <div className="absolute left-0 right-0 h-[5px] bg-white/[0.08] rounded-full"></div>
         
         {/* Center zero mark (only if bidirectional) */}
         {isBidirectional && (
           <div 
-            className="absolute -translate-x-1/2 w-1 h-3 bg-white/30 rounded-full"
+            className="absolute -translate-x-1/2 w-1 h-3.5 bg-white/25 rounded-full"
             style={{ left: `${zeroPct}%` }}
           ></div>
         )}
 
         {/* Active Track (Colored from 0 to value) */}
         <div 
-          className={`absolute h-[4px] rounded-full pointer-events-none ${!isDragging ? 'transition-all duration-75' : ''}`}
+          className={`absolute h-[5px] rounded-full pointer-events-none ${!isDragging ? 'transition-all duration-75' : ''}`}
           style={{ 
             left: `${fillLeft}%`,
             width: `${fillWidth}%`,
             backgroundColor: color,
-            boxShadow: `0 0 8px ${color}80`
+            boxShadow: `0 0 10px ${color}`
           }}
         ></div>
 
         {/* Thumb */}
         <div 
-          className={`absolute w-4 h-8 bg-[#1a1a1a] rounded-md border border-white/20 shadow-lg pointer-events-none flex flex-col items-center justify-center group-hover:border-white/40 ${!isDragging ? 'transition-transform duration-75' : ''}`}
+          className={`absolute w-5 h-9 bg-[#0c1626] rounded-xl border border-white/25 shadow-2xl pointer-events-none flex flex-col items-center justify-center group-hover:border-primary/60 group-hover:scale-105 ${!isDragging ? 'transition-transform duration-75' : ''}`}
           style={{ 
             left: `${percentage}%`,
             transform: 'translateX(-50%)'
           }}
         >
           {/* Thumb vertical line */}
-          <div className="w-[2px] h-3 bg-white/80 rounded-full"></div>
+          <div className="w-[2px] h-3.5 bg-primary rounded-full shadow-[0_0_6px_rgba(0,245,255,0.8)]"></div>
         </div>
       </div>
       
-      
       {!hideLabels && (
-        <div className="relative h-4 font-mono text-[10px] text-white/40 mt-1">
+        <div className="relative h-4 font-mono text-[10px] text-slate-400 mt-1.5 font-medium">
           <span className="absolute left-0">{min}</span>
           {isBidirectional && (
             <span 

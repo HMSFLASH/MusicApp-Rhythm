@@ -29,12 +29,12 @@ export function MasterOutput() {
   return (
     <AudioEffectPanel
       title={t('studio.masterOutput.title', 'Master Output')}
-      description={t('studio.masterOutput.desc', 'Final stage output controls and panning.')}
+      description={t('studio.masterOutput.desc', 'Final stage output controls, latency buffer and panning.')}
       leading={(
         <EffectPowerButton
           active={playerState.fxEnabled.master}
           onClick={() => playerState.toggleFx('master')}
-          activeClassName="bg-[#ffffff]/20 text-[#ffffff] shadow-[0_0_15px_rgba(255,255,255,0.4)]"
+          activeClassName="bg-white/20 text-white shadow-[0_0_15px_rgba(255,255,255,0.4)] border border-white/30"
         />
       )}
     >
@@ -46,7 +46,7 @@ export function MasterOutput() {
           max={100}
           onChange={playerState.updatePanValue}
           label={t('studio.masterOutput.lrBalance', 'L/R Balance')}
-          color="#ffffff"
+          color="#00f5ff"
           unit="%"
         />
       </EffectControlsGate>

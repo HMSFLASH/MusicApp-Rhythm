@@ -12,34 +12,34 @@ export function DynamicsRack() {
     <div className="flex flex-col gap-8 w-full">
       
       {/* Dynamics Compressor */}
-      <div className="bg-[#0a0a0a] p-4 md:p-8 rounded-2xl border border-white/5 shadow-2xl flex flex-col gap-6 md:gap-10">
-        <div className="flex flex-col gap-4 border-b border-white/10 pb-4 md:flex-row md:items-center md:justify-between">
+      <div className="bg-[#0c1626]/80 p-4 sm:p-6 md:p-8 rounded-3xl border border-white/[0.08] shadow-[0_15px_40px_rgba(0,0,0,0.5)] backdrop-blur-2xl flex flex-col gap-6 md:gap-10">
+        <div className="flex flex-col gap-4 border-b border-white/[0.06] pb-5 md:flex-row md:items-center md:justify-between">
           <div>
-            <h2 className="text-xl font-bold font-sans text-white/80 tracking-tight">{t('studio.dynamics.title', 'Compressor / Night Mode')}</h2>
-            <p className="text-secondary/60 text-xs font-mono mt-1">{t('studio.dynamics.desc', 'Controls dynamic range separately from loudness normalization.')}</p>
+            <h2 className="text-lg sm:text-xl font-bold font-display text-white tracking-tight">{t('studio.dynamics.title', 'Compressor / Night Mode')}</h2>
+            <p className="text-slate-400 text-xs font-mono mt-1">{t('studio.dynamics.desc', 'Controls dynamic range separately from loudness normalization.')}</p>
           </div>
           <div className="flex flex-wrap items-center gap-2">
-            <button aria-label="Action"
+            <button aria-label="Default Compressor Settings"
               onClick={playerState.applyDefaultCompressor}
               title={t('studio.dynamics.defaultTitle', 'Apply recommended compressor settings')}
-              className="flex h-10 items-center gap-2 rounded-md border border-[#ff0055]/30 bg-[#ff0055]/10 px-3 text-sm font-medium text-[#ff4f88] transition-colors hover:bg-[#ff0055]/20"
+              className="flex h-9 items-center gap-2 rounded-xl border border-rose-500/30 bg-rose-500/10 px-3.5 text-xs font-bold text-rose-400 transition-all hover:bg-rose-500/20 active:scale-95 shadow-sm"
             >
-              <Wand2 size={16} />
+              <Wand2 size={14} />
               {t('studio.dynamics.defaultButton', 'Default')}
             </button>
-            <button aria-label="Action"
+            <button aria-label="Reset Compressor"
               onClick={playerState.resetCompressor}
               title={t('studio.dynamics.resetTitle', 'Reset compressor to neutral settings')}
-              className="flex h-10 items-center gap-2 rounded-md border border-white/10 bg-white/5 px-3 text-sm font-medium text-white/60 transition-colors hover:bg-white/10 hover:text-white"
+              className="flex h-9 items-center gap-2 rounded-xl border border-white/[0.08] bg-white/[0.04] px-3.5 text-xs font-semibold text-slate-300 transition-all hover:bg-white/[0.08] hover:text-white active:scale-95"
             >
-              <RotateCcw size={16} />
+              <RotateCcw size={14} />
               {t('studio.dynamics.resetButton', 'Reset')}
             </button>
             <EffectPowerButton
               size="lg"
               active={playerState.fxEnabled.comp}
               onClick={() => playerState.toggleFx('comp')}
-              activeClassName="bg-[#ff0055]/20 text-[#ff0055] shadow-[0_0_15px_rgba(255,0,85,0.4)]"
+              activeClassName="bg-rose-500/20 text-rose-400 shadow-[0_0_15px_rgba(244,63,94,0.4)] border border-rose-500/40"
             />
           </div>
         </div>

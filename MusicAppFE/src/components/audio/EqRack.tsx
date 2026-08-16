@@ -105,23 +105,23 @@ function EqResponseModal({
   }, [bands, enabled, preampGain, bassGain, trebleGain, eqResponseData, effectsEnabled]);
 
   const modalContent = (
-    <div className="fixed inset-0 z-[100] flex items-center justify-center bg-black/80 backdrop-blur-sm p-4">
-      <div className="bg-[#0b0b0b] border border-white/10 rounded-xl shadow-2xl w-full max-w-5xl max-h-[calc(100dvh-2rem)] overflow-hidden flex flex-col">
-        <div className="flex items-center justify-between px-4 py-3 border-b border-white/10 bg-white/[0.03]">
+    <div className="fixed inset-0 z-[100] flex items-center justify-center bg-black/80 backdrop-blur-md p-4">
+      <div className="bg-[#0c1626] border border-white/10 rounded-2xl shadow-2xl w-full max-w-5xl max-h-[calc(100dvh-2rem)] overflow-hidden flex flex-col backdrop-blur-2xl">
+        <div className="flex items-center justify-between px-5 py-4 border-b border-white/[0.06] bg-white/[0.02]">
           <div className="flex items-baseline gap-3 min-w-0">
-            <h2 className="text-white font-bold text-sm uppercase tracking-widest">EQ Response</h2>
-            <span className="text-white/50 text-xs font-mono">{enabled ? '20 Hz - 20 kHz' : 'Bypassed'}</span>
+            <h2 className="text-white font-bold font-display text-base uppercase tracking-wider">EQ Response</h2>
+            <span className="text-primary text-xs font-mono">{enabled ? '20 Hz - 20 kHz' : 'Bypassed'}</span>
           </div>
           <button
             aria-label="Close EQ response"
             onClick={onClose}
-            className="w-8 h-8 rounded-md text-white/70 hover:text-white hover:bg-white/10 flex items-center justify-center transition-colors"
+            className="w-8 h-8 rounded-lg text-slate-400 hover:text-white hover:bg-white/10 flex items-center justify-center transition-colors"
           >
             <X size={18} />
           </button>
         </div>
 
-        <div className="p-4 overflow-y-auto">
+        <div className="p-4 sm:p-6 overflow-y-auto">
           <div className="w-full">
             <svg
               viewBox={`0 0 ${GRAPH_WIDTH} ${GRAPH_HEIGHT}`}
@@ -134,8 +134,8 @@ function EqResponseModal({
                 y={GRAPH_PADDING.top}
                 width={graphInnerWidth}
                 height={graphInnerHeight}
-                rx="6"
-                fill="#050505"
+                rx="8"
+                fill="#060b14"
                 stroke="rgba(255,255,255,0.08)"
               />
 
@@ -312,61 +312,61 @@ export function EqRack() {
   );
 
   return (
-    <div className="bg-[#0a0a0a] rounded-2xl border border-white/5 shadow-2xl flex flex-col overflow-hidden w-full">
+    <div className="bg-[#0c1626]/80 rounded-3xl border border-white/[0.08] shadow-[0_15px_40px_rgba(0,0,0,0.5)] flex flex-col overflow-hidden w-full backdrop-blur-2xl">
       {/* EQ Header */}
-      <div className="flex flex-col md:flex-row md:items-center justify-between gap-4 p-4 border-b border-white/5 bg-white/[0.02]">
+      <div className="flex flex-col md:flex-row md:items-center justify-between gap-4 p-4 sm:p-6 border-b border-white/[0.06] bg-white/[0.02]">
         <div className="flex items-center justify-between md:justify-start w-full md:w-auto gap-4">
           <EffectPowerButton
             size="lg"
             active={playerState.fxEnabled.eq}
             onClick={() => playerState.toggleFx('eq')}
-            activeClassName="bg-[#00E5FF]/20 text-[#00E5FF] shadow-[0_0_15px_rgba(0,229,255,0.4)]"
+            activeClassName="bg-primary/20 text-primary shadow-[0_0_15px_rgba(0,245,255,0.4)] border border-primary/40"
           />
           <div className="relative flex-1 min-w-0 md:flex-none">
-            <button aria-label="Action"
+            <button aria-label="Preset Menu"
               onClick={() => setShowPresetMenu(!showPresetMenu)}
-              className="flex items-center justify-between md:justify-start w-full gap-2 px-4 py-2 rounded-lg bg-white/5 hover:bg-white/10 text-white font-medium text-sm transition-colors border border-white/10"
+              className="flex items-center justify-between md:justify-start w-full gap-2.5 px-4 py-2.5 rounded-xl bg-white/[0.04] hover:bg-white/[0.08] text-white font-semibold text-xs transition-all border border-white/[0.08] shadow-sm"
             >
               <div className="flex items-center gap-2">
-                {isParametricPreset ? <CircleDot size={16} className="text-[#ff00ff]" /> : <Sliders size={16} className="text-[#00E5FF]" />}
-                <span className="truncate max-w-[200px] md:max-w-xs">{playerState.eqPresetName.replace('_', ' ')}</span>
+                {isParametricPreset ? <CircleDot size={15} className="text-purple-400" /> : <Sliders size={15} className="text-primary" />}
+                <span className="truncate max-w-[180px] md:max-w-xs">{playerState.eqPresetName.replace('_', ' ')}</span>
               </div>
-              <ChevronDown size={16} className="shrink-0 text-white/50" />
+              <ChevronDown size={15} className="shrink-0 text-slate-400" />
             </button>
 
             {showPresetMenu && (
               <>
                 <div className="fixed inset-0 z-40" onClick={() => setShowPresetMenu(false)} />
-                <div className="absolute top-full left-0 mt-2 w-64 max-w-[calc(100vw-32px)] bg-[#1a1a1a] border border-white/10 rounded-lg shadow-2xl z-50 overflow-hidden py-1 max-h-96 overflow-y-auto">
+                <div className="absolute top-full left-0 mt-2 w-72 max-w-[calc(100vw-32px)] bg-[#0c1626] border border-white/10 rounded-2xl shadow-2xl z-50 overflow-hidden py-2 max-h-96 overflow-y-auto backdrop-blur-2xl">
                   {Object.keys(EQ_PRESETS).map((key) => (
-                    <button aria-label="Action"
+                    <button aria-label="Select preset"
                       key={key}
                       onClick={() => {
                         playerState.applyPreset(key as keyof typeof EQ_PRESETS);
                         setShowPresetMenu(false);
                       }}
-                      className="w-full flex items-center gap-2 px-4 py-2 hover:bg-white/10 text-white text-sm transition-colors"
+                      className="w-full flex items-center gap-2.5 px-4 py-2 hover:bg-white/[0.06] text-slate-200 hover:text-white text-xs font-medium transition-colors"
                     >
-                      <Sliders size={14} className="text-white/50 shrink-0" />
+                      <Sliders size={13} className="text-slate-400 shrink-0" />
                       <span>{key.replace('_', ' ')}</span>
                     </button>
                   ))}
 
-                  <div className="h-px bg-white/10 my-1"></div>
-                  <div className="px-4 py-1 text-[10px] text-white/80 uppercase font-bold tracking-widest">Sound Signatures</div>
+                  <div className="h-px bg-white/[0.06] my-1.5"></div>
+                  <div className="px-4 py-1 text-[10px] text-slate-400 uppercase font-bold tracking-widest">Sound Signatures</div>
                   {Object.keys(STYLISTIC_PRESETS).map((key) => {
                     const preset = STYLISTIC_PRESETS[key as keyof typeof STYLISTIC_PRESETS];
                     const isParam = 'isParametric' in preset && (preset as any).isParametric;
                     return (
-                      <button aria-label="Action"
+                      <button aria-label="Select sound signature"
                         key={key}
                         onClick={() => {
                           playerState.applyStylisticPreset(key as keyof typeof STYLISTIC_PRESETS);
                           setShowPresetMenu(false);
                         }}
-                        className="w-full flex items-center gap-2 px-4 py-2 hover:bg-[#ff00ff]/20 text-[#ff00ff] font-bold text-sm transition-colors"
+                        className="w-full flex items-center gap-2.5 px-4 py-2 hover:bg-purple-500/15 text-purple-400 font-semibold text-xs transition-colors"
                       >
-                        {isParam ? <CircleDot size={14} className="shrink-0" /> : <Sliders size={14} className="shrink-0" />}
+                        {isParam ? <CircleDot size={13} className="shrink-0" /> : <Sliders size={13} className="shrink-0" />}
                         <span>{preset.name}</span>
                       </button>
                     );
@@ -374,46 +374,46 @@ export function EqRack() {
 
                   {playerState.customEqPresets.length > 0 && (
                     <>
-                      <div className="h-px bg-white/10 my-1"></div>
-                      <div className="px-4 py-1 text-[10px] text-white/80 uppercase font-bold tracking-widest">{t('studio.eq.savedPresets', 'Saved Presets')}</div>
+                      <div className="h-px bg-white/[0.06] my-1.5"></div>
+                      <div className="px-4 py-1 text-[10px] text-slate-400 uppercase font-bold tracking-widest">{t('studio.eq.savedPresets', 'Saved Presets')}</div>
                       {playerState.customEqPresets.map((preset) => {
                         const isParam = isSavedParametricPreset(preset);
                         return (
-                          <div key={preset.name} className="flex items-center w-full px-4 py-1 hover:bg-white/10 group transition-colors">
-                            <button aria-label="Action"
+                          <div key={preset.name} className="flex items-center w-full px-4 py-1.5 hover:bg-white/[0.06] group transition-colors">
+                            <button aria-label="Select custom preset"
                               onClick={() => {
                                 playerState.applyCustomSavedPreset(preset.name);
                                 setShowPresetMenu(false);
                               }}
-                              className="flex-1 flex items-center gap-2 text-left text-white/80 text-sm mr-2"
+                              className="flex-1 flex items-center gap-2 text-left text-slate-200 text-xs font-medium mr-2"
                             >
-                              {isParam ? <CircleDot size={14} className="shrink-0" /> : <Sliders size={14} className="shrink-0" />}
-                              <span className="truncate max-w-[100px]">{preset.name}</span>
-                              <span className="text-[10px] text-white/50 ml-auto">
+                              {isParam ? <CircleDot size={13} className="shrink-0 text-purple-400" /> : <Sliders size={13} className="shrink-0 text-primary" />}
+                              <span className="truncate max-w-[110px]">{preset.name}</span>
+                              <span className="text-[10px] text-slate-400 ml-auto font-mono">
                                 {isParam ? '(Parametric)' : `(${preset.bands.length} ${t('studio.eq.bands', 'bands')})`}
                               </span>
                             </button>
 
                             <div className="flex items-center gap-1 opacity-100 lg:opacity-30 group-hover:opacity-100 transition-opacity">
-                              <button aria-label="Action"
+                              <button aria-label="Rename preset"
                                 onClick={(e) => {
                                   e.stopPropagation();
                                   setModalInput(preset.name);
                                   setModalState({ type: 'rename', oldName: preset.name });
                                   setShowPresetMenu(false);
                                 }}
-                                className="p-1 text-white/80 hover:text-white transition-colors"
+                                className="p-1 text-slate-400 hover:text-white transition-colors"
                                 title="Đổi tên"
                               >
                                 <Edit2 size={12} />
                               </button>
-                              <button aria-label="Action"
+                              <button aria-label="Delete preset"
                                 onClick={(e) => {
                                   e.stopPropagation();
                                   setModalState({ type: 'delete', name: preset.name });
                                   setShowPresetMenu(false);
                                 }}
-                                className="p-1 text-white/80 hover:text-red-400 transition-colors"
+                                className="p-1 text-slate-400 hover:text-rose-400 transition-colors"
                                 title="Xóa"
                               >
                                 <Trash2 size={12} />
@@ -425,22 +425,22 @@ export function EqRack() {
                     </>
                   )}
 
-                  <div className="h-px bg-white/10 my-1"></div>
-                  <button aria-label="Action"
+                  <div className="h-px bg-white/[0.06] my-1.5"></div>
+                  <button aria-label="Set Custom Preset"
                     onClick={() => {
                       playerState.setCustomPreset();
                       setShowPresetMenu(false);
                     }}
-                    className="w-full text-left px-4 py-2 hover:bg-[#00E5FF]/20 text-[#00E5FF] font-medium text-sm transition-colors"
+                    className="w-full text-left px-4 py-2 hover:bg-primary/10 text-primary font-bold text-xs transition-colors"
                   >
                     CUSTOM
                   </button>
-                  <button aria-label="Action"
+                  <button aria-label="Set Parametric Preset"
                     onClick={() => {
                       playerState.setParametricPreset();
                       setShowPresetMenu(false);
                     }}
-                    className="w-full text-left px-4 py-2 hover:bg-[#00E5FF]/20 text-[#00E5FF] font-medium text-sm transition-colors"
+                    className="w-full text-left px-4 py-2 hover:bg-purple-500/10 text-purple-400 font-bold text-xs transition-colors"
                   >
                     PARAMETRIC
                   </button>
@@ -455,25 +455,25 @@ export function EqRack() {
             aria-label="EQ response"
             title="EQ response"
             onClick={() => setShowEqInfo(true)}
-            className="w-8 h-8 rounded-md bg-white/5 text-white/70 hover:text-white hover:bg-white/10 border border-white/10 flex items-center justify-center transition-colors"
+            className="w-9 h-9 rounded-xl bg-white/[0.04] text-slate-300 hover:text-white hover:bg-white/[0.08] border border-white/[0.08] flex items-center justify-center transition-all shadow-sm"
           >
             <Info size={16} />
           </button>
-          <button aria-label="Action"
+          <button aria-label="Save EQ Preset"
             onClick={() => {
               setModalInput("");
               setModalState({ type: 'save' });
             }}
-            className="flex items-center gap-1.5 px-3 py-1.5 rounded-md bg-[#00f5ff]/10 text-[#00f5ff] hover:bg-[#00f5ff]/20 transition-colors text-sm font-medium border border-[#00f5ff]/30 whitespace-nowrap shrink-0"
+            className="flex items-center gap-1.5 px-3.5 h-9 rounded-xl bg-primary/15 text-primary hover:bg-primary/25 transition-all text-xs font-bold border border-primary/30 whitespace-nowrap shrink-0 shadow-sm"
           >
             {t('studio.eq.save', 'Lưu')}
           </button>
           {isEditablePreset && (
-            <button aria-label="Action"
+            <button aria-label="Add custom EQ band"
               onClick={() => playerState.addCustomEqBand(1000)}
-              className="flex items-center gap-1.5 px-3 py-1.5 rounded-md bg-[#00E5FF]/10 text-[#00E5FF] hover:bg-[#00E5FF]/20 transition-colors text-sm font-medium border border-[#00E5FF]/30 whitespace-nowrap shrink-0"
+              className="flex items-center gap-1.5 px-3.5 h-9 rounded-xl bg-primary/15 text-primary hover:bg-primary/25 transition-all text-xs font-bold border border-primary/30 whitespace-nowrap shrink-0 shadow-sm"
             >
-              <Plus size={16} />
+              <Plus size={15} />
               {t('studio.eq.addBand', 'Add Band')}
             </button>
           )}

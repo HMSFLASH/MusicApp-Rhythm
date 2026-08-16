@@ -22,14 +22,14 @@ export function AudioSelectRow<T extends string | number>({
   descriptionClassName,
 }: AudioSelectRowProps<T>) {
   const containerStyle = tone === 'amber'
-    ? 'bg-amber-500/5 border-amber-500/20'
-    : 'bg-white/5 border-white/10';
+    ? 'bg-amber-500/[0.04] border-amber-500/20 hover:border-amber-500/30'
+    : 'bg-white/[0.02] border-white/[0.06] hover:border-white/[0.12]';
 
   return (
-    <div className={`flex flex-col gap-3 mt-2 p-4 rounded-xl border ${containerStyle} w-full`}>
+    <div className={`flex flex-col gap-3 mt-2 p-4 rounded-2xl border transition-all ${containerStyle} w-full`}>
       <div className="flex flex-col w-full">
-        <span className={`text-sm font-bold block leading-snug break-words ${titleClassName || 'text-white/80'}`}>{title}</span>
-        <span className={`text-xs font-mono mt-1 block leading-normal break-words ${descriptionClassName || 'text-white/50'}`}>
+        <span className={`text-sm font-semibold block leading-snug break-words ${titleClassName || 'text-slate-100'}`}>{title}</span>
+        <span className={`text-xs font-mono mt-1 block leading-normal break-words ${descriptionClassName || 'text-slate-400'}`}>
           {description}
         </span>
       </div>
@@ -44,10 +44,10 @@ export function AudioSelectRow<T extends string | number>({
               onChange(val as T);
             }
           }}
-          className="w-full bg-black/70 text-[#00E5FF] font-mono text-xs font-bold border border-white/20 rounded-lg px-3 py-2 outline-none cursor-pointer hover:border-[#00E5FF]/60 focus:border-[#00E5FF] transition-colors truncate"
+          className="w-full bg-[#0c1626] text-primary font-mono text-xs font-semibold border border-white/[0.1] rounded-xl px-3.5 py-2.5 outline-none cursor-pointer hover:border-primary/50 focus:border-primary transition-all truncate shadow-md"
         >
           {options.map((opt) => (
-            <option key={opt.value} value={opt.value} className="bg-[#121212] text-white font-mono py-1">
+            <option key={opt.value} value={opt.value} className="bg-[#0c1626] text-slate-200 font-mono py-1.5">
               {opt.label}
             </option>
           ))}

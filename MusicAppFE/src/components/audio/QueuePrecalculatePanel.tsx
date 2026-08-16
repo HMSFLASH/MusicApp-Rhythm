@@ -54,14 +54,14 @@ export function QueuePrecalculatePanel({ playerState }: QueuePrecalculatePanelPr
   };
 
   return (
-    <div className="flex flex-col gap-3 mt-2 p-4 bg-red-500/5 rounded-xl border border-red-500/20">
+    <div className="flex flex-col gap-3.5 mt-2 p-4 sm:p-5 bg-rose-500/[0.04] rounded-2xl border border-rose-500/20">
       <div className="flex items-start gap-3">
-        <Cpu className="text-red-400 shrink-0 mt-0.5" size={18} />
+        <Cpu className="text-rose-400 shrink-0 mt-0.5" size={18} />
         <div className="min-w-0 flex-1">
-          <span className="text-sm text-red-300/90 font-bold block">
+          <span className="text-sm text-rose-300 font-semibold block">
             {t('studio.masterOutput.queuePrecalcTitle', 'Full Queue Pre-calculate')}
           </span>
-          <span className="text-xs text-red-300/65 font-mono mt-1 block">
+          <span className="text-xs text-rose-300/70 font-mono mt-1 block">
             {!isConstrained
               ? t('studio.masterOutput.queuePrecalcDesc', {
                 cores: totalCores,
@@ -79,7 +79,7 @@ export function QueuePrecalculatePanel({ playerState }: QueuePrecalculatePanelPr
 
       {!isRunning && maxWorkers > 1 && (
         <div className="flex items-center gap-2">
-          <label className="text-xs text-red-300/70 font-mono whitespace-nowrap shrink-0">
+          <label className="text-xs text-rose-300/80 font-mono whitespace-nowrap shrink-0 font-medium">
             {t('studio.masterOutput.queuePrecalcWorkers', 'Workers:')}
           </label>
           <input
@@ -88,7 +88,7 @@ export function QueuePrecalculatePanel({ playerState }: QueuePrecalculatePanelPr
             max={maxWorkers}
             value={selectedWorkers}
             onChange={(e) => setRequestedWorkers(Number(e.target.value))}
-            className="min-w-0 flex-1 accent-red-400"
+            className="min-w-0 flex-1 accent-rose-400 cursor-pointer"
           />
           <input
             type="number"
@@ -96,15 +96,12 @@ export function QueuePrecalculatePanel({ playerState }: QueuePrecalculatePanelPr
             max={maxWorkers}
             value={selectedWorkers}
             onChange={(e) => setRequestedWorkers(Number(e.target.value))}
-            className="w-14 h-8 rounded-md bg-white/5 border border-red-400/20 text-center text-sm text-red-100 font-mono
-              focus:outline-none focus:border-red-400/50 [appearance:textfield]
-              [&::-webkit-outer-spin-button]:appearance-none [&::-webkit-inner-spin-button]:appearance-none"
+            className="w-14 h-8 rounded-xl bg-[#0c1626] border border-rose-400/30 text-center text-xs text-rose-100 font-mono focus:outline-none focus:border-rose-400 [appearance:textfield] [&::-webkit-outer-spin-button]:appearance-none [&::-webkit-inner-spin-button]:appearance-none"
           />
           <button
             type="button"
             onClick={() => setRequestedWorkers(null)}
-            className="h-8 px-2 rounded-md bg-red-500/15 hover:bg-red-500/25 border border-red-400/20
-              text-[11px] text-red-200 font-bold uppercase transition-colors whitespace-nowrap"
+            className="h-8 px-3 rounded-xl bg-rose-500/15 hover:bg-rose-500/25 border border-rose-400/30 text-[11px] text-rose-200 font-bold uppercase transition-all whitespace-nowrap active:scale-95"
           >
             {t('studio.masterOutput.queuePrecalcRecommended', { workers: recommendedWorkers, defaultValue: '{{workers}} rec.' })}
           </button>
@@ -116,8 +113,7 @@ export function QueuePrecalculatePanel({ playerState }: QueuePrecalculatePanelPr
           aria-label={t('studio.masterOutput.queuePrecalcCancelButton', 'Cancel')}
           title={t('studio.masterOutput.queuePrecalcCancelButton', 'Cancel')}
           onClick={handleCancel}
-          className="w-full h-10 rounded-lg bg-red-600/30 hover:bg-red-600/45 text-red-100 border border-red-400/40
-            flex items-center justify-center gap-2 text-xs font-bold uppercase transition-colors"
+          className="w-full h-10 rounded-xl bg-rose-600/30 hover:bg-rose-600/45 text-rose-100 border border-rose-400/40 flex items-center justify-center gap-2 text-xs font-bold uppercase transition-all shadow-md active:scale-95"
         >
           <XCircle size={15} />
           <span>{t('studio.masterOutput.queuePrecalcCancelButton', 'Cancel')}</span>
@@ -128,9 +124,7 @@ export function QueuePrecalculatePanel({ playerState }: QueuePrecalculatePanelPr
           title={t('studio.masterOutput.queuePrecalcButton', 'Pre-calculate Entire Queue')}
           onClick={handlePrecalculateQueue}
           disabled={!canPrecalculateQueue || isRunning}
-          className="w-full h-10 rounded-lg bg-red-500/20 hover:bg-red-500/30 disabled:bg-white/5
-            disabled:text-white/30 disabled:cursor-not-allowed text-red-100 border border-red-400/30
-            flex items-center justify-center gap-2 text-xs font-bold uppercase transition-colors"
+          className="w-full h-10 rounded-xl bg-rose-500/20 hover:bg-rose-500/30 disabled:bg-white/5 disabled:text-white/30 disabled:cursor-not-allowed text-rose-100 border border-rose-400/30 flex items-center justify-center gap-2 text-xs font-bold uppercase transition-all shadow-md active:scale-95"
         >
           <Zap size={15} />
           <span>
@@ -141,13 +135,13 @@ export function QueuePrecalculatePanel({ playerState }: QueuePrecalculatePanelPr
 
       {(isRunning || totalCount > 0) && (
         <div className="flex flex-col gap-2">
-          <div className="h-1.5 rounded-full bg-white/10 overflow-hidden">
+          <div className="h-2 rounded-full bg-white/10 overflow-hidden">
             <div
-              className="h-full bg-red-400 transition-all"
+              className="h-full bg-rose-400 transition-all shadow-[0_0_8px_rgba(244,63,94,0.6)]"
               style={{ width: `${progressPercent}%` }}
             />
           </div>
-          <span className="text-[11px] text-red-200/70 font-mono">
+          <span className="text-[11px] text-rose-200/70 font-mono">
             {isRunning
               ? t('studio.masterOutput.queuePrecalcRunning', {
                 completed: completedCount,
@@ -171,8 +165,7 @@ export function QueuePrecalculatePanel({ playerState }: QueuePrecalculatePanelPr
           aria-label={t('studio.masterOutput.queuePrecalcRetryButton', 'Retry Failed ({{count}})', { count: failedTrackIds.length })}
           title={t('studio.masterOutput.queuePrecalcRetryButton', 'Retry Failed ({{count}})', { count: failedTrackIds.length })}
           onClick={handleRetryFailed}
-          className="w-full h-10 rounded-lg bg-amber-500/20 hover:bg-amber-500/30 text-amber-100 border border-amber-400/30
-            flex items-center justify-center gap-2 text-xs font-bold uppercase transition-colors"
+          className="w-full h-10 rounded-xl bg-amber-500/20 hover:bg-amber-500/30 text-amber-100 border border-amber-400/30 flex items-center justify-center gap-2 text-xs font-bold uppercase transition-all active:scale-95"
         >
           <RefreshCw size={15} />
           <span>

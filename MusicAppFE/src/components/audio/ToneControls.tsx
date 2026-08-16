@@ -18,9 +18,9 @@ export function ToneControls() {
             size="sm"
             active={playerState.fxEnabled.preamp}
             onClick={() => playerState.toggleFx('preamp')}
-            activeClassName="bg-[#00E5FF]/20 text-[#00E5FF] shadow-[0_0_10px_rgba(0,229,255,0.4)]"
+            activeClassName="bg-primary/20 text-primary shadow-[0_0_12px_rgba(0,245,255,0.4)] border border-primary/30"
           />
-          <span className="text-sm font-bold text-white/80">Input Preamp</span>
+          <span className="text-sm font-semibold text-slate-100">Input Preamp</span>
         </div>
         <EffectControlsGate active={playerState.fxEnabled.preamp}>
           <HorizontalSlider
@@ -29,12 +29,12 @@ export function ToneControls() {
             max={6}
             onChange={playerState.updatePreampGain}
             label={t('studio.tone.preamp', 'Preamp')}
-            color="#00E5FF"
+            color="#00f5ff"
           />
         </EffectControlsGate>
       </div>
 
-      <div className="h-px w-full bg-white/5"></div>
+      <div className="h-px w-full bg-white/[0.06]"></div>
 
       <div className="flex flex-col gap-6">
         <div className="flex items-center gap-3">
@@ -42,9 +42,9 @@ export function ToneControls() {
             size="sm"
             active={playerState.fxEnabled.tone}
             onClick={() => playerState.toggleFx('tone')}
-            activeClassName="bg-[#00f5ff]/20 text-[#00f5ff] shadow-[0_0_10px_rgba(0,245,255,0.4)]"
+            activeClassName="bg-cyan-500/20 text-cyan-400 shadow-[0_0_12px_rgba(6,182,212,0.4)] border border-cyan-500/30"
           />
-          <span className="text-sm font-bold text-white/80">Tone Controls</span>
+          <span className="text-sm font-semibold text-slate-100">Tone Controls</span>
         </div>
         <EffectControlsGate active={playerState.fxEnabled.tone} className="flex flex-col gap-8">
           <HorizontalSlider
@@ -61,7 +61,7 @@ export function ToneControls() {
             max={15}
             onChange={playerState.updateBassGain}
             label={t('studio.tone.bass', 'Bass')}
-            color="#ff6600"
+            color="#f97316"
           />
         </EffectControlsGate>
       </div>
