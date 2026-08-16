@@ -1,7 +1,7 @@
 import { useState, useEffect, useMemo, useRef } from 'react';
 import { useGlobalAudio } from '../context/AudioContext';
 import { useLibrary } from '../context/LibraryContext';
-import { Play, Pause, Trash2, GripVertical, MoreHorizontal, ArrowUp, ArrowDown, ListPlus, Heart, Info, X, ChevronsUp, ChevronsDown, CheckSquare, Square, Download } from 'lucide-react';
+import { Play, Trash2, GripVertical, MoreHorizontal, ArrowUp, ArrowDown, ListPlus, Heart, Info, X, ChevronsUp, ChevronsDown, CheckSquare, Square, Download } from 'lucide-react';
 import type { Track } from '../hooks/useAudioPlayer';
 import { useVirtualList } from '../hooks/useVirtualList';
 import { AddToPlaylistModal } from '../components/AddToPlaylistModal';
@@ -217,9 +217,9 @@ export function QueuePage() {
 
   return (
     <div className="flex flex-col h-full max-w-7xl 2xl:max-w-none mx-auto pb-28 md:pb-32">
-      <div className="mb-6 md:mb-8 border-b border-white/10 pb-4 md:pb-6">
-        <h1 className="text-2xl md:text-3xl font-bold font-sans text-white tracking-tight">Play Queue</h1>
-        <p className="text-secondary/60 text-sm font-mono mt-1">
+      <div className="mb-6 md:mb-8 border-b border-white/[0.06] pb-4 md:pb-6">
+        <h1 className="text-2xl md:text-3xl font-bold font-display text-white tracking-tight">Play Queue</h1>
+        <p className="text-slate-400 text-xs md:text-sm font-mono mt-0.5">
           {queue.length} track{queue.length !== 1 ? 's' : ''} in queue
         </p>
       </div>
@@ -233,11 +233,11 @@ export function QueuePage() {
       />
 
       {selectedIndexes.size > 0 && (
-        <div className="sticky top-0 z-20 mb-4 flex flex-wrap items-center justify-between gap-y-3 gap-x-4 bg-[#1A1A1A]/95 backdrop-blur border border-primary/30 rounded-xl p-3 shadow-lg shadow-black/50 mx-2 sm:mx-0">
+        <div className="sticky top-0 z-20 mb-4 flex flex-wrap items-center justify-between gap-y-2 gap-x-3 bg-[#0c1626]/95 backdrop-blur-xl border border-primary/30 rounded-xl p-3 shadow-2xl mx-2 sm:mx-0">
           <div className="flex items-center gap-2 sm:gap-3 flex-wrap">
-            <span className="text-primary font-bold whitespace-nowrap">{selectedIndexes.size} selected</span>
-            <button onClick={() => setSelectedIndexes(new Set())} className="text-white/50 hover:text-white transition-colors shrink-0" title="Clear selection">
-              <X size={18} />
+            <span className="text-primary text-xs font-bold whitespace-nowrap">{selectedIndexes.size} selected</span>
+            <button onClick={() => setSelectedIndexes(new Set())} className="text-slate-400 hover:text-white transition-colors shrink-0 p-1" title="Clear selection">
+              <X size={16} />
             </button>
             <button
               onClick={() => {
@@ -247,16 +247,16 @@ export function QueuePage() {
                   setSelectedIndexes(new Set(Array.from({ length: queue.length }, (_, i) => i)));
                 }
               }}
-              className="p-1.5 rounded-full bg-white/5 border border-white/10 hover:bg-white/10 text-white/60 hover:text-white transition-colors flex items-center gap-2 px-3 text-sm ml-2 shrink-0 whitespace-nowrap"
+              className="p-1 rounded-lg bg-white/5 border border-white/10 hover:bg-white/10 text-slate-300 hover:text-white transition-colors flex items-center gap-1.5 px-2.5 text-xs ml-1 shrink-0 whitespace-nowrap"
             >
-              {selectedIndexes.size === queue.length && queue.length > 0 ? <CheckSquare size={16} /> : <Square size={16} />}
+              {selectedIndexes.size === queue.length && queue.length > 0 ? <CheckSquare size={14} className="text-primary" /> : <Square size={14} />}
               <span className="hidden md:inline">Select All</span>
             </button>
           </div>
           <div className="flex items-center gap-2 flex-wrap">
             <ActionMenu
               ariaLabel="Batch actions"
-              buttonClassName="p-2 rounded-lg bg-white/5 hover:bg-white/10 text-white flex items-center justify-center transition-colors"
+              buttonClassName="p-1.5 rounded-lg bg-white/5 hover:bg-white/10 text-white flex items-center justify-center transition-colors"
               actions={[
                 { label: 'Add to Playlist', icon: <ListPlus size={16} />, onSelect: () => setTracksToPlaylist(Array.from(selectedIndexes).map(idx => queue[idx]).filter(Boolean)) },
                 { label: 'Add to Favorites', icon: <Heart size={16} />, onSelect: handleBatchAddToFavorites },
@@ -270,11 +270,11 @@ export function QueuePage() {
       <div
         ref={containerRef}
         id="queue-page-container"
-        className="flex-1 overflow-y-auto relative"
+        className="flex-1 overflow-y-auto relative no-scrollbar"
         onScroll={handleScroll}
       >
         {queue.length === 0 ? (
-          <div className="flex flex-col items-center justify-center h-64 text-white/60">
+          <div className="flex flex-col items-center justify-center h-64 text-slate-500 font-mono text-sm">
             <p>Queue is empty</p>
           </div>
         ) : (
@@ -315,9 +315,9 @@ export function QueuePage() {
                       }
                     }}
                     onClick={(e) => handleTrackClick(track, index, e)}
-                    className={`group flex h-[76px] items-center gap-3 sm:gap-4 p-3 rounded-xl transition-all cursor-pointer select-none ${isCurrent
-                        ? 'bg-primary/20 border border-primary/30'
-                        : 'hover:bg-white/5 border border-transparent'
+                    className={`group flex h-[76px] items-center gap-3 sm:gap-3.5 p-2.5 sm:p-3 rounded-xl transition-all cursor-pointer select-none ${isCurrent
+                        ? 'bg-primary/15 border border-primary/30 text-primary shadow-[inset_0_0_15px_rgba(0,245,255,0.1)]'
+                        : 'bg-white/[0.02] hover:bg-white/[0.06] border border-white/[0.05] hover:border-primary/25 backdrop-blur-md'
                       } ${draggedIndex === index ? 'opacity-50' : 'opacity-100'}`}
                   >
                     {selectedIndexes.size > 0 ? (
@@ -325,19 +325,19 @@ export function QueuePage() {
                         onClick={(e) => toggleSelection(index, e)}
                         className="w-5 flex items-center justify-center transition-colors shrink-0"
                       >
-                        {selectedIndexes.has(index) ? <CheckSquare size={18} className="text-primary" /> : <Square size={18} className="text-white/50" />}
+                        {selectedIndexes.has(index) ? <CheckSquare size={17} className="text-primary" /> : <Square size={17} className="text-slate-500" />}
                       </button>
                     ) : (
-                      <div className="text-white/20 hover:text-white/60 cursor-grab active:cursor-grabbing p-1 hidden sm:block shrink-0">
+                      <div className="text-slate-600 hover:text-slate-300 cursor-grab active:cursor-grabbing p-1 hidden sm:block shrink-0">
                         <GripVertical size={16} />
                       </div>
                     )}
 
-                    <div className="w-10 h-10 sm:w-12 sm:h-12 flex-shrink-0 bg-white/5 rounded-lg overflow-hidden relative flex items-center justify-center">
+                    <div className="w-10 h-10 sm:w-11 sm:h-11 flex-shrink-0 bg-slate-800 rounded-lg overflow-hidden relative flex items-center justify-center border border-white/10 shadow-sm">
                       {track.imageUrl || playerState.getTrackImage(track.id) ? (
                         <img src={track.imageUrl || playerState.getTrackImage(track.id)} alt="" className="w-full h-full object-cover" />
                       ) : (
-                        <div className="w-full h-full bg-white/5 flex items-center justify-center text-white/40">
+                        <div className="w-full h-full bg-slate-800 flex items-center justify-center text-slate-500 text-xs font-mono">
                           🎵
                         </div>
                       )}
@@ -345,94 +345,98 @@ export function QueuePage() {
                       <div className={`absolute inset-0 flex items-center justify-center bg-black/60 transition-opacity ${isCurrent && isPlaying ? 'opacity-100' : 'opacity-100 lg:opacity-0 lg:group-hover:opacity-100'
                       }`}>
                         {isCurrent && isPlaying ? (
-                          <Pause size={20} className="text-primary fill-primary" />
+                          <div className="flex items-end justify-center gap-0.5 h-3">
+                            <span className="w-0.5 bg-primary rounded-full animate-eq-1" />
+                            <span className="w-0.5 bg-primary rounded-full animate-eq-2" />
+                            <span className="w-0.5 bg-primary rounded-full animate-eq-3" />
+                          </div>
                         ) : (
-                          <Play size={20} className="text-white fill-white ml-1" />
+                          <Play size={16} fill="currentColor" className="text-primary ml-0.5" />
                         )}
                       </div>
                     </div>
 
                     <div className="flex-1 min-w-0">
-                      <span className={`block text-sm sm:text-base font-medium truncate ${isCurrent ? 'text-primary' : 'text-white'}`}>
+                      <span className={`block text-xs sm:text-sm font-semibold truncate ${isCurrent ? 'text-primary' : 'text-slate-100'}`}>
                         {getDisplayTitle(track, playerState.getTrackMetadata(track.id))}
                       </span>
-                      <p className="text-xs sm:text-sm text-white/60 truncate">
+                      <p className="text-[11px] font-mono text-slate-400 truncate mt-0.5">
                         {getDisplayArtist(track, playerState.getTrackMetadata(track.id))} {track.album ? `• ${track.album}` : ''}
                       </p>
                     </div>
 
-                    <div className="relative flex items-center gap-2">
+                    <div className="relative flex items-center gap-1.5">
                       <button
                         aria-label="More options"
                         onClick={(e) => {
                           e.stopPropagation();
                           setOpenMenuIndex(openMenuIndex === index ? null : index);
                         }}
-                        className="p-2 text-white/60 hover:text-white hover:bg-white/10 rounded-full transition-colors opacity-100 lg:opacity-0 lg:group-hover:opacity-100"
+                        className="p-1.5 text-slate-400 hover:text-white hover:bg-white/10 rounded-lg transition-colors opacity-100 lg:opacity-0 lg:group-hover:opacity-100"
                       >
-                        <MoreHorizontal size={18} />
+                        <MoreHorizontal size={17} />
                       </button>
 
                       {openMenuIndex === index && (
-                        <div className="absolute right-0 top-full mt-1 w-44 max-w-[calc(100vw_-_2rem)] bg-[#1A1A1A] border border-white/10 rounded-lg shadow-xl overflow-hidden z-50 py-1">
+                        <div className="absolute right-0 top-full mt-1 w-48 max-w-[calc(100vw_-_2rem)] bg-[#0c1626] border border-white/10 rounded-xl shadow-2xl overflow-hidden z-50 py-1.5 backdrop-blur-2xl">
                           <button
                             disabled={index === 0}
                             onClick={(e) => moveTrack(e, index, 'top')}
-                            className="w-full flex items-center gap-3 px-4 py-2 text-sm text-left text-white/80 hover:bg-white/10 disabled:opacity-30 disabled:cursor-not-allowed"
+                            className="w-full flex items-center gap-3 px-3.5 py-2 text-xs font-medium text-left text-slate-200 hover:bg-white/[0.06] hover:text-white transition-colors disabled:opacity-30 disabled:cursor-not-allowed"
                           >
-                            <ChevronsUp size={14} /> Move to Top
+                            <ChevronsUp size={14} className="text-primary" /> Move to Top
                           </button>
                           <button
                             disabled={index === 0}
                             onClick={(e) => moveTrack(e, index, 'up')}
-                            className="w-full flex items-center gap-3 px-4 py-2 text-sm text-left text-white/80 hover:bg-white/10 disabled:opacity-30 disabled:cursor-not-allowed"
+                            className="w-full flex items-center gap-3 px-3.5 py-2 text-xs font-medium text-left text-slate-200 hover:bg-white/[0.06] hover:text-white transition-colors disabled:opacity-30 disabled:cursor-not-allowed"
                           >
                             <ArrowUp size={14} /> Move Up
                           </button>
                           <button
                             disabled={index === queue.length - 1}
                             onClick={(e) => moveTrack(e, index, 'down')}
-                            className="w-full flex items-center gap-3 px-4 py-2 text-sm text-left text-white/80 hover:bg-white/10 disabled:opacity-30 disabled:cursor-not-allowed"
+                            className="w-full flex items-center gap-3 px-3.5 py-2 text-xs font-medium text-left text-slate-200 hover:bg-white/[0.06] hover:text-white transition-colors disabled:opacity-30 disabled:cursor-not-allowed"
                           >
                             <ArrowDown size={14} /> Move Down
                           </button>
                           <button
                             disabled={index === queue.length - 1}
                             onClick={(e) => moveTrack(e, index, 'bottom')}
-                            className="w-full flex items-center gap-3 px-4 py-2 text-sm text-left text-white/80 hover:bg-white/10 disabled:opacity-30 disabled:cursor-not-allowed"
+                            className="w-full flex items-center gap-3 px-3.5 py-2 text-xs font-medium text-left text-slate-200 hover:bg-white/[0.06] hover:text-white transition-colors disabled:opacity-30 disabled:cursor-not-allowed"
                           >
                             <ChevronsDown size={14} /> Move to Bottom
                           </button>
                           {track.sourceType !== 'LOCAL' && (
                             <button
                               onClick={(e) => { e.stopPropagation(); downloadTrackFile(track); setOpenMenuIndex(null); }}
-                              className="w-full flex items-center gap-3 px-4 py-2 text-sm text-left text-white/80 hover:bg-white/10"
+                              className="w-full flex items-center gap-3 px-3.5 py-2 text-xs font-medium text-left text-slate-200 hover:bg-white/[0.06] hover:text-white transition-colors"
                             >
-                              <Download size={14} /> Download File
+                              <Download size={14} className="text-slate-400" /> Download File
                             </button>
                           )}
                           {track.sourceType !== 'LOCAL' && (
                             <button
                               onClick={(e) => handleToggleFavorite(track, e)}
-                              className="w-full flex items-center gap-3 px-4 py-2 text-sm text-left text-white/80 hover:bg-white/10"
+                              className="w-full flex items-center gap-3 px-3.5 py-2 text-xs font-medium text-left text-slate-200 hover:bg-white/[0.06] hover:text-white transition-colors"
                             >
-                              <Heart size={14} fill={isFavorite ? "currentColor" : "none"} className={isFavorite ? "text-primary" : ""} /> 
+                              <Heart size={14} fill={isFavorite ? "currentColor" : "none"} className={isFavorite ? "text-primary" : "text-slate-400"} /> 
                               {isFavorite ? "Remove from Favorites" : "Add to Favorites"}
                             </button>
                           )}
                           <button
                             onClick={(e) => { e.stopPropagation(); setInfoTrack(track); setOpenMenuIndex(null); }}
-                            className="w-full flex items-center gap-3 px-4 py-2 text-sm text-left text-white/80 hover:bg-white/10"
+                            className="w-full flex items-center gap-3 px-3.5 py-2 text-xs font-medium text-left text-slate-200 hover:bg-white/[0.06] hover:text-white transition-colors"
                           >
-                            <Info size={14} /> Info
+                            <Info size={14} className="text-slate-400" /> Info
                           </button>
-                          <div className="h-px bg-white/10 my-1"></div>
+                          <div className="h-px bg-white/[0.06] my-1"></div>
                           <button
                             onClick={(e) => {
                               setOpenMenuIndex(null);
                               handleRemoveTrack(e, track.id);
                             }}
-                            className="w-full flex items-center gap-3 px-4 py-2 text-sm text-left text-red-400 hover:bg-white/10"
+                            className="w-full flex items-center gap-3 px-3.5 py-2 text-xs font-medium text-left text-rose-400 hover:bg-rose-500/10 hover:text-rose-300 transition-colors"
                           >
                             <Trash2 size={14} /> Remove
                           </button>
@@ -442,10 +446,10 @@ export function QueuePage() {
                       <button
                         aria-label="Remove from queue"
                         onClick={(e) => handleRemoveTrack(e, track.id)}
-                        className="p-2 text-white/60 hover:text-red-400 hover:bg-white/10 rounded-full transition-colors opacity-100 lg:opacity-0 lg:group-hover:opacity-100 hidden sm:block"
+                        className="p-1.5 text-slate-500 hover:text-rose-400 hover:bg-white/10 rounded-lg transition-colors opacity-100 lg:opacity-0 lg:group-hover:opacity-100 hidden sm:block"
                         title="Remove from queue"
                       >
-                        <Trash2 size={18} />
+                        <Trash2 size={16} />
                       </button>
                     </div>
                   </div>
@@ -457,37 +461,37 @@ export function QueuePage() {
         )}
         {upcomingQueues && upcomingQueues.length > 0 && (
           <div className="mt-8">
-            <h2 className="text-xl font-bold font-sans text-white tracking-tight mb-4 flex items-center gap-2">
-              <ListPlus size={20} className="text-primary" />
+            <h2 className="text-lg font-bold font-display text-white tracking-tight mb-3 flex items-center gap-2">
+              <ListPlus size={18} className="text-primary" />
               Upcoming Queues
             </h2>
-            <div className="flex flex-col gap-6">
+            <div className="flex flex-col gap-4">
               {upcomingQueues.map((upQueue, qIndex) => (
-                <div key={qIndex} className="bg-white/5 rounded-xl p-3 sm:p-4 border border-white/10">
+                <div key={qIndex} className="bg-white/[0.02] rounded-xl p-3 sm:p-4 border border-white/[0.06] backdrop-blur-md">
                   <div className="flex items-center justify-between gap-3 mb-3">
-                    <h3 className="font-semibold text-white/80">Queue #{qIndex + 1}</h3>
+                    <h3 className="font-semibold text-xs font-mono text-slate-300">Queue #{qIndex + 1}</h3>
                     <button 
                       aria-label="Remove this queue"
                       onClick={() => removeUpcomingQueue && removeUpcomingQueue(qIndex)}
-                      className="text-white/60 hover:text-red-400 transition-colors"
+                      className="text-slate-500 hover:text-rose-400 transition-colors p-1"
                       title="Remove this queue"
                     >
-                      <Trash2 size={16} />
+                      <Trash2 size={15} />
                     </button>
                   </div>
-                  <div className="flex flex-col gap-2">
+                  <div className="flex flex-col gap-1.5">
                     {upQueue.map((track, tIndex) => (
-                      <div key={`${qIndex}-${track.id}-${tIndex}`} className="flex items-center gap-3 sm:gap-4 p-2 rounded-lg bg-black/20">
-                        <div className="w-10 h-10 flex-shrink-0 bg-white/5 rounded-md overflow-hidden">
+                      <div key={`${qIndex}-${track.id}-${tIndex}`} className="flex items-center gap-3 p-2 rounded-lg bg-black/30 border border-white/[0.04]">
+                        <div className="w-9 h-9 flex-shrink-0 bg-slate-800 rounded-md overflow-hidden flex items-center justify-center">
                           {track.imageUrl || playerState.getTrackImage(track.id) ? (
                             <img src={track.imageUrl || playerState.getTrackImage(track.id)} alt="" className="w-full h-full object-cover" />
                           ) : (
-                            <div className="w-full h-full flex items-center justify-center text-white/20 text-xs">🎵</div>
+                            <div className="w-full h-full flex items-center justify-center text-slate-500 text-xs">🎵</div>
                           )}
                         </div>
                         <div className="flex-1 min-w-0">
-                          <span className="block text-sm font-medium text-white truncate">{track.title || playerState.getTrackMetadata(track.id)?.title || track.fileName}</span>
-                          <p className="text-xs text-white/60 truncate">{track.artist || playerState.getTrackMetadata(track.id)?.artist || 'Unknown Artist'}</p>
+                          <span className="block text-xs font-semibold text-slate-200 truncate">{track.title || playerState.getTrackMetadata(track.id)?.title || track.fileName}</span>
+                          <p className="text-[11px] font-mono text-slate-400 truncate">{track.artist || playerState.getTrackMetadata(track.id)?.artist || 'Unknown Artist'}</p>
                         </div>
                       </div>
                     ))}
@@ -502,29 +506,29 @@ export function QueuePage() {
       {/* Info Modal */}
       {infoTrack && (
         <div
-          className="fixed inset-0 z-[100] flex items-center justify-center bg-black/60 backdrop-blur-sm p-4"
+          className="fixed inset-0 z-[100] flex items-center justify-center bg-black/70 backdrop-blur-md p-4"
           onClick={() => setInfoTrack(null)}
         >
           <div
-            className="bg-[#1a1a1a] border border-white/10 rounded-2xl w-full max-w-md max-h-[calc(100dvh-2rem)] shadow-2xl overflow-hidden flex flex-col"
+            className="bg-[#0c1626] border border-white/10 rounded-2xl w-full max-w-md max-h-[calc(100dvh-2rem)] shadow-2xl overflow-hidden flex flex-col"
             onClick={(e) => e.stopPropagation()}
           >
-            <div className="flex items-center justify-between p-5 border-b border-white/5">
-              <div className="flex items-center gap-3 text-white">
-                <Info size={24} className="text-primary" />
-                <h2 className="font-semibold text-lg">Track Metadata</h2>
+            <div className="flex items-center justify-between p-4 border-b border-white/[0.06]">
+              <div className="flex items-center gap-2.5 text-white">
+                <Info size={20} className="text-primary" />
+                <h2 className="font-semibold text-base">Track Metadata</h2>
               </div>
               <button
                 aria-label="Close info"
                 onClick={() => setInfoTrack(null)}
-                className="text-white/60 hover:text-white transition-colors p-1"
+                className="text-slate-400 hover:text-white transition-colors p-1 rounded-lg hover:bg-white/[0.05]"
               >
-                <X size={20} />
+                <X size={18} />
               </button>
             </div>
 
-            <div className="p-5 flex flex-col gap-4 overflow-y-auto max-h-[70vh]">
-              <div className="bg-white/5 rounded-xl p-4 flex flex-col gap-3">
+            <div className="p-4 flex flex-col gap-3 overflow-y-auto max-h-[70vh] no-scrollbar">
+              <div className="bg-white/[0.03] border border-white/[0.05] rounded-xl p-3.5 flex flex-col gap-2">
                 {[
                   { label: 'Title', value: infoTrack.title || playerState.getTrackMetadata(infoTrack.id)?.title },
                   { label: 'Artist', value: infoTrack.artist || playerState.getTrackMetadata(infoTrack.id)?.artist },
@@ -546,9 +550,9 @@ export function QueuePage() {
                   { label: 'Audio Sample Rate', value: (infoTrack.sampleRate || playerState.getTrackMetadata(infoTrack.id)?.sampleRate) ? `${((infoTrack.sampleRate || playerState.getTrackMetadata(infoTrack.id)?.sampleRate!) / 1000).toFixed(3)} kHz` : null },
                   { label: 'Bit Depth', value: (infoTrack.bitsPerSample || playerState.getTrackMetadata(infoTrack.id)?.bitsPerSample) ? `${infoTrack.bitsPerSample || playerState.getTrackMetadata(infoTrack.id)?.bitsPerSample} bit` : null }
                 ].map((item, idx) => (
-                  <div key={idx} className="flex flex-col gap-1">
-                    <span className="text-[10px] uppercase tracking-wider text-white/60 font-semibold">{item.label}</span>
-                    <span className="text-sm text-white/90 font-medium break-all">{item.value || 'unknown'}</span>
+                  <div key={idx} className="flex flex-col gap-0.5">
+                    <span className="text-[10px] uppercase tracking-wider text-slate-400 font-mono font-semibold">{item.label}</span>
+                    <span className="text-xs text-slate-200 font-medium break-all">{item.value || 'unknown'}</span>
                   </div>
                 ))}
               </div>

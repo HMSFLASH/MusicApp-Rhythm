@@ -1,4 +1,4 @@
-import { Heart, ListMusic, Album, Mic2, Music, Disc, CloudUpload, RefreshCw, Play, TrendingUp, Cloud, ListPlus, Download } from 'lucide-react';
+import { Heart, ListMusic, Album, Mic2, Music, Disc, CloudUpload, RefreshCw, Play, TrendingUp, ListPlus, Download } from 'lucide-react';
 import { useNavigate } from 'react-router-dom';
 import { useEffect, useMemo, useState } from 'react';
 import { useGlobalAudio } from '../context/AudioContext';
@@ -62,13 +62,18 @@ export function LibraryPage() {
   }, [tracks]);
 
   return (
-    <div className="w-full h-full flex flex-col max-w-6xl 2xl:max-w-none mx-auto pb-28 md:pb-32 overflow-y-auto">
-      <div className="mb-6 md:mb-8 flex flex-col md:flex-row justify-between items-start md:items-end gap-4">
+    <div className="w-full h-full flex flex-col max-w-6xl 2xl:max-w-none mx-auto pb-28 md:pb-32 overflow-y-auto no-scrollbar">
+      {/* Header & Quick Actions */}
+      <div className="mb-6 md:mb-8 flex flex-col md:flex-row justify-between items-start md:items-center gap-4 border-b border-white/[0.06] pb-6">
         <div className="min-w-0">
-          <h1 className="text-2xl md:text-3xl font-bold font-sans text-white tracking-tight">Your Library</h1>
-          <p className="text-white/80 text-sm mt-1">{tracks.length} songs across all your collections.</p>
+          <h1 className="text-2xl md:text-3xl font-bold font-display text-white tracking-tight flex items-center gap-2.5">
+            Your Library
+          </h1>
+          <p className="text-slate-400 text-xs md:text-sm mt-1 font-mono">
+            {tracks.length} songs • {albumsCount} albums • {artistsCount} artists
+          </p>
         </div>
-        <div className="flex w-full flex-wrap items-center gap-2 sm:w-auto">
+        <div className="flex w-full flex-wrap items-center gap-2.5 sm:w-auto">
           <input
             type="file"
             accept="audio/*"
@@ -79,167 +84,173 @@ export function LibraryPage() {
           />
           <label
             htmlFor="drive-upload"
-            className="flex min-w-0 flex-1 sm:flex-none items-center justify-center gap-2 px-4 py-2 rounded-xl border border-white/10 hover:border-white/20 bg-white/5 hover:bg-white/10 cursor-pointer transition-colors"
+            className="flex min-w-0 flex-1 sm:flex-none items-center justify-center gap-2 px-4 py-2.5 rounded-xl border border-primary/30 bg-primary/10 hover:bg-primary/20 text-primary cursor-pointer transition-all shadow-[0_0_15px_rgba(0,245,255,0.15)] hover:shadow-[0_0_20px_rgba(0,245,255,0.3)] hover:scale-[1.02] active:scale-95"
             title="Upload through backend metadata scan"
           >
-            <CloudUpload size={16} className="text-blue-400" />
-            <span className="truncate text-sm font-medium">Upload to Drive</span>
+            <CloudUpload size={16} />
+            <span className="truncate text-xs font-bold">Upload to Drive</span>
           </label>
           <ActionMenu
             ariaLabel="More library actions"
-            buttonClassName="h-10 w-10 rounded-xl border border-white/10 bg-white/5 text-white/80 hover:border-white/20 hover:bg-white/10 hover:text-white flex items-center justify-center transition-colors"
+            buttonClassName="h-10 w-10 rounded-xl border border-white/[0.08] bg-white/[0.04] text-slate-300 hover:border-white/20 hover:bg-white/[0.08] hover:text-white flex items-center justify-center transition-all"
             actions={[
               {
-                label: isLoading ? 'Reloading' : 'Reload',
+                label: isLoading ? 'Reloading' : 'Reload Library',
                 icon: <RefreshCw size={14} className={isLoading ? 'animate-spin text-primary' : ''} />,
                 disabled: isLoading,
                 onSelect: () => syncLibrary(),
               }
             ]}
           />
-
         </div>
       </div>
 
       {/* Category Cards */}
-      <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 2xl:grid-cols-6 gap-4 md:gap-6 mt-2 md:mt-4">
+      <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 2xl:grid-cols-6 gap-3.5 md:gap-4.5 mt-1">
         <div
-          className="bg-gradient-to-br from-[#00E5FF]/20 to-[#00E5FF]/5 border border-[#00E5FF]/20 rounded-2xl p-5 md:p-6 hover:border-[#00E5FF]/50 hover:shadow-[0_0_30px_-10px_rgba(0,229,255,0.3)] transition-all cursor-pointer group relative overflow-hidden flex flex-col justify-between min-h-[140px] md:min-h-[160px]"
+          className="bg-gradient-to-br from-primary/15 via-primary/5 to-transparent border border-primary/20 hover:border-primary/50 rounded-2xl p-5 hover:shadow-[0_8px_30px_rgba(0,245,255,0.15)] transition-all duration-300 cursor-pointer group relative overflow-hidden flex flex-col justify-between min-h-[140px] backdrop-blur-md hover:-translate-y-1"
           onClick={() => navigate('/tracks?tab=all')}
         >
-          <div className="absolute -right-4 -bottom-4 p-0 opacity-10 group-hover:opacity-20 transition-opacity text-[#00E5FF]">
-            <Disc size={120} />
+          <div className="absolute -right-4 -bottom-4 opacity-10 group-hover:opacity-20 transition-opacity text-primary">
+            <Disc size={110} />
           </div>
-          <div className="w-14 h-14 rounded-full bg-[#00E5FF]/10 flex items-center justify-center text-[#00E5FF] group-hover:scale-110 transition-transform relative z-10 mb-4">
-            <Disc size={28} />
+          <div className="w-11 h-11 rounded-xl bg-primary/20 border border-primary/30 flex items-center justify-center text-primary group-hover:scale-110 transition-transform relative z-10 mb-3 shadow-[0_0_15px_rgba(0,245,255,0.2)]">
+            <Disc size={22} />
           </div>
           <div className="relative z-10">
-            <h2 className="text-xl font-bold text-white mb-1">All Songs</h2>
-            <p className="text-white/70 text-sm font-medium">{tracks.length} songs</p>
+            <h2 className="text-base font-bold text-white mb-0.5 group-hover:text-primary transition-colors">All Songs</h2>
+            <p className="text-slate-400 text-xs font-mono">{tracks.length} tracks</p>
           </div>
         </div>
 
         <div
-          className="bg-gradient-to-br from-[#4f46e5]/30 to-[#7c3aed]/20 border border-[#7c3aed]/20 rounded-2xl p-5 md:p-6 hover:border-[#7c3aed]/50 hover:shadow-[0_0_30px_-10px_rgba(124,58,237,0.3)] transition-all cursor-pointer group relative overflow-hidden flex flex-col justify-between min-h-[140px] md:min-h-[160px]"
+          className="bg-gradient-to-br from-rose-500/15 via-rose-500/5 to-transparent border border-rose-500/20 hover:border-rose-500/50 rounded-2xl p-5 hover:shadow-[0_8px_30px_rgba(244,63,94,0.15)] transition-all duration-300 cursor-pointer group relative overflow-hidden flex flex-col justify-between min-h-[140px] backdrop-blur-md hover:-translate-y-1"
           onClick={() => navigate('/tracks?tab=favorites')}
         >
-          <div className="absolute -right-4 -bottom-4 p-0 opacity-10 group-hover:opacity-20 transition-opacity text-[#7c3aed]">
-            <Heart size={120} />
+          <div className="absolute -right-4 -bottom-4 opacity-10 group-hover:opacity-20 transition-opacity text-rose-400">
+            <Heart size={110} />
           </div>
-          <div className="w-14 h-14 rounded-full bg-[#7c3aed]/20 flex items-center justify-center text-[#a78bfa] group-hover:scale-110 transition-transform relative z-10 mb-4">
-            <Heart size={28} fill="currentColor" />
+          <div className="w-11 h-11 rounded-xl bg-rose-500/20 border border-rose-500/30 flex items-center justify-center text-rose-400 group-hover:scale-110 transition-transform relative z-10 mb-3 shadow-[0_0_15px_rgba(244,63,94,0.2)]">
+            <Heart size={22} fill="currentColor" />
           </div>
           <div className="relative z-10">
-            <h2 className="text-xl font-bold text-white mb-1">Favorites</h2>
-            <p className="text-white/70 text-sm font-medium">{favorites.length} songs</p>
+            <h2 className="text-base font-bold text-white mb-0.5 group-hover:text-rose-400 transition-colors">Favorites</h2>
+            <p className="text-slate-400 text-xs font-mono">{favorites.length} tracks</p>
           </div>
         </div>
 
         <div
-          className="bg-gradient-to-br from-[#10b981]/20 to-[#10b981]/5 border border-[#10b981]/20 rounded-2xl p-5 md:p-6 hover:border-[#10b981]/50 hover:shadow-[0_0_30px_-10px_rgba(16,185,129,0.3)] transition-all cursor-pointer group relative overflow-hidden flex flex-col justify-between min-h-[140px] md:min-h-[160px]"
+          className="bg-gradient-to-br from-emerald-500/15 via-emerald-500/5 to-transparent border border-emerald-500/20 hover:border-emerald-500/50 rounded-2xl p-5 hover:shadow-[0_8px_30px_rgba(16,185,129,0.15)] transition-all duration-300 cursor-pointer group relative overflow-hidden flex flex-col justify-between min-h-[140px] backdrop-blur-md hover:-translate-y-1"
           onClick={() => navigate('/playlist')}
         >
-          <div className="absolute -right-4 -bottom-4 p-0 opacity-10 group-hover:opacity-20 transition-opacity text-[#10b981]">
-            <ListMusic size={120} />
+          <div className="absolute -right-4 -bottom-4 opacity-10 group-hover:opacity-20 transition-opacity text-emerald-400">
+            <ListMusic size={110} />
           </div>
-          <div className="w-14 h-14 rounded-full bg-[#10b981]/10 flex items-center justify-center text-[#10b981] group-hover:scale-110 transition-transform relative z-10 mb-4">
-            <ListMusic size={28} />
+          <div className="w-11 h-11 rounded-xl bg-emerald-500/20 border border-emerald-500/30 flex items-center justify-center text-emerald-400 group-hover:scale-110 transition-transform relative z-10 mb-3 shadow-[0_0_15px_rgba(16,185,129,0.2)]">
+            <ListMusic size={22} />
           </div>
           <div className="relative z-10">
-            <h2 className="text-xl font-bold text-white mb-1">Playlists</h2>
-            <p className="text-white/70 text-sm font-medium">Manage queues</p>
+            <h2 className="text-base font-bold text-white mb-0.5 group-hover:text-emerald-400 transition-colors">Playlists</h2>
+            <p className="text-slate-400 text-xs font-mono">Custom collections</p>
           </div>
         </div>
 
         <div
-          className="bg-gradient-to-br from-[#f59e0b]/15 to-[#d97706]/10 border border-[#f59e0b]/20 rounded-2xl p-5 md:p-6 hover:border-[#f59e0b]/50 hover:shadow-[0_0_30px_-10px_rgba(245,158,11,0.3)] transition-all cursor-pointer group relative overflow-hidden flex flex-col justify-between min-h-[140px] md:min-h-[160px]"
+          className="bg-gradient-to-br from-amber-500/15 via-amber-500/5 to-transparent border border-amber-500/20 hover:border-amber-500/50 rounded-2xl p-5 hover:shadow-[0_8px_30px_rgba(245,158,11,0.15)] transition-all duration-300 cursor-pointer group relative overflow-hidden flex flex-col justify-between min-h-[140px] backdrop-blur-md hover:-translate-y-1"
           onClick={() => navigate('/albums')}
         >
-          <div className="absolute -right-4 -bottom-4 p-0 opacity-10 group-hover:opacity-20 transition-opacity text-[#f59e0b]">
-            <Album size={120} />
+          <div className="absolute -right-4 -bottom-4 opacity-10 group-hover:opacity-20 transition-opacity text-amber-400">
+            <Album size={110} />
           </div>
-          <div className="w-14 h-14 rounded-full bg-[#f59e0b]/10 flex items-center justify-center text-[#f59e0b] group-hover:scale-110 transition-transform relative z-10 mb-4">
-            <Album size={28} />
+          <div className="w-11 h-11 rounded-xl bg-amber-500/20 border border-amber-500/30 flex items-center justify-center text-amber-400 group-hover:scale-110 transition-transform relative z-10 mb-3 shadow-[0_0_15px_rgba(245,158,11,0.2)]">
+            <Album size={22} />
           </div>
           <div className="relative z-10">
-            <h2 className="text-xl font-bold text-white mb-1">Albums</h2>
-            <p className="text-white/70 text-sm font-medium">{albumsCount} albums</p>
+            <h2 className="text-base font-bold text-white mb-0.5 group-hover:text-amber-400 transition-colors">Albums</h2>
+            <p className="text-slate-400 text-xs font-mono">{albumsCount} albums</p>
           </div>
         </div>
 
         <div
-          className="bg-gradient-to-br from-[#10b981]/15 to-[#059669]/10 border border-[#10b981]/20 rounded-2xl p-5 md:p-6 hover:border-[#10b981]/50 hover:shadow-[0_0_30px_-10px_rgba(16,185,129,0.3)] transition-all cursor-pointer group relative overflow-hidden flex flex-col justify-between min-h-[140px] md:min-h-[160px]"
+          className="bg-gradient-to-br from-indigo-500/15 via-indigo-500/5 to-transparent border border-indigo-500/20 hover:border-indigo-500/50 rounded-2xl p-5 hover:shadow-[0_8px_30px_rgba(99,102,241,0.15)] transition-all duration-300 cursor-pointer group relative overflow-hidden flex flex-col justify-between min-h-[140px] backdrop-blur-md hover:-translate-y-1"
           onClick={() => navigate('/artists')}
         >
-          <div className="absolute -right-4 -bottom-4 p-0 opacity-10 group-hover:opacity-20 transition-opacity text-[#10b981]">
-            <Mic2 size={120} />
+          <div className="absolute -right-4 -bottom-4 opacity-10 group-hover:opacity-20 transition-opacity text-indigo-400">
+            <Mic2 size={110} />
           </div>
-          <div className="w-14 h-14 rounded-full bg-[#10b981]/10 flex items-center justify-center text-[#10b981] group-hover:scale-110 transition-transform relative z-10 mb-4">
-            <Mic2 size={28} />
+          <div className="w-11 h-11 rounded-xl bg-indigo-500/20 border border-indigo-500/30 flex items-center justify-center text-indigo-400 group-hover:scale-110 transition-transform relative z-10 mb-3 shadow-[0_0_15px_rgba(99,102,241,0.2)]">
+            <Mic2 size={22} />
           </div>
           <div className="relative z-10">
-            <h2 className="text-xl font-bold text-white mb-1">Artists</h2>
-            <p className="text-white/70 text-sm font-medium">{artistsCount} artists</p>
+            <h2 className="text-base font-bold text-white mb-0.5 group-hover:text-indigo-400 transition-colors">Artists</h2>
+            <p className="text-slate-400 text-xs font-mono">{artistsCount} artists</p>
           </div>
         </div>
 
         <div
-          className="bg-gradient-to-br from-[#ec4899]/15 to-[#db2777]/10 border border-[#ec4899]/20 rounded-2xl p-5 md:p-6 hover:border-[#ec4899]/50 hover:shadow-[0_0_30px_-10px_rgba(236,72,153,0.3)] transition-all cursor-pointer group relative overflow-hidden flex flex-col justify-between min-h-[140px] md:min-h-[160px]"
+          className="bg-gradient-to-br from-purple-500/15 via-purple-500/5 to-transparent border border-purple-500/20 hover:border-purple-500/50 rounded-2xl p-5 hover:shadow-[0_8px_30px_rgba(168,85,247,0.15)] transition-all duration-300 cursor-pointer group relative overflow-hidden flex flex-col justify-between min-h-[140px] backdrop-blur-md hover:-translate-y-1"
           onClick={() => navigate('/genres')}
         >
-          <div className="absolute -right-4 -bottom-4 p-0 opacity-10 group-hover:opacity-20 transition-opacity text-[#ec4899]">
-            <Music size={120} />
+          <div className="absolute -right-4 -bottom-4 opacity-10 group-hover:opacity-20 transition-opacity text-purple-400">
+            <Music size={110} />
           </div>
-          <div className="w-14 h-14 rounded-full bg-[#ec4899]/10 flex items-center justify-center text-[#ec4899] group-hover:scale-110 transition-transform relative z-10 mb-4">
-            <Music size={28} />
+          <div className="w-11 h-11 rounded-xl bg-purple-500/20 border border-purple-500/30 flex items-center justify-center text-purple-400 group-hover:scale-110 transition-transform relative z-10 mb-3 shadow-[0_0_15px_rgba(168,85,247,0.2)]">
+            <Music size={22} />
           </div>
           <div className="relative z-10">
-            <h2 className="text-xl font-bold text-white mb-1">Genres</h2>
-            <p className="text-white/70 text-sm font-medium">{genresCount} genres</p>
+            <h2 className="text-base font-bold text-white mb-0.5 group-hover:text-purple-400 transition-colors">Genres</h2>
+            <p className="text-slate-400 text-xs font-mono">{genresCount} genres</p>
           </div>
         </div>
       </div>
 
       {/* Most Played Section */}
       {tracks.length > 0 && (
-        <div className="mt-12">
-          <h2 className="text-2xl font-bold font-sans text-white mb-6 flex items-center gap-3">
-            <TrendingUp size={24} className="text-primary" />
-            Most Played
-          </h2>
-          <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 2xl:grid-cols-4 3xl:grid-cols-5 4k:grid-cols-6 gap-4">
+        <div className="mt-10">
+          <div className="flex items-center justify-between mb-4">
+            <h2 className="text-lg md:text-xl font-bold font-display text-white flex items-center gap-2.5">
+              <TrendingUp size={20} className="text-primary" />
+              Most Played Tracks
+            </h2>
+            <button
+              onClick={() => navigate('/tracks')}
+              className="text-xs text-primary hover:underline font-mono"
+            >
+              View all →
+            </button>
+          </div>
+          <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 2xl:grid-cols-4 3xl:grid-cols-5 4k:grid-cols-6 gap-3">
             {[...tracks].sort((a, b) => (b.playCount ?? 0) - (a.playCount ?? 0)).slice(0, 12).map((track) => (
               <div
                 key={track.id}
                 onClick={() => playerState.playTrack(track, tracks)}
-                className="flex items-center gap-4 p-4 rounded-xl border border-white/5 bg-white/[0.02] hover:bg-white/5 hover:border-white/10 transition-colors group cursor-pointer"
+                className="flex items-center gap-3.5 p-3 rounded-xl border border-white/[0.06] bg-white/[0.02] hover:bg-white/[0.06] hover:border-primary/30 transition-all group cursor-pointer backdrop-blur-md"
               >
-                <div className="relative w-12 h-12 rounded-lg bg-white/5 flex items-center justify-center shrink-0 overflow-hidden border border-white/10 group-hover:shadow-lg transition-all">
+                <div className="relative w-11 h-11 rounded-lg bg-slate-800 flex items-center justify-center shrink-0 overflow-hidden border border-white/10 group-hover:shadow-[0_0_15px_rgba(0,245,255,0.2)] transition-all">
                   {track.imageUrl || playerState.getTrackImage(track.id) ? (
-                    <img src={track.imageUrl || playerState.getTrackImage(track.id)} alt="Cover" className="w-full h-full object-cover group-hover:scale-105 transition-transform" />
+                    <img src={track.imageUrl || playerState.getTrackImage(track.id)} alt="Cover" className="w-full h-full object-cover group-hover:scale-110 transition-transform duration-300" />
                   ) : (
-                    <ListMusic size={20} className="text-white/40" />
+                    <ListMusic size={18} className="text-slate-500" />
                   )}
-                  <div className="absolute inset-0 bg-black/40 opacity-0 group-hover:opacity-100 transition-opacity flex items-center justify-center">
-                    <Play size={20} fill="currentColor" className="text-white ml-1" />
+                  <div className="absolute inset-0 bg-black/50 opacity-0 group-hover:opacity-100 transition-opacity flex items-center justify-center">
+                    <Play size={16} fill="currentColor" className="text-primary ml-0.5 drop-shadow" />
                   </div>
                 </div>
-                <div className="flex flex-col truncate flex-1 pr-2">
-                  <span className="text-sm font-semibold text-white truncate group-hover:text-primary transition-colors">
+                <div className="flex flex-col truncate flex-1 pr-1">
+                  <span className="text-xs font-semibold text-slate-100 truncate group-hover:text-primary transition-colors">
                     {track.title || playerState.getTrackMetadata(track.id)?.title || (track.fileName ? track.fileName.replace(/\.[^/.]+$/, "") : 'Unknown')}
                   </span>
-                  <div className="flex items-center gap-2 mt-1">
-                    <Cloud size={12} className="text-blue-400" />
-                    <span className="text-xs text-white/40 truncate max-w-[120px]">
+                  <div className="flex items-center gap-1.5 mt-0.5 font-mono text-[10px] text-slate-400">
+                    <span className="truncate max-w-[100px]">
                       {track.artist || playerState.getTrackMetadata(track.id)?.artist || 'Unknown Artist'}
                     </span>
-                    <span className="text-xs text-white/20">|</span>
-                    <span className="text-xs text-white/30 shrink-0">{track.playCount ?? 0} listens</span>
+                    <span className="text-slate-600">•</span>
+                    <span className="text-primary/90 shrink-0 font-medium">{track.playCount ?? 0} plays</span>
                   </div>
                 </div>
                 <ActionMenu
                   ariaLabel={`Song actions for ${track.title || track.fileName}`}
-                  buttonClassName="p-1.5 text-white/40 hover:text-white hover:bg-white/10 rounded-full transition-colors shrink-0"
+                  buttonClassName="p-1.5 text-slate-400 hover:text-white hover:bg-white/10 rounded-lg transition-colors shrink-0"
                   actions={[
                     { label: 'Play Next', icon: <ListMusic size={14} />, onSelect: () => playerState.addToNextQueue([track]) },
                     { label: 'Add to Queue', icon: <ListPlus size={14} />, onSelect: () => playerState.addToCurrentQueue([track]) },

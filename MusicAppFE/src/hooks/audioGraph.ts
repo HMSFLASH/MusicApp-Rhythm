@@ -5,7 +5,7 @@ import {
 } from './audioMath';
 import { TRUE_PEAK_CEILING_DB } from './audioLoudness';
 
-export const REVERB_WET_GAIN = 0.35;
+export const REVERB_WET_GAIN = 0.70;
 export const REVERB_PRE_DELAY_MIN_SECONDS = 0.008;
 export const REVERB_PRE_DELAY_RANGE_SECONDS = 0.032;
 export const REVERB_WET_HIGHPASS_HZ = 150;

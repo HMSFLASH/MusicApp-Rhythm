@@ -1,7 +1,7 @@
 import { useState, useRef, useEffect, useCallback } from 'react';
 import { useGlobalAudio } from '../context/AudioContext';
 import { useAuth } from '../context/AuthContext';
-import { Disc, Play, Pause, SkipBack, SkipForward, Shuffle, Repeat, Heart, Info, ListPlus, MoreHorizontal, Repeat1, User, Volume2, VolumeX, BarChart2, Gauge, Music, Check, X, ArrowRight, Square, PauseCircle, ListX, Loader2, Trash2, Cpu, Tags, RefreshCw, MonitorSpeaker, Download } from 'lucide-react';
+import { Disc, Play, Pause, SkipBack, SkipForward, Shuffle, Repeat, Heart, Info, ListPlus, MoreHorizontal, Repeat1, Volume2, VolumeX, BarChart2, Gauge, Music, Check, X, ArrowRight, Square, PauseCircle, ListX, Loader2, Trash2, Cpu, Tags, RefreshCw, MonitorSpeaker, Download } from 'lucide-react';
 import { HorizontalSlider } from '../components/HorizontalSlider';
 import { SpeedPitchPanel } from '../components/SpeedPitchPanel';
 import { useLibrary } from '../context/LibraryContext';
@@ -319,33 +319,38 @@ export function NowPlaying() {
 
   if (!currentTrack) {
     return (
-      <div className="h-full flex flex-col items-center justify-center gap-8 max-w-2xl mx-auto w-full">
-        {/* Demo album art */}
-        <div className="relative flex items-center justify-center w-56 h-56 rounded-full border-2 border-white/5 shadow-2xl">
-          <div className="absolute inset-0 rounded-full bg-gradient-to-tr from-[#111] to-[#333]"></div>
-          <div className="absolute inset-2 rounded-full border border-black/40"></div>
-          <div className="absolute inset-6 rounded-full border border-black/30"></div>
-          <div className="absolute inset-10 rounded-full border border-black/20"></div>
-          <div className="relative z-10 w-16 h-16 bg-primary/20 rounded-full flex items-center justify-center border-4 border-[#111]">
-            <Disc size={20} className="text-primary" />
+      <div className="h-full flex flex-col items-center justify-center gap-6 max-w-md mx-auto w-full text-center px-4 py-12">
+        {/* Sleek Vinyl Graphic */}
+        <div className="relative flex items-center justify-center w-48 h-48 rounded-full border border-white/10 shadow-[0_0_50px_rgba(0,0,0,0.8)] bg-gradient-to-b from-slate-900 to-[#040810]">
+          <div className="absolute inset-3 rounded-full border border-white/5" />
+          <div className="absolute inset-7 rounded-full border border-white/5" />
+          <div className="absolute inset-11 rounded-full border border-white/5" />
+          <div className="relative z-10 w-14 h-14 bg-primary/15 rounded-full flex items-center justify-center border-2 border-primary/30 shadow-[0_0_20px_rgba(0,245,255,0.2)]">
+            <Disc size={22} className="text-primary animate-spin-slow" />
           </div>
-          <div className="absolute z-20 w-3 h-3 bg-background rounded-full"></div>
+          <div className="absolute z-20 w-3 h-3 bg-background rounded-full border border-slate-700" />
         </div>
-        <div className="text-center">
-          <p className="text-white font-semibold text-lg">{t('nowPlaying.noTrack')}</p>
-          <p className="text-white/30 text-xs mt-3">{t('nowPlaying.noTrackDesc')}</p>
+        <div>
+          <h2 className="text-xl font-bold font-display text-white tracking-tight">{t('nowPlaying.noTrack')}</h2>
+          <p className="text-slate-400 text-xs mt-2 max-w-xs leading-relaxed">{t('nowPlaying.noTrackDesc')}</p>
         </div>
+        <button
+          onClick={() => navigate('/library')}
+          className="px-5 py-2.5 rounded-xl bg-primary text-slate-950 font-bold text-xs shadow-[0_0_20px_rgba(0,245,255,0.35)] hover:shadow-[0_0_30px_rgba(0,245,255,0.5)] transition-all hover:scale-105 active:scale-95"
+        >
+          Open Library
+        </button>
       </div>
     );
   }
 
   return (
     <div ref={pageScrollRef} className="h-full overflow-y-auto w-full no-scrollbar relative" onScroll={handleScroll}>
-      <div className="flex flex-col lg:flex-row items-start justify-center max-w-6xl 2xl:max-w-[1400px] 3xl:max-w-[1600px] 4k:max-w-[2000px] mx-auto w-full gap-8 md:gap-12 py-4 md:py-8 pb-28 md:pb-32 relative z-10">
+      <div className="flex flex-col lg:flex-row items-start justify-center max-w-6xl 2xl:max-w-[1400px] 3xl:max-w-[1600px] 4k:max-w-[2000px] mx-auto w-full gap-8 md:gap-12 py-3 md:py-6 pb-28 md:pb-32 relative z-10">
 
         {/* Left Side: Player */}
-        <div className="flex-1 flex flex-col items-center w-full max-w-lg mx-auto gap-6 md:gap-8 pt-2 md:pt-8">
-          {/* Album Art / Lyrics Wrapper */}
+        <div className="flex-1 flex flex-col items-center w-full max-w-lg mx-auto gap-5 md:gap-7 pt-1 md:pt-4">
+          {/* Album Art / Lyrics Wrapper with Ambient Glow */}
           <div
             className={`flex items-center justify-center transition-[width,opacity] duration-500 relative w-full ${showLyrics && hasLyrics ? 'flex-shrink-0' : 'flex-shrink-0'}`}
             style={{
@@ -356,43 +361,52 @@ export function NowPlaying() {
           >
             <div className={`w-full h-full flex flex-col min-h-0 relative overflow-hidden animate-fade-in ${showLyrics && hasLyrics ? 'block' : 'hidden'}`}>
               {showLyrics && hasLyrics && (
-                <LyricsView lyrics={trackLyrics!} currentTime={currentTime} duration={duration} onSeek={playerState.seek} />
+                <div className="w-full h-full rounded-2xl bg-[#0c1626]/70 border border-white/[0.08] backdrop-blur-xl p-4 shadow-xl">
+                  <LyricsView lyrics={trackLyrics!} currentTime={currentTime} duration={duration} onSeek={playerState.seek} />
+                </div>
               )}
             </div>
 
             <div className={`w-full h-full relative ${showLyrics && hasLyrics ? 'hidden' : 'block'}`}>
+              {/* Dynamic Vinyl Ambient Aura */}
+              <div className={`absolute inset-0 rounded-full blur-3xl transition-opacity duration-700 pointer-events-none ${isPlaying ? 'bg-primary/20 scale-110 opacity-100' : 'opacity-0 scale-90'}`} />
+
               {currentArtwork ? (
                 <div
-                  className={`absolute inset-0 flex items-center justify-center w-full h-full rounded-full shadow-[0_0_40px_rgba(0,0,0,0.5)] border-[8px] border-[#111] overflow-hidden mb-4 ${isPlaying ? 'scale-100 opacity-100' : 'scale-90 opacity-60'}`}
+                  className={`absolute inset-0 flex items-center justify-center w-full h-full rounded-full shadow-[0_15px_50px_rgba(0,0,0,0.8)] border-[6px] border-slate-900/90 overflow-hidden ${isPlaying ? 'scale-100 opacity-100' : 'scale-95 opacity-70'}`}
                   style={{ transition: 'transform 0.7s cubic-bezier(0.34, 1.56, 0.64, 1), opacity 0.7s ease' }}
                 >
-                  <div ref={discRef1} className="w-full h-full">
+                  <div ref={discRef1} className="w-full h-full relative">
                     <img src={currentArtwork} alt="Album Art" className="w-full h-full object-cover" />
-                    <div className="absolute inset-0 bg-black/10"></div>
+                    <div className="absolute inset-0 bg-gradient-to-tr from-black/30 via-transparent to-white/10 pointer-events-none" />
+                    {/* Concentric subtle vinyl grooves */}
+                    <div className="absolute inset-4 rounded-full border border-white/[0.06] pointer-events-none" />
+                    <div className="absolute inset-10 rounded-full border border-white/[0.04] pointer-events-none" />
                     {/* Center hole */}
-                    <div className="absolute z-20 w-[8%] h-[8%] bg-background rounded-full border-2 border-black/40 top-1/2 left-1/2 -translate-x-1/2 -translate-y-1/2"></div>
+                    <div className="absolute z-20 w-[10%] h-[10%] bg-slate-950 rounded-full border-2 border-slate-700 shadow-inner top-1/2 left-1/2 -translate-x-1/2 -translate-y-1/2">
+                      <div className="w-1.5 h-1.5 rounded-full bg-slate-400 m-auto mt-1" />
+                    </div>
                   </div>
                 </div>
               ) : (
                 <div
-                  className={`absolute inset-0 flex items-center justify-center w-full h-full rounded-full border-2 border-white/5 shadow-2xl ${isPlaying ? 'scale-100 opacity-100' : 'scale-90 opacity-60'}`}
+                  className={`absolute inset-0 flex items-center justify-center w-full h-full rounded-full border border-white/10 shadow-[0_15px_50px_rgba(0,0,0,0.8)] bg-gradient-to-tr from-slate-950 via-slate-900 to-slate-800 ${isPlaying ? 'scale-100 opacity-100' : 'scale-95 opacity-70'}`}
                   style={{ transition: 'transform 0.7s cubic-bezier(0.34, 1.56, 0.64, 1), opacity 0.7s ease' }}
                 >
-                  <div ref={discRef2} className="w-full h-full">
-                    <div className="absolute inset-0 rounded-full bg-gradient-to-tr from-[#111] to-[#333]"></div>
+                  <div ref={discRef2} className="w-full h-full relative">
                     {/* Vinyl grooves */}
-                    <div className="absolute inset-2 rounded-full border border-black/40"></div>
-                    <div className="absolute inset-6 rounded-full border border-black/30"></div>
-                    <div className="absolute inset-10 rounded-full border border-black/20"></div>
-                    <div className="absolute inset-14 rounded-full border border-black/10"></div>
+                    <div className="absolute inset-3 rounded-full border border-white/[0.06]" />
+                    <div className="absolute inset-7 rounded-full border border-white/[0.04]" />
+                    <div className="absolute inset-11 rounded-full border border-white/[0.05]" />
+                    <div className="absolute inset-16 rounded-full border border-white/[0.03]" />
 
                     {/* Center Label */}
-                    <div className="absolute z-10 w-1/3 h-1/3 bg-primary/20 rounded-full flex items-center justify-center border-4 border-[#111] top-1/2 left-1/2 -translate-x-1/2 -translate-y-1/2">
-                      <Disc size={32} className="text-primary" />
+                    <div className="absolute z-10 w-1/3 h-1/3 bg-gradient-to-br from-primary/30 to-indigo-600/30 backdrop-blur-md rounded-full flex items-center justify-center border-2 border-primary/40 top-1/2 left-1/2 -translate-x-1/2 -translate-y-1/2 shadow-lg">
+                      <Disc size={28} className="text-primary drop-shadow-[0_0_8px_rgba(0,245,255,0.6)]" />
                     </div>
 
                     {/* Inner hole */}
-                    <div className="absolute z-20 w-4 h-4 bg-background rounded-full top-1/2 left-1/2 -translate-x-1/2 -translate-y-1/2"></div>
+                    <div className="absolute z-20 w-3.5 h-3.5 bg-slate-950 rounded-full border border-slate-700 top-1/2 left-1/2 -translate-x-1/2 -translate-y-1/2" />
                   </div>
                 </div>
               )}
@@ -400,56 +414,70 @@ export function NowPlaying() {
           </div>
 
           <div className="text-center px-4 w-full">
-            <h2 className="text-xl sm:text-2xl md:text-3xl font-bold text-white mb-2 truncate">{currentTrack.title || playerState.getTrackMetadata(currentTrack.id)?.title || (currentTrack.fileName ? (currentTrack.fileName.includes(' - ') ? currentTrack.fileName.split(' - ')[1].replace(/\.[^/.]+$/, "") : currentTrack.fileName.replace(/\.[^/.]+$/, "")) : 'Unknown Title')}</h2>
-            <div className="flex items-center justify-center gap-2 text-base md:text-lg text-white/50 truncate w-full">
-              <User size={16} className="flex-shrink-0" />
+            <h2 className="text-xl sm:text-2xl font-bold font-display text-white mb-1.5 tracking-tight truncate">
+              {currentTrack.title || playerState.getTrackMetadata(currentTrack.id)?.title || (currentTrack.fileName ? (currentTrack.fileName.includes(' - ') ? currentTrack.fileName.split(' - ')[1].replace(/\.[^/.]+$/, "") : currentTrack.fileName.replace(/\.[^/.]+$/, "")) : 'Unknown Title')}
+            </h2>
+            <div className="flex items-center justify-center gap-2 text-sm text-slate-400 font-medium truncate w-full">
               <span className="truncate">{currentTrack.artist || playerState.getTrackMetadata(currentTrack.id)?.artist || (currentTrack.fileName?.includes(' - ') ? currentTrack.fileName.split(' - ')[0] : t('bottomPlayer.unknown'))}</span>
+              {currentTrack.album && (
+                <>
+                  <span className="text-slate-600">•</span>
+                  <span className="text-slate-400 truncate text-xs">{currentTrack.album}</span>
+                </>
+              )}
             </div>
           </div>
 
           {/* Playback Controls (Play/Pause, Skip, Progress) */}
-          <div className="w-full max-w-md mt-2">
+          <div className="w-full max-w-md mt-1">
 
             {/* Top Action Bar */}
-            <div className="flex items-center justify-between px-2 mb-8 text-white/60">
+            <div className="flex items-center justify-between px-2 mb-6 text-slate-400">
               {currentTrack.sourceType !== 'LOCAL' ? (
                 <button
                   onClick={toggleFavorite}
                   className={`
-                    ${isFavorite ? 'text-primary drop-shadow-[0_0_12px_var(--tw-colors-primary)] scale-110' : 'text-white/40 hover:text-white'} 
-                    transition-all duration-300 p-2 rounded-full
+                    ${isFavorite ? 'text-primary drop-shadow-[0_0_12px_rgba(0,245,255,0.8)] scale-110' : 'text-slate-400 hover:text-white'} 
+                    transition-all duration-300 p-2 rounded-xl hover:bg-white/[0.05]
                     active:scale-95
                   `}
                   aria-label={isFavorite ? "Remove from Favorites" : "Add to Favorites"}
                 >
-                  <Heart size={24} fill={isFavorite ? "currentColor" : "none"} className={`transition-all duration-300`} />
+                  <Heart size={20} fill={isFavorite ? "currentColor" : "none"} className="transition-all duration-300" />
                 </button>
               ) : (
-                <div className="w-10 h-10"></div>
+                <div className="w-9 h-9" />
               )}
 
               {hasLyrics && (
                 <button
                   onClick={() => setShowLyrics(!showLyrics)}
-                  className={`transition-all p-2 rounded-full ${showLyrics ? 'text-primary bg-primary/20 shadow-[0_0_12px_var(--tw-colors-primary)]' : 'hover:bg-white/10 hover:text-white'}`}
+                  className={`transition-all p-2 rounded-xl text-xs font-semibold flex items-center gap-1.5 ${showLyrics ? 'text-primary bg-primary/15 border border-primary/30 shadow-[0_0_12px_rgba(0,245,255,0.2)]' : 'hover:bg-white/[0.05] text-slate-400 hover:text-white'}`}
                   title={showLyrics ? 'Show Disc' : t('nowPlaying.viewLyrics')}
                 >
-                  <Music size={24} />
+                  <Music size={18} />
+                  <span>Lyrics</span>
                 </button>
               )}
 
-              <button onClick={() => setShowMetadata(true)} className="hover:text-white transition-colors p-2 rounded-full hover:bg-white/10"><Info size={24} /></button>
+              <button 
+                onClick={() => setShowMetadata(true)} 
+                className="hover:text-white transition-colors p-2 rounded-xl hover:bg-white/[0.05]"
+                title="Track Info"
+              >
+                <Info size={20} />
+              </button>
 
               {/* More Options (...) Button */}
               <div className="relative" ref={menuRef}>
                 <button
                   onClick={() => setShowMenu(v => !v)}
-                  className={`hover:text-white transition-colors p-2 rounded-full ${showMenu ? 'text-white bg-white/10' : ''}`}
+                  className={`hover:text-white transition-colors p-2 rounded-xl hover:bg-white/[0.05] ${showMenu ? 'text-primary bg-primary/10' : ''}`}
                 >
-                  <MoreHorizontal size={24} />
+                  <MoreHorizontal size={20} />
                 </button>
                 {showMenu && (
-                  <div className="absolute bottom-full left-1/2 -translate-x-1/2 mb-3 w-72 max-w-[calc(100vw_-_2rem)] bg-[#1e1e1e] border border-white/10 rounded-2xl shadow-2xl overflow-hidden z-50">
+                  <div className="absolute bottom-full left-1/2 -translate-x-1/2 mb-3 w-72 max-w-[calc(100vw_-_2rem)] bg-[#0c1626] border border-white/10 rounded-2xl shadow-2xl overflow-hidden z-50 backdrop-blur-2xl">
                     {showSpeedPitch ? (
                       <SpeedPitchPanel
                         playbackRate={playbackRate}
@@ -469,8 +497,8 @@ export function NowPlaying() {
                       />
                     ) : showDeviceMenu ? (
                       <div className="flex flex-col max-h-[65vh] overflow-y-auto">
-                        <div className="flex items-center gap-3 px-4 py-3 border-b border-white/5 sticky top-0 bg-[#1e1e1e] z-10">
-                          <button onClick={() => setShowDeviceMenu(false)} className="hover:bg-white/10 p-1.5 -ml-1.5 rounded-full transition-colors">
+                        <div className="flex items-center gap-3 px-4 py-3 border-b border-white/5 sticky top-0 bg-[#0c1626] z-10">
+                          <button onClick={() => setShowDeviceMenu(false)} className="hover:bg-white/10 p-1.5 -ml-1.5 rounded-lg transition-colors">
                             <ArrowRight size={16} className="rotate-180 text-white/80" />
                           </button>
                           <span className="text-sm font-bold text-white/90">{t('nowPlaying.outputDevice') || 'Output Device'}</span>
@@ -478,12 +506,12 @@ export function NowPlaying() {
                         
                         {!hasDeviceLabels && (
                           <div className="p-4 border-b border-white/5">
-                            <p className="text-xs text-white/70 mb-3 leading-tight">
+                            <p className="text-xs text-slate-400 mb-3 leading-tight">
                               {t('nowPlaying.devicePermissionReason') || 'Trình duyệt ẩn tên thiết bị cho đến khi bạn cấp quyền Audio.'}
                             </p>
                             <button
                               onClick={requestAudioPermission}
-                              className="w-full text-xs font-medium bg-primary/20 text-primary py-2 rounded-lg hover:bg-primary/30 transition-colors"
+                              className="w-full text-xs font-semibold bg-primary/20 text-primary py-2 rounded-lg hover:bg-primary/30 transition-colors"
                             >
                               {t('nowPlaying.grantPermission') || 'Hiện tên thiết bị'}
                             </button>
@@ -500,13 +528,13 @@ export function NowPlaying() {
                                 playerState.setAudioOutputDevice(id);
                               }
                             }}
-                            className={`w-full text-left px-4 py-3 text-sm transition-colors flex items-center justify-between border-b border-white/5 ${selectedDeviceId === (device.deviceId || '') ? 'bg-primary/10 text-primary font-medium' : 'text-white/80 hover:bg-white/5'}`}
+                            className={`w-full text-left px-4 py-3 text-xs font-medium transition-colors flex items-center justify-between border-b border-white/[0.04] ${selectedDeviceId === (device.deviceId || '') ? 'bg-primary/10 text-primary font-semibold' : 'text-slate-300 hover:bg-white/[0.05]'}`}
                           >
                             <span className="truncate pr-2">{device.label || `Device (${device.deviceId ? device.deviceId.slice(0, 5) : 'default'}...)`}</span>
-                            {selectedDeviceId === (device.deviceId || '') && <Check size={14} className="flex-shrink-0" />}
+                            {selectedDeviceId === (device.deviceId || '') && <Check size={14} className="flex-shrink-0 text-primary" />}
                           </button>
                         )) : (
-                          <p className="text-sm text-white/50 px-4 py-4 text-center">No devices found</p>
+                          <p className="text-xs text-slate-500 px-4 py-4 text-center">No devices found</p>
                         )}
                       </div>
                     ) : (
@@ -514,13 +542,13 @@ export function NowPlaying() {
                         {/* Speed & Pitch Button */}
                         <button
                           onClick={() => setShowSpeedPitch(true)}
-                          className="w-full flex items-center justify-between px-4 py-3 text-sm text-white/80 hover:bg-white/5 transition-colors border-b border-white/5"
+                          className="w-full flex items-center justify-between px-4 py-3 text-xs font-medium text-slate-300 hover:bg-white/[0.05] transition-colors border-b border-white/[0.04]"
                         >
                           <div className="flex items-center gap-3">
-                            <Gauge size={16} className={playbackRate !== 1 || (speedPitchMode === 'advanced' && pitchRate !== 1) ? 'text-primary' : ''} />
+                            <Gauge size={16} className={playbackRate !== 1 || (speedPitchMode === 'advanced' && pitchRate !== 1) ? 'text-primary' : 'text-slate-400'} />
                             <span>{t('nowPlaying.speedAndPitch')}</span>
                           </div>
-                          <span className="text-[10px] font-mono text-white/40">
+                          <span className="text-[10px] font-mono text-primary">
                             {speedPitchMode === 'advanced' && pitchRate !== 1
                               ? `${playbackRate}x / ${pitchRate}x`
                               : `${playbackRate}x`
@@ -530,13 +558,13 @@ export function NowPlaying() {
                         {/* Output Device Button */}
                         <button
                           onClick={() => setShowDeviceMenu(true)}
-                          className="w-full flex items-center justify-between px-4 py-3 text-sm text-white/80 hover:bg-white/5 transition-colors border-b border-white/5"
+                          className="w-full flex items-center justify-between px-4 py-3 text-xs font-medium text-slate-300 hover:bg-white/[0.05] transition-colors border-b border-white/[0.04]"
                         >
                           <div className="flex items-center gap-3">
-                            <MonitorSpeaker size={16} />
+                            <MonitorSpeaker size={16} className="text-slate-400" />
                             <span>{t('nowPlaying.outputDevice') || 'Output Device'}</span>
                           </div>
-                          <span className="text-[10px] font-mono text-white/40 truncate max-w-[80px]">
+                          <span className="text-[10px] font-mono text-slate-400 truncate max-w-[80px]">
                             {audioDevices.find(d => d.deviceId === selectedDeviceId)?.label || 'Default'}
                           </span>
                         </button>
@@ -546,9 +574,9 @@ export function NowPlaying() {
                               downloadTrackFile(currentTrack);
                               setShowMenu(false);
                             }}
-                            className="w-full flex items-center gap-3 px-4 py-3 text-sm text-white/80 hover:bg-white/5 transition-colors border-b border-white/5"
+                            className="w-full flex items-center gap-3 px-4 py-3 text-xs font-medium text-slate-300 hover:bg-white/[0.05] transition-colors border-b border-white/[0.04]"
                           >
-                            <Download size={16} />
+                            <Download size={16} className="text-slate-400" />
                             <span>Download File</span>
                           </button>
                         )}
@@ -558,9 +586,9 @@ export function NowPlaying() {
                               playerState.toggleFlacWasmForTrack(currentTrack);
                               setShowMenu(false);
                             }}
-                            className="w-full flex items-center gap-3 px-4 py-3 text-sm text-white/80 hover:bg-white/5 transition-colors border-b border-white/5"
+                            className="w-full flex items-center gap-3 px-4 py-3 text-xs font-medium text-slate-300 hover:bg-white/[0.05] transition-colors border-b border-white/[0.04]"
                           >
-                            <Cpu size={16} className={playerState.isFlacWasmEnabled(currentTrack) ? 'text-primary' : ''} />
+                            <Cpu size={16} className={playerState.isFlacWasmEnabled(currentTrack) ? 'text-primary' : 'text-slate-400'} />
                             <span>{playerState.isFlacWasmEnabled(currentTrack) ? 'Use Normal FLAC' : 'Use FLAC WASM'}</span>
                           </button>
                         )}
@@ -573,9 +601,9 @@ export function NowPlaying() {
                                 await playerState.reloadCurrentTrackFromDrive();
                               }
                             }}
-                            className="w-full flex items-center gap-3 px-4 py-3 text-sm text-white/80 hover:bg-white/5 transition-colors border-b border-white/5"
+                            className="w-full flex items-center gap-3 px-4 py-3 text-xs font-medium text-slate-300 hover:bg-white/[0.05] transition-colors border-b border-white/[0.04]"
                           >
-                            <Cpu size={16} className={playerState.isM4aWasmEnabled(currentTrack) ? 'text-primary' : ''} />
+                            <Cpu size={16} className={playerState.isM4aWasmEnabled(currentTrack) ? 'text-primary' : 'text-slate-400'} />
                             <span>{playerState.isM4aWasmEnabled(currentTrack) ? 'Use Normal M4A' : 'Use M4A WASM'}</span>
                           </button>
                         )}
@@ -588,10 +616,10 @@ export function NowPlaying() {
                                 await playerState.reloadCurrentTrackFromDrive();
                               }
                             }}
-                            className="w-full flex items-center gap-3 px-4 py-3 text-sm text-white/80 hover:bg-white/5 transition-colors border-b border-white/5"
+                            className="w-full flex items-center gap-3 px-4 py-3 text-xs font-medium text-slate-300 hover:bg-white/[0.05] transition-colors border-b border-white/[0.04]"
                           >
-                            <Tags size={16} className={playerState.isLegacyMetadataEnabled(currentTrack) ? 'text-primary' : ''} />
-                            <span>{playerState.isLegacyMetadataEnabled(currentTrack) ? 'Use New Metadata Parser' : 'Use Legacy Metadata Parser'}</span>
+                            <Tags size={16} className={playerState.isLegacyMetadataEnabled(currentTrack) ? 'text-primary' : 'text-slate-400'} />
+                            <span>{playerState.isLegacyMetadataEnabled(currentTrack) ? 'Use New Metadata' : 'Use Legacy Metadata'}</span>
                           </button>
                         )}
                         {currentTrack.sourceType !== 'LOCAL' && (
@@ -600,9 +628,9 @@ export function NowPlaying() {
                               setShowMenu(false);
                               await playerState.reloadCurrentTrackFromDrive();
                             }}
-                            className="w-full flex items-center gap-3 px-4 py-3 text-sm text-white/80 hover:bg-white/5 transition-colors border-b border-white/5"
+                            className="w-full flex items-center gap-3 px-4 py-3 text-xs font-medium text-slate-300 hover:bg-white/[0.05] transition-colors border-b border-white/[0.04]"
                           >
-                            <RefreshCw size={16} />
+                            <RefreshCw size={16} className="text-slate-400" />
                             <span>{t('nowPlaying.reloadFromDrive')}</span>
                           </button>
                         )}
@@ -629,7 +657,7 @@ export function NowPlaying() {
                                 }
                               }
                             }}
-                            className="w-full flex items-center gap-3 px-4 py-3 text-sm text-red-400 hover:bg-white/5 hover:text-red-300 transition-colors border-t border-white/5"
+                            className="w-full flex items-center gap-3 px-4 py-3 text-xs font-medium text-red-400 hover:bg-red-500/10 transition-colors border-t border-white/[0.04]"
                           >
                             <Trash2 size={16} />
                             <span>Delete from Library</span>
@@ -656,10 +684,10 @@ export function NowPlaying() {
                         }
                       }}
                       onContextMenu={(e) => { e.preventDefault(); openRepeatMenu(); }}
-                      className={`hover:scale-105 transition-transform ${(queueEndMode === 'repeat' || songEndMode === 'repeat_one') ? 'text-primary' : 'text-white/40 hover:text-white'}`}
+                      className={`hover:scale-105 transition-transform p-1.5 rounded-lg hover:bg-white/[0.05] ${(queueEndMode === 'repeat' || songEndMode === 'repeat_one') ? 'text-primary drop-shadow-[0_0_8px_rgba(0,245,255,0.6)]' : 'text-slate-400 hover:text-white'}`}
                       title={songEndMode === 'repeat_one' ? t('bottomPlayer.repeatSong') : (queueEndMode === 'repeat' ? t('bottomPlayer.repeatQueue') : t('bottomPlayer.repeatOff'))}
                     >
-                      {songEndMode === 'repeat_one' ? <Repeat1 size={22} /> : <Repeat size={22} />}
+                      {songEndMode === 'repeat_one' ? <Repeat1 size={20} /> : <Repeat size={20} />}
                     </button>
                   </div>
                 ) : (
@@ -673,8 +701,7 @@ export function NowPlaying() {
                           else setSongEndMode('next');
                         }}
                         onContextMenu={(e) => { e.preventDefault(); openRepeatMenu(); }}
-                        className={`hover:scale-105 transition-transform ${songEndMode !== 'next' ? 'text-primary' : 'text-white/40 hover:text-white'
-                          }`}
+                        className={`hover:scale-105 transition-transform p-1.5 rounded-lg hover:bg-white/[0.05] ${songEndMode !== 'next' ? 'text-primary drop-shadow-[0_0_8px_rgba(0,245,255,0.6)]' : 'text-slate-400 hover:text-white'}`}
                         title={
                           songEndMode === 'next' ? t('bottomPlayer.songNext') :
                           songEndMode === 'repeat_one' ? t('bottomPlayer.songRepeat') :
@@ -682,10 +709,10 @@ export function NowPlaying() {
                         }
                       >
                         {(() => {
-                          if (songEndMode === 'repeat_one') return <Repeat1 size={22} />;
-                          if (songEndMode === 'stop') return <Square size={18} />;
-                          if (songEndMode === 'preload') return <PauseCircle size={22} />;
-                          return <ArrowRight size={22} />;
+                          if (songEndMode === 'repeat_one') return <Repeat1 size={20} />;
+                          if (songEndMode === 'stop') return <Square size={16} />;
+                          if (songEndMode === 'preload') return <PauseCircle size={20} />;
+                          return <ArrowRight size={20} />;
                         })()}
                       </button>
                     </div>
@@ -697,17 +724,16 @@ export function NowPlaying() {
                           else setQueueEndMode('repeat');
                         }}
                         onContextMenu={(e) => { e.preventDefault(); openRepeatMenu(); }}
-                        className={`hover:scale-105 transition-transform ${queueEndMode !== 'stop' ? 'text-primary' : 'text-white/40 hover:text-white'
-                          }`}
+                        className={`hover:scale-105 transition-transform p-1.5 rounded-lg hover:bg-white/[0.05] ${queueEndMode !== 'stop' ? 'text-primary drop-shadow-[0_0_8px_rgba(0,245,255,0.6)]' : 'text-slate-400 hover:text-white'}`}
                         title={
                           queueEndMode === 'repeat' ? t('bottomPlayer.queueRepeat') :
-                          queueEndMode === 'next' ? t('bottomPlayer.queueNext') : t('bottomPlayer.queueStop')
+                          queueEndMode === 'next' ? t('bottomPlayer.queueNext') : queueEndMode === 'stop' ? t('bottomPlayer.queueStop') : ''
                         }
                       >
                         {(() => {
-                          if (queueEndMode === 'repeat') return <Repeat size={22} />;
-                          if (queueEndMode === 'next') return <ListPlus size={22} />;
-                          return <ListX size={22} />;
+                          if (queueEndMode === 'repeat') return <Repeat size={20} />;
+                          if (queueEndMode === 'next') return <ListPlus size={20} />;
+                          return <ListX size={20} />;
                         })()}
                       </button>
                     </div>
@@ -715,24 +741,22 @@ export function NowPlaying() {
                 )}
 
                 {showRepeatMenu && (
-                  <div className="fixed left-1/2 top-1/2 z-[120] flex max-h-[calc(100dvh_-_2rem)] w-80 max-w-[calc(100vw_-_2rem)] -translate-x-1/2 -translate-y-1/2 flex-col overflow-hidden rounded-2xl border border-white/10 bg-[#1e1e1e] shadow-2xl">
+                  <div className="fixed left-1/2 top-1/2 z-[120] flex max-h-[calc(100dvh_-_2rem)] w-80 max-w-[calc(100vw_-_2rem)] -translate-x-1/2 -translate-y-1/2 flex-col overflow-hidden rounded-2xl border border-white/10 bg-[#0c1626] shadow-2xl backdrop-blur-2xl">
                     {/* Tabs */}
                     <div className="flex shrink-0 border-b border-white/10">
                       <button
                         onClick={() => setRepeatMode('simple')}
-                        className={`flex-1 py-3 text-sm font-semibold transition-colors rounded-tl-2xl ${repeatMode === 'simple' ? 'text-white border-b-2 border-primary' : 'text-white/40 hover:text-white/70'
-                          }`}
+                        className={`flex-1 py-3 text-xs font-bold transition-colors ${repeatMode === 'simple' ? 'text-primary border-b-2 border-primary bg-primary/10' : 'text-slate-400 hover:text-white'}`}
                       >{t('nowPlaying.simple')}</button>
                       <button
                         onClick={() => setRepeatMode('advanced')}
-                        className={`flex-1 py-3 text-sm font-semibold transition-colors rounded-tr-2xl ${repeatMode === 'advanced' ? 'text-white border-b-2 border-primary' : 'text-white/40 hover:text-white/70'
-                          }`}
+                        className={`flex-1 py-3 text-xs font-bold transition-colors ${repeatMode === 'advanced' ? 'text-primary border-b-2 border-primary bg-primary/10' : 'text-slate-400 hover:text-white'}`}
                       >{t('nowPlaying.advanced')}</button>
                     </div>
 
                     {/* Simple Tab */}
                     {repeatMode === 'simple' && (
-                      <div className="overflow-y-auto">
+                      <div className="overflow-y-auto p-1.5">
                         {([
                           { sMode: 'next' as SongEndMode, qMode: 'stop' as QueueEndMode, label: t('nowPlaying.playNext') },
                           { sMode: 'next' as SongEndMode, qMode: 'repeat' as QueueEndMode, label: t('nowPlaying.repeatQueue') },
@@ -746,12 +770,10 @@ export function NowPlaying() {
                                 setSongEndModeTemp(sMode);
                                 setQueueEndModeTemp(qMode);
                               }}
-                              className={`w-full flex items-center gap-4 px-4 py-3.5 text-sm transition-colors hover:bg-white/5 ${isActive ? 'text-white font-semibold' : 'text-white/50'
-                                }`}
+                              className={`w-full flex items-center gap-3.5 px-3.5 py-3 text-xs rounded-xl transition-all ${isActive ? 'bg-primary/15 text-primary font-semibold border border-primary/25' : 'text-slate-300 hover:bg-white/[0.04]'}`}
                             >
-                              <div className={`w-5 h-5 rounded-full border-2 flex items-center justify-center flex-shrink-0 ${isActive ? 'border-primary' : 'border-white/30'
-                                }`}>
-                                {isActive && <div className="w-2.5 h-2.5 rounded-full bg-primary" />}
+                              <div className={`w-4 h-4 rounded-full border-2 flex items-center justify-center flex-shrink-0 ${isActive ? 'border-primary' : 'border-slate-500'}`}>
+                                {isActive && <div className="w-2 h-2 rounded-full bg-primary" />}
                               </div>
                               <span>{label}</span>
                             </button>
@@ -762,9 +784,9 @@ export function NowPlaying() {
 
                     {/* Advanced Tab */}
                     {repeatMode === 'advanced' && (
-                      <div className="divide-y divide-white/5 overflow-y-auto">
-                        <div className="px-4 py-3">
-                          <p className="text-xs font-bold text-primary uppercase tracking-wider mb-3">{t('nowPlaying.whenSongEnds')}</p>
+                      <div className="divide-y divide-white/5 overflow-y-auto p-2">
+                        <div className="px-2 py-2">
+                          <p className="text-[10px] font-mono font-bold text-primary uppercase tracking-wider mb-2">{t('nowPlaying.whenSongEnds')}</p>
                           {([
                             { val: 'stop' as SongEndMode, label: t('nowPlaying.stopPlayback') },
                             { val: 'preload' as SongEndMode, label: t('nowPlaying.preloadNext') },
@@ -772,18 +794,16 @@ export function NowPlaying() {
                             { val: 'repeat_one' as SongEndMode, label: t('nowPlaying.repeatSong') },
                           ]).map(({ val, label }) => (
                             <button key={val} onClick={() => setSongEndModeTemp(val)}
-                              className={`w-full flex items-center gap-3 py-2.5 text-sm transition-colors ${songEndModeTemp === val ? 'text-white font-semibold' : 'text-white/40 hover:text-white/70'
-                                }`}>
-                              <div className={`w-4 h-4 rounded-full border-2 flex items-center justify-center flex-shrink-0 ${songEndModeTemp === val ? 'border-primary' : 'border-white/30'
-                                }`}>
-                                {songEndModeTemp === val && <div className="w-2 h-2 rounded-full bg-primary" />}
+                              className={`w-full flex items-center gap-3 py-2 text-xs rounded-lg px-2 transition-colors ${songEndModeTemp === val ? 'text-primary font-semibold bg-primary/10' : 'text-slate-400 hover:text-white'}`}>
+                              <div className={`w-3.5 h-3.5 rounded-full border-2 flex items-center justify-center flex-shrink-0 ${songEndModeTemp === val ? 'border-primary' : 'border-slate-500'}`}>
+                                {songEndModeTemp === val && <div className="w-1.5 h-1.5 rounded-full bg-primary" />}
                               </div>
                               <span>{label}</span>
                             </button>
                           ))}
                         </div>
-                        <div className="px-4 py-3">
-                          <p className="text-xs font-bold text-primary uppercase tracking-wider mb-3">{t('nowPlaying.whenQueueEnds')}</p>
+                        <div className="px-2 py-2">
+                          <p className="text-[10px] font-mono font-bold text-primary uppercase tracking-wider mb-2">{t('nowPlaying.whenQueueEnds')}</p>
                           {([
                             { val: 'stop' as QueueEndMode, label: t('nowPlaying.stopPlayback') },
                             { val: 'next' as QueueEndMode, label: t('nowPlaying.switchToNextQueue') },
@@ -791,19 +811,16 @@ export function NowPlaying() {
                           ]).map(({ val, label }) => (
                             <div key={val}>
                               <button onClick={() => setQueueEndModeTemp(val)}
-                                className={`w-full flex items-center gap-3 py-2 text-sm ${queueEndModeTemp === val ? 'text-white font-semibold' : 'text-white/40 hover:text-white/70'
-                                  }`}>
-                                <div className={`w-4 h-4 rounded-full border-2 flex items-center justify-center flex-shrink-0 ${queueEndModeTemp === val ? 'border-primary' : 'border-white/30'
-                                  }`}>
-                                  {queueEndModeTemp === val && <div className="w-2 h-2 rounded-full bg-primary" />}
+                                className={`w-full flex items-center gap-3 py-2 text-xs rounded-lg px-2 ${queueEndModeTemp === val ? 'text-primary font-semibold bg-primary/10' : 'text-slate-400 hover:text-white'}`}>
+                                <div className={`w-3.5 h-3.5 rounded-full border-2 flex items-center justify-center flex-shrink-0 ${queueEndModeTemp === val ? 'border-primary' : 'border-slate-500'}`}>
+                                  {queueEndModeTemp === val && <div className="w-1.5 h-1.5 rounded-full bg-primary" />}
                                 </div>
                                 <span>{label}</span>
                               </button>
 
                               {/* Sub-options when 'next' is selected */}
                               {val === 'next' && queueEndModeTemp === 'next' && (
-                                <div className="ml-7 mt-1 mb-2 flex flex-col gap-2">
-
+                                <div className="ml-6 mt-1 mb-2 flex flex-col gap-2">
                                   <label className="flex items-start gap-2.5 cursor-pointer group">
                                     <input
                                       type="checkbox"
@@ -811,7 +828,7 @@ export function NowPlaying() {
                                       onChange={e => setCycleQueues(e.target.checked)}
                                       className="mt-0.5 accent-primary w-3.5 h-3.5 cursor-pointer flex-shrink-0"
                                     />
-                                    <span className="text-xs text-white/60 group-hover:text-white/80 transition-colors">
+                                    <span className="text-xs text-slate-400 group-hover:text-slate-200 transition-colors">
                                       {t('nowPlaying.cycleQueues')}
                                     </span>
                                   </label>
@@ -824,9 +841,9 @@ export function NowPlaying() {
                     )}
 
                     {/* Bottom Action Buttons */}
-                    <div className="flex shrink-0 items-center justify-end gap-2 border-t border-white/10 p-2">
-                      <button onClick={confirmRepeat} className="w-9 h-9 flex items-center justify-center rounded-xl bg-primary/80 hover:bg-primary text-white transition-colors">
-                        <Check size={16} />
+                    <div className="flex shrink-0 items-center justify-end gap-2 border-t border-white/10 p-2.5 bg-[#09101d]">
+                      <button onClick={confirmRepeat} className="px-4 py-1.5 flex items-center justify-center rounded-xl bg-primary text-slate-950 font-bold text-xs shadow-md transition-colors hover:brightness-110">
+                        <Check size={15} className="mr-1" /> Done
                       </button>
                     </div>
                   </div>
@@ -834,120 +851,124 @@ export function NowPlaying() {
               </div>
               <button
                 onClick={() => setIsShuffle(prev => !prev)}
-                className={`${isShuffle ? 'text-primary' : 'text-white/40 hover:text-white'} transition-colors`}
+                className={`p-1.5 rounded-lg hover:bg-white/[0.05] ${isShuffle ? 'text-primary drop-shadow-[0_0_8px_rgba(0,245,255,0.6)]' : 'text-slate-400 hover:text-white'} transition-colors`}
                 title={isShuffle ? "Shuffle On" : "Shuffle Off"}
               >
-                <Shuffle size={22} />
+                <Shuffle size={20} />
               </button>
             </div>
 
-            <div className="flex items-center gap-4 font-mono text-sm font-bold text-white/90 mb-8 select-none relative">
-
-              <span className="min-w-[40px] text-right z-10">{formatTime(displayTime)}</span>
+            {/* Seek Bar */}
+            <div className="flex items-center gap-3 font-mono text-xs font-semibold text-slate-400 mb-6 select-none relative">
+              <span className="min-w-[36px] text-right">{formatTime(displayTime)}</span>
               <div
                 ref={progressBarRef}
-                className="flex-1 relative flex items-center group h-6 cursor-pointer touch-none z-10"
+                className="flex-1 relative flex items-center group h-5 cursor-pointer touch-none"
                 onPointerDown={handleProgressPointerDown}
               >
-                <div className="absolute inset-x-0 h-1.5 bg-white/20 rounded-full overflow-hidden">
+                <div className="absolute inset-x-0 h-1.5 group-hover:h-2 bg-white/10 rounded-full overflow-hidden transition-all">
                   <div
-                    className="h-full bg-white transition-colors"
+                    className="h-full bg-gradient-to-r from-cyan-400 to-primary shadow-[0_0_12px_rgba(0,245,255,0.5)] transition-colors"
                     style={{ width: `${displayPercent}%` }}
                   />
                 </div>
                 <div
-                  className={`absolute h-4 w-4 bg-white rounded-full shadow-lg flex items-center justify-center transition-opacity ${isDraggingProgress ? 'opacity-100' : 'opacity-0 group-hover:opacity-100'}`}
+                  className={`absolute h-4 w-4 bg-white rounded-full shadow-[0_0_12px_rgba(0,245,255,0.8)] border border-primary flex items-center justify-center transition-all ${isDraggingProgress ? 'opacity-100 scale-110' : 'opacity-0 group-hover:opacity-100'}`}
                   style={{ left: `calc(${displayPercent}% - 8px)` }}
                 />
               </div>
-              <span className="min-w-[40px] text-left z-10">{formatTime(duration)}</span>
+              <span className="min-w-[36px] text-left">{formatTime(duration)}</span>
             </div>
 
-            <div className="flex items-center justify-between px-2 mb-4">
-              <div className="flex items-center gap-1 sm:gap-2">
-                <div className="relative" ref={volumeRef}>
-                  <button
-                    aria-label="Volume"
-                    onClick={() => setShowVolume(v => !v)}
-                    className={`transition-colors p-2 rounded-full ${showVolume ? 'text-white bg-white/10' : 'text-white/60 hover:text-white'}`}
-                  >
-                    {volume === 0 ? <VolumeX size={20} className="text-white/40" /> : <Volume2 size={20} fill="currentColor" className={volume > 0.5 ? "text-white/20" : "text-white/40"} />}
-                  </button>
+            {/* Bottom Playback Main Controls */}
+            <div className="flex items-center justify-between px-2 mb-2">
+              <div className="relative" ref={volumeRef}>
+                <button
+                  aria-label="Volume"
+                  onClick={() => setShowVolume(v => !v)}
+                  className={`transition-colors p-2.5 rounded-xl ${showVolume ? 'text-primary bg-primary/10' : 'text-slate-400 hover:text-white hover:bg-white/[0.05]'}`}
+                >
+                  {volume === 0 ? <VolumeX size={20} className="text-red-400" /> : <Volume2 size={20} />}
+                </button>
 
-                  {showVolume && (
-                    <div className="absolute bottom-full left-0 mb-4 bg-[#1e1e1e] border border-white/10 p-4 rounded-2xl shadow-2xl z-50 w-40">
-                      <HorizontalSlider
-                        value={Math.round(volume * 100)}
-                        min={0}
-                        max={100}
-                        step={1}
-                        onChange={(val) => setVolume(val / 100)}
-                        label="Volume"
-                        color="#00f5ff"
-                        unit="%"
-                      />
-                    </div>
-                  )}
-                </div>
+                {showVolume && (
+                  <div className="absolute bottom-full left-0 mb-3 bg-[#0c1626] border border-white/10 p-4 rounded-2xl shadow-2xl z-50 w-44 backdrop-blur-2xl">
+                    <HorizontalSlider
+                      value={Math.round(volume * 100)}
+                      min={0}
+                      max={100}
+                      step={1}
+                      onChange={(val) => setVolume(val / 100)}
+                      label="Volume"
+                      color="#00f5ff"
+                      unit="%"
+                    />
+                  </div>
+                )}
               </div>
 
-              <div className="flex items-center gap-4 sm:gap-6 md:gap-10">
+              <div className="flex items-center gap-4 sm:gap-6 md:gap-8">
                 <button
                   aria-label="Previous track"
                   onClick={playPrevious}
                   disabled={!hasPrevious}
-                  className={`transition-colors ${hasPrevious ? 'text-white hover:text-white/80' : 'text-white/20 cursor-not-allowed'}`}
+                  className={`transition-all p-2 rounded-xl hover:bg-white/[0.05] ${hasPrevious ? 'text-slate-200 hover:text-white' : 'text-white/20 cursor-not-allowed'}`}
                 >
-                  <SkipBack size={28} className="md:w-8 md:h-8" fill="currentColor" />
+                  <SkipBack size={26} fill="currentColor" />
                 </button>
                 <button
                   aria-label="Play or pause"
                   onClick={togglePlay}
                   disabled={isLoadingTrack}
-                  className={`w-14 h-14 md:w-16 md:h-16 flex items-center justify-center text-white transition-transform ${isLoadingTrack ? 'cursor-not-allowed opacity-80' : 'hover:scale-105'}`}
+                  className={`w-14 h-14 md:w-16 md:h-16 rounded-full flex items-center justify-center text-slate-950 transition-all ${
+                    isLoadingTrack 
+                      ? 'bg-slate-700 text-slate-400 cursor-not-allowed' 
+                      : 'bg-primary shadow-[0_0_25px_rgba(0,245,255,0.45)] hover:shadow-[0_0_35px_rgba(0,245,255,0.7)] hover:scale-105 active:scale-95'
+                  }`}
                 >
                   {isLoadingTrack ? (
-                    <Loader2 size={40} className="md:w-12 md:h-12 animate-spin" />
+                    <Loader2 size={28} className="animate-spin text-slate-400" />
                   ) : isPlaying ? (
-                    <Pause size={40} className="md:w-12 md:h-12" fill="currentColor" />
+                    <Pause size={28} fill="currentColor" />
                   ) : (
-                    <Play size={40} className="md:w-12 md:h-12" fill="currentColor" />
+                    <Play size={28} fill="currentColor" className="ml-1" />
                   )}
                 </button>
                 <button
                   aria-label="Next track"
                   onClick={playNext}
                   disabled={!hasNext}
-                  className={`transition-colors ${hasNext ? 'text-white hover:text-white/80' : 'text-white/20 cursor-not-allowed'}`}
+                  className={`transition-all p-2 rounded-xl hover:bg-white/[0.05] ${hasNext ? 'text-slate-200 hover:text-white' : 'text-white/20 cursor-not-allowed'}`}
                 >
-                  <SkipForward size={28} className="md:w-8 md:h-8" fill="currentColor" />
+                  <SkipForward size={26} fill="currentColor" />
                 </button>
               </div>
 
               <button
                 aria-label="EQ and tone settings"
                 onClick={() => navigate('/studio')}
-                className="text-white/60 hover:text-white transition-colors"
-                title="EQ & Tone"
+                className="text-slate-400 hover:text-primary transition-colors p-2.5 rounded-xl hover:bg-white/[0.05]"
+                title="EQ & Studio"
               >
-                <BarChart2 size={24} />
+                <BarChart2 size={20} />
               </button>
             </div>
           </div>
 
         </div>
 
-        {/* Right Side: Playlist */}
-        <div className="hidden lg:block lg:w-[400px] flex-shrink-0">
-          <div className="w-full bg-white/5 rounded-2xl p-4 md:p-6 border border-white/10 h-full max-h-[65vh] lg:max-h-[80vh] flex flex-col">
-            <div className="flex items-center gap-6 mb-6 border-b border-white/10 pb-1">
-              <div className="font-bold pb-2 border-b-2 border-primary text-primary flex items-center gap-2">
-                <ListPlus size={18} />
-                {t('player.upNext')}
+        {/* Right Side: Playlist / Up Next */}
+        <div className="hidden lg:block lg:w-[380px] xl:w-[420px] flex-shrink-0">
+          <div className="w-full bg-[#0c1626]/70 rounded-2xl p-4 md:p-5 border border-white/[0.08] backdrop-blur-xl h-full max-h-[65vh] lg:max-h-[80vh] flex flex-col shadow-xl">
+            <div className="flex items-center justify-between mb-4 pb-3 border-b border-white/[0.06]">
+              <div className="font-bold text-sm text-white flex items-center gap-2">
+                <ListPlus size={16} className="text-primary" />
+                <span>{t('player.upNext')}</span>
               </div>
+              <span className="text-xs font-mono text-slate-400">{playerState.queue.length} songs</span>
             </div>
 
-            <div ref={queueContainerRef} id="nowplaying-queue-container" className="flex flex-col gap-3 overflow-y-auto pr-2 relative flex-1">
+            <div ref={queueContainerRef} id="nowplaying-queue-container" className="flex flex-col gap-2 overflow-y-auto pr-1 relative flex-1 no-scrollbar">
               {playerState.queue.map((track) => {
                 const isActive = String(currentTrack?.id) === String(track.id);
                 return (
@@ -956,23 +977,38 @@ export function NowPlaying() {
                     ref={isActive ? activeQueueTrackRef : undefined}
                     id={isActive ? 'nowplaying-current-track' : undefined}
                     onClick={() => playerState.playTrack(track, playerState.queue)}
-                    className={`flex items-center gap-3 sm:gap-4 p-3 rounded-xl cursor-pointer transition-colors shadow-sm ${isActive ? 'bg-primary/20 border border-primary/30' : 'bg-white/5 hover:bg-white/10 border border-white/5'
-                      }`}
+                    className={`group flex items-center gap-3 p-2.5 rounded-xl cursor-pointer transition-all ${
+                      isActive
+                        ? 'bg-primary/15 border border-primary/30 text-primary shadow-[inset_0_0_12px_rgba(0,245,255,0.1)]'
+                        : 'bg-white/[0.02] hover:bg-white/[0.06] border border-white/[0.04]'
+                    }`}
                   >
                     <div
-                      className="w-12 h-12 rounded-full bg-primary/20 bg-cover bg-center flex-shrink-0 shadow-md flex items-center justify-center overflow-hidden"
+                      className="w-10 h-10 rounded-lg bg-slate-800 bg-cover bg-center flex-shrink-0 shadow flex items-center justify-center overflow-hidden relative"
                       style={(track.imageUrl || playerState.getTrackImage(track.id)) ? { backgroundImage: `url(${track.imageUrl || playerState.getTrackImage(track.id)})` } : {}}
                     >
-                      {!(track.imageUrl || playerState.getTrackImage(track.id)) && <Music size={20} className="text-white/40" />}
+                      {!(track.imageUrl || playerState.getTrackImage(track.id)) && <Music size={16} className="text-slate-500" />}
+                      {isActive && (
+                        <div className="absolute inset-0 bg-primary/25 flex items-center justify-center">
+                          <div className="flex items-end gap-0.5 h-3">
+                            <span className="w-0.5 bg-primary rounded-full animate-eq-1" />
+                            <span className="w-0.5 bg-primary rounded-full animate-eq-2" />
+                            <span className="w-0.5 bg-primary rounded-full animate-eq-3" />
+                          </div>
+                        </div>
+                      )}
                     </div>
                     <div className="flex-1 min-w-0">
-                      <p className={`text-sm font-bold truncate ${isActive ? 'text-primary' : 'text-white'}`}>
+                      <p className={`text-xs font-semibold truncate ${isActive ? 'text-primary' : 'text-slate-200'}`}>
                         {track.title || playerState.getTrackMetadata(track.id)?.title || (track.fileName ? (track.fileName.includes(' - ') ? track.fileName.split(' - ')[1].replace(/\.[^/.]+$/, "") : track.fileName.replace(/\.[^/.]+$/, "")) : 'Unknown Title')}
                       </p>
-                      <p className="text-xs text-white/50 truncate mt-0.5">
+                      <p className="text-[11px] text-slate-400 truncate mt-0.5 font-mono">
                         {track.artist || playerState.getTrackMetadata(track.id)?.artist || (track.fileName?.includes(' - ') ? track.fileName.split(' - ')[0] : 'Unknown Artist')}
                       </p>
                     </div>
+                    {isActive && (
+                      <div className="w-1.5 h-1.5 rounded-full bg-primary mr-1 shadow-[0_0_8px_rgba(0,245,255,0.8)]" />
+                    )}
                   </div>
                 );
               })}
@@ -985,28 +1021,28 @@ export function NowPlaying() {
       {/* Metadata Modal */}
       {showMetadata && currentTrack && (
         <div
-          className="fixed inset-0 z-[100] flex items-center justify-center bg-black/60 backdrop-blur-sm p-4"
+          className="fixed inset-0 z-[100] flex items-center justify-center bg-black/70 backdrop-blur-md p-4"
           onClick={() => setShowMetadata(false)}
         >
           <div
-            className="bg-[#1a1a1a] border border-white/10 rounded-2xl w-full max-w-md max-h-[calc(100dvh-2rem)] shadow-2xl overflow-hidden flex flex-col"
+            className="bg-[#0c1626] border border-white/10 rounded-2xl w-full max-w-md max-h-[calc(100dvh-2rem)] shadow-2xl overflow-hidden flex flex-col"
             onClick={(e) => e.stopPropagation()}
           >
-            <div className="flex items-center justify-between p-5 border-b border-white/5">
-              <div className="flex items-center gap-3 text-white">
-                <Info size={24} className="text-primary" />
-                <h3 className="font-semibold text-lg">{t('bottomPlayer.trackMetadata')}</h3>
+            <div className="flex items-center justify-between p-4 border-b border-white/[0.06]">
+              <div className="flex items-center gap-2.5 text-white">
+                <Info size={20} className="text-primary" />
+                <h3 className="font-semibold text-base">{t('bottomPlayer.trackMetadata')}</h3>
               </div>
               <button
                 onClick={() => setShowMetadata(false)}
-                className="text-white/40 hover:text-white transition-colors p-1"
+                className="text-slate-400 hover:text-white transition-colors p-1 rounded-lg hover:bg-white/[0.05]"
               >
-                <X size={20} />
+                <X size={18} />
               </button>
             </div>
 
-            <div className="p-5 flex flex-col gap-4 overflow-y-auto max-h-[70vh]">
-              <div className="bg-white/5 rounded-xl p-4 flex flex-col gap-3">
+            <div className="p-4 flex flex-col gap-3 overflow-y-auto max-h-[70vh] no-scrollbar">
+              <div className="bg-white/[0.03] border border-white/[0.05] rounded-xl p-3.5 flex flex-col gap-2">
                 {[
                   { label: t('bottomPlayer.title'), value: currentTrack.title || playerState.getTrackMetadata(currentTrack.id)?.title },
                   { label: t('bottomPlayer.artist'), value: currentTrack.artist || playerState.getTrackMetadata(currentTrack.id)?.artist },
@@ -1024,9 +1060,9 @@ export function NowPlaying() {
                   { label: 'Audio Sample Rate', value: currentTrack.sampleRate ? `${(currentTrack.sampleRate / 1000).toFixed(3)} kHz` : null },
                   { label: 'Bit Depth', value: currentTrack.bitsPerSample ? `${currentTrack.bitsPerSample} bit` : null }
                 ].map((item, idx) => (
-                  <div key={idx} className="flex flex-col gap-1">
-                    <span className="text-[10px] uppercase tracking-wider text-white/40 font-semibold">{item.label}</span>
-                    <span className="text-sm text-white/90 font-medium break-all">{item.value || 'unknown'}</span>
+                  <div key={idx} className="flex flex-col gap-0.5">
+                    <span className="text-[10px] uppercase tracking-wider text-slate-400 font-mono font-semibold">{item.label}</span>
+                    <span className="text-xs text-slate-200 font-medium break-all">{item.value || 'unknown'}</span>
                   </div>
                 ))}
               </div>

@@ -242,23 +242,40 @@ export function BottomPlayerBar() {
       : <ListX size={14} />;
 
   return (
-    <div className="h-16 md:h-20 bg-surface border-t border-white/5 px-2 sm:px-3 md:px-6 grid grid-cols-[minmax(0,1fr)_auto_auto] md:flex items-center gap-2 md:gap-4 md:justify-between select-none shadow-[0_-10px_40px_rgba(0,0,0,0.3)] z-50">
+    <div className="h-16 md:h-20 bg-[#08111e]/90 backdrop-blur-2xl border-t border-white/[0.08] px-3 sm:px-4 md:px-6 grid grid-cols-[minmax(0,1fr)_auto_auto] md:flex items-center gap-2 md:gap-4 md:justify-between select-none shadow-[0_-12px_40px_rgba(0,0,0,0.65)] z-50">
       
       {/* Left: Track Info */}
-      <div className="flex items-center min-w-0 md:flex-1 w-full md:max-w-xs gap-2 md:gap-3 cursor-pointer md:cursor-auto" onClick={() => { if (globalThis.innerWidth < 768) openNowPlaying(); }}>
-        <div className={`w-10 h-10 md:w-12 md:h-12 rounded-md bg-background border border-white/10 flex items-center justify-center overflow-hidden shrink-0`}>
+      <div className="flex items-center min-w-0 md:flex-1 w-full md:max-w-xs gap-2.5 md:gap-3 cursor-pointer md:cursor-auto" onClick={() => { if (globalThis.innerWidth < 768) openNowPlaying(); }}>
+        <div className="relative group w-10 h-10 md:w-12 md:h-12 rounded-xl bg-slate-900 border border-white/10 flex items-center justify-center overflow-hidden shrink-0 shadow-md">
           {currentArtwork ? (
-            <img src={currentArtwork} alt="Album Art" className="w-full h-full object-cover" />
+            <img src={currentArtwork} alt="Album Art" className="w-full h-full object-cover transition-transform duration-500 group-hover:scale-110" />
           ) : (
-            <div ref={discRef} className="w-8 h-8 rounded-full bg-white/10 flex items-center justify-center">
-              <Disc size={20} className="text-white/50" />
+            <div ref={discRef} className="w-full h-full bg-gradient-to-br from-slate-800 to-slate-950 flex items-center justify-center">
+              <Disc size={22} className="text-primary/60" />
+            </div>
+          )}
+          {isPlaying && (
+            <div className="absolute inset-0 bg-black/25 flex items-center justify-center">
+              <div className="flex items-end gap-0.5 h-3">
+                <span className="w-0.5 bg-primary rounded-full animate-eq-1" />
+                <span className="w-0.5 bg-primary rounded-full animate-eq-2" />
+                <span className="w-0.5 bg-primary rounded-full animate-eq-3" />
+              </div>
             </div>
           )}
         </div>
         <div className="flex flex-col min-w-0 overflow-hidden pr-1 sm:pr-2">
-          <span className="text-sm font-medium text-white truncate">{currentTrack.title || playerState.getTrackMetadata(currentTrack.id)?.title || (currentTrack.fileName ? (currentTrack.fileName.includes(' - ') ? currentTrack.fileName.split(' - ')[1].replace(/\.[^/.]+$/, "") : currentTrack.fileName.replace(/\.[^/.]+$/, "")) : 'Unknown Title')}</span>
-          <span className="text-xs text-secondary/60 font-mono flex items-center gap-1 mt-0.5 truncate">
-            {currentTrack.sourceType === 'DRIVE' && <Cloud size={10} className="text-primary shrink-0" />}
+          <span className="text-xs md:text-sm font-semibold text-white truncate hover:text-primary transition-colors cursor-pointer" onClick={openNowPlaying}>
+            {currentTrack.title || playerState.getTrackMetadata(currentTrack.id)?.title || (currentTrack.fileName ? (currentTrack.fileName.includes(' - ') ? currentTrack.fileName.split(' - ')[1].replace(/\.[^/.]+$/, "") : currentTrack.fileName.replace(/\.[^/.]+$/, "")) : 'Unknown Title')}
+          </span>
+          <span className="text-[11px] text-slate-400 font-mono flex items-center gap-1.5 mt-0.5 truncate">
+            {currentTrack.sourceType === 'DRIVE' ? (
+              <span className="inline-flex items-center gap-0.5 text-primary text-[10px] bg-primary/10 px-1.5 py-0.2 rounded-full border border-primary/20 shrink-0">
+                <Cloud size={9} /> Drive
+              </span>
+            ) : (
+              <span className="text-[10px] text-slate-400 font-medium shrink-0">Local</span>
+            )}
             <span className="truncate">{currentTrack.artist || playerState.getTrackMetadata(currentTrack.id)?.artist || (currentTrack.fileName?.includes(' - ') ? currentTrack.fileName.split(' - ')[0] : 'Unknown Artist')}</span>
           </span>
         </div>
@@ -266,13 +283,13 @@ export function BottomPlayerBar() {
           <button 
             onClick={(e) => { e.stopPropagation(); toggleFavorite(); }}
             className={`
-              ${isFavorite ? 'text-primary drop-shadow-[0_0_8px_var(--tw-colors-primary)] scale-110' : 'text-white/40 hover:text-white'} 
-              transition-all duration-300 ml-0 md:ml-2 p-1.5 md:p-1 rounded-full shrink-0
-              active:scale-95
+              ${isFavorite ? 'text-primary drop-shadow-[0_0_8px_rgba(0,245,255,0.6)] scale-110' : 'text-slate-400 hover:text-slate-200'} 
+              transition-all duration-300 ml-0 md:ml-2 p-1.5 rounded-full shrink-0
+              active:scale-90 hover:bg-white/[0.05]
             `}
             aria-label={isFavorite ? "Remove from Favorites" : "Add to Favorites"}
           >
-            <Heart size={18} fill={isFavorite ? "currentColor" : "none"} className={`transition-all duration-300`} />
+            <Heart size={17} fill={isFavorite ? "currentColor" : "none"} className="transition-all duration-300" />
           </button>
         ) : (
           <div className="w-[30px] ml-1 md:ml-2"></div>
@@ -281,31 +298,31 @@ export function BottomPlayerBar() {
 
       {/* Center: Controls & Seek Bar */}
       <div className="flex flex-col items-end md:items-center gap-1 shrink-0 md:w-2/4 md:max-w-2xl md:pr-0">
-        <div className="flex items-center gap-2 sm:gap-3 md:gap-6">
+        <div className="flex items-center gap-2 sm:gap-3 md:gap-5">
           <button 
             onClick={(e) => { e.stopPropagation(); setIsShuffle(prev => !prev); }}
             aria-label={isShuffle ? "Turn off shuffle" : "Turn on shuffle"}
-            className={`${isShuffle ? 'text-primary' : 'text-white/40 hover:text-white'} transition-colors hidden md:block`}
+            className={`${isShuffle ? 'text-primary drop-shadow-[0_0_6px_rgba(0,245,255,0.4)]' : 'text-slate-400 hover:text-white'} transition-colors hidden md:flex p-1.5 rounded-lg hover:bg-white/[0.05]`}
             title={isShuffle ? "Shuffle On" : "Shuffle Off"}
           >
-            <Shuffle size={16} />
+            <Shuffle size={15} />
           </button>
           <button 
             onClick={(e) => { e.stopPropagation(); playPrevious(); }}
             aria-label="Previous track"
             disabled={!hasPrevious}
-            className={`transition-colors ${hasPrevious ? 'text-white/60 hover:text-white' : 'text-white/20 cursor-not-allowed'}`}
+            className={`transition-colors p-1.5 rounded-lg hover:bg-white/[0.05] ${hasPrevious ? 'text-slate-300 hover:text-white' : 'text-white/20 cursor-not-allowed'}`}
           >
-            <SkipBack size={17} fill="currentColor" />
+            <SkipBack size={16} fill="currentColor" />
           </button>
           <button 
             onClick={(e) => { e.stopPropagation(); togglePlay(); }}
             aria-label="Play or pause"
             disabled={isLoadingTrack}
-            className={`w-8 h-8 md:w-8 md:h-8 shrink-0 rounded-full flex items-center justify-center transition-transform ${
+            className={`w-9 h-9 md:w-9 md:h-9 shrink-0 rounded-full flex items-center justify-center transition-all ${
               isLoadingTrack 
-                ? 'bg-white/50 text-black/50 cursor-not-allowed' 
-                : 'bg-white text-black hover:scale-105'
+                ? 'bg-slate-700 text-slate-400 cursor-not-allowed' 
+                : 'bg-primary text-slate-950 shadow-[0_0_18px_rgba(0,245,255,0.4)] hover:shadow-[0_0_24px_rgba(0,245,255,0.6)] hover:scale-105 active:scale-95'
             }`}
           >
             {isLoadingTrack ? (
@@ -320,11 +337,11 @@ export function BottomPlayerBar() {
             onClick={(e) => { e.stopPropagation(); playNext(); }}
             aria-label="Next track"
             disabled={!hasNext}
-            className={`transition-colors ${hasNext ? 'text-white/60 hover:text-white' : 'text-white/20 cursor-not-allowed'}`}
+            className={`transition-colors p-1.5 rounded-lg hover:bg-white/[0.05] ${hasNext ? 'text-slate-300 hover:text-white' : 'text-white/20 cursor-not-allowed'}`}
           >
-            <SkipForward size={17} fill="currentColor" />
+            <SkipForward size={16} fill="currentColor" />
           </button>
-          <div className="hidden md:flex items-center gap-2 border-l border-white/10 pl-4 ml-2">
+          <div className="hidden md:flex items-center gap-1.5 border-l border-white/10 pl-3 ml-1">
             {repeatMode === 'simple' ? (
               <button
                 onClick={() => {
@@ -338,10 +355,10 @@ export function BottomPlayerBar() {
                   }
                 }}
                 aria-label="Change repeat mode"
-                className={`${(queueEndMode === 'repeat' || songEndMode === 'repeat_one') ? 'text-primary' : 'text-white/40 hover:text-white'} transition-colors relative flex items-center justify-center`}
+                className={`p-1.5 rounded-lg hover:bg-white/[0.05] ${(queueEndMode === 'repeat' || songEndMode === 'repeat_one') ? 'text-primary drop-shadow-[0_0_6px_rgba(0,245,255,0.4)]' : 'text-slate-400 hover:text-white'} transition-colors relative flex items-center justify-center`}
                 title={songEndMode === 'repeat_one' ? t('bottomPlayer.repeatSong', 'Repeat Song') : queueEndMode === 'repeat' ? t('bottomPlayer.repeatQueue', 'Repeat Queue') : t('bottomPlayer.repeatOff', 'Repeat: Off')}
               >
-                {songEndMode === 'repeat_one' ? <Repeat1 size={16} /> : <Repeat size={16} />}
+                {songEndMode === 'repeat_one' ? <Repeat1 size={15} /> : <Repeat size={15} />}
               </button>
             ) : (
               <>
@@ -353,10 +370,10 @@ export function BottomPlayerBar() {
                     else setSongEndMode('next');
                   }}
                   aria-label="Change song repeat mode"
-                  className={`${songEndMode !== 'next' ? 'text-primary' : 'text-white/40 hover:text-white'} transition-colors relative flex items-center justify-center`}
+                  className={`p-1.5 rounded-lg hover:bg-white/[0.05] ${songEndMode !== 'next' ? 'text-primary drop-shadow-[0_0_6px_rgba(0,245,255,0.4)]' : 'text-slate-400 hover:text-white'} transition-colors relative flex items-center justify-center`}
                   title={songEndMode === 'next' ? t('bottomPlayer.songNext', 'Song: Next') : songEndMode === 'repeat_one' ? t('bottomPlayer.songRepeat', 'Song: Repeat') : songEndMode === 'preload' ? t('bottomPlayer.songPreload', 'Song: Preload & Stop') : t('bottomPlayer.songStop', 'Song: Stop')}
                 >
-                  {songEndMode === 'repeat_one' ? <Repeat1 size={16} /> : songEndMode === 'stop' ? <Square size={14} /> : songEndMode === 'preload' ? <PauseCircle size={16} /> : <ArrowRight size={16} />}
+                  {songEndMode === 'repeat_one' ? <Repeat1 size={15} /> : songEndMode === 'stop' ? <Square size={13} /> : songEndMode === 'preload' ? <PauseCircle size={15} /> : <ArrowRight size={15} />}
                 </button>
                 <button
                   onClick={() => {
@@ -365,35 +382,35 @@ export function BottomPlayerBar() {
                     else setQueueEndMode('repeat');
                   }}
                   aria-label="Change queue repeat mode"
-                  className={`${queueEndMode !== 'stop' ? 'text-primary' : 'text-white/40 hover:text-white'} transition-colors relative flex items-center justify-center`}
+                  className={`p-1.5 rounded-lg hover:bg-white/[0.05] ${queueEndMode !== 'stop' ? 'text-primary drop-shadow-[0_0_6px_rgba(0,245,255,0.4)]' : 'text-slate-400 hover:text-white'} transition-colors relative flex items-center justify-center`}
                   title={queueEndMode === 'repeat' ? t('bottomPlayer.queueRepeat', 'Queue: Repeat') : queueEndMode === 'next' ? t('bottomPlayer.queueNext', 'Queue: Next') : t('bottomPlayer.queueStop', 'Queue: Stop')}
                 >
-                  {queueEndMode === 'repeat' ? <Repeat size={16} /> : queueEndMode === 'next' ? <ListPlus size={16} /> : <ListX size={16} />}
+                  {queueEndMode === 'repeat' ? <Repeat size={15} /> : queueEndMode === 'next' ? <ListPlus size={15} /> : <ListX size={15} />}
                 </button>
               </>
             )}
           </div>
         </div>
         
-        <div className="hidden md:flex w-full items-center gap-2 font-mono text-[10px] text-white/50 select-none">
-          <span className="min-w-[30px] text-right">{formatTime(displayTime)}</span>
+        <div className="hidden md:flex w-full items-center gap-2.5 font-mono text-[11px] text-slate-400 select-none">
+          <span className="min-w-[34px] text-right font-medium text-slate-400">{formatTime(displayTime)}</span>
           <div 
             ref={progressBarRef}
             className="flex-1 relative flex items-center group h-3 cursor-pointer touch-none" 
             onPointerDown={handleProgressPointerDown}
           >
-            <div className="absolute inset-x-0 h-1 bg-white/20 rounded-full overflow-hidden">
+            <div className="absolute inset-x-0 h-1 group-hover:h-1.5 bg-white/10 group-hover:bg-white/15 rounded-full overflow-hidden transition-all duration-200">
               <div 
-                className="h-full bg-primary group-hover:bg-[#00E5FF] transition-colors"
+                className="h-full bg-gradient-to-r from-cyan-400 to-primary group-hover:from-primary group-hover:to-cyan-300 transition-colors shadow-[0_0_10px_rgba(0,245,255,0.4)]"
                 style={{ width: `${displayPercent}%` }}
               />
             </div>
             <div 
-              className={`absolute h-3 w-3 bg-white rounded-full shadow flex items-center justify-center transition-opacity ${isDraggingProgress ? 'opacity-100' : 'opacity-0 group-hover:opacity-100'}`}
-              style={{ left: `calc(${displayPercent}% - 6px)` }}
+              className={`absolute h-3.5 w-3.5 bg-white rounded-full shadow-[0_0_10px_rgba(0,245,255,0.8)] border border-primary flex items-center justify-center transition-all ${isDraggingProgress ? 'opacity-100 scale-110' : 'opacity-0 group-hover:opacity-100'}`}
+              style={{ left: `calc(${displayPercent}% - 7px)` }}
             />
           </div>
-          <span className="min-w-[30px] text-left">{formatTime(duration)}</span>
+          <span className="min-w-[34px] text-left font-medium text-slate-400">{formatTime(duration)}</span>
         </div>
       </div>
 
@@ -401,7 +418,7 @@ export function BottomPlayerBar() {
         <ActionMenu
           ariaLabel="More player controls"
           direction="up"
-          buttonClassName="h-9 w-9 rounded-full bg-white/5 text-white/70 hover:bg-white/10 hover:text-white flex items-center justify-center transition-colors"
+          buttonClassName="h-9 w-9 rounded-full bg-white/[0.06] text-slate-300 hover:bg-white/[0.12] hover:text-white flex items-center justify-center transition-colors border border-white/[0.06]"
           menuClassName="w-56"
           actions={[
             { label: t('nav.nowPlaying', 'Now Playing'), icon: <Maximize2 size={14} />, onSelect: openNowPlaying },
@@ -451,39 +468,42 @@ export function BottomPlayerBar() {
       </div>
 
       {/* Right: Extra Controls */}
-      <div className="hidden md:flex items-center justify-end w-1/4 min-w-[200px] gap-4 text-white/50">
-        <button onClick={openNowPlaying} className="hover:text-white transition-colors" aria-label="Now Playing">
+      <div className="hidden md:flex items-center justify-end w-1/4 min-w-[200px] gap-3 text-slate-400">
+        <button onClick={openNowPlaying} className="p-2 rounded-lg hover:bg-white/[0.05] hover:text-white transition-colors" aria-label="Now Playing" title="Expand Player">
           <Maximize2 size={16} />
         </button>
         {currentTrack.sourceType === 'DRIVE' && (
           <button
             onClick={() => void playerState.reloadCurrentTrackFromDrive()}
             disabled={isLoadingTrack}
-            className={`transition-colors ${isLoadingTrack ? 'text-white/20 cursor-not-allowed' : 'hover:text-white'}`}
+            className={`p-2 rounded-lg hover:bg-white/[0.05] transition-colors ${isLoadingTrack ? 'text-white/20 cursor-not-allowed' : 'hover:text-white'}`}
             aria-label={t('bottomPlayer.reloadFromDrive', 'Reload from Drive')}
             title={t('bottomPlayer.reloadFromDrive', 'Reload from Drive')}
           >
-            <RefreshCw size={16} className={isLoadingTrack ? 'animate-spin' : ''} />
+            <RefreshCw size={15} className={isLoadingTrack ? 'animate-spin text-primary' : ''} />
           </button>
         )}
-        <button onClick={() => setShowMetadata(true)} className="hover:text-white transition-colors" aria-label="Track Information"><Info size={16} /></button>
+        <button onClick={() => setShowMetadata(true)} className="p-2 rounded-lg hover:bg-white/[0.05] hover:text-white transition-colors" aria-label="Track Information" title="Track Info">
+          <Info size={16} />
+        </button>
         <div className="relative" ref={queueRef}>
           <button 
             onClick={() => setShowQueue(v => !v)} 
             aria-label="Toggle Queue"
-            className={`transition-colors flex items-center justify-center p-2 rounded-full ${showQueue ? 'text-white bg-white/10' : 'hover:text-white'}`}
+            className={`transition-all flex items-center justify-center p-2 rounded-lg ${showQueue ? 'text-primary bg-primary/10 border border-primary/25' : 'hover:text-white hover:bg-white/[0.05]'}`}
+            title="Queue"
           >
             <ListMusic size={16} />
           </button>
           
           {showQueue && (
-            <div className="absolute bottom-full right-0 mb-4 w-80 max-w-[calc(100vw_-_2rem)] bg-[#1e1e1e] border border-white/10 rounded-2xl shadow-2xl overflow-hidden z-50 flex flex-col max-h-[60vh]">
-              <div className="p-4 border-b border-white/10 flex items-center justify-between sticky top-0 bg-[#1e1e1e]/90 backdrop-blur-md z-10">
-                <h2 className="font-bold text-white flex items-center gap-2">
-                  <ListPlus size={18} className="text-primary" /> 
+            <div className="absolute bottom-full right-0 mb-3 w-80 max-w-[calc(100vw_-_2rem)] bg-[#0c1626]/95 border border-white/10 rounded-2xl shadow-2xl backdrop-blur-2xl overflow-hidden z-50 flex flex-col max-h-[60vh]">
+              <div className="p-3.5 border-b border-white/10 flex items-center justify-between sticky top-0 bg-[#0c1626]/90 backdrop-blur-md z-10">
+                <h2 className="font-bold text-sm text-white flex items-center gap-2">
+                  <ListPlus size={16} className="text-primary" /> 
                   {t('bottomPlayer.queueTitle', 'Queue')}
                 </h2>
-                <span className="text-xs text-white/50">{queue.length} {t('bottomPlayer.songs', 'songs')}</span>
+                <span className="text-xs font-mono text-slate-400">{queue.length} {t('bottomPlayer.songs', 'songs')}</span>
               </div>
               <div
                 ref={queueListRef}
@@ -508,22 +528,31 @@ export function BottomPlayerBar() {
                     >
                       <div
                         onClick={() => playTrack(track, queue)}
-                        className={`flex h-[50px] items-center gap-3 p-2 rounded-xl cursor-pointer transition-colors ${
-                          isActive ? 'bg-primary/20 border border-primary/30' : 'hover:bg-white/5 border border-transparent'
+                        className={`flex h-[50px] items-center gap-2.5 p-2 rounded-xl cursor-pointer transition-all ${
+                          isActive ? 'bg-primary/15 border border-primary/30 text-primary shadow-[inset_0_0_10px_rgba(0,245,255,0.1)]' : 'hover:bg-white/[0.05] border border-transparent'
                         }`}
                       >
-                        <div className="w-10 h-10 rounded-full bg-primary/20 bg-cover bg-center flex-shrink-0" style={{ backgroundImage: artwork ? `url(${artwork})` : undefined }}>
-                          {!artwork && <Disc size={16} className="text-white/30 m-auto mt-3" />}
+                        <div className="w-9 h-9 rounded-lg bg-slate-800 bg-cover bg-center flex-shrink-0 overflow-hidden relative" style={{ backgroundImage: artwork ? `url(${artwork})` : undefined }}>
+                          {!artwork && <Disc size={15} className="text-slate-500 m-auto mt-2.5" />}
+                          {isActive && (
+                            <div className="absolute inset-0 bg-primary/20 flex items-center justify-center">
+                              <div className="flex items-end gap-0.5 h-2.5">
+                                <span className="w-0.5 bg-primary rounded-full animate-eq-1" />
+                                <span className="w-0.5 bg-primary rounded-full animate-eq-2" />
+                                <span className="w-0.5 bg-primary rounded-full animate-eq-3" />
+                              </div>
+                            </div>
+                          )}
                         </div>
                         <div className="flex-1 min-w-0">
-                          <p className={`text-sm font-medium truncate ${isActive ? 'text-primary' : 'text-white'}`}>
+                          <p className={`text-xs font-semibold truncate ${isActive ? 'text-primary' : 'text-slate-200'}`}>
                             {track.title || track.fileName?.replace(/\.[^/.]+$/, "")}
                           </p>
-                          <p className="text-xs text-white/50 truncate">
+                          <p className="text-[11px] text-slate-400 truncate mt-0.5 font-mono">
                             {track.artist || track.fileName?.split(' - ')[0] || 'Unknown Artist'}
                           </p>
                         </div>
-                        {isActive && <div className="w-1.5 h-1.5 rounded-full bg-primary mr-2 shadow-[0_0_8px_var(--tw-colors-primary)]" />}
+                        {isActive && <div className="w-1.5 h-1.5 rounded-full bg-primary mr-1.5 shadow-[0_0_8px_rgba(0,245,255,0.8)]" />}
                       </div>
                     </div>
                   );
@@ -534,16 +563,16 @@ export function BottomPlayerBar() {
             </div>
           )}
         </div>
-        <div className="flex items-center gap-3 ml-2 w-48">
+        <div className="flex items-center gap-2.5 ml-1 w-44">
           <button 
             onClick={() => setVolume(volume === 0 ? 1 : 0)}
             aria-label="Mute or Unmute"
-            className="hover:text-white transition-colors flex items-center gap-1.5"
+            className="hover:text-white transition-colors flex items-center gap-1"
           >
-            {volume === 0 ? <VolumeX size={16} /> : <Volume2 size={16} />}
-            <span className="text-xs font-mono w-9 text-left">{Math.round(volume * 100)}%</span>
+            {volume === 0 ? <VolumeX size={15} className="text-red-400" /> : <Volume2 size={15} className="text-slate-300" />}
+            <span className="text-[11px] font-mono w-8 text-left text-slate-400">{Math.round(volume * 100)}%</span>
           </button>
-          <div className="flex-1 mt-1">
+          <div className="flex-1 mt-0.5">
             <HorizontalSlider
               value={volume}
               min={0}
@@ -561,28 +590,28 @@ export function BottomPlayerBar() {
       {/* Metadata Modal */}
       {showMetadata && currentTrack && (
         <div 
-          className="fixed inset-0 z-[100] flex items-center justify-center bg-black/60 backdrop-blur-sm p-4"
+          className="fixed inset-0 z-[100] flex items-center justify-center bg-black/70 backdrop-blur-md p-4"
           onClick={() => setShowMetadata(false)}
         >
           <div 
-            className="bg-[#1a1a1a] border border-white/10 rounded-2xl w-full max-w-md max-h-[calc(100dvh-2rem)] shadow-2xl overflow-hidden flex flex-col"
+            className="bg-[#0c1626] border border-white/10 rounded-2xl w-full max-w-md max-h-[calc(100dvh-2rem)] shadow-2xl overflow-hidden flex flex-col"
             onClick={(e) => e.stopPropagation()}
           >
-            <div className="flex items-center justify-between p-5 border-b border-white/5">
-              <div className="flex items-center gap-3 text-white">
-                <Info size={24} className="text-primary" />
-                <h3 className="font-semibold text-lg">{t('bottomPlayer.trackMetadata', 'Track Metadata')}</h3>
+            <div className="flex items-center justify-between p-4 border-b border-white/[0.06]">
+              <div className="flex items-center gap-2.5 text-white">
+                <Info size={20} className="text-primary" />
+                <h3 className="font-semibold text-base">{t('bottomPlayer.trackMetadata', 'Track Metadata')}</h3>
               </div>
               <button 
                 onClick={() => setShowMetadata(false)}
-                className="text-white/40 hover:text-white transition-colors p-1"
+                className="text-slate-400 hover:text-white transition-colors p-1 rounded-lg hover:bg-white/[0.05]"
               >
-                <X size={20} />
+                <X size={18} />
               </button>
             </div>
             
-            <div className="p-5 flex flex-col gap-4 overflow-y-auto max-h-[70vh] no-scrollbar">
-              <div className="bg-white/5 rounded-xl p-4 flex flex-col gap-3">
+            <div className="p-4 flex flex-col gap-3 overflow-y-auto max-h-[70vh] no-scrollbar">
+              <div className="bg-white/[0.03] border border-white/[0.05] rounded-xl p-3.5 flex flex-col gap-2.5">
                 {[
                   { label: t('bottomPlayer.title', 'Title'), value: currentTrack.title || playerState.getTrackMetadata(currentTrack.id)?.title },
                   { label: t('bottomPlayer.artist', 'Artist'), value: currentTrack.artist || playerState.getTrackMetadata(currentTrack.id)?.artist },
@@ -593,9 +622,9 @@ export function BottomPlayerBar() {
                   { label: t('bottomPlayer.source', 'Source'), value: currentTrack.sourceType },
                   { label: t('bottomPlayer.trackId', 'Track ID'), value: String(currentTrack.id) }
                 ].map((item, idx) => (
-                  <div key={idx} className="flex flex-col gap-1">
-                    <span className="text-[10px] uppercase tracking-wider text-white/40 font-semibold">{item.label}</span>
-                    <span className="text-sm text-white/90 font-medium break-all">{item.value || t('bottomPlayer.unknown', 'unknown')}</span>
+                  <div key={idx} className="flex flex-col gap-0.5">
+                    <span className="text-[10px] uppercase tracking-wider text-slate-400 font-mono font-semibold">{item.label}</span>
+                    <span className="text-xs text-slate-200 font-medium break-all">{item.value || t('bottomPlayer.unknown', 'unknown')}</span>
                   </div>
                 ))}
               </div>
