@@ -21,8 +21,8 @@ type ActionMenuProps = {
 export function ActionMenu({
   actions,
   ariaLabel = 'More actions',
-  buttonClassName = 'p-2 text-white/60 hover:text-white hover:bg-white/10 rounded-full transition-colors',
-  menuClassName = 'w-52',
+  buttonClassName = 'p-2 text-slate-400 hover:text-white hover:bg-white/[0.08] rounded-xl transition-all',
+  menuClassName = 'w-56',
   direction = 'down',
   align = 'right',
 }: ActionMenuProps) {
@@ -54,12 +54,12 @@ export function ActionMenu({
         }}
         className={buttonClassName}
       >
-        <MoreHorizontal size={18} />
+        <MoreHorizontal size={17} />
       </button>
 
       {isOpen && (
         <div
-          className={`absolute ${align === 'right' ? 'right-0' : 'left-0'} ${direction === 'up' ? 'bottom-full mb-2' : 'top-full mt-2'} ${menuClassName} max-w-[calc(100vw_-_2rem)] bg-[#1A1A1A] border border-white/10 rounded-lg shadow-xl overflow-hidden z-50 py-1`}
+          className={`absolute ${align === 'right' ? 'right-0' : 'left-0'} ${direction === 'up' ? 'bottom-full mb-2' : 'top-full mt-2'} ${menuClassName} max-w-[calc(100vw_-_2rem)] bg-[#0c1626]/95 border border-white/[0.1] rounded-2xl shadow-2xl overflow-hidden z-50 py-1.5 backdrop-blur-2xl`}
           onClick={(event) => event.stopPropagation()}
         >
           {actions.map((action) => (
@@ -72,13 +72,13 @@ export function ActionMenu({
                 action.onSelect();
                 setIsOpen(false);
               }}
-              className={`w-full flex items-center gap-3 px-4 py-2 text-sm text-left hover:bg-white/10 disabled:opacity-30 disabled:cursor-not-allowed ${
+              className={`w-full flex items-center gap-3 px-3.5 py-2.5 text-xs font-medium text-left hover:bg-white/[0.08] transition-colors disabled:opacity-30 disabled:cursor-not-allowed ${
                 action.tone === 'danger'
-                  ? 'text-red-400 hover:text-red-300'
-                  : 'text-white/80 hover:text-white'
+                  ? 'text-rose-400 hover:text-rose-300 hover:bg-rose-500/10'
+                  : 'text-slate-200 hover:text-white'
               }`}
             >
-              {action.icon && <span className="shrink-0">{action.icon}</span>}
+              {action.icon && <span className="shrink-0 text-slate-400 group-hover:text-primary">{action.icon}</span>}
               <span className="truncate">{action.label}</span>
             </button>
           ))}

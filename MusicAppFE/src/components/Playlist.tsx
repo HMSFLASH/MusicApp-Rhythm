@@ -541,34 +541,34 @@ export function Playlist({ isAuthenticated, onPlay, currentTrackId }: PlaylistPr
                   key={track.id}
                   onMouseLeave={() => setOpenMenuId(null)}
                   onClick={() => onPlay(track, selectedPlaylistDetails.tracks)}
-                  className={`flex items-center justify-between gap-3 p-3 rounded-lg border transition-colors group cursor-pointer ${currentTrackId === track.id
-                      ? 'bg-primary/10 border-primary/30'
-                      : 'bg-background/50 border-white/5 hover:border-white/10 hover:bg-white/5'
+                  className={`flex items-center justify-between gap-3 p-3.5 rounded-2xl border transition-all duration-300 group cursor-pointer ${currentTrackId === track.id
+                      ? 'bg-primary/10 border-primary/30 shadow-[0_0_20px_rgba(0,245,255,0.1)]'
+                      : 'bg-[#0c1626]/60 border-white/[0.05] hover:border-white/[0.12] hover:bg-white/[0.04]'
                     }`}
                 >
-                  <div className="flex items-center gap-3 sm:gap-4 overflow-hidden w-full">
+                  <div className="flex items-center gap-3.5 overflow-hidden w-full">
                     <button
                       onClick={(e) => { e.stopPropagation(); onPlay(track, selectedPlaylistDetails.tracks); }}
-                      className={`flex items-center justify-center p-2 rounded-full transition-colors shrink-0 ${currentTrackId === track.id
-                          ? "bg-primary text-black"
-                          : "bg-white/10 text-white group-hover:bg-primary group-hover:text-black"
+                      className={`flex items-center justify-center w-8 h-8 rounded-xl transition-all shrink-0 ${currentTrackId === track.id
+                          ? "bg-primary text-slate-950 shadow-[0_0_12px_rgba(0,245,255,0.4)]"
+                          : "bg-white/[0.06] text-slate-300 group-hover:bg-primary group-hover:text-slate-950"
                         }`}
                     >
-                      <Play size={14} fill="currentColor" className={currentTrackId !== track.id ? "ml-0.5" : ""} />
+                      <Play size={13} fill="currentColor" className={currentTrackId !== track.id ? "ml-0.5" : ""} />
                     </button>
-                    <div className="w-10 h-10 rounded-md bg-white/5 flex items-center justify-center shrink-0 overflow-hidden border border-white/10">
+                    <div className="w-10 h-10 rounded-xl bg-white/[0.04] flex items-center justify-center shrink-0 overflow-hidden border border-white/[0.08]">
                       {track.imageUrl || playerState.getTrackImage(track.id) ? (
                         <img src={track.imageUrl || playerState.getTrackImage(track.id)} alt="Cover" className="w-full h-full object-cover" />
                       ) : (
-                        <ListMusic size={16} className="text-white/40" />
+                        <ListMusic size={16} className="text-slate-500" />
                       )}
                     </div>
                     <div className="flex flex-col truncate w-full pr-2">
-                      <span className={`text-sm font-medium truncate ${currentTrackId === track.id ? 'text-primary' : 'text-white'}`}>
+                      <span className={`text-xs sm:text-sm font-semibold truncate ${currentTrackId === track.id ? 'text-primary' : 'text-slate-200 group-hover:text-white'}`}>
                         {track.title || playerState.getTrackMetadata(track.id)?.title || (track.fileName ? (track.fileName.includes(' - ') ? track.fileName.split(' - ')[1].replace(/\.[^/.]+$/, "") : track.fileName.replace(/\.[^/.]+$/, "")) : 'Unknown Title')}
                       </span>
-                      <span className="text-xs text-secondary/60 font-mono mt-0.5 flex items-center gap-1 truncate">
-                        {track.sourceType === 'DRIVE' && <Cloud size={10} className="text-primary shrink-0" />}
+                      <span className="text-[11px] text-slate-400 font-mono mt-0.5 flex items-center gap-1.5 truncate">
+                        {track.sourceType === 'DRIVE' && <Cloud size={11} className="text-primary shrink-0" />}
                         <span className="truncate">{track.artist || playerState.getTrackMetadata(track.id)?.artist || (track.fileName?.includes(' - ') ? track.fileName.split(' - ')[0] : 'Unknown Artist')}</span>
                       </span>
                     </div>
@@ -577,53 +577,53 @@ export function Playlist({ isAuthenticated, onPlay, currentTrackId }: PlaylistPr
                   <div className={`relative flex items-center gap-2 transition-opacity ${openMenuId === track.id ? 'opacity-100' : 'opacity-100 lg:opacity-0 lg:group-hover:opacity-100'}`}>
                     <button
                       onClick={(e) => { e.stopPropagation(); setOpenMenuId(openMenuId === track.id ? null : track.id); }}
-                      className="p-1.5 text-white/40 hover:text-white hover:bg-white/10 rounded-full transition-colors"
+                      className="p-1.5 text-slate-400 hover:text-white hover:bg-white/[0.08] rounded-xl transition-colors"
                       title="More options"
                     >
-                      <MoreHorizontal size={18} />
+                      <MoreHorizontal size={17} />
                     </button>
 
                     {openMenuId === track.id && (
-                      <div className="absolute right-0 top-full mt-1 w-48 max-w-[calc(100vw_-_2rem)] bg-[#1A1A1A] border border-white/10 rounded-lg shadow-xl overflow-hidden z-50 py-1">
+                      <div className="absolute right-0 top-full mt-2 w-52 max-w-[calc(100vw_-_2rem)] bg-[#0c1626]/95 border border-white/[0.1] rounded-2xl shadow-2xl overflow-hidden z-50 py-1.5 backdrop-blur-2xl">
                         <button
                           onClick={(e) => handlePlayNext(track, e)}
-                          className="w-full flex items-center gap-3 px-4 py-2 text-sm text-left text-white/80 hover:bg-white/10"
+                          className="w-full flex items-center gap-3 px-3.5 py-2 text-xs font-medium text-left text-slate-200 hover:text-white hover:bg-white/[0.08] transition-colors"
                         >
-                          <ListStart size={14} /> Play Next
+                          <ListStart size={14} className="text-slate-400" /> Play Next
                         </button>
                         <button
                           onClick={(e) => handleAddToQueue(track, e)}
-                          className="w-full flex items-center gap-3 px-4 py-2 text-sm text-left text-white/80 hover:bg-white/10"
+                          className="w-full flex items-center gap-3 px-3.5 py-2 text-xs font-medium text-left text-slate-200 hover:text-white hover:bg-white/[0.08] transition-colors"
                         >
-                          <ListEnd size={14} /> Add to Queue
+                          <ListEnd size={14} className="text-slate-400" /> Add to Queue
                         </button>
                         {track.sourceType !== 'LOCAL' && (
                           <button
                             onClick={(e) => { e.stopPropagation(); downloadTrackFile(track); setOpenMenuId(null); }}
-                            className="w-full flex items-center gap-3 px-4 py-2 text-sm text-left text-white/80 hover:bg-white/10"
+                            className="w-full flex items-center gap-3 px-3.5 py-2 text-xs font-medium text-left text-slate-200 hover:text-white hover:bg-white/[0.08] transition-colors"
                           >
-                            <Download size={14} /> Download File
+                            <Download size={14} className="text-slate-400" /> Download File
                           </button>
                         )}
                         {track.sourceType !== 'LOCAL' && (
                           <button
                             onClick={(e) => handleToggleFavorite(track, e)}
-                            className="w-full flex items-center gap-3 px-4 py-2 text-sm text-left text-white/80 hover:bg-white/10"
+                            className="w-full flex items-center gap-3 px-3.5 py-2 text-xs font-medium text-left text-slate-200 hover:text-white hover:bg-white/[0.08] transition-colors"
                           >
-                            <Heart size={14} fill={favorites.some(f => f.id === track.id) ? "currentColor" : "none"} className={favorites.some(f => f.id === track.id) ? "text-primary" : ""} /> 
+                            <Heart size={14} fill={favorites.some(f => f.id === track.id) ? "currentColor" : "none"} className={favorites.some(f => f.id === track.id) ? "text-primary" : "text-slate-400"} /> 
                             {favorites.some(f => f.id === track.id) ? "Remove from Favorites" : "Add to Favorites"}
                           </button>
                         )}
                         <button
                           onClick={(e) => { e.stopPropagation(); setInfoTrack(track); setOpenMenuId(null); }}
-                          className="w-full flex items-center gap-3 px-4 py-2 text-sm text-left text-white/80 hover:bg-white/10 border-t border-white/10"
+                          className="w-full flex items-center gap-3 px-3.5 py-2 text-xs font-medium text-left text-slate-200 hover:text-white hover:bg-white/[0.08] transition-colors border-t border-white/[0.06] mt-1 pt-1.5"
                         >
-                          <Info size={14} /> Info
+                          <Info size={14} className="text-slate-400" /> Info
                         </button>
-                        <div className="h-px bg-white/10 my-1"></div>
+                        <div className="h-px bg-white/[0.06] my-1"></div>
                         <button
                           onClick={(e) => { setOpenMenuId(null); removeTrackFromPlaylist(track.id, e); }}
-                          className="w-full flex items-center gap-3 px-4 py-2 text-sm text-left text-red-400 hover:bg-white/10"
+                          className="w-full flex items-center gap-3 px-3.5 py-2 text-xs font-medium text-left text-rose-400 hover:text-rose-300 hover:bg-rose-500/10 transition-colors"
                         >
                           <Trash2 size={14} /> Remove
                         </button>

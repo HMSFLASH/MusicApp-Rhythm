@@ -42,24 +42,24 @@ export function ConfirmProvider({ children }: { children: React.ReactNode }) {
     <ConfirmContext.Provider value={{ confirm }}>
       {children}
       {isOpen && (
-        <div className="fixed inset-0 z-[110] flex items-center justify-center bg-black/60 backdrop-blur-sm p-4 animate-in fade-in duration-200" onClick={() => handleClose(false)}>
-          <div className="bg-[#121212] border border-white/10 rounded-2xl p-4 sm:p-6 w-full max-w-sm max-h-[calc(100dvh-2rem)] overflow-y-auto shadow-2xl scale-100 animate-in zoom-in-95 duration-200" onClick={e => e.stopPropagation()}>
-            <h2 className="text-lg font-bold text-white mb-2">
+        <div className="fixed inset-0 z-[110] flex items-center justify-center bg-black/70 backdrop-blur-md p-4 animate-in fade-in duration-200" onClick={() => handleClose(false)}>
+          <div className="bg-[#0c1626]/95 border border-white/[0.1] rounded-3xl p-5 sm:p-6 w-full max-w-sm max-h-[calc(100dvh-2rem)] overflow-y-auto shadow-[0_20px_60px_rgba(0,0,0,0.7)] backdrop-blur-2xl animate-in zoom-in-95 duration-200" onClick={e => e.stopPropagation()}>
+            <h2 className="text-base sm:text-lg font-bold font-display text-white mb-2">
               {options.title || t('layout.confirmTitle', 'Xác nhận')}
             </h2>
-            <p className="text-white/70 mb-6 text-sm whitespace-pre-line leading-relaxed">
+            <p className="text-slate-300/90 mb-6 text-xs leading-relaxed whitespace-pre-line font-sans">
               {options.description}
             </p>
-            <div className="flex flex-col-reverse sm:flex-row sm:justify-end gap-3">
+            <div className="flex flex-col-reverse sm:flex-row sm:justify-end gap-2.5">
               <button
                 onClick={() => handleClose(false)}
-                className="px-4 py-2 rounded-xl text-white/80 hover:text-white hover:bg-white/10 transition-colors font-semibold text-sm"
+                className="px-4 py-2.5 rounded-xl text-slate-400 hover:text-white hover:bg-white/[0.06] transition-colors font-semibold text-xs"
               >
                 {options.cancelText || t('layout.cancel', 'Hủy')}
               </button>
               <button
                 onClick={() => handleClose(true)}
-                className={`px-4 py-2 rounded-xl font-semibold text-sm transition-colors border ${options.confirmColor || 'bg-primary/20 text-primary hover:bg-primary/30 border-primary/30'
+                className={`px-5 py-2.5 rounded-xl font-bold text-xs transition-all border shadow-sm active:scale-95 ${options.confirmColor || 'bg-primary text-slate-950 hover:brightness-110 border-primary/40 shadow-[0_0_15px_rgba(0,245,255,0.3)]'
                   }`}
               >
                 {options.confirmText || t('layout.confirm', 'Đồng ý')}

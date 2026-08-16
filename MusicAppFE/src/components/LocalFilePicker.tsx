@@ -22,18 +22,18 @@ function LocalPickerButton({
   return (
     <button
       onClick={onClick}
-      className="flex items-start gap-3 px-3 py-2.5 rounded-lg text-white/60 hover:text-white hover:bg-white/5 transition-colors text-left w-full"
+      className="flex items-start gap-3 px-3.5 py-2.5 rounded-xl text-slate-400 hover:text-white hover:bg-white/[0.06] transition-all text-left w-full active:scale-[0.98]"
     >
-      <FolderOpen size={20} className={iconClassName} />
+      <FolderOpen size={18} className={iconClassName || "text-slate-400 mt-0.5 shrink-0"} />
       {hint ? (
-        <span className="flex flex-col gap-0.5">
-          <span>{label}</span>
-          <span className="text-[11px] leading-snug text-amber-400/70">
+        <span className="flex flex-col gap-0.5 min-w-0">
+          <span className="text-xs font-semibold">{label}</span>
+          <span className="text-[10px] leading-snug text-amber-400/80 font-mono">
             {hint}
           </span>
         </span>
       ) : (
-        <span>{label}</span>
+        <span className="text-xs font-semibold">{label}</span>
       )}
     </button>
   );

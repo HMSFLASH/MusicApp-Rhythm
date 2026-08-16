@@ -42,39 +42,39 @@ export function CreatePlaylistModal({ isOpen, onClose, onSuccess }: CreatePlayli
   };
 
   return (
-    <div className="fixed inset-0 z-[100] flex items-center justify-center bg-black/60 backdrop-blur-sm p-4 animate-in fade-in duration-200">
+    <div className="fixed inset-0 z-[100] flex items-center justify-center bg-black/70 backdrop-blur-md p-4 animate-in fade-in duration-200">
       <div
-        className="bg-surface border border-white/10 rounded-2xl w-full max-w-md max-h-[calc(100dvh-2rem)] shadow-2xl overflow-hidden animate-in zoom-in-95 duration-200"
+        className="bg-[#0c1626]/95 border border-white/[0.1] rounded-3xl w-full max-w-md max-h-[calc(100dvh-2rem)] shadow-[0_20px_60px_rgba(0,0,0,0.7)] overflow-hidden animate-in zoom-in-95 duration-200 backdrop-blur-2xl"
         onClick={(e) => e.stopPropagation()}
       >
-        <div className="flex items-center justify-between gap-3 p-4 sm:p-6 border-b border-white/5">
-          <h2 className="text-lg sm:text-xl font-bold text-white">Create New Playlist</h2>
+        <div className="flex items-center justify-between gap-3 p-5 sm:p-6 border-b border-white/[0.06] bg-white/[0.02]">
+          <h2 className="text-lg sm:text-xl font-bold font-display text-white">Create New Playlist</h2>
           <button
             onClick={onClose}
-            className="text-white/40 hover:text-white hover:bg-white/10 p-2 rounded-full transition-colors"
+            className="text-slate-400 hover:text-white hover:bg-white/[0.08] p-1.5 rounded-xl transition-colors"
           >
-            <X size={20} />
+            <X size={18} />
           </button>
         </div>
 
-        <form onSubmit={handleSubmit} className="p-4 sm:p-6 flex flex-col gap-5 overflow-y-auto">
+        <form onSubmit={handleSubmit} className="p-5 sm:p-6 flex flex-col gap-5 overflow-y-auto">
           {error && (
-            <div className="p-3 rounded-lg bg-red-500/10 border border-red-500/20 text-red-400 text-sm">
+            <div className="p-3 rounded-xl bg-rose-500/10 border border-rose-500/20 text-rose-400 text-xs">
               {error}
             </div>
           )}
 
           <div className="flex flex-col gap-2">
-            <label htmlFor="name" className="text-sm font-medium text-white/80">
-              Name <span className="text-red-400">*</span>
+            <label htmlFor="name" className="text-xs font-semibold uppercase tracking-wider text-slate-300 font-mono">
+              Playlist Name <span className="text-rose-400">*</span>
             </label>
             <input
               id="name"
               type="text"
               value={name}
               onChange={(e) => setName(e.target.value)}
-              placeholder="My Awesome Playlist"
-              className="w-full bg-background border border-white/10 rounded-lg p-3 text-white placeholder-white/30 focus:outline-none focus:border-primary focus:ring-1 focus:ring-primary transition-all"
+              placeholder="e.g. Cyberpunk Vibes, Acoustic Hits"
+              className="w-full bg-[#060b14] border border-white/[0.1] rounded-xl p-3 text-sm text-white placeholder-slate-500 focus:outline-none focus:border-primary focus:ring-1 focus:ring-primary transition-all font-sans"
               autoFocus
               maxLength={100}
             />
@@ -84,7 +84,7 @@ export function CreatePlaylistModal({ isOpen, onClose, onSuccess }: CreatePlayli
             <button
               type="button"
               onClick={onClose}
-              className="px-5 py-2.5 rounded-full text-white/70 hover:text-white hover:bg-white/5 transition-colors font-medium"
+              className="px-5 py-2.5 rounded-xl text-slate-400 hover:text-white hover:bg-white/[0.06] transition-colors text-xs font-semibold"
               disabled={loading}
             >
               Cancel
@@ -92,10 +92,10 @@ export function CreatePlaylistModal({ isOpen, onClose, onSuccess }: CreatePlayli
             <button
               type="submit"
               disabled={loading || !name.trim()}
-              className="px-6 py-2.5 rounded-full bg-primary text-black font-bold hover:bg-primary/90 hover:scale-105 active:scale-95 transition-all disabled:opacity-50 disabled:cursor-not-allowed disabled:hover:scale-100 flex items-center justify-center gap-2"
+              className="px-6 py-2.5 rounded-xl bg-primary text-slate-950 font-bold hover:brightness-110 hover:scale-105 active:scale-95 transition-all disabled:opacity-50 disabled:cursor-not-allowed disabled:hover:scale-100 flex items-center justify-center gap-2 text-xs shadow-[0_0_15px_rgba(0,245,255,0.3)]"
             >
-              {loading && <Loader2 size={16} className="animate-spin" />}
-              Create
+              {loading && <Loader2 size={15} className="animate-spin" />}
+              Create Playlist
             </button>
           </div>
         </form>

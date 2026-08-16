@@ -48,41 +48,41 @@ export function TrackInfoModal({ track, trackMetadata, onClose }: TrackInfoModal
 
   return (
     <div 
-      className="fixed inset-0 bg-black/60 backdrop-blur-sm z-[100] flex items-center justify-center p-4 animate-in fade-in duration-200"
+      className="fixed inset-0 bg-black/70 backdrop-blur-md z-[100] flex items-center justify-center p-4 animate-in fade-in duration-200"
       onClick={onClose}
       onKeyDown={handleKeyDown}
       role="button"
       tabIndex={0}
     >
       <div 
-        className="bg-[#121212] border border-white/10 rounded-2xl w-full max-w-md overflow-hidden shadow-2xl animate-in zoom-in-95 duration-200"
+        className="bg-[#0c1626]/95 border border-white/[0.1] rounded-3xl w-full max-w-md overflow-hidden shadow-[0_20px_60px_rgba(0,0,0,0.7)] animate-in zoom-in-95 duration-200 backdrop-blur-2xl flex flex-col max-h-[80vh]"
         onClick={(e) => e.stopPropagation()}
         onKeyDown={(e) => e.stopPropagation()}
         role="dialog"
         aria-modal="true"
         tabIndex={-1}
       >
-        <div className="flex items-center justify-between p-6 border-b border-white/5">
+        <div className="flex items-center justify-between p-5 sm:p-6 border-b border-white/[0.06] bg-white/[0.02]">
           <div className="flex items-center gap-3">
-            <Info size={24} className="text-[#00E5FF]" />
-            <h2 className="text-xl font-bold text-white tracking-tight">Track Information</h2>
+            <Info size={20} className="text-primary" />
+            <h2 className="text-base sm:text-lg font-bold font-display text-white tracking-tight">Track Information</h2>
           </div>
           <button 
             aria-label="Close info"
             onClick={onClose}
-            className="text-white/40 hover:text-white hover:bg-white/10 p-2 rounded-full transition-colors"
+            className="text-slate-400 hover:text-white hover:bg-white/[0.08] p-1.5 rounded-xl transition-colors"
           >
-            <X size={20} />
+            <X size={18} />
           </button>
         </div>
         
-        <div className="p-6 max-h-[70vh] overflow-y-auto custom-scrollbar">
-          <div className="space-y-4">
+        <div className="p-5 sm:p-6 overflow-y-auto no-scrollbar flex-1">
+          <div className="bg-white/[0.02] border border-white/[0.05] rounded-2xl p-4 flex flex-col gap-3">
             {items.map((item) => (
-              <div key={item.label} className="flex flex-col sm:flex-row sm:items-center py-2 border-b border-white/5 last:border-0">
-                <span className="text-white/40 text-sm w-1/3 mb-1 sm:mb-0">{item.label}</span>
-                <span className="text-white text-sm font-medium w-2/3 break-words">
-                  {item.value || <span className="text-white/20 italic">Unknown</span>}
+              <div key={item.label} className="flex flex-col gap-0.5 border-b border-white/[0.04] pb-2.5 last:border-0 last:pb-0">
+                <span className="text-[10px] uppercase tracking-wider text-slate-400 font-mono font-semibold">{item.label}</span>
+                <span className="text-xs text-slate-200 font-medium break-all">
+                  {item.value || <span className="text-slate-500 italic">Unknown</span>}
                 </span>
               </div>
             ))}

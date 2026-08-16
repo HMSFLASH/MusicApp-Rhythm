@@ -73,15 +73,15 @@ export function AddToPlaylistModal({ isOpen, onClose, track, tracks }: AddToPlay
   };
 
   return (
-    <div className="fixed inset-0 z-[100] flex items-center justify-center bg-black/60 backdrop-blur-sm p-4 animate-in fade-in duration-200">
+    <div className="fixed inset-0 z-[100] flex items-center justify-center bg-black/70 backdrop-blur-md p-4 animate-in fade-in duration-200">
       <div
-        className="bg-surface border border-white/10 rounded-2xl w-full max-w-sm shadow-2xl overflow-hidden animate-in zoom-in-95 duration-200 flex flex-col max-h-[calc(100dvh-2rem)]"
+        className="bg-[#0c1626]/95 border border-white/[0.1] rounded-3xl w-full max-w-sm shadow-[0_20px_60px_rgba(0,0,0,0.7)] overflow-hidden animate-in zoom-in-95 duration-200 flex flex-col max-h-[calc(100dvh-2rem)] backdrop-blur-2xl"
         onClick={(e) => e.stopPropagation()}
       >
-        <div className="flex items-center justify-between gap-3 p-4 sm:p-6 border-b border-white/5 shrink-0">
+        <div className="flex items-center justify-between gap-3 p-4 sm:p-5 border-b border-white/[0.06] shrink-0 bg-white/[0.02]">
           <div className="min-w-0">
-            <h2 className="text-lg sm:text-xl font-bold text-white">Add to Playlist</h2>
-            <p className="text-sm text-white/50 truncate mt-1">
+            <h2 className="text-base sm:text-lg font-bold font-display text-white">Add to Playlist</h2>
+            <p className="text-xs text-slate-400 font-mono truncate mt-0.5">
               {items.length === 1
                 ? (items[0].title || playerState.getTrackMetadata(items[0].id)?.title || (items[0].fileName ? (items[0].fileName.includes(' - ') ? items[0].fileName.split(' - ')[1].replace(/\.[^/.]+$/, "") : items[0].fileName.replace(/\.[^/.]+$/, "")) : 'Unknown Title'))
                 : `${items.length} tracks selected`}
@@ -89,20 +89,20 @@ export function AddToPlaylistModal({ isOpen, onClose, track, tracks }: AddToPlay
           </div>
           <button
             onClick={onClose}
-            className="text-white/40 hover:text-white hover:bg-white/10 p-2 rounded-full transition-colors self-start"
+            className="text-slate-400 hover:text-white hover:bg-white/[0.08] p-1.5 rounded-xl transition-colors self-start"
           >
-            <X size={20} />
+            <X size={18} />
           </button>
         </div>
 
         <div className="p-4 overflow-y-auto flex-1 no-scrollbar flex flex-col gap-2">
           {error && (
-            <div className="p-3 rounded-lg bg-red-500/10 border border-red-500/20 text-red-400 text-sm mb-2">
+            <div className="p-3 rounded-xl bg-rose-500/10 border border-rose-500/20 text-rose-400 text-xs mb-1">
               {error}
             </div>
           )}
           {successMsg && (
-            <div className="p-3 rounded-lg bg-green-500/10 border border-green-500/20 text-green-400 text-sm mb-2">
+            <div className="p-3 rounded-xl bg-emerald-500/10 border border-emerald-500/20 text-emerald-400 text-xs mb-1">
               {successMsg}
             </div>
           )}
@@ -112,7 +112,7 @@ export function AddToPlaylistModal({ isOpen, onClose, track, tracks }: AddToPlay
               <Loader2 size={24} className="text-primary animate-spin" />
             </div>
           ) : playlists.length === 0 ? (
-            <div className="text-center py-8 text-white/50 text-sm">
+            <div className="text-center py-8 text-slate-400 text-xs font-mono">
               You don't have any playlists yet.
             </div>
           ) : (
@@ -121,17 +121,17 @@ export function AddToPlaylistModal({ isOpen, onClose, track, tracks }: AddToPlay
                 key={p.id}
                 onClick={() => handleAddToPlaylist(p.id)}
                 disabled={addingId !== null}
-                className="w-full flex items-center justify-between p-3 rounded-xl bg-white/5 hover:bg-white/10 border border-white/5 hover:border-white/10 transition-all text-left group disabled:opacity-50 disabled:cursor-not-allowed"
+                className="w-full flex items-center justify-between p-3 rounded-2xl bg-white/[0.03] hover:bg-white/[0.08] border border-white/[0.05] hover:border-primary/30 transition-all text-left group disabled:opacity-50 disabled:cursor-not-allowed shadow-sm"
               >
                 <div className="flex min-w-0 flex-col truncate pr-4">
-                  <span className="text-sm font-bold text-white truncate">{p.name}</span>
-                  <span className="text-xs text-white/40 mt-0.5">{p.trackCount} tracks</span>
+                  <span className="text-xs sm:text-sm font-semibold text-slate-200 group-hover:text-primary transition-colors truncate">{p.name}</span>
+                  <span className="text-[11px] text-slate-400 font-mono mt-0.5">{p.trackCount} tracks</span>
                 </div>
                 {addingId === p.id ? (
                   <Loader2 size={16} className="text-primary animate-spin shrink-0" />
                 ) : (
-                  <div className="w-8 h-8 rounded-full bg-white/5 flex items-center justify-center group-hover:bg-primary group-hover:text-black text-white/40 transition-colors shrink-0">
-                    <ListPlus size={14} />
+                  <div className="w-8 h-8 rounded-xl bg-white/[0.05] flex items-center justify-center group-hover:bg-primary group-hover:text-slate-950 text-slate-400 transition-all shrink-0">
+                    <ListPlus size={15} />
                   </div>
                 )}
               </button>

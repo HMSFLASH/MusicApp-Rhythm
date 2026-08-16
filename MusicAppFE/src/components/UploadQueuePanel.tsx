@@ -51,19 +51,19 @@ export function UploadQueuePanel() {
       <button
         type="button"
         onClick={() => setIsQueueOpen(true)}
-        className={`fixed bottom-28 right-4 md:right-8 z-[100] flex h-14 w-14 items-center justify-center rounded-full border shadow-2xl backdrop-blur-md transition hover:scale-105 ${
+        className={`fixed bottom-28 right-4 md:right-8 z-[100] flex h-14 w-14 items-center justify-center rounded-2xl border shadow-2xl backdrop-blur-2xl transition hover:scale-105 active:scale-95 ${
           errorCount > 0
-            ? 'border-red-400/40 bg-red-500/20 text-red-300'
-            : 'border-blue-300/30 bg-[#1e293b]/95 text-blue-300'
+            ? 'border-rose-400/40 bg-rose-500/20 text-rose-300'
+            : 'border-primary/30 bg-[#0c1626]/95 text-primary shadow-[0_0_20px_rgba(0,245,255,0.2)]'
         }`}
         aria-label={t('uploadQueue.openQueue', 'Open upload queue')}
         title={t('uploadQueue.openQueue', 'Open upload queue')}
       >
         {activeCount > 0 ? (
-          <div className="absolute inset-1 rounded-full border-2 border-blue-300/25 border-t-blue-300 animate-spin" />
+          <div className="absolute inset-1.5 rounded-xl border-2 border-primary/25 border-t-primary animate-spin" />
         ) : null}
-        {errorCount > 0 ? <AlertCircle size={24} /> : <CloudUpload size={24} />}
-        <span className="absolute -right-1 -top-1 flex h-6 min-w-6 items-center justify-center rounded-full bg-white px-1.5 text-xs font-bold text-slate-900">
+        {errorCount > 0 ? <AlertCircle size={22} /> : <CloudUpload size={22} />}
+        <span className="absolute -right-1.5 -top-1.5 flex h-6 min-w-6 items-center justify-center rounded-full bg-primary px-1.5 text-xs font-bold text-slate-950 shadow-md">
           {errorCount > 0 ? errorCount : activeCount || successCount}
         </span>
         <span className="sr-only">{progressPercent}%</span>
@@ -72,27 +72,27 @@ export function UploadQueuePanel() {
   }
 
   return (
-    <div className="fixed bottom-28 right-4 md:right-8 w-[calc(100vw_-_2rem)] max-w-96 bg-[#1e293b] border border-white/10 shadow-2xl rounded-2xl overflow-hidden flex flex-col z-[100] animate-in slide-in-from-bottom-5">
-      <div className="flex items-center justify-between p-4 border-b border-white/5 bg-black/20">
-        <h3 className="font-bold text-white flex min-w-0 items-center gap-2">
-          <CloudUpload size={18} className="text-blue-400" />
+    <div className="fixed bottom-28 right-4 md:right-8 w-[calc(100vw_-_2rem)] max-w-96 bg-[#0c1626]/95 border border-white/[0.1] shadow-[0_20px_60px_rgba(0,0,0,0.7)] rounded-3xl overflow-hidden flex flex-col z-[100] animate-in slide-in-from-bottom-5 backdrop-blur-2xl">
+      <div className="flex items-center justify-between p-4 sm:p-5 border-b border-white/[0.06] bg-white/[0.02]">
+        <h3 className="font-bold text-white flex min-w-0 items-center gap-2 font-display text-sm">
+          <CloudUpload size={18} className="text-primary" />
           <span className="truncate">{t('uploadQueue.title', 'Upload Queue')}</span>
-          <span className="text-xs font-medium text-white/40">{progressPercent}%</span>
+          <span className="text-xs font-mono font-semibold text-primary">{progressPercent}%</span>
         </h3>
         <div className="flex items-center gap-3">
-          <button onClick={clearCompletedTasks} className="text-xs text-white/40 hover:text-white transition-colors">{t('uploadQueue.clearDone', 'Clear Done')}</button>
+          <button onClick={clearCompletedTasks} className="text-xs font-mono text-slate-400 hover:text-white transition-colors">{t('uploadQueue.clearDone', 'Clear Done')}</button>
           <button
             type="button"
             onClick={() => setIsQueueOpen(false)}
-            className="text-white/40 hover:text-white transition-colors"
+            className="text-slate-400 hover:text-white transition-colors p-1 hover:bg-white/[0.08] rounded-lg"
             aria-label={t('uploadQueue.minimize', 'Minimize upload queue')}
             title={t('uploadQueue.minimize', 'Minimize upload queue')}
           >
-            <X size={18} />
+            <X size={16} />
           </button>
         </div>
       </div>
-      <div className="max-h-80 overflow-y-auto p-2 flex flex-col gap-1">
+      <div className="max-h-80 overflow-y-auto p-3 flex flex-col gap-1.5 no-scrollbar">
         {renderSection(t('uploadQueue.directQueue', 'Direct to Drive'), directTasks)}
       </div>
     </div>
