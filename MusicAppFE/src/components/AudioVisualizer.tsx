@@ -66,50 +66,50 @@ export const AudioVisualizer = memo(function AudioVisualizer({
           const nyquist = sampleRate / 2;
           const binWidth = nyquist / bufferLength;
 
-          const minFreq = 20; // 20 Hz Sub-bass
-          const maxFreq = 20000; // 20 kHz Full spectrum
+          const minFreq = 20; // 20 Hz
+          const maxFreq = 20000; // 20000 Hz
 
           for (let i = 0; i < barCount; i++) {
-            // Logarithmic frequency bounds for bar i
+            // Logarithmic frequency bounds from 20 Hz to 20,000 Hz
             const fStart = minFreq * Math.pow(maxFreq / minFreq, i / barCount);
             const fEnd = minFreq * Math.pow(maxFreq / minFreq, (i + 1) / barCount);
 
-            const binStart = Math.max(1, Math.floor(fStart / binWidth));
-            const binEnd = Math.min(bufferLength - 1, Math.max(binStart, Math.floor(fEnd / binWidth)));
+            const binStart = Math.max(0, Math.floor(fStart / binWidth));
+            const binEnd = Math.min(bufferLength - 1, Math.max(binStart, Math.ceil(fEnd / binWidth)));
 
             let sum = 0;
-            let maxInBand = 0;
             let count = 0;
 
             for (let b = binStart; b <= binEnd; b++) {
-              const val = fullData[b] || 0;
-              sum += val;
-              if (val > maxInBand) maxInBand = val;
+              sum += fullData[b] || 0;
               count++;
             }
 
-            // Raw frequency energy directly from Web Audio analyser without artificial tilt/amplification
-            const bandEnergy = count > 0 ? Math.max(sum / count, maxInBand) : 0;
+            // Clean average frequency energy
+            const bandEnergy = count > 0 ? (sum / count) : 0;
             const targetHeight = Math.max(2, (bandEnergy / 255) * (height - 4));
 
-            // Instant attack, smooth decay
-            if (!smoothedBars[i] || targetHeight > smoothedBars[i]) {
-              smoothedBars[i] = targetHeight;
+            // Smooth fluid motion (LERP) - no harsh jitter or aggressive bouncing
+            const prev = smoothedBars[i] ?? 2;
+            if (targetHeight > prev) {
+              smoothedBars[i] = prev + (targetHeight - prev) * 0.35; // Gentle smooth rise
             } else {
-              smoothedBars[i] = Math.max(2, smoothedBars[i] * 0.88 - 0.2);
+              smoothedBars[i] = prev + (targetHeight - prev) * 0.14; // Silky fluid fall
             }
           }
         } else if (isPlaying) {
-          // Subtle idle pulse
-          const time = Date.now() / 300;
+          // Gentle ambient idle pulse
+          const time = Date.now() / 400;
           for (let i = 0; i < barCount; i++) {
-            const targetHeight = Math.max(2, (Math.sin(time + i * 0.2) * 0.3 + 0.5) * (height * 0.4));
-            smoothedBars[i] = targetHeight;
+            const targetHeight = Math.max(2, (Math.sin(time + i * 0.15) * 0.2 + 0.3) * (height * 0.35));
+            const prev = smoothedBars[i] ?? 2;
+            smoothedBars[i] = prev + (targetHeight - prev) * 0.1;
           }
         } else {
-          // Zero decay when paused
+          // Smooth decay to bottom when stopped/paused
           for (let i = 0; i < barCount; i++) {
-            smoothedBars[i] = Math.max(0, (smoothedBars[i] || 0) * 0.85 - 0.5);
+            const prev = smoothedBars[i] ?? 0;
+            smoothedBars[i] = Math.max(0, prev * 0.9 - 0.2);
           }
         }
 
@@ -119,11 +119,11 @@ export const AudioVisualizer = memo(function AudioVisualizer({
           const x = i * (barWidth + gap);
           const y = height - barHeight;
 
-          // Peak cap calculation
+          // Slower, smoother peak cap descent
           if (!peakBars[i] || barHeight >= peakBars[i]) {
             peakBars[i] = barHeight;
           } else {
-            peakBars[i] = Math.max(0, peakBars[i] - 0.7);
+            peakBars[i] = Math.max(0, peakBars[i] - 0.35);
           }
 
           // Bar Gradient with glowing top
