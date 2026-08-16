@@ -28,15 +28,21 @@ export const AudioVisualizer = memo(function AudioVisualizer({
 
     let animationId: number;
     const peakBars: number[] = [];
+    const smoothedBars: number[] = [];
 
     const render = () => {
       const dpr = globalThis.devicePixelRatio || 1;
       const width = canvas.clientWidth;
       const height = canvas.clientHeight;
 
-      if (canvas.width !== width * dpr || canvas.height !== height * dpr) {
-        canvas.width = width * dpr;
-        canvas.height = height * dpr;
+      if (width === 0 || height === 0) {
+        animationId = requestAnimationFrame(render);
+        return;
+      }
+
+      if (canvas.width !== Math.floor(width * dpr) || canvas.height !== Math.floor(height * dpr)) {
+        canvas.width = Math.floor(width * dpr);
+        canvas.height = Math.floor(height * dpr);
       }
 
       ctx.save();
@@ -46,79 +52,130 @@ export const AudioVisualizer = memo(function AudioVisualizer({
       const analyser = analyserRef?.current;
 
       if (mode === 'bars') {
-        const barCount = mode === 'bars' ? Math.min(48, Math.floor(width / 6)) : 24;
-        const barWidth = Math.max(2, (width / barCount) - 2);
-        const freqData = new Uint8Array(barCount);
+        const barCount = Math.min(52, Math.max(24, Math.floor(width / 7)));
+        const gap = 2;
+        const totalGap = gap * (barCount - 1);
+        const barWidth = Math.max(2, (width - totalGap) / barCount);
 
         if (analyser && isPlaying) {
           const bufferLength = analyser.frequencyBinCount;
           const fullData = new Uint8Array(bufferLength);
           analyser.getByteFrequencyData(fullData);
 
-          const step = Math.floor(bufferLength / barCount);
+          const sampleRate = analyser.context?.sampleRate || 44100;
+          const nyquist = sampleRate / 2;
+          const binWidth = nyquist / bufferLength;
+
+          const minFreq = 28; // 28 Hz Sub-bass
+          const maxFreq = 16500; // 16.5 kHz Air/Cymbals
+
           for (let i = 0; i < barCount; i++) {
-            freqData[i] = fullData[i * step] || 0;
+            // Logarithmic frequency bounds for bar i
+            const fStart = minFreq * Math.pow(maxFreq / minFreq, i / barCount);
+            const fEnd = minFreq * Math.pow(maxFreq / minFreq, (i + 1) / barCount);
+
+            const binStart = Math.max(1, Math.floor(fStart / binWidth));
+            const binEnd = Math.min(bufferLength - 1, Math.max(binStart, Math.floor(fEnd / binWidth)));
+
+            let sum = 0;
+            let maxInBand = 0;
+            let count = 0;
+
+            for (let b = binStart; b <= binEnd; b++) {
+              const val = fullData[b] || 0;
+              sum += val;
+              if (val > maxInBand) maxInBand = val;
+              count++;
+            }
+
+            const avgInBand = count > 0 ? sum / count : 0;
+            let rawBandVal = avgInBand * 0.45 + maxInBand * 0.55;
+
+            // Equal-loudness & frequency tilt compensation (boost mids & highs proportionally)
+            const freqProgress = i / (barCount - 1);
+            const tilt = 0.85 + Math.pow(freqProgress, 0.65) * 1.65;
+            rawBandVal = rawBandVal * tilt;
+
+            // Decibel dynamic range expansion (normalize from active musical floor ~70 to 255)
+            const normalized = Math.max(0, Math.min(1, (rawBandVal - 65) / (255 - 65)));
+            const shaped = Math.pow(normalized, 0.88);
+            const targetHeight = Math.max(2, shaped * (height - 6));
+
+            // Instant attack, smooth exponential decay
+            if (!smoothedBars[i] || targetHeight > smoothedBars[i]) {
+              smoothedBars[i] = targetHeight;
+            } else {
+              smoothedBars[i] = Math.max(2, smoothedBars[i] * 0.88 - 0.2);
+            }
           }
         } else if (isPlaying) {
-          // Simulated pulsing
-          const time = Date.now() / 200;
+          // Subtle idle pulse
+          const time = Date.now() / 300;
           for (let i = 0; i < barCount; i++) {
-            freqData[i] = Math.sin(time + i * 0.3) * 60 + 80;
+            const targetHeight = Math.max(2, (Math.sin(time + i * 0.2) * 0.3 + 0.5) * (height * 0.4));
+            smoothedBars[i] = targetHeight;
+          }
+        } else {
+          // Zero decay when paused
+          for (let i = 0; i < barCount; i++) {
+            smoothedBars[i] = Math.max(0, (smoothedBars[i] || 0) * 0.85 - 0.5);
           }
         }
 
+        // Render Bars & Peak Caps
         for (let i = 0; i < barCount; i++) {
-          const value = freqData[i] || 0;
-          const barHeight = Math.max(3, (value / 255) * (height - 6));
-          const x = i * (barWidth + 2);
+          const barHeight = smoothedBars[i] || 2;
+          const x = i * (barWidth + gap);
           const y = height - barHeight;
 
           // Peak cap calculation
-          if (!peakBars[i] || barHeight > peakBars[i]) {
+          if (!peakBars[i] || barHeight >= peakBars[i]) {
             peakBars[i] = barHeight;
           } else {
-            peakBars[i] = Math.max(0, peakBars[i] - 0.5);
+            peakBars[i] = Math.max(0, peakBars[i] - 0.7);
           }
 
-          // Bar Gradient
+          // Bar Gradient with glowing top
           const gradient = ctx.createLinearGradient(0, height, 0, y);
-          gradient.addColorStop(0, `${barColor}33`);
-          gradient.addColorStop(0.7, barColor);
+          gradient.addColorStop(0, `${barColor}22`);
+          gradient.addColorStop(0.65, barColor);
           gradient.addColorStop(1, '#ffffff');
 
           ctx.fillStyle = gradient;
-          ctx.shadowBlur = 8;
+          ctx.shadowBlur = 10;
           ctx.shadowColor = glowColor;
           ctx.beginPath();
           ctx.roundRect(x, y, barWidth, barHeight, [2, 2, 0, 0]);
           ctx.fill();
 
-          // Draw Peak Cap
-          const peakY = height - peakBars[i] - 2;
-          ctx.fillStyle = '#ffffff';
-          ctx.shadowBlur = 4;
-          ctx.shadowColor = '#ffffff';
-          ctx.fillRect(x, Math.max(0, peakY), barWidth, 1.5);
+          // Draw Peak Cap Indicator
+          if (peakBars[i] > 3) {
+            const peakY = height - peakBars[i] - 2;
+            ctx.fillStyle = '#ffffff';
+            ctx.shadowBlur = 6;
+            ctx.shadowColor = '#ffffff';
+            ctx.fillRect(x, Math.max(0, peakY), barWidth, 1.5);
+          }
         }
       } else if (mode === 'wave') {
-        const bufferLength = analyser ? analyser.fftSize : 128;
+        const bufferLength = analyser ? analyser.fftSize : 256;
         const timeData = new Uint8Array(bufferLength);
 
         if (analyser && isPlaying) {
           analyser.getByteTimeDomainData(timeData);
         } else {
           for (let i = 0; i < bufferLength; i++) {
-            timeData[i] = isPlaying ? 128 + Math.sin(Date.now() / 200 + i * 0.1) * 25 : 128;
+            timeData[i] = isPlaying ? 128 + Math.sin(Date.now() / 200 + i * 0.1) * 20 : 128;
           }
         }
 
-        ctx.lineWidth = 2;
+        ctx.lineWidth = 2.5;
         ctx.strokeStyle = barColor;
-        ctx.shadowBlur = 12;
+        ctx.shadowBlur = 14;
         ctx.shadowColor = glowColor;
         ctx.beginPath();
 
-        const sliceWidth = width / bufferLength;
+        const sliceWidth = width / (bufferLength - 1);
         let x = 0;
 
         for (let i = 0; i < bufferLength; i++) {
@@ -134,7 +191,6 @@ export const AudioVisualizer = memo(function AudioVisualizer({
           x += sliceWidth;
         }
 
-        ctx.lineTo(width, height / 2);
         ctx.stroke();
       }
 
