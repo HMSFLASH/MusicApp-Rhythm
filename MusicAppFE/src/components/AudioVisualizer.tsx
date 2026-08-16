@@ -66,8 +66,8 @@ export const AudioVisualizer = memo(function AudioVisualizer({
           const nyquist = sampleRate / 2;
           const binWidth = nyquist / bufferLength;
 
-          const minFreq = 28; // 28 Hz Sub-bass
-          const maxFreq = 16500; // 16.5 kHz Air/Cymbals
+          const minFreq = 20; // 20 Hz Sub-bass
+          const maxFreq = 20000; // 20 kHz Full spectrum
 
           for (let i = 0; i < barCount; i++) {
             // Logarithmic frequency bounds for bar i
@@ -88,20 +88,11 @@ export const AudioVisualizer = memo(function AudioVisualizer({
               count++;
             }
 
-            const avgInBand = count > 0 ? sum / count : 0;
-            let rawBandVal = avgInBand * 0.45 + maxInBand * 0.55;
+            // Raw frequency energy directly from Web Audio analyser without artificial tilt/amplification
+            const bandEnergy = count > 0 ? Math.max(sum / count, maxInBand) : 0;
+            const targetHeight = Math.max(2, (bandEnergy / 255) * (height - 4));
 
-            // Equal-loudness & frequency tilt compensation (boost mids & highs proportionally)
-            const freqProgress = i / (barCount - 1);
-            const tilt = 0.85 + Math.pow(freqProgress, 0.65) * 1.65;
-            rawBandVal = rawBandVal * tilt;
-
-            // Decibel dynamic range expansion (normalize from active musical floor ~70 to 255)
-            const normalized = Math.max(0, Math.min(1, (rawBandVal - 65) / (255 - 65)));
-            const shaped = Math.pow(normalized, 0.88);
-            const targetHeight = Math.max(2, shaped * (height - 6));
-
-            // Instant attack, smooth exponential decay
+            // Instant attack, smooth decay
             if (!smoothedBars[i] || targetHeight > smoothedBars[i]) {
               smoothedBars[i] = targetHeight;
             } else {
