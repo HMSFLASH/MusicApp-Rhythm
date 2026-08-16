@@ -31,6 +31,7 @@ public class SecurityConfig {
     private final CustomJwtDecoder customJwtDecoder;
     private final JwtAuthenticationEntryPoint jwtAuthenticationEntryPoint;
     private final OAuth2LoginSuccessHandler oAuth2LoginSuccessHandler;
+    private final OAuth2LoginFailureHandler oAuth2LoginFailureHandler;
     private final ClientRegistrationRepository clientRegistrationRepository;
 
     private static final String[] PUBLIC_ENDPOINTS = {
@@ -96,7 +97,8 @@ public class SecurityConfig {
 
         httpSecurity.oauth2Login(oauth2 -> oauth2.authorizationEndpoint(
                         auth -> auth.authorizationRequestResolver(authorizationRequestResolver))
-                .successHandler(oAuth2LoginSuccessHandler));
+                .successHandler(oAuth2LoginSuccessHandler)
+                .failureHandler(oAuth2LoginFailureHandler));
 
         // Authentication cookies are Strict and CORS is an explicit allowlist.
         // CSRF protection is retained for browser-initiated state changes.

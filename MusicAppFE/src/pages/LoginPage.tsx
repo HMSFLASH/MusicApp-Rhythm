@@ -1,6 +1,6 @@
 import { Disc, ChevronRight, Loader2, Eye, EyeOff } from 'lucide-react';
-import { NavLink, useNavigate } from 'react-router-dom';
-import { useState } from 'react';
+import { NavLink, useNavigate, useSearchParams } from 'react-router-dom';
+import { useState, useEffect } from 'react';
 import { axiosClient } from '../api/axiosClient';
 import { useAuth } from '../context/AuthContext';
 import { BACKEND_URL } from '../api/axiosClient';
@@ -13,6 +13,15 @@ export function LoginPage() {
   const [error, setError] = useState('');
   const { setIsAuthenticated } = useAuth();
   const navigate = useNavigate();
+  const [searchParams] = useSearchParams();
+
+  useEffect(() => {
+    const errorParam = searchParams.get('error');
+    const messageParam = searchParams.get('message');
+    if (errorParam === 'oauth2_failure') {
+      setError(messageParam || 'Google login failed');
+    }
+  }, [searchParams]);
 
   const handleGoogleLogin = (provider: string = 'google') => {
     globalThis.location.href = `${BACKEND_URL}/oauth2/authorization/${provider}`;
