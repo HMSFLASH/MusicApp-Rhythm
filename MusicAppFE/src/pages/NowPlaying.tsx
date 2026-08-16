@@ -1,11 +1,12 @@
 import { useState, useRef, useEffect, useCallback } from 'react';
 import { useGlobalAudio } from '../context/AudioContext';
 import { useAuth } from '../context/AuthContext';
-import { Disc, Play, Pause, SkipBack, SkipForward, Shuffle, Repeat, Heart, Info, ListPlus, MoreHorizontal, Repeat1, Volume2, VolumeX, BarChart2, Gauge, Music, Check, X, ArrowRight, Square, PauseCircle, ListX, Loader2, Trash2, Cpu, Tags, RefreshCw, MonitorSpeaker, Download } from 'lucide-react';
+import { Disc, Play, Pause, SkipBack, SkipForward, Shuffle, Repeat, Heart, Info, ListPlus, MoreHorizontal, Repeat1, Volume2, VolumeX, BarChart2, Gauge, Music, Check, X, ArrowRight, Square, PauseCircle, ListX, Loader2, Trash2, Cpu, Tags, RefreshCw, MonitorSpeaker, Download, Keyboard, Activity } from 'lucide-react';
 import { HorizontalSlider } from '../components/HorizontalSlider';
 import { SpeedPitchPanel } from '../components/SpeedPitchPanel';
 import { useLibrary } from '../context/LibraryContext';
 import { LyricsView } from '../components/LyricsView';
+import { AudioVisualizer } from '../components/AudioVisualizer';
 
 import { useNavigate } from 'react-router-dom';
 import { useTranslation } from 'react-i18next';
@@ -180,6 +181,8 @@ export function NowPlaying() {
   const [showMetadata, setShowMetadata] = useState(false);
   // Lyrics Modal state
     const [showLyrics, setShowLyrics] = useState(false);
+  // Visualizer Mode state
+  const [visualizerMode, setVisualizerMode] = useState<'bars' | 'wave' | 'off'>('bars');
 
   // Audio Device state
   const [showDeviceMenu, setShowDeviceMenu] = useState(false);
@@ -428,6 +431,22 @@ export function NowPlaying() {
             </div>
           </div>
 
+          {/* Real-time Spectrum Audio Visualizer */}
+          {visualizerMode !== 'off' && (
+            <div className="w-full max-w-md px-4 my-1 animate-in fade-in duration-300">
+              <div className="p-3 rounded-2xl bg-white/[0.02] border border-white/[0.05] backdrop-blur-md shadow-inner flex flex-col items-center">
+                <AudioVisualizer
+                  analyserRef={playerState.masterAnalyserRef}
+                  isPlaying={isPlaying}
+                  mode={visualizerMode === 'wave' ? 'wave' : 'bars'}
+                  className="w-full h-12"
+                  barColor="#00f5ff"
+                  glowColor="rgba(0, 245, 255, 0.5)"
+                />
+              </div>
+            </div>
+          )}
+
           {/* Playback Controls (Play/Pause, Skip, Progress) */}
           <div className="w-full max-w-md mt-1">
 
@@ -448,6 +467,27 @@ export function NowPlaying() {
               ) : (
                 <div className="w-9 h-9" />
               )}
+
+              {/* Visualizer Mode Toggle */}
+              <button
+                onClick={() => setVisualizerMode(m => m === 'bars' ? 'wave' : m === 'wave' ? 'off' : 'bars')}
+                className={`transition-all p-2 rounded-xl text-xs font-semibold flex items-center gap-1.5 ${visualizerMode !== 'off' ? 'text-primary bg-primary/10 border border-primary/25 shadow-sm' : 'hover:bg-white/[0.05] text-slate-400 hover:text-white'}`}
+                title={`Visualizer: ${visualizerMode.toUpperCase()}`}
+              >
+                <Activity size={18} />
+                <span className="hidden sm:inline uppercase text-[10px] font-mono">{visualizerMode}</span>
+              </button>
+
+              {/* Keyboard Shortcuts Trigger */}
+              <button
+                onClick={() => {
+                  window.dispatchEvent(new KeyboardEvent('keydown', { key: '?' }));
+                }}
+                className="hover:text-white transition-colors p-2 rounded-xl hover:bg-white/[0.05]"
+                title="Keyboard Shortcuts (?)"
+              >
+                <Keyboard size={19} />
+              </button>
 
               {hasLyrics && (
                 <button

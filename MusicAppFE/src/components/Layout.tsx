@@ -16,6 +16,7 @@ import {
   Key,
   Menu,
   Languages,
+  Keyboard,
   X as CloseIcon
 } from 'lucide-react';
 import { useState, useEffect } from 'react';
@@ -332,14 +333,26 @@ export function Layout() {
           <div className="p-3 border-t border-white/[0.06] bg-[#070e1a]/70">
             <div className="flex items-center justify-between mb-2.5 px-1.5">
               <span className="text-[11px] font-mono text-slate-400 tracking-wider">{t('layout.language', 'Ngôn ngữ')}</span>
-              <button
-                onClick={() => i18n.changeLanguage(i18n.language === 'vi' ? 'en' : 'vi')}
-                className="flex items-center gap-1.5 px-2 py-0.5 rounded-lg bg-white/[0.05] hover:bg-white/[0.1] text-slate-300 hover:text-white transition-all text-xs font-mono border border-white/[0.06]"
-                aria-label="Toggle language"
-              >
-                <Languages size={13} className="text-primary" />
-                <span className="font-bold">{i18n.language === 'vi' ? 'VI' : 'EN'}</span>
-              </button>
+              <div className="flex items-center gap-1.5">
+                <button
+                  onClick={() => {
+                    window.dispatchEvent(new KeyboardEvent('keydown', { key: '?' }));
+                  }}
+                  className="p-1 rounded-lg bg-white/[0.05] hover:bg-white/[0.1] text-slate-300 hover:text-primary transition-all border border-white/[0.06]"
+                  title="Phím tắt nhanh (?)"
+                  aria-label="Keyboard Shortcuts"
+                >
+                  <Keyboard size={13} />
+                </button>
+                <button
+                  onClick={() => i18n.changeLanguage(i18n.language === 'vi' ? 'en' : 'vi')}
+                  className="flex items-center gap-1 px-2 py-0.5 rounded-lg bg-white/[0.05] hover:bg-white/[0.1] text-slate-300 hover:text-white transition-all text-xs font-mono border border-white/[0.06]"
+                  aria-label="Toggle language"
+                >
+                  <Languages size={13} className="text-primary" />
+                  <span className="font-bold">{i18n.language === 'vi' ? 'VI' : 'EN'}</span>
+                </button>
+              </div>
             </div>
             {isAuthenticated ? (
               <div className="flex items-center justify-between p-2 rounded-xl bg-white/[0.03] border border-white/[0.06] hover:border-primary/30 transition-all relative">

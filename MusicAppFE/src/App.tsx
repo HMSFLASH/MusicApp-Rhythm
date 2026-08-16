@@ -23,6 +23,8 @@ import { UploadProvider } from './context/UploadContext';
 import { LibraryProvider } from './context/LibraryContext';
 import { ConfirmProvider } from './context/ConfirmContext';
 import { OfflineProvider } from './context/OfflineContext';
+import { ToastProvider } from './context/ToastContext';
+import { KeyboardShortcutsModal } from './components/KeyboardShortcutsModal';
 
 function ProtectedRoute({ children }: { children: React.ReactNode }) {
   const { isAuthenticated, isAuthResolved } = useAuth();
@@ -45,6 +47,7 @@ function GuestRoute({ children }: { children: React.ReactNode }) {
 function App() {
   return (
     <BrowserRouter>
+      <KeyboardShortcutsModal />
       <Routes>
         <Route path="/oauth2/callback" element={<OAuthCallback />} />
 
@@ -85,9 +88,11 @@ function AppProviders() {
       <LibraryProvider>
         <UploadProvider>
           <OfflineProvider>
-            <ConfirmProvider>
-              <App />
-            </ConfirmProvider>
+            <ToastProvider>
+              <ConfirmProvider>
+                <App />
+              </ConfirmProvider>
+            </ToastProvider>
           </OfflineProvider>
         </UploadProvider>
       </LibraryProvider>
