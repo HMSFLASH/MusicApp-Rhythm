@@ -24,6 +24,8 @@ export const KeyboardShortcutsModal = memo(function KeyboardShortcutsModal() {
       if (isInput) return;
 
       if (e.key === '?' || (e.shiftKey && e.key === '/')) {
+        // Skip on mobile devices
+        if (window.innerWidth < 768) return;
         e.preventDefault();
         setIsOpen(prev => !prev);
         return;

@@ -478,12 +478,12 @@ export function NowPlaying() {
                 <span className="hidden sm:inline uppercase text-[10px] font-mono">{visualizerMode}</span>
               </button>
 
-              {/* Keyboard Shortcuts Trigger */}
+              {/* Keyboard Shortcuts Trigger (Desktop only) */}
               <button
                 onClick={() => {
                   window.dispatchEvent(new KeyboardEvent('keydown', { key: '?' }));
                 }}
-                className="hover:text-white transition-colors p-2 rounded-xl hover:bg-white/[0.05]"
+                className="hidden md:flex hover:text-white transition-colors p-2 rounded-xl hover:bg-white/[0.05]"
                 title="Keyboard Shortcuts (?)"
               >
                 <Keyboard size={19} />

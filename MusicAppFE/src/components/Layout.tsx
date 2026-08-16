@@ -338,7 +338,7 @@ export function Layout() {
                   onClick={() => {
                     window.dispatchEvent(new KeyboardEvent('keydown', { key: '?' }));
                   }}
-                  className="p-1 rounded-lg bg-white/[0.05] hover:bg-white/[0.1] text-slate-300 hover:text-primary transition-all border border-white/[0.06]"
+                  className="hidden md:inline-flex p-1 rounded-lg bg-white/[0.05] hover:bg-white/[0.1] text-slate-300 hover:text-primary transition-all border border-white/[0.06]"
                   title="Phím tắt nhanh (?)"
                   aria-label="Keyboard Shortcuts"
                 >
