@@ -541,7 +541,7 @@ export function Playlist({ isAuthenticated, onPlay, currentTrackId }: PlaylistPr
                   key={track.id}
                   onMouseLeave={() => setOpenMenuId(null)}
                   onClick={() => onPlay(track, selectedPlaylistDetails.tracks)}
-                  className={`flex items-center justify-between gap-3 p-3.5 rounded-2xl border transition-all duration-300 group cursor-pointer ${currentTrackId === track.id
+                  className={`flex items-center justify-between gap-3 p-3.5 rounded-2xl border transition-all duration-300 group cursor-pointer relative ${openMenuId === track.id ? 'z-40 ring-1 ring-primary/40' : 'z-0'} ${currentTrackId === track.id
                       ? 'bg-primary/10 border-primary/30 shadow-[0_0_20px_rgba(0,245,255,0.1)]'
                       : 'bg-[#0c1626]/60 border-white/[0.05] hover:border-white/[0.12] hover:bg-white/[0.04]'
                     }`}
@@ -577,14 +577,14 @@ export function Playlist({ isAuthenticated, onPlay, currentTrackId }: PlaylistPr
                   <div className={`relative flex items-center gap-2 transition-opacity ${openMenuId === track.id ? 'opacity-100' : 'opacity-100 lg:opacity-0 lg:group-hover:opacity-100'}`}>
                     <button
                       onClick={(e) => { e.stopPropagation(); setOpenMenuId(openMenuId === track.id ? null : track.id); }}
-                      className="p-1.5 text-slate-400 hover:text-white hover:bg-white/[0.08] rounded-xl transition-colors"
+                      className={`p-1.5 rounded-xl transition-colors ${openMenuId === track.id ? 'text-primary bg-primary/10' : 'text-slate-400 hover:text-white hover:bg-white/[0.08]'}`}
                       title="More options"
                     >
                       <MoreHorizontal size={17} />
                     </button>
 
                     {openMenuId === track.id && (
-                      <div className="absolute right-0 top-full mt-2 w-52 max-w-[calc(100vw_-_2rem)] bg-[#0c1626]/95 border border-white/[0.1] rounded-2xl shadow-2xl overflow-hidden z-50 py-1.5 backdrop-blur-2xl">
+                      <div className="absolute right-0 top-full mt-2 w-52 max-w-[calc(100vw_-_2rem)] bg-[#0c1626]/98 border border-white/[0.12] rounded-2xl shadow-[0_20px_60px_rgba(0,0,0,0.95)] overflow-hidden z-50 py-1.5 backdrop-blur-2xl animate-in zoom-in-95 duration-150">
                         <button
                           onClick={(e) => handlePlayNext(track, e)}
                           className="w-full flex items-center gap-3 px-3.5 py-2 text-xs font-medium text-left text-slate-200 hover:text-white hover:bg-white/[0.08] transition-colors"

@@ -292,7 +292,7 @@ export function QueuePage() {
               return (
                 <div
                   key={`${track.id}-${index}`}
-                  className="relative"
+                  className={`relative ${openMenuIndex === index ? 'z-40' : 'z-0'}`}
                   style={{ height: QUEUE_ITEM_HEIGHT }}
                 >
                   <div
@@ -315,7 +315,7 @@ export function QueuePage() {
                       }
                     }}
                     onClick={(e) => handleTrackClick(track, index, e)}
-                    className={`group flex h-[76px] items-center gap-3 sm:gap-3.5 p-2.5 sm:p-3 rounded-xl transition-all cursor-pointer select-none ${isCurrent
+                    className={`group flex h-[76px] items-center gap-3 sm:gap-3.5 p-2.5 sm:p-3 rounded-xl transition-all cursor-pointer select-none relative ${openMenuIndex === index ? 'z-40 ring-1 ring-primary/40' : 'z-0'} ${isCurrent
                         ? 'bg-primary/15 border border-primary/30 text-primary shadow-[inset_0_0_15px_rgba(0,245,255,0.1)]'
                         : 'bg-white/[0.02] hover:bg-white/[0.06] border border-white/[0.05] hover:border-primary/25 backdrop-blur-md'
                       } ${draggedIndex === index ? 'opacity-50' : 'opacity-100'}`}
@@ -372,45 +372,45 @@ export function QueuePage() {
                           e.stopPropagation();
                           setOpenMenuIndex(openMenuIndex === index ? null : index);
                         }}
-                        className="p-1.5 text-slate-400 hover:text-white hover:bg-white/10 rounded-lg transition-colors opacity-100 lg:opacity-0 lg:group-hover:opacity-100"
+                        className={`p-1.5 rounded-lg transition-colors opacity-100 lg:opacity-0 lg:group-hover:opacity-100 ${openMenuIndex === index ? 'text-primary bg-primary/10 opacity-100' : 'text-slate-400 hover:text-white hover:bg-white/10'}`}
                       >
                         <MoreHorizontal size={17} />
                       </button>
 
                       {openMenuIndex === index && (
-                        <div className="absolute right-0 top-full mt-1 w-48 max-w-[calc(100vw_-_2rem)] bg-[#0c1626] border border-white/10 rounded-xl shadow-2xl overflow-hidden z-50 py-1.5 backdrop-blur-2xl">
+                        <div className="absolute right-0 top-full mt-1.5 w-52 max-w-[calc(100vw_-_2rem)] bg-[#0c1626]/98 border border-white/[0.12] rounded-2xl shadow-[0_20px_60px_rgba(0,0,0,0.95)] overflow-hidden z-50 py-1.5 backdrop-blur-2xl animate-in zoom-in-95 duration-150">
                           <button
                             disabled={index === 0}
                             onClick={(e) => moveTrack(e, index, 'top')}
-                            className="w-full flex items-center gap-3 px-3.5 py-2 text-xs font-medium text-left text-slate-200 hover:bg-white/[0.06] hover:text-white transition-colors disabled:opacity-30 disabled:cursor-not-allowed"
+                            className="w-full flex items-center gap-3 px-3.5 py-2.5 text-xs font-medium text-left text-slate-200 hover:bg-white/[0.08] hover:text-white transition-colors disabled:opacity-30 disabled:cursor-not-allowed"
                           >
                             <ChevronsUp size={14} className="text-primary" /> Move to Top
                           </button>
                           <button
                             disabled={index === 0}
                             onClick={(e) => moveTrack(e, index, 'up')}
-                            className="w-full flex items-center gap-3 px-3.5 py-2 text-xs font-medium text-left text-slate-200 hover:bg-white/[0.06] hover:text-white transition-colors disabled:opacity-30 disabled:cursor-not-allowed"
+                            className="w-full flex items-center gap-3 px-3.5 py-2.5 text-xs font-medium text-left text-slate-200 hover:bg-white/[0.08] hover:text-white transition-colors disabled:opacity-30 disabled:cursor-not-allowed"
                           >
                             <ArrowUp size={14} /> Move Up
                           </button>
                           <button
                             disabled={index === queue.length - 1}
                             onClick={(e) => moveTrack(e, index, 'down')}
-                            className="w-full flex items-center gap-3 px-3.5 py-2 text-xs font-medium text-left text-slate-200 hover:bg-white/[0.06] hover:text-white transition-colors disabled:opacity-30 disabled:cursor-not-allowed"
+                            className="w-full flex items-center gap-3 px-3.5 py-2.5 text-xs font-medium text-left text-slate-200 hover:bg-white/[0.08] hover:text-white transition-colors disabled:opacity-30 disabled:cursor-not-allowed"
                           >
                             <ArrowDown size={14} /> Move Down
                           </button>
                           <button
                             disabled={index === queue.length - 1}
                             onClick={(e) => moveTrack(e, index, 'bottom')}
-                            className="w-full flex items-center gap-3 px-3.5 py-2 text-xs font-medium text-left text-slate-200 hover:bg-white/[0.06] hover:text-white transition-colors disabled:opacity-30 disabled:cursor-not-allowed"
+                            className="w-full flex items-center gap-3 px-3.5 py-2.5 text-xs font-medium text-left text-slate-200 hover:bg-white/[0.08] hover:text-white transition-colors disabled:opacity-30 disabled:cursor-not-allowed"
                           >
                             <ChevronsDown size={14} /> Move to Bottom
                           </button>
                           {track.sourceType !== 'LOCAL' && (
                             <button
                               onClick={(e) => { e.stopPropagation(); downloadTrackFile(track); setOpenMenuIndex(null); }}
-                              className="w-full flex items-center gap-3 px-3.5 py-2 text-xs font-medium text-left text-slate-200 hover:bg-white/[0.06] hover:text-white transition-colors"
+                              className="w-full flex items-center gap-3 px-3.5 py-2.5 text-xs font-medium text-left text-slate-200 hover:bg-white/[0.08] hover:text-white transition-colors border-t border-white/[0.04] mt-0.5 pt-2"
                             >
                               <Download size={14} className="text-slate-400" /> Download File
                             </button>
@@ -418,7 +418,7 @@ export function QueuePage() {
                           {track.sourceType !== 'LOCAL' && (
                             <button
                               onClick={(e) => handleToggleFavorite(track, e)}
-                              className="w-full flex items-center gap-3 px-3.5 py-2 text-xs font-medium text-left text-slate-200 hover:bg-white/[0.06] hover:text-white transition-colors"
+                              className="w-full flex items-center gap-3 px-3.5 py-2.5 text-xs font-medium text-left text-slate-200 hover:bg-white/[0.08] hover:text-white transition-colors"
                             >
                               <Heart size={14} fill={isFavorite ? "currentColor" : "none"} className={isFavorite ? "text-primary" : "text-slate-400"} /> 
                               {isFavorite ? "Remove from Favorites" : "Add to Favorites"}
@@ -426,7 +426,7 @@ export function QueuePage() {
                           )}
                           <button
                             onClick={(e) => { e.stopPropagation(); setInfoTrack(track); setOpenMenuIndex(null); }}
-                            className="w-full flex items-center gap-3 px-3.5 py-2 text-xs font-medium text-left text-slate-200 hover:bg-white/[0.06] hover:text-white transition-colors"
+                            className="w-full flex items-center gap-3 px-3.5 py-2.5 text-xs font-medium text-left text-slate-200 hover:bg-white/[0.08] hover:text-white transition-colors"
                           >
                             <Info size={14} className="text-slate-400" /> Info
                           </button>
@@ -436,7 +436,7 @@ export function QueuePage() {
                               setOpenMenuIndex(null);
                               handleRemoveTrack(e, track.id);
                             }}
-                            className="w-full flex items-center gap-3 px-3.5 py-2 text-xs font-medium text-left text-rose-400 hover:bg-rose-500/10 hover:text-rose-300 transition-colors"
+                            className="w-full flex items-center gap-3 px-3.5 py-2.5 text-xs font-medium text-left text-rose-400 hover:bg-rose-500/10 hover:text-rose-300 transition-colors"
                           >
                             <Trash2 size={14} /> Remove
                           </button>

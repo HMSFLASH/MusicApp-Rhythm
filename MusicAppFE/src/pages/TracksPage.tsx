@@ -462,7 +462,7 @@ export function TracksPage() {
                 if (isOfflineMode && !isCached(track)) return;
                 handleTrackClick(track, e);
               }}
-              className={`flex items-center gap-3 sm:gap-3.5 p-2.5 sm:p-3 rounded-xl border transition-all duration-200 group cursor-pointer select-none ${isOfflineMode && !isCached(track) ? 'opacity-40 grayscale pointer-events-none' :
+              className={`flex items-center gap-3 sm:gap-3.5 p-2.5 sm:p-3 rounded-xl border transition-all duration-200 group cursor-pointer select-none relative ${openMenuId === track.id ? 'z-40 ring-1 ring-primary/40' : 'z-0'} ${isOfflineMode && !isCached(track) ? 'opacity-40 grayscale pointer-events-none' :
                   isActive
                     ? 'bg-primary/15 border-primary/30 text-primary shadow-[inset_0_0_15px_rgba(0,245,255,0.1)]'
                     : 'bg-white/[0.02] border-white/[0.05] hover:bg-white/[0.06] hover:border-primary/25 backdrop-blur-md'
@@ -525,14 +525,14 @@ export function TracksPage() {
                 <button
                   aria-label="More options"
                   onClick={(e) => { e.stopPropagation(); setOpenMenuId(openMenuId === track.id ? null : track.id); }}
-                  className="p-1.5 text-slate-400 hover:text-white hover:bg-white/10 rounded-lg transition-colors pointer-events-auto"
+                  className={`p-1.5 rounded-lg transition-colors pointer-events-auto ${openMenuId === track.id ? 'text-primary bg-primary/10' : 'text-slate-400 hover:text-white hover:bg-white/10'}`}
                   title="More options"
                 >
                   <MoreHorizontal size={17} />
                 </button>
 
                 {openMenuId === track.id && (
-                  <div className="absolute right-0 top-full mt-1 w-56 max-w-[calc(100vw_-_2rem)] bg-[#0c1626] border border-white/10 rounded-xl shadow-2xl overflow-hidden z-50 py-1.5 backdrop-blur-2xl">
+                  <div className="absolute right-0 top-full mt-1.5 w-56 max-w-[calc(100vw_-_2rem)] bg-[#0c1626]/98 border border-white/[0.12] rounded-2xl shadow-[0_20px_60px_rgba(0,0,0,0.95)] overflow-hidden z-50 py-1.5 backdrop-blur-2xl animate-in zoom-in-95 duration-150">
                     <button
                       onClick={(e) => handlePlayNext(track, e)}
                       className="w-full flex items-center gap-3 px-3.5 py-2 text-xs font-medium text-left text-slate-200 hover:bg-white/[0.06] hover:text-white transition-colors"
