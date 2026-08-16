@@ -1,4 +1,5 @@
-import type { ReactNode } from 'react';
+import { useState, useRef, useEffect, type ReactNode } from 'react';
+import { ChevronDown, Check } from 'lucide-react';
 
 type AudioSelectRowProps<T extends string | number> = {
   title: ReactNode;
@@ -21,37 +22,80 @@ export function AudioSelectRow<T extends string | number>({
   titleClassName,
   descriptionClassName,
 }: AudioSelectRowProps<T>) {
+  const [isOpen, setIsOpen] = useState(false);
+  const containerRef = useRef<HTMLDivElement>(null);
+
+  const selectedOption = options.find((opt) => opt.value === value) || options[0];
+
+  useEffect(() => {
+    const handlePointerDown = (event: PointerEvent) => {
+      if (!containerRef.current?.contains(event.target as Node)) {
+        setIsOpen(false);
+      }
+    };
+
+    document.addEventListener('pointerdown', handlePointerDown);
+    return () => document.removeEventListener('pointerdown', handlePointerDown);
+  }, []);
+
   const containerStyle = tone === 'amber'
     ? 'bg-amber-500/[0.04] border-amber-500/20 hover:border-amber-500/30'
     : 'bg-white/[0.02] border-white/[0.06] hover:border-white/[0.12]';
 
   return (
-    <div className={`flex flex-col gap-3 mt-2 p-4 rounded-2xl border transition-all ${containerStyle} w-full`}>
+    <div className={`flex flex-col gap-3 mt-2 p-4 sm:p-5 rounded-2xl border transition-all ${containerStyle} w-full`}>
       <div className="flex flex-col w-full">
         <span className={`text-sm font-semibold block leading-snug break-words ${titleClassName || 'text-slate-100'}`}>{title}</span>
         <span className={`text-xs font-mono mt-1 block leading-normal break-words ${descriptionClassName || 'text-slate-400'}`}>
           {description}
         </span>
       </div>
-      <div className="relative w-full">
-        <select
-          value={value}
-          onChange={(e) => {
-            const val = e.target.value;
-            if (options.length > 0 && typeof options[0].value === 'number') {
-              onChange(Number(val) as T);
-            } else {
-              onChange(val as T);
-            }
-          }}
-          className="w-full bg-[#0c1626] text-primary font-mono text-xs font-semibold border border-white/[0.1] rounded-xl px-3.5 py-2.5 outline-none cursor-pointer hover:border-primary/50 focus:border-primary transition-all truncate shadow-md"
+
+      <div ref={containerRef} className="relative w-full">
+        {/* Custom Dropdown Trigger */}
+        <button
+          type="button"
+          aria-expanded={isOpen}
+          onClick={() => setIsOpen(open => !open)}
+          className={`w-full flex items-center justify-between gap-3 bg-[#0c1626] text-primary font-mono text-xs font-semibold border rounded-xl px-4 py-3 outline-none transition-all shadow-md active:scale-[0.99] ${
+            isOpen 
+              ? 'border-primary shadow-[0_0_15px_rgba(0,245,255,0.25)] ring-1 ring-primary/40' 
+              : 'border-white/[0.1] hover:border-primary/50'
+          }`}
         >
-          {options.map((opt) => (
-            <option key={opt.value} value={opt.value} className="bg-[#0c1626] text-slate-200 font-mono py-1.5">
-              {opt.label}
-            </option>
-          ))}
-        </select>
+          <span className="truncate text-left">{selectedOption ? selectedOption.label : String(value)}</span>
+          <ChevronDown
+            size={16}
+            className={`text-slate-400 transition-transform duration-300 shrink-0 ${isOpen ? 'rotate-180 text-primary' : ''}`}
+          />
+        </button>
+
+        {/* Custom Glassmorphic Popover Menu */}
+        {isOpen && (
+          <div className="absolute top-full left-0 right-0 mt-2 bg-[#0c1626]/98 border border-white/[0.12] rounded-2xl shadow-[0_20px_50px_rgba(0,0,0,0.85)] z-50 py-1.5 backdrop-blur-2xl max-h-64 overflow-y-auto no-scrollbar animate-in zoom-in-95 fade-in duration-200">
+            {options.map((opt) => {
+              const isSelected = opt.value === value;
+              return (
+                <button
+                  key={String(opt.value)}
+                  type="button"
+                  onClick={() => {
+                    onChange(opt.value);
+                    setIsOpen(false);
+                  }}
+                  className={`w-full flex items-center justify-between gap-2.5 px-4 py-2.5 text-xs font-mono text-left transition-all ${
+                    isSelected
+                      ? 'bg-primary/15 text-primary font-bold shadow-[inset_0_0_10px_rgba(0,245,255,0.1)]'
+                      : 'text-slate-300 hover:bg-white/[0.08] hover:text-white'
+                  }`}
+                >
+                  <span className="truncate">{opt.label}</span>
+                  {isSelected && <Check size={14} className="text-primary shrink-0 drop-shadow-[0_0_6px_rgba(0,245,255,0.8)]" />}
+                </button>
+              );
+            })}
+          </div>
+        )}
       </div>
     </div>
   );
