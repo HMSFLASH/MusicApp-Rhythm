@@ -132,12 +132,12 @@ export function SpatialEffects() {
             color="#818cf8"
             unit="%"
           />
-          <AudioSelectRow
+          <AudioSelectRow<number>
             title={t('studio.spatial.stereoFftTitle', 'Độ phân giải phân tích Stereo (FFT Size)')}
             description={t('studio.spatial.stereoFftDesc', 'Tần số lấy mẫu phân tích tương quan kênh L/R. Mặc định 1024 cho độ mượt cao, có thể chỉnh lên 16384 hoặc giảm xuống 256.')}
             value={playerState.stereoFftSize || 1024}
             options={stereoFftOptions}
-            onChange={playerState.updateStereoFftSize}
+            onChange={(val) => playerState.updateStereoFftSize(val)}
           />
         </EffectControlsGate>
       </AudioEffectPanel>

@@ -212,7 +212,6 @@ export function Layout() {
               <div className="flex flex-col">
                 <span className="text-xl font-bold font-display tracking-tight text-white group-hover:text-primary transition-colors flex items-center gap-1.5">
                   Rhythm
-                  <span className="text-[9px] font-mono font-semibold px-1.5 py-0.5 rounded-full bg-primary/10 text-primary border border-primary/20">PRO</span>
                 </span>
                 <span className="text-[11px] font-mono text-slate-400">Hi-Res Audio Studio</span>
               </div>
@@ -242,11 +241,10 @@ export function Layout() {
                       }}
                       className={({ isActive }) => {
                         const active = (isActive && item.path !== '/library') || isLibraryChild;
-                        return `group flex items-center gap-3 px-3 py-2.5 rounded-xl text-sm font-medium transition-all duration-200 ${
-                          active
+                        return `group flex items-center gap-3 px-3 py-2.5 rounded-xl text-sm font-medium transition-all duration-200 ${active
                             ? 'bg-primary/15 text-primary shadow-[inset_0_0_12px_rgba(0,245,255,0.1)] border border-primary/25 font-semibold'
                             : 'text-slate-400 hover:text-slate-100 hover:bg-white/[0.04] border border-transparent'
-                        }`;
+                          }`;
                       }}
                     >
                       <span className="transition-transform group-hover:scale-110 duration-200">{item.icon}</span>
@@ -265,10 +263,9 @@ export function Layout() {
                     key={item.path}
                     to={item.path}
                     className={({ isActive }) =>
-                      `group flex items-center gap-3 px-3 py-2.5 rounded-xl text-sm font-medium transition-all duration-200 ${
-                        isActive
-                          ? 'bg-primary/15 text-primary shadow-[inset_0_0_12px_rgba(0,245,255,0.1)] border border-primary/25 font-semibold'
-                          : 'text-slate-400 hover:text-slate-100 hover:bg-white/[0.04] border border-transparent'
+                      `group flex items-center gap-3 px-3 py-2.5 rounded-xl text-sm font-medium transition-all duration-200 ${isActive
+                        ? 'bg-primary/15 text-primary shadow-[inset_0_0_12px_rgba(0,245,255,0.1)] border border-primary/25 font-semibold'
+                        : 'text-slate-400 hover:text-slate-100 hover:bg-white/[0.04] border border-transparent'
                       }`
                     }
                   >
@@ -426,8 +423,7 @@ export function Layout() {
               <NavLink
                 to="/login"
                 className={({ isActive }) =>
-                  `w-full flex items-center justify-center gap-2 font-semibold text-xs py-2.5 rounded-xl transition-all ${
-                    isActive ? 'bg-primary text-slate-950 shadow-[0_0_15px_rgba(0,245,255,0.4)]' : 'bg-white/[0.06] hover:bg-primary/20 text-slate-200 hover:text-primary border border-white/[0.08]'
+                  `w-full flex items-center justify-center gap-2 font-semibold text-xs py-2.5 rounded-xl transition-all ${isActive ? 'bg-primary text-slate-950 shadow-[0_0_15px_rgba(0,245,255,0.4)]' : 'bg-white/[0.06] hover:bg-primary/20 text-slate-200 hover:text-primary border border-white/[0.08]'
                   }`
                 }
               >
