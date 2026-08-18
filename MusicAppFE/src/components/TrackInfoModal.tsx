@@ -1,5 +1,5 @@
 import React, { useState } from 'react';
-import { X, Info, Tag, Image as ImageIcon, Plus, Trash2, Check, Copy, Music } from 'lucide-react';
+import { X, Info, Tag, Image as ImageIcon, Plus, Trash2, Check, Copy, Music, Download, ExternalLink } from 'lucide-react';
 import type { Track } from '../hooks/audioTypes';
 import { useToast } from '../context/ToastContext';
 
@@ -41,7 +41,7 @@ export function TrackInfoModal({ track, trackMetadata, onClose, onUpdateMetadata
 
   const [newKey, setNewKey] = useState('');
   const [newValue, setNewValue] = useState('');
-  const [coverUrl, setCoverUrl] = useState<string | null>(track.imageUrl || null);
+  const coverUrl = track.imageUrl || trackMetadata?.imageUrl || null;
 
   const formatFileSize = (bytes?: number) => {
     if (!bytes) return 'N/A';
@@ -84,19 +84,54 @@ export function TrackInfoModal({ track, trackMetadata, onClose, onUpdateMetadata
     if (onUpdateMetadata) {
       onUpdateMetadata(record);
     }
-    toast.success('Đã cập nhật toàn bộ Metadata thành công!');
+    toast.success('Đã cập nhật toàn bộ Metadata bộ nhớ tạm thành công!');
   };
 
-  const handleCoverUpload = (e: React.ChangeEvent<HTMLInputElement>) => {
-    const file = e.target.files?.[0];
-    if (file) {
-      const reader = new FileReader();
-      reader.onload = (event) => {
-        const result = event.target?.result as string;
-        setCoverUrl(result);
-        toast.success('Đã tải lên ảnh bìa mới!');
-      };
-      reader.readAsDataURL(file);
+  const handleDownloadCover = () => {
+    if (!coverUrl) {
+      toast.info('Bài hát này không có ảnh bìa để tải về');
+      return;
+    }
+    const cleanTitle = (track.title || track.fileName || 'cover').replace(/[\\/:*?"<>|]/g, '_');
+    const filename = `${cleanTitle}-cover.jpg`;
+
+    try {
+      if (coverUrl.startsWith('data:')) {
+        const link = document.createElement('a');
+        link.href = coverUrl;
+        link.download = filename;
+        document.body.appendChild(link);
+        link.click();
+        document.body.removeChild(link);
+        toast.success(`Đã tải ảnh bìa: ${filename}`);
+      } else {
+        fetch(coverUrl)
+          .then(res => res.blob())
+          .then(blob => {
+            const blobUrl = URL.createObjectURL(blob);
+            const link = document.createElement('a');
+            link.href = blobUrl;
+            link.download = filename;
+            document.body.appendChild(link);
+            link.click();
+            document.body.removeChild(link);
+            URL.revokeObjectURL(blobUrl);
+            toast.success(`Đã tải ảnh bìa: ${filename}`);
+          })
+          .catch(() => {
+            window.open(coverUrl, '_blank');
+            toast.info('Đang mở ảnh bìa trong tab mới');
+          });
+      }
+    } catch {
+      window.open(coverUrl, '_blank');
+    }
+  };
+
+  const handleCopyCoverUrl = () => {
+    if (coverUrl) {
+      navigator.clipboard.writeText(coverUrl);
+      toast.success('Đã sao chép liên kết ảnh bìa!');
     }
   };
 
@@ -146,7 +181,7 @@ export function TrackInfoModal({ track, trackMetadata, onClose, onUpdateMetadata
               <h2 className="text-base sm:text-lg font-bold font-display text-white tracking-tight leading-none">
                 Chi Tiết & Quản Lý Bài Hát
               </h2>
-              <p className="text-xs text-slate-400 mt-1 line-clamp-1">{track.title} • {track.artist}</p>
+              <p className="text-xs text-slate-400 mt-1 line-clamp-1">{track.title || track.fileName} • {track.artist || 'Unknown'}</p>
             </div>
           </div>
           <button 
@@ -181,7 +216,7 @@ export function TrackInfoModal({ track, trackMetadata, onClose, onUpdateMetadata
             }`}
           >
             <Tag size={15} />
-            Sửa Metadata (Key-Value)
+            Metadata (Key-Value)
           </button>
 
           <button
@@ -193,7 +228,7 @@ export function TrackInfoModal({ track, trackMetadata, onClose, onUpdateMetadata
             }`}
           >
             <ImageIcon size={15} />
-            Ảnh Bìa
+            Tải Ảnh Bìa
           </button>
         </div>
 
@@ -239,7 +274,7 @@ export function TrackInfoModal({ track, trackMetadata, onClose, onUpdateMetadata
                   className="flex items-center gap-1.5 px-3 py-1.5 bg-cyan-500/20 hover:bg-cyan-500/30 text-cyan-300 border border-cyan-500/40 rounded-xl text-xs font-semibold transition-all shadow-[0_0_15px_rgba(0,245,255,0.2)]"
                 >
                   <Check size={14} />
-                  Lưu Thay Đổi
+                  Lưu Tạm
                 </button>
               </div>
 
@@ -300,37 +335,47 @@ export function TrackInfoModal({ track, trackMetadata, onClose, onUpdateMetadata
             </div>
           )}
 
-          {/* TAB 3: COVER ART */}
+          {/* TAB 3: COVER ART (DOWNLOAD / VIEW ONLY) */}
           {activeTab === 'cover' && (
-            <div className="flex flex-col items-center gap-4 py-2">
-              <div className="w-44 h-44 rounded-2xl overflow-hidden bg-black/40 border border-white/[0.12] shadow-2xl relative group flex items-center justify-center">
+            <div className="flex flex-col items-center gap-5 py-3">
+              <div className="w-48 h-48 sm:w-56 sm:h-56 rounded-2xl overflow-hidden bg-black/50 border border-white/[0.12] shadow-[0_15px_40px_rgba(0,0,0,0.8)] relative group flex items-center justify-center">
                 {coverUrl ? (
-                  <img src={coverUrl} alt="Cover Art" className="w-full h-full object-cover" />
+                  <img src={coverUrl} alt="Cover Art" className="w-full h-full object-cover transition-transform duration-300 group-hover:scale-105" />
                 ) : (
                   <div className="flex flex-col items-center gap-2 text-slate-500">
-                    <ImageIcon size={40} />
-                    <span className="text-[11px]">Chưa có ảnh bìa</span>
+                    <ImageIcon size={48} className="opacity-40" />
+                    <span className="text-xs">Bài hát này không có ảnh bìa</span>
                   </div>
                 )}
               </div>
 
-              <div className="flex items-center gap-3">
-                <label className="cursor-pointer px-4 py-2 bg-cyan-500/20 hover:bg-cyan-500/30 text-cyan-300 border border-cyan-500/40 rounded-xl text-xs font-semibold transition-all shadow-[0_0_15px_rgba(0,245,255,0.2)]">
-                  Thay Ảnh Mới
-                  <input type="file" accept="image/*" onChange={handleCoverUpload} className="hidden" />
-                </label>
-                {coverUrl && (
+              {coverUrl && (
+                <div className="flex flex-wrap items-center justify-center gap-3">
                   <button
-                    onClick={() => {
-                      setCoverUrl(null);
-                      toast.info('Đã xóa ảnh bìa!');
-                    }}
-                    className="px-4 py-2 bg-red-500/10 hover:bg-red-500/20 text-red-400 border border-red-500/30 rounded-xl text-xs font-semibold transition-colors"
+                    onClick={handleDownloadCover}
+                    className="flex items-center gap-2 px-4 py-2.5 bg-cyan-500/20 hover:bg-cyan-500/30 text-cyan-300 border border-cyan-500/40 rounded-xl text-xs font-bold transition-all shadow-[0_0_20px_rgba(0,245,255,0.25)] hover:scale-105"
                   >
-                    Xóa Ảnh Bìa
+                    <Download size={15} />
+                    Tải Ảnh Bìa Về Máy
                   </button>
-                )}
-              </div>
+
+                  <button
+                    onClick={() => window.open(coverUrl, '_blank')}
+                    className="flex items-center gap-1.5 px-3 py-2 bg-white/[0.05] hover:bg-white/[0.1] text-slate-300 border border-white/[0.1] rounded-xl text-xs font-medium transition-colors"
+                  >
+                    <ExternalLink size={14} />
+                    Xem Toàn Màn Hình
+                  </button>
+
+                  <button
+                    onClick={handleCopyCoverUrl}
+                    className="flex items-center gap-1.5 px-3 py-2 bg-white/[0.05] hover:bg-white/[0.1] text-slate-300 border border-white/[0.1] rounded-xl text-xs font-medium transition-colors"
+                  >
+                    <Copy size={14} />
+                    Sao Chép Link
+                  </button>
+                </div>
+              )}
             </div>
           )}
         </div>
