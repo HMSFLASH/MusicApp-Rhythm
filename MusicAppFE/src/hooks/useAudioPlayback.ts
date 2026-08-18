@@ -6,12 +6,11 @@ import { axiosClient } from '../api/axiosClient';
 import { getAudioConfigStorageKey } from './audioStorage';
 import { clamp } from './audioMath';
 import {
-  calculateAutoPostFxTrimDb,
-  calculateNormalizedTrackGain,
-  dbToGain,
-  INPUT_HEADROOM_DB,
+  calculateRealtimeTrackLoudnessGain,
+  measureLoudness,
+  type LoudnessMeasurement,
 } from './audioLoudness';
-import { getAudioFxActivity } from './audioFxActivity';
+import { getTrackLoudness, saveTrackLoudness, removeTrackLoudness } from '../utils/loudnessCache';
 import { getBufferProgressIntervalMs, getFullCoreCount, getPrecalculateDelayMs, getQueuePrecalculateWorkerSettings, isLikelyConstrainedDevice, isMobileDevice } from './audioDevice';
 import { audioBufferToWavBlob } from './audioBufferWav';
 import {
@@ -165,6 +164,7 @@ export function useAudioPlayback(
   const precalculatedNextBufferRef = useRef<PrecalculatedNextBuffer | null>(null);
   const precalculatedQueueBuffersRef = useRef<Map<string, AudioBuffer>>(new Map());
   const loudnessGainCacheRef = useRef<Map<string, number>>(new Map());
+  const loudnessMeasurementCacheRef = useRef<Map<string, LoudnessMeasurement>>(new Map());
   const inFlightRef = useRef<InFlightTracker>(new Map());
   const fullQueuePrecalculateCacheRef = useRef<boolean>(false);
   const isPrecalculatingNextRef = useRef<boolean>(false);
@@ -632,6 +632,21 @@ export function useAudioPlayback(
       loudnessGainCacheRef.current.clear();
       inFlightRef.current.clear();
       stopQueuePrecalculateStatusSoon();
+
+      const currentTrack = currentTrackSnapshotRef.current;
+      if (currentTrack && !usingBufferPlaybackRef.current && audioParamsRef.current.loudnessNormalization) {
+        const trackId = String(currentTrack.id);
+        const measurement = loudnessMeasurementCacheRef.current.get(trackId);
+        if (measurement) {
+          const gain = calculateRealtimeTrackLoudnessGain(
+            measurement,
+            audioParamsRef.current,
+            fxEnabledRef.current || {}
+          );
+          loudnessGainCacheRef.current.set(trackId, gain);
+          setTrackLoudnessGain?.(gain);
+        }
+      }
     }, 300);
     return () => clearTimeout(timeoutId);
   }, [
@@ -650,6 +665,7 @@ export function useAudioPlayback(
     preampGain,
     reverbMix,
     reverbTime,
+    setTrackLoudnessGain,
     stopQueuePrecalculateStatusSoon,
     stereoWidth,
     trebleGain,
@@ -699,6 +715,7 @@ export function useAudioPlayback(
       precalculatedQueueBuffersRef.current.delete(trackId);
     }
     loudnessGainCacheRef.current.delete(trackId);
+    loudnessMeasurementCacheRef.current.delete(trackId);
     inFlightRef.current.delete(trackId);
 
     if (precalculatedNextBufferRef.current?.trackId === trackId) {
@@ -1137,32 +1154,34 @@ export function useAudioPlayback(
       isParametricPreset: effectsState.isParametricPreset,
     });
 
-  const getRealtimeTrackLoudnessGain = async (track: Track, audioUrl: string) => {
+  const getRealtimeTrackLoudnessGain = async (track: Track, _audioUrl?: string) => {
     if (!audioParamsRef.current.loudnessNormalization) return 1;
 
     const trackId = String(track.id);
     const cachedGain = loudnessGainCacheRef.current.get(trackId);
     if (cachedGain != null) return cachedGain;
 
-    try {
-      const response = await fetch(audioUrl);
-      const arrayBuffer = await response.arrayBuffer();
-      const audioBuffer = await audioContextRef.current!.decodeAudioData(arrayBuffer);
-      const enabled = fxEnabledRef.current || {};
-      const fxActivity = getAudioFxActivity(audioParamsRef.current, enabled);
-      const postFxTrimDb = calculateAutoPostFxTrimDb(audioParamsRef.current, enabled);
-      const downstreamGainDb = INPUT_HEADROOM_DB + postFxTrimDb;
-      const normalizedGain = calculateNormalizedTrackGain(audioBuffer, downstreamGainDb);
-      const gain = fxActivity.any
-        ? normalizedGain
-        : normalizedGain * dbToGain(downstreamGainDb);
-      loudnessGainCacheRef.current.set(trackId, gain);
-      explicitReleaseAudioBuffer(audioBuffer);
-      return gain;
-    } catch (error) {
-      console.warn('[Audio] Loudness measurement failed; using unity gain.', error);
-      return 1;
+    // Kiểm tra trong in-memory measurement cache hoặc IndexedDB
+    let measurement = loudnessMeasurementCacheRef.current.get(trackId);
+    if (!measurement) {
+      measurement = (await getTrackLoudness(trackId)) || undefined;
+      if (measurement) {
+        loudnessMeasurementCacheRef.current.set(trackId, measurement);
+      }
     }
+
+    if (measurement) {
+      const gain = calculateRealtimeTrackLoudnessGain(
+        measurement,
+        audioParamsRef.current,
+        fxEnabledRef.current || {}
+      );
+      loudnessGainCacheRef.current.set(trackId, gain);
+      return gain;
+    }
+
+    // Nếu chưa có dữ liệu tính toán trước thì phát âm thanh bình thường (unity gain)
+    return 1;
   };
 
   const withRenderTimeout = <T>(promise: Promise<T>, ms: number, label: string): Promise<T> => {
@@ -1252,6 +1271,19 @@ export function useAudioPlayback(
             explicitReleaseAudioBuffer(audioBuffer);
           }
           throw new Error('Precalculation aborted before rendering');
+        }
+
+        // Đo đạc và lưu mức âm lượng nếu bật Cân Bằng Âm Lượng
+        if (audioParamsRef.current.loudnessNormalization && audioBuffer) {
+          try {
+            const measurement = measureLoudness(audioBuffer);
+            if (Number.isFinite(measurement.integratedLufs)) {
+              loudnessMeasurementCacheRef.current.set(trackId, measurement);
+              void saveTrackLoudness(trackId, measurement);
+            }
+          } catch (err) {
+            console.warn('[Audio] Failed to measure/save loudness during precalculate:', err);
+          }
         }
 
         let finalRenderedBuffer: AudioBuffer;
@@ -1852,11 +1884,6 @@ export function useAudioPlayback(
       pauseMediaSessionAnchor();
       audioBufferRef.current = null;
       usingBufferPlaybackRef.current = false;
-      bufferPausedTimeRef.current = 0;
-      if (loudnessNormalization) {
-        setLoadingTrackPhase(autoPlay ? 'processing' : null);
-      }
-      console.log(`[Audio] Fetching realtime loudness gain...`);
       const realtimeLoudnessGain = await getRealtimeTrackLoudnessGain(startingTrack, audioUrl);
       if (decodeSessionRef.current !== playSessionId || precalculateOnIdleRef.current) {
         console.log(`[Audio] Session changed during streaming prep, aborting.`);
@@ -2248,6 +2275,10 @@ export function useAudioPlayback(
     const handleMusicDeleted = (e: Event) => {
       const deletedId = (e as CustomEvent).detail;
       if (!deletedId) return;
+      const tid = String(deletedId);
+      loudnessGainCacheRef.current.delete(tid);
+      loudnessMeasurementCacheRef.current.delete(tid);
+      void removeTrackLoudness(tid);
       continueAfterDeletedCurrentTrack(deletedId);
     };
 

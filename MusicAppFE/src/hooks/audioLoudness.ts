@@ -1,5 +1,6 @@
 import type { EqBand } from './audioTypes';
 import { clamp } from './audioMath';
+import { getAudioFxActivity } from './audioFxActivity';
 
 export const LOUDNESS_TARGET_LUFS = -14;
 export const TRUE_PEAK_CEILING_DB = -1.5;
@@ -222,3 +223,35 @@ export const calculateAutoPostFxTrimDb = (
     0
   );
 };
+
+export const calculateRealtimeTrackLoudnessGain = (
+  measurement: LoudnessMeasurement,
+  params: {
+    preampGain?: number;
+    eqBands?: EqBand[];
+    bassGain?: number;
+    trebleGain?: number;
+    reverbMix?: number;
+    stereoWidth?: number;
+    panValue?: number;
+  },
+  fxEnabled: Partial<Record<'preamp' | 'eq' | 'tone' | 'reverb' | 'stereo' | 'master' | 'limiter', boolean>> = {}
+): number => {
+  const fxParams = {
+    preampGain: params.preampGain ?? 0,
+    eqBands: params.eqBands ?? [],
+    bassGain: params.bassGain ?? 0,
+    trebleGain: params.trebleGain ?? 0,
+    reverbMix: params.reverbMix ?? 0,
+    stereoWidth: params.stereoWidth ?? 100,
+    panValue: params.panValue ?? 0,
+  };
+  const fxActivity = getAudioFxActivity(fxParams, fxEnabled);
+  const postFxTrimDb = calculateAutoPostFxTrimDb(params, fxEnabled);
+  const downstreamGainDb = INPUT_HEADROOM_DB + postFxTrimDb;
+  const normalizedGain = dbToGain(calculateTrackGainDb(measurement, downstreamGainDb));
+  return fxActivity.any
+    ? normalizedGain
+    : normalizedGain * dbToGain(downstreamGainDb);
+};
+

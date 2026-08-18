@@ -1,6 +1,7 @@
 import { createContext, useContext, useEffect, useState, useCallback, useMemo, type ReactNode } from 'react';
 import { getAllCachedIds, removeCachedAudio, removeCachedAudios, clearCachedAudio } from '../utils/mediaCache';
 import { clearCovers } from '../utils/idb';
+import { removeTrackLoudness, removeTracksLoudness } from '../utils/loudnessCache';
 import { loadTrackAudioUrl } from '../hooks/audioTrackLoader';
 import type { Track } from '../hooks/useAudioPlayer';
 import { useAuth } from './AuthContext';
@@ -99,22 +100,30 @@ export function OfflineProvider({ children }: OfflineProviderProps) {
   }, [driveToken, fetchDriveToken, isCached, playerState, refreshCachedMediaIds]);
 
   const removeCachedAudioTrack = useCallback(async (id: string) => {
-    await removeCachedAudio(id);
+    await Promise.allSettled([
+      removeCachedAudio(id),
+      removeTrackLoudness(id),
+    ]);
     await refreshCachedMediaIds();
   }, [refreshCachedMediaIds]);
 
   const removeCachedAudioTracks = useCallback(async (ids: string[]) => {
-    await removeCachedAudios(ids);
+    await Promise.allSettled([
+      removeCachedAudios(ids),
+      removeTracksLoudness(ids),
+    ]);
     await refreshCachedMediaIds();
   }, [refreshCachedMediaIds]);
 
   const clearAllCache = useCallback(async () => {
+    const ids = Array.from(cachedMediaIds);
     await Promise.allSettled([
       clearCachedAudio(),
       clearCovers(),
+      removeTracksLoudness(ids),
     ]);
     await refreshCachedMediaIds();
-  }, [refreshCachedMediaIds]);
+  }, [cachedMediaIds, refreshCachedMediaIds]);
 
   const value = useMemo(() => ({
     isOfflineMode,

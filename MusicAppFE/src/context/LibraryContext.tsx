@@ -6,6 +6,7 @@ import { db } from '../lib/db';
 import { removeCachedAudio } from '../utils/mediaCache';
 import { getCover, removeCover } from '../utils/idb';
 import { getCachedMetadataForTrack, removeCachedMetadataForTrack } from '../utils/metadataCache';
+import { removeTrackLoudness } from '../utils/loudnessCache';
 
 interface LibraryContextType {
   tracks: Track[];
@@ -342,6 +343,7 @@ export function LibraryProvider({ children }: { children: ReactNode }) {
         removeCachedMetadataForTrack(trackId),
         removeCover(trackId),
         removeCachedAudio(trackId),
+        removeTrackLoudness(trackId),
         ...(track.driveFileId ? [removeCachedAudio(`drive:${track.driveFileId}`)] : []),
       ]);
       setTracks(prev => {
