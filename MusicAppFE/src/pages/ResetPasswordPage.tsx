@@ -1,9 +1,11 @@
 import { Disc, ChevronRight, Loader2, Lock, Eye, EyeOff } from 'lucide-react';
 import { useNavigate, useSearchParams } from 'react-router-dom';
 import { useState } from 'react';
+import { useTranslation } from 'react-i18next';
 import { axiosClient } from '../api/axiosClient';
 
 export function ResetPasswordPage() {
+  const { t } = useTranslation();
   const [searchParams] = useSearchParams();
   const token = searchParams.get('token');
 
@@ -21,15 +23,15 @@ export function ResetPasswordPage() {
   const handleSubmit = async (e: React.FormEvent) => {
     e.preventDefault();
     if (!newPassword || !confirmPassword) {
-      setError('Please fill in all fields');
+      setError(t('auth.fillAllFields', 'Please fill in all fields'));
       return;
     }
     if (newPassword !== confirmPassword) {
-      setError('Passwords do not match');
+      setError(t('auth.passwordsDoNotMatch', 'Passwords do not match'));
       return;
     }
     if (!token) {
-      setError('Invalid or missing token');
+      setError(t('auth.invalidToken', 'Invalid or missing token'));
       return;
     }
 
@@ -42,7 +44,7 @@ export function ResetPasswordPage() {
       setTimeout(() => navigate('/login'), 3000);
 
     } catch (err: any) {
-      setError(err.response?.data?.message || err.message || 'Failed to reset password. The link might be expired.');
+      setError(err.response?.data?.message || err.message || t('auth.resetPasswordFail', 'Failed to reset password. The link might be expired.'));
     } finally {
       setLoading(false);
     }
@@ -52,8 +54,8 @@ export function ResetPasswordPage() {
     return (
       <div className="w-full min-h-[calc(100dvh-8rem)] flex items-center justify-center p-3 sm:p-4">
         <div className="text-center p-5 sm:p-8 bg-white/[0.02] border border-white/5 rounded-2xl md:rounded-3xl backdrop-blur-3xl shadow-2xl">
-          <h2 className="text-xl text-white mb-2">Invalid Link</h2>
-          <p className="text-white/50 text-sm">The password reset link is invalid or missing the token.</p>
+          <h2 className="text-xl text-white mb-2">{t('auth.invalidLink', 'Invalid Link')}</h2>
+          <p className="text-white/50 text-sm">{t('auth.invalidLinkDesc', 'The password reset link is invalid or missing the token.')}</p>
         </div>
       </div>
     );
@@ -76,21 +78,21 @@ export function ResetPasswordPage() {
           <div className="w-12 h-12 rounded-2xl bg-[#00E5FF]/10 flex items-center justify-center mb-6 shadow-[0_0_30px_rgba(0,229,255,0.2)]">
             <Disc size={26} className="text-[#00E5FF] animate-spin-slow" />
           </div>
-          <h2 className="text-2xl font-semibold text-white mb-2">Create New Password</h2>
+          <h2 className="text-2xl font-semibold text-white mb-2">{t('auth.createNewPassword', 'Create New Password')}</h2>
 
           {success ? (
             <div className="mt-4">
               <div className="p-4 bg-green-500/10 border border-green-500/20 rounded-xl text-green-400 text-sm mb-6">
-                Password successfully reset!
+                {t('auth.passwordResetSuccess', 'Password successfully reset!')}
               </div>
               <p className="text-sm text-white/50 mb-8">
-                Redirecting to login page...
+                {t('auth.redirectingLogin', 'Redirecting to login page...')}
               </p>
             </div>
           ) : (
             <>
               <p className="text-sm text-white/50 mb-8">
-                Your new password must be different from previous used passwords.
+                {t('auth.newPasswordDiff', 'Your new password must be different from previous used passwords.')}
               </p>
 
               <form onSubmit={handleSubmit} className="w-full space-y-4">
@@ -111,7 +113,7 @@ export function ResetPasswordPage() {
                     type={showPassword ? "text" : "password"}
                     value={newPassword}
                     onChange={(e) => setNewPassword(e.target.value)}
-                    placeholder="New Password"
+                    placeholder={t('auth.newPassword', 'New Password')}
                     required
                     className="w-full bg-black/20 border-b border-white/10 hover:border-white/30 focus:border-[#00E5FF] text-white text-sm py-4 pl-10 pr-10 outline-none transition-all placeholder:text-white/30"
                   />
@@ -128,7 +130,7 @@ export function ResetPasswordPage() {
                     type={showConfirmPassword ? "text" : "password"}
                     value={confirmPassword}
                     onChange={(e) => setConfirmPassword(e.target.value)}
-                    placeholder="Confirm New Password"
+                    placeholder={t('auth.confirmNewPassword', 'Confirm New Password')}
                     required
                     className="w-full bg-black/20 border-b border-white/10 hover:border-white/30 focus:border-[#00E5FF] text-white text-sm py-4 pl-10 pr-10 outline-none transition-all placeholder:text-white/30"
                   />
@@ -139,7 +141,7 @@ export function ResetPasswordPage() {
                   disabled={loading}
                   className="w-full flex items-center justify-center gap-2 bg-[#00E5FF] hover:bg-[#00E5FF]/90 text-black font-bold py-4 rounded-xl shadow-[0_0_20px_rgba(0,229,255,0.3)] hover:shadow-[0_0_30px_rgba(0,229,255,0.5)] transition-all mt-6 disabled:opacity-50"
                 >
-                  {loading ? <Loader2 size={18} className="animate-spin" /> : <span>Reset Password</span>}
+                  {loading ? <Loader2 size={18} className="animate-spin" /> : <span>{t('auth.resetPasswordBtn', 'Reset Password')}</span>}
                   {!loading && <ChevronRight size={18} strokeWidth={3} />}
                 </button>
               </form>

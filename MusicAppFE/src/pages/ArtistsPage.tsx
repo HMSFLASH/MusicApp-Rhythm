@@ -1,5 +1,6 @@
 import { useState } from 'react';
 import { useNavigate, useLocation } from 'react-router-dom';
+import { useTranslation } from 'react-i18next';
 import { ArrowLeft, Mic2, Play, ListMusic, ListPlus, Shuffle, Heart } from 'lucide-react';
 import { useGlobalAudio } from '../context/AudioContext';
 import { useLibrary } from '../context/LibraryContext';
@@ -7,17 +8,20 @@ import { getSecureRandom } from '../utils/randomUtils';
 import type { Track } from '../hooks/useAudioPlayer';
 import { ActionMenu } from '../components/ActionMenu';
 import { AddToPlaylistModal } from '../components/AddToPlaylistModal';
+import { AddToQueueModal } from '../components/AddToQueueModal';
 import { useVirtualList } from '../hooks/useVirtualList';
 
 const ARTIST_TRACK_ROW_HEIGHT = 72;
 
 export function ArtistsPage() {
+  const { t } = useTranslation();
   const navigate = useNavigate();
   const location = useLocation();
   const { playerState } = useGlobalAudio();
   const { tracks, favorites, toggleFavorite } = useLibrary();
   const [selectedArtist, setSelectedArtist] = useState<string | null>(location.state?.selectedArtist || null);
   const [trackToPlaylist, setTrackToPlaylist] = useState<Track | null>(null);
+  const [tracksToQueueModal, setTracksToQueueModal] = useState<Track[] | null>(null);
 
   const artists = Array.from(new Set(
     tracks.map(t => t.artist || playerState.getTrackMetadata(t.id)?.artist || (t.fileName?.includes(' - ') ? t.fileName.split(' - ')[0] : null))
@@ -31,14 +35,14 @@ export function ArtistsPage() {
     const metaArtist = playerState.getTrackMetadata(track.id)?.artist;
     if (metaArtist) return metaArtist;
     if (track.fileName?.includes(' - ')) return track.fileName.split(' - ')[0];
-    return 'Unknown Artist';
+    return t('common.unknownArtist', 'Unknown Artist');
   };
   
   const getTitle = (track: Track) => {
     if (track.title) return track.title;
     const metaTitle = playerState.getTrackMetadata(track.id)?.title;
     if (metaTitle) return metaTitle;
-    if (!track.fileName) return 'Unknown Title';
+    if (!track.fileName) return t('common.unknownTitle', 'Unknown Title');
     const cleanName = track.fileName.replace(/\.[^/.]+$/, '');
     if (cleanName.includes(' - ')) return cleanName.split(' - ')[1];
     return cleanName;
@@ -91,12 +95,12 @@ export function ArtistsPage() {
           </button>
           <div>
             <h1 className="text-2xl md:text-3xl font-bold font-display text-white tracking-tight">
-              {selectedArtist || 'Artists'}
+              {selectedArtist || t('artists.title', 'Artists')}
             </h1>
             <p className="text-slate-400 text-xs md:text-sm font-mono mt-0.5">
               {selectedArtist
-                ? `${selectedArtistTracks.length} songs by this artist.`
-                : `${artists.length} artists in your library.`}
+                ? t('artists.artistSummary', '{{count}} songs by this artist.', { count: selectedArtistTracks.length })
+                : t('artists.librarySummary', '{{count}} artists in your library.', { count: artists.length })}
             </p>
           </div>
         </div>
@@ -105,23 +109,23 @@ export function ArtistsPage() {
             <button
               onClick={() => playTracks(selectedArtistTracks)}
               className="px-3.5 h-8.5 rounded-xl bg-primary text-slate-950 hover:brightness-110 flex items-center gap-1.5 transition-all text-xs font-bold shadow-[0_0_15px_rgba(0,245,255,0.3)] whitespace-nowrap hover:scale-105 active:scale-95"
-              title="Play Artist"
+              title={t('artists.playArtist', 'Play Artist')}
             >
-              <Play size={13} fill="currentColor" /> Play
+              <Play size={13} fill="currentColor" /> {t('common.play', 'Play')}
             </button>
             <button
               onClick={() => shuffleTracks(selectedArtistTracks)}
               className="px-3.5 h-8.5 rounded-xl bg-white/[0.06] border border-white/[0.08] text-slate-200 hover:bg-white/[0.12] hover:text-white flex items-center gap-1.5 transition-all text-xs font-semibold whitespace-nowrap"
-              title="Shuffle Artist"
+              title={t('artists.shuffleArtist', 'Shuffle')}
             >
-              <Shuffle size={13} /> Shuffle
+              <Shuffle size={13} /> {t('common.shuffle', 'Shuffle')}
             </button>
             <ActionMenu
-              ariaLabel="More artist actions"
+              ariaLabel={t('artists.moreActions', 'More artist actions')}
               buttonClassName="h-8.5 w-8.5 rounded-xl bg-white/[0.06] border border-white/[0.08] text-slate-300 hover:bg-white/[0.12] hover:text-white flex items-center justify-center transition-all"
               actions={[
-                { label: 'Add to Queue', icon: <ListPlus size={14} />, onSelect: () => playerState.addToCurrentQueue(selectedArtistTracks) },
-                { label: 'Play Next', icon: <ListMusic size={14} />, onSelect: () => playerState.addToNextQueue(selectedArtistTracks) },
+                { label: t('tracks.addToQueue', 'Add to Queue'), icon: <ListPlus size={14} />, onSelect: () => setTracksToQueueModal(selectedArtistTracks) },
+                { label: t('tracks.playNext', 'Play Next'), icon: <ListMusic size={14} />, onSelect: () => playerState.addToNextQueue(selectedArtistTracks) },
               ]}
             />
           </div>
@@ -193,12 +197,12 @@ export function ArtistsPage() {
                       ariaLabel={`Song actions for ${getTitle(track)}`}
                       buttonClassName="p-1.5 text-slate-400 hover:text-white hover:bg-white/10 rounded-lg transition-colors shrink-0"
                       actions={[
-                        { label: 'Play Next', icon: <ListMusic size={14} />, onSelect: () => playerState.addToNextQueue([track]) },
-                        { label: 'Add to Queue', icon: <ListPlus size={14} />, onSelect: () => playerState.addToCurrentQueue([track]) },
-                        { label: 'Add to Playlist', icon: <ListPlus size={14} />, onSelect: () => setTrackToPlaylist(track) },
+                        { label: t('tracks.playNext', 'Play Next'), icon: <ListMusic size={14} />, onSelect: () => playerState.addToNextQueue([track]) },
+                        { label: t('tracks.addToQueue', 'Add to Queue'), icon: <ListPlus size={14} />, onSelect: () => setTracksToQueueModal([track]) },
+                        { label: t('tracks.addToPlaylist', 'Add to Playlist'), icon: <ListPlus size={14} />, onSelect: () => setTrackToPlaylist(track) },
                         ...(track.sourceType !== 'LOCAL'
                           ? [{
-                              label: favorites.some(f => f.id === track.id) ? 'Remove Favorite' : 'Add to Favorite',
+                              label: favorites.some(f => f.id === track.id) ? t('tracks.removeFavorite', 'Remove from Favorites') : t('tracks.addFavorite', 'Add to Favorites'),
                               icon: <Heart size={14} fill={favorites.some(f => f.id === track.id) ? "currentColor" : "none"} className={favorites.some(f => f.id === track.id) ? "text-primary" : "text-slate-400"} />,
                               onSelect: () => void toggleFavorite(track)
                             }]
@@ -226,18 +230,17 @@ export function ArtistsPage() {
                 >
                   <span className="text-3xl sm:text-4xl font-bold font-display text-white/70 group-hover:text-white group-hover:scale-110 transition-all">{artist[0]}</span>
                 </div>
-                <div className="absolute bottom-0 right-0 z-10 opacity-0 group-hover:opacity-100 transition-opacity">
-                  <ActionMenu
-                    ariaLabel={`Artist actions for ${artist}`}
-                    direction="up"
-                    buttonClassName="h-8.5 w-8.5 rounded-full bg-emerald-500 text-slate-950 flex items-center justify-center shadow-lg border-2 border-[#09101d] hover:scale-110 transition-all font-bold"
-                    actions={[
-                      { label: 'Play', icon: <Play size={13} fill="currentColor" />, onSelect: () => playTracks(getArtistTracks(artist)) },
-                      { label: 'Add to Queue', icon: <ListPlus size={14} />, onSelect: () => playerState.addToCurrentQueue(getArtistTracks(artist)) },
-                      { label: 'Play Next', icon: <ListMusic size={14} />, onSelect: () => playerState.addToNextQueue(getArtistTracks(artist)) },
-                    ]}
-                  />
-                </div>
+                <ActionMenu
+                  className="absolute bottom-0 right-0 z-10 opacity-0 group-hover:opacity-100 transition-opacity"
+                  ariaLabel={`Artist actions for ${artist}`}
+                  direction="up"
+                  buttonClassName="h-8.5 w-8.5 rounded-full bg-emerald-500 text-slate-950 flex items-center justify-center shadow-lg border-2 border-[#09101d] hover:scale-110 transition-all font-bold"
+                  actions={[
+                    { label: t('common.play', 'Play'), icon: <Play size={13} fill="currentColor" />, onSelect: () => playTracks(getArtistTracks(artist)) },
+                    { label: t('tracks.addToQueue', 'Add to Queue'), icon: <ListPlus size={14} />, onSelect: () => setTracksToQueueModal(getArtistTracks(artist)) },
+                    { label: t('tracks.playNext', 'Play Next'), icon: <ListMusic size={14} />, onSelect: () => playerState.addToNextQueue(getArtistTracks(artist)) },
+                  ]}
+                />
               </div>
               <span className="text-xs sm:text-sm font-bold text-slate-200 group-hover:text-emerald-400 text-center w-full truncate px-1 transition-colors">{artist}</span>
             </div>
@@ -246,7 +249,7 @@ export function ArtistsPage() {
       ) : (
         <div className="flex-1 flex flex-col items-center justify-center opacity-50 py-16">
           <Mic2 size={56} className="mb-3 text-emerald-400" />
-          <p className="text-sm font-mono text-slate-400">No artists found in your library.</p>
+          <p className="text-sm font-mono text-slate-400">{t('artists.noArtists', 'No artists found in your library.')}</p>
         </div>
       )}
 
@@ -254,6 +257,13 @@ export function ArtistsPage() {
         isOpen={!!trackToPlaylist}
         onClose={() => setTrackToPlaylist(null)}
         track={trackToPlaylist}
+      />
+
+      <AddToQueueModal
+        isOpen={!!tracksToQueueModal}
+        tracks={tracksToQueueModal || []}
+        currentPlayingTrackId={playerState.currentTrack?.id}
+        onClose={() => setTracksToQueueModal(null)}
       />
     </div>
   );

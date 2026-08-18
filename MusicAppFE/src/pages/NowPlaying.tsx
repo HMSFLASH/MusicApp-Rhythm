@@ -1,21 +1,20 @@
 import { useState, useRef, useEffect, useCallback } from 'react';
 import { useGlobalAudio } from '../context/AudioContext';
 import { useAuth } from '../context/AuthContext';
-import { Disc, Play, Pause, SkipBack, SkipForward, Shuffle, Repeat, Heart, Info, ListPlus, MoreHorizontal, Repeat1, Volume2, VolumeX, BarChart2, Gauge, Music, Check, ArrowRight, Square, PauseCircle, ListX, Loader2, Trash2, Cpu, RefreshCw, MonitorSpeaker, Download, Activity, Moon, DownloadCloud, CheckCircle2 } from 'lucide-react';
+import { Disc, Play, Pause, SkipBack, SkipForward, Shuffle, Repeat, Heart, Info, ListPlus, MoreHorizontal, Repeat1, Volume2, VolumeX, BarChart2, Gauge, Music, Check, ArrowRight, Square, PauseCircle, ListX, Loader2, Trash2, RefreshCw, MonitorSpeaker, Download, Activity, Moon, DownloadCloud, CheckCircle2 } from 'lucide-react';
 import { HorizontalSlider } from '../components/HorizontalSlider';
 import { SpeedPitchPanel } from '../components/SpeedPitchPanel';
 import { useLibrary } from '../context/LibraryContext';
 import { useSleepTimer } from '../context/SleepTimerContext';
 import { useOffline } from '../context/OfflineContext';
 import { LyricsView } from '../components/LyricsView';
-import { AudioVisualizer } from '../components/AudioVisualizer';
+import { AudioVisualizer, type VisualizerMode } from '../components/AudioVisualizer';
 import { MeshAmbientGlow } from '../components/MeshAmbientGlow';
 import { useArtworkPalette } from '../hooks/useArtworkPalette';
 
 import { useNavigate } from 'react-router-dom';
 import { useTranslation } from 'react-i18next';
 import { useConfirm } from '../context/ConfirmContext';
-import { getAudioExtension } from '../hooks/audioMime';
 import { downloadTrackFile } from '../utils/downloadUtils';
 import { TrackInfoModal } from '../components/TrackInfoModal';
 
@@ -34,7 +33,7 @@ export function NowPlaying() {
   const confirm = useConfirm();
   const { isAuthenticated } = useAuth();
   const { playerState } = useGlobalAudio();
-  const { deleteTrack, favorites, toggleFavorite: libraryToggleFavorite } = useLibrary();
+  const { deleteTrack, favorites, toggleFavorite: libraryToggleFavorite, syncLibrary } = useLibrary();
   const { state: sleepTimerState, openModal: openSleepTimerModal } = useSleepTimer();
   const { isOfflineMode, isCached, downloadTrack, downloadingTrackIds } = useOffline();
   const navigate = useNavigate();
@@ -193,14 +192,22 @@ export function NowPlaying() {
   const [showMetadata, setShowMetadata] = useState(false);
   // Lyrics Modal state
   const [showLyrics, setShowLyrics] = useState(false);
-  // Visualizer Mode state (default to 'off')
-  const [visualizerMode, setVisualizerMode] = useState<'mirror' | 'bars' | 'wave' | 'off'>(() => {
-    const saved = localStorage.getItem('RHYTHM_VISUALIZER_MODE');
-    if (saved && ['mirror', 'bars', 'wave', 'off'].includes(saved)) {
-      return saved as 'mirror' | 'bars' | 'wave' | 'off';
+  const VISUALIZER_CYCLE: VisualizerMode[] = ['mirror', 'bars', 'wave', 'radial', 'oscilloscope', 'off'];
+  // Visualizer Mode state (default to 'mirror')
+  const [visualizerMode, setVisualizerMode] = useState<VisualizerMode>(() => {
+    const saved = localStorage.getItem('RHYTHM_VISUALIZER_MODE') as VisualizerMode;
+    if (saved && VISUALIZER_CYCLE.includes(saved)) {
+      return saved;
     }
-    return 'off';
+    return 'mirror';
   });
+
+  const cycleVisualizerMode = useCallback(() => {
+    setVisualizerMode(prev => {
+      const idx = VISUALIZER_CYCLE.indexOf(prev);
+      return VISUALIZER_CYCLE[(idx + 1) % VISUALIZER_CYCLE.length];
+    });
+  }, []);
 
   useEffect(() => {
     localStorage.setItem('RHYTHM_VISUALIZER_MODE', visualizerMode);
@@ -508,7 +515,7 @@ export function NowPlaying() {
             <div className="w-full max-w-md px-2 my-1 animate-in fade-in duration-300">
               <div
                 className="group relative p-2.5 rounded-2xl bg-white/[0.025] hover:bg-white/[0.045] border border-white/[0.06] hover:border-white/[0.1] backdrop-blur-md shadow-inner flex flex-col items-center cursor-pointer transition-all duration-300"
-                onClick={() => setVisualizerMode(m => m === 'mirror' ? 'bars' : m === 'bars' ? 'wave' : m === 'wave' ? 'off' : 'mirror')}
+                onClick={cycleVisualizerMode}
                 title={`Visualizer: ${visualizerMode.toUpperCase()} (Click to switch)`}
               >
                 <AudioVisualizer
@@ -863,7 +870,7 @@ export function NowPlaying() {
 
               {/* Visualizer Mode Toggle */}
               <button
-                onClick={() => setVisualizerMode(m => m === 'off' ? 'mirror' : m === 'mirror' ? 'bars' : m === 'bars' ? 'wave' : 'off')}
+                onClick={cycleVisualizerMode}
                 className={`transition-all p-2.5 rounded-xl flex items-center gap-1.5 cursor-pointer ${
                   visualizerMode !== 'off'
                     ? 'text-primary bg-primary/15 border border-primary/25 shadow-[0_0_12px_rgba(0,245,255,0.2)]'
@@ -1033,7 +1040,7 @@ export function NowPlaying() {
                               setShowMenu(false);
                             }}
                             className="w-full flex items-center gap-3 px-4 py-3 text-xs font-medium text-slate-300 hover:bg-white/[0.05] transition-colors border-b border-white/[0.04]"
-                            title="Tải file âm thanh về thiết bị"
+                            title={t('tracks.tooltipDownload', 'Download audio file to device')}
                           >
                             <Download size={16} className="text-slate-400" />
                             <span>{t('tracks.downloadFile', 'Download File')}</span>
@@ -1048,7 +1055,7 @@ export function NowPlaying() {
                               }
                             }}
                             className="w-full flex items-center gap-3 px-4 py-3 text-xs font-medium text-slate-300 hover:bg-white/[0.05] transition-colors border-b border-white/[0.04]"
-                            title="Lưu vào bộ nhớ đệm trình duyệt để nghe khi offline"
+                            title={t('tracks.tooltipSaveOffline', 'Save to browser cache for offline listening')}
                           >
                             {(() => {
                               if (isCached(currentTrack)) return <CheckCircle2 size={16} className="text-green-400" />;
@@ -1061,44 +1068,24 @@ export function NowPlaying() {
                           </button>
                         )}
 
-                        {getAudioExtension(currentTrack.fileName) === 'flac' && (
-                          <button
-                            onClick={() => {
-                              playerState.toggleFlacWasmForTrack(currentTrack);
-                              setShowMenu(false);
-                            }}
-                            className="w-full flex items-center gap-3 px-4 py-3 text-xs font-medium text-slate-300 hover:bg-white/[0.05] transition-colors border-b border-white/[0.04]"
-                          >
-                            <Cpu size={16} className={playerState.isFlacWasmEnabled(currentTrack) ? 'text-primary' : 'text-slate-400'} />
-                            <span>{playerState.isFlacWasmEnabled(currentTrack) ? 'Use Normal FLAC' : 'Use FLAC WASM'}</span>
-                          </button>
-                        )}
+                        <button
+                          onClick={() => {
+                            setShowMetadata(true);
+                            setShowMenu(false);
+                          }}
+                          className="w-full flex items-center gap-3 px-4 py-3 text-xs font-medium text-slate-300 hover:bg-white/[0.05] transition-colors border-b border-white/[0.04]"
+                        >
+                          <Info size={16} className="text-slate-400" />
+                          <span>{t('tracks.info', 'Track Info')}</span>
+                        </button>
 
-                        {(getAudioExtension(currentTrack.fileName) === 'm4a' || getAudioExtension(currentTrack.fileName) === 'aac') && (
-                          <button
-                            onClick={async () => {
-                              playerState.toggleM4aWasmForTrack(currentTrack);
-                              setShowMenu(false);
-                              if (currentTrack.sourceType !== 'LOCAL') {
-                                await playerState.reloadCurrentTrackFromDrive();
-                              }
-                            }}
-                            className="w-full flex items-center gap-3 px-4 py-3 text-xs font-medium text-slate-300 hover:bg-white/[0.05] transition-colors border-b border-white/[0.04]"
-                          >
-                            <Cpu size={16} className={playerState.isM4aWasmEnabled(currentTrack) ? 'text-primary' : 'text-slate-400'} />
-                            <span>{playerState.isM4aWasmEnabled(currentTrack) ? 'Use Normal M4A' : 'Use M4A WASM'}</span>
-                          </button>
-                        )}
-
-
-
-                        {currentTrack.sourceType !== 'LOCAL' && (
+                        {currentTrack && currentTrack.sourceType !== 'LOCAL' && (
                           <button
                             onClick={async () => {
                               setShowMenu(false);
-                              await playerState.reloadCurrentTrackFromDrive();
+                              await syncLibrary();
                             }}
-                            className="w-full flex items-center gap-3 px-4 py-3 text-xs font-medium text-slate-300 hover:bg-white/[0.05] transition-colors border-b border-white/[0.04]"
+                            className="w-full flex items-center gap-3 px-4 py-3 text-xs font-medium text-slate-300 hover:bg-white/[0.05] transition-colors"
                           >
                             <RefreshCw size={16} className="text-slate-400" />
                             <span>{t('nowPlaying.reloadFromDrive')}</span>
@@ -1108,17 +1095,18 @@ export function NowPlaying() {
                         {currentTrack.sourceType !== 'LOCAL' && (
                           <button
                             onClick={async () => {
+                              const trackName = currentTrack.title || currentTrack.fileName || t('common.unknownTitle', 'Unknown Title');
                               const isConfirmed = await confirm({
-                                title: 'Xóa bài hát',
-                                description: `Bạn có chắc chắn muốn xóa bài hát "${currentTrack.title || currentTrack.fileName}" khỏi thư viện?`,
-                                confirmText: 'Xóa',
+                                title: t('tracks.deleteSingleTitle', 'Delete Track'),
+                                description: t('tracks.deleteSingleDesc', 'Are you sure you want to remove "{{title}}" from your library?', { title: trackName }),
+                                confirmText: t('tracks.confirmDelete', 'Delete'),
                                 confirmColor: 'bg-red-500/20 text-red-400 hover:bg-red-500/30 border-red-500/30'
                               });
                               if (isConfirmed) {
                                 const isConfirmed2 = await confirm({
-                                  title: 'Xác nhận xóa vĩnh viễn',
-                                  description: `Hành động này sẽ xóa vĩnh viễn bài hát "${currentTrack.title || currentTrack.fileName}" từ Google Drive của bạn và không thể hoàn tác. Bạn vẫn muốn tiếp tục?`,
-                                  confirmText: 'Xóa vĩnh viễn',
+                                  title: t('tracks.deleteSinglePermanentTitle', 'Confirm Permanent Deletion'),
+                                  description: t('tracks.deleteSinglePermanentDesc', 'This will permanently delete "{{title}}" from your Google Drive and cannot be undone. Do you still want to proceed?', { title: trackName }),
+                                  confirmText: t('tracks.confirmPermanentDelete', 'Delete Permanently'),
                                   confirmColor: 'bg-red-600 text-white hover:bg-red-700 border-red-600'
                                 });
                                 if (isConfirmed2) {
@@ -1130,7 +1118,7 @@ export function NowPlaying() {
                             className="w-full flex items-center gap-3 px-4 py-3 text-xs font-medium text-red-400 hover:bg-red-500/10 transition-colors border-t border-white/[0.04]"
                           >
                             <Trash2 size={16} />
-                            <span>Delete from Library</span>
+                            <span>{t('tracks.delete', 'Delete Track')}</span>
                           </button>
                         )}
                       </>

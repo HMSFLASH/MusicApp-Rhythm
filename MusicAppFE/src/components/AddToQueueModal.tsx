@@ -1,5 +1,6 @@
 import { useState, useEffect } from 'react';
 import { X, ListMusic, Plus, Play, Check, Layers, ListEnd, ListPlus } from 'lucide-react';
+import { useTranslation } from 'react-i18next';
 import type { Track } from '../hooks/audioTypes';
 import { useToast } from '../context/ToastContext';
 import { loadMultiQueues, saveMultiQueues, addTracksToTargetQueue, MAX_QUEUES, type MultiQueue } from '../utils/multiQueueStorage';
@@ -19,6 +20,7 @@ export function AddToQueueModal({
   onClose,
   onQueueUpdated,
 }: AddToQueueModalProps) {
+  const { t } = useTranslation();
   const { toast } = useToast();
   const [queues, setQueues] = useState<MultiQueue[]>([]);
   const [activeQueueId, setActiveQueueId] = useState<string>('queue-1');
@@ -42,10 +44,10 @@ export function AddToQueueModal({
 
   const handleCreateNewQueue = () => {
     if (queues.length >= MAX_QUEUES) {
-      toast.info(`Đã đạt giới hạn tối đa ${MAX_QUEUES} hàng đợi.`);
+      toast.info(t('modals.addToQueue.maxQueuesReached', 'Reached maximum of {{max}} queues.', { max: MAX_QUEUES }));
       return;
     }
-    const name = newQueueName.trim() || `Hàng Đợi ${queues.length + 1}`;
+    const name = newQueueName.trim() || t('queue.queueName', 'Queue {{index}}', { index: queues.length + 1 });
     const newQueue: MultiQueue = {
       id: `queue-${Date.now()}`,
       name,
@@ -56,7 +58,7 @@ export function AddToQueueModal({
     const updated = [...queues, newQueue];
     saveMultiQueues(updated, activeQueueId);
     setQueues(updated);
-    toast.success(`Đã tạo hàng đợi "${name}" và thêm ${tracks.length} bài hát!`);
+    toast.success(t('modals.addToQueue.createSuccess', 'Created queue "{{name}}" and added {{count}} tracks!', { name, count: tracks.length }));
     if (onQueueUpdated) {
       onQueueUpdated(newQueue.id, newQueue.tracks);
     }
@@ -66,16 +68,16 @@ export function AddToQueueModal({
   const handleApplyToQueue = () => {
     const result = addTracksToTargetQueue(selectedQueueId, tracks, insertMode, currentPlayingTrackId);
     const updatedQueue = result.queues.find((q) => q.id === selectedQueueId);
-    const targetName = updatedQueue?.name || 'Hàng đợi';
+    const targetName = updatedQueue?.name || t('queue.queueDefault', 'Queue');
 
     const modeText =
       insertMode === 'replace'
-        ? 'đã thay thế toàn bộ'
+        ? t('modals.addToQueue.modeReplaced', 'replaced entire')
         : insertMode === 'next'
-        ? 'sẽ phát tiếp theo trong'
-        : 'đã thêm vào cuối';
+        ? t('modals.addToQueue.modePlayNext', 'will play next in')
+        : t('modals.addToQueue.modeAddedEnd', 'added to end of');
 
-    toast.success(`Đã thêm ${tracks.length} bài hát (${modeText} "${targetName}")!`);
+    toast.success(t('modals.addToQueue.applySuccess', 'Added {{count}} tracks ({{mode}} "{{name}}")!', { count: tracks.length, mode: modeText, name: targetName }));
 
     if (onQueueUpdated && updatedQueue) {
       onQueueUpdated(selectedQueueId, updatedQueue.tracks);
@@ -106,10 +108,10 @@ export function AddToQueueModal({
             </div>
             <div>
               <h2 className="text-base font-bold font-display text-white tracking-tight leading-none">
-                Thêm Vào Đa Hàng Đợi
+                {t('modals.addToQueue.title', 'Add to Multi-Queue')}
               </h2>
               <p className="text-xs text-slate-400 mt-1 line-clamp-1">
-                {tracks.length} bài hát được chọn • Tối đa {MAX_QUEUES} hàng đợi
+                {t('modals.addToQueue.subtitle', '{{count}} tracks selected • Max {{max}} queues', { count: tracks.length, max: MAX_QUEUES })}
               </p>
             </div>
           </div>
@@ -125,7 +127,7 @@ export function AddToQueueModal({
         <div className="p-6 overflow-y-auto no-scrollbar flex-1 flex flex-col gap-4">
           {/* Insertion Mode */}
           <div className="flex flex-col gap-1.5">
-            <span className="text-[11px] font-semibold text-slate-400 uppercase tracking-wider">Vị Trí Chèn</span>
+            <span className="text-[11px] font-semibold text-slate-400 uppercase tracking-wider">{t('modals.addToQueue.insertMode', 'Insert Position')}</span>
             <div className="grid grid-cols-3 gap-2 bg-black/40 p-1 rounded-xl border border-white/[0.06]">
               <button
                 type="button"
@@ -137,7 +139,7 @@ export function AddToQueueModal({
                 }`}
               >
                 <ListEnd size={13} />
-                Vào Cuối
+                {t('modals.addToQueue.modeEnd', 'At End')}
               </button>
               <button
                 type="button"
@@ -149,7 +151,7 @@ export function AddToQueueModal({
                 }`}
               >
                 <Play size={12} fill="currentColor" />
-                Phát Kế Tiếp
+                {t('modals.addToQueue.modePlayNextLabel', 'Play Next')}
               </button>
               <button
                 type="button"
@@ -161,7 +163,7 @@ export function AddToQueueModal({
                 }`}
               >
                 <ListPlus size={13} />
-                Thay Thế
+                {t('modals.addToQueue.modeReplaceLabel', 'Replace')}
               </button>
             </div>
           </div>
@@ -170,7 +172,7 @@ export function AddToQueueModal({
           <div className="flex flex-col gap-2">
             <div className="flex items-center justify-between">
               <span className="text-[11px] font-semibold text-slate-400 uppercase tracking-wider">
-                Chọn Hàng Đợi Đích ({queues.length}/{MAX_QUEUES})
+                {t('modals.addToQueue.selectTargetQueue', 'Select Target Queue ({{count}}/{{max}})', { count: queues.length, max: MAX_QUEUES })}
               </span>
               {queues.length < MAX_QUEUES && !isCreatingNew && (
                 <button
@@ -179,7 +181,7 @@ export function AddToQueueModal({
                   className="text-xs text-cyan-400 hover:text-cyan-300 flex items-center gap-1 font-semibold"
                 >
                   <Plus size={13} />
-                  Tạo Hàng Đợi Mới
+                  {t('modals.addToQueue.createNewQueue', 'New Queue')}
                 </button>
               )}
             </div>
@@ -188,14 +190,14 @@ export function AddToQueueModal({
             {isCreatingNew && (
               <div className="bg-white/[0.04] border border-cyan-500/30 p-3 rounded-2xl flex flex-col gap-2.5 animate-in fade-in duration-150">
                 <span className="text-xs font-bold text-cyan-300 flex items-center gap-1.5">
-                  <Plus size={14} /> Đặt Tên Hàng Đợi Mới
+                  <Plus size={14} /> {t('modals.addToQueue.nameNewQueue', 'Name New Queue')}
                 </span>
                 <div className="flex items-center gap-2">
                   <input
                     type="text"
                     value={newQueueName}
                     onChange={(e) => setNewQueueName(e.target.value)}
-                    placeholder="VD: Nhạc Tập Gym, Nhạc Chill..."
+                    placeholder={t('modals.addToQueue.queueNamePlaceholder', 'e.g. Workout Music, Chill...')}
                     className="flex-1 bg-black/50 border border-white/[0.1] text-white text-xs rounded-xl px-3 py-2 focus:outline-none focus:border-cyan-500/50"
                   />
                   <button
@@ -203,7 +205,7 @@ export function AddToQueueModal({
                     onClick={handleCreateNewQueue}
                     className="px-3.5 py-2 bg-cyan-500 text-black font-bold text-xs rounded-xl hover:bg-cyan-400 transition-colors"
                   >
-                    Tạo & Thêm
+                    {t('modals.addToQueue.createAndAdd', 'Create & Add')}
                   </button>
                   <button
                     type="button"
@@ -246,12 +248,12 @@ export function AddToQueueModal({
                           <span className="text-xs font-bold truncate block">{q.name}</span>
                           {isCurrentActive && (
                             <span className="text-[10px] font-mono font-bold text-cyan-400 bg-cyan-500/20 px-1.5 py-0.2 rounded border border-cyan-500/30">
-                              Đang Phát
+                              {t('queue.nowPlayingBadge', 'Now Playing')}
                             </span>
                           )}
                         </div>
                         <span className="text-[11px] text-slate-400 block font-mono mt-0.5">
-                          {q.tracks.length} bài hát
+                          {t('queue.trackCount', '{{count}} tracks', { count: q.tracks.length })}
                         </span>
                       </div>
                     </div>
@@ -279,7 +281,7 @@ export function AddToQueueModal({
             onClick={onClose}
             className="px-4 py-2 bg-white/[0.05] hover:bg-white/[0.1] text-slate-300 border border-white/[0.1] rounded-xl text-xs font-semibold transition-colors"
           >
-            Hủy
+            {t('common.cancel', 'Cancel')}
           </button>
           <button
             type="button"
@@ -287,7 +289,7 @@ export function AddToQueueModal({
             className="flex items-center gap-2 px-5 py-2 bg-cyan-500 hover:bg-cyan-400 text-black rounded-xl text-xs font-bold transition-all shadow-[0_0_20px_rgba(0,245,255,0.3)] hover:scale-105"
           >
             <Check size={16} />
-            Xác Nhận Thêm
+            {t('modals.addToQueue.confirmAdd', 'Confirm Add')}
           </button>
         </div>
       </div>

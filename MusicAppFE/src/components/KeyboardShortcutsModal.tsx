@@ -1,11 +1,13 @@
 import { useEffect, useState, memo } from 'react';
 import { Keyboard, X } from 'lucide-react';
+import { useTranslation } from 'react-i18next';
 import { useGlobalAudio } from '../context/AudioContext';
 import { useLibrary } from '../context/LibraryContext';
 import { useToast } from '../context/ToastContext';
 import { useSleepTimer } from '../context/SleepTimerContext';
 
 export const KeyboardShortcutsModal = memo(function KeyboardShortcutsModal() {
+  const { t } = useTranslation();
   const [isOpen, setIsOpen] = useState(false);
   const { playerState } = useGlobalAudio();
   const { toggleFavorite, favorites } = useLibrary();
@@ -41,7 +43,7 @@ export const KeyboardShortcutsModal = memo(function KeyboardShortcutsModal() {
       if (e.code === 'Space') {
         e.preventDefault();
         togglePlay();
-        toast.info(isPlaying ? 'Tạm dừng (Paused)' : 'Đang phát (Playing)');
+        toast.info(isPlaying ? t('shortcuts.toastPaused', 'Paused') : t('shortcuts.toastPlaying', 'Playing'));
         return;
       }
 
@@ -50,7 +52,7 @@ export const KeyboardShortcutsModal = memo(function KeyboardShortcutsModal() {
         const delta = e.shiftKey ? 15 : 5;
         const target = Math.max(0, currentTime - delta);
         seek(target);
-        toast.info(`Tua lại -${delta}s`);
+        toast.info(t('shortcuts.toastSeekBack', 'Rewind -{{delta}}s', { delta }));
         return;
       }
 
@@ -59,7 +61,7 @@ export const KeyboardShortcutsModal = memo(function KeyboardShortcutsModal() {
         const delta = e.shiftKey ? 15 : 5;
         const target = Math.min(duration, currentTime + delta);
         seek(target);
-        toast.info(`Tua tới +${delta}s`);
+        toast.info(t('shortcuts.toastSeekForward', 'Fast forward +{{delta}}s', { delta }));
         return;
       }
 
@@ -67,7 +69,7 @@ export const KeyboardShortcutsModal = memo(function KeyboardShortcutsModal() {
         e.preventDefault();
         const newVol = Math.min(1, Math.round((volume + 0.05) * 100) / 100);
         setVolume(newVol);
-        toast.info(`Âm lượng: ${Math.round(newVol * 100)}%`);
+        toast.info(t('shortcuts.toastVolume', 'Volume: {{vol}}%', { vol: Math.round(newVol * 100) }));
         return;
       }
 
@@ -75,7 +77,7 @@ export const KeyboardShortcutsModal = memo(function KeyboardShortcutsModal() {
         e.preventDefault();
         const newVol = Math.max(0, Math.round((volume - 0.05) * 100) / 100);
         setVolume(newVol);
-        toast.info(`Âm lượng: ${Math.round(newVol * 100)}%`);
+        toast.info(t('shortcuts.toastVolume', 'Volume: {{vol}}%', { vol: Math.round(newVol * 100) }));
         return;
       }
 
@@ -83,14 +85,14 @@ export const KeyboardShortcutsModal = memo(function KeyboardShortcutsModal() {
         e.preventDefault();
         const newVol = volume > 0 ? 0 : 0.8;
         setVolume(newVol);
-        toast.info(newVol === 0 ? 'Đã tắt tiếng (Muted)' : `Bật âm lượng: ${Math.round(newVol * 100)}%`);
+        toast.info(newVol === 0 ? t('shortcuts.toastMuted', 'Muted') : t('shortcuts.toastUnmuted', 'Volume: {{vol}}%', { vol: Math.round(newVol * 100) }));
         return;
       }
 
       if (e.code === 'KeyS') {
         e.preventDefault();
         setIsShuffle(!isShuffle);
-        toast.info(!isShuffle ? 'Trộn bài: Bật (Shuffle ON)' : 'Trộn bài: Tắt (Shuffle OFF)');
+        toast.info(!isShuffle ? t('shortcuts.toastShuffleOn', 'Shuffle: ON') : t('shortcuts.toastShuffleOff', 'Shuffle: OFF'));
         return;
       }
 
@@ -98,14 +100,14 @@ export const KeyboardShortcutsModal = memo(function KeyboardShortcutsModal() {
         e.preventDefault();
         if (songEndMode === 'next' && queueEndMode === 'stop') {
           setQueueEndMode('repeat');
-          toast.info('Lặp lại: Danh sách (Repeat Queue)');
+          toast.info(t('shortcuts.toastRepeatQueue', 'Repeat: Queue'));
         } else if (songEndMode === 'next' && queueEndMode === 'repeat') {
           setSongEndMode('repeat_one');
-          toast.info('Lặp lại: 1 bài (Repeat 1 Track)');
+          toast.info(t('shortcuts.toastRepeatOne', 'Repeat: 1 Track'));
         } else {
           setSongEndMode('next');
           setQueueEndMode('stop');
-          toast.info('Lặp lại: Tắt (Repeat OFF)');
+          toast.info(t('shortcuts.toastRepeatOff', 'Repeat: OFF'));
         }
         return;
       }
@@ -114,7 +116,7 @@ export const KeyboardShortcutsModal = memo(function KeyboardShortcutsModal() {
         e.preventDefault();
         void toggleFavorite(currentTrack);
         const isFav = favorites.some(f => f.id === currentTrack.id);
-        toast.success(isFav ? 'Đã xóa khỏi yêu thích' : 'Đã thêm vào bài hát yêu thích');
+        toast.success(isFav ? t('tracks.removedFavorite', 'Removed from Favorites') : t('tracks.addedFavorite', 'Added to Favorites'));
         return;
       }
 
@@ -127,21 +129,21 @@ export const KeyboardShortcutsModal = memo(function KeyboardShortcutsModal() {
 
     window.addEventListener('keydown', handleKeyDown);
     return () => window.removeEventListener('keydown', handleKeyDown);
-  }, [isOpen, isPlaying, togglePlay, seek, currentTime, duration, volume, setVolume, isShuffle, setIsShuffle, songEndMode, setSongEndMode, queueEndMode, setQueueEndMode, currentTrack, toggleFavorite, favorites, toast, toggleSleepTimerModal]);
+  }, [isOpen, isPlaying, togglePlay, seek, currentTime, duration, volume, setVolume, isShuffle, setIsShuffle, songEndMode, setSongEndMode, queueEndMode, setQueueEndMode, currentTrack, toggleFavorite, favorites, toast, toggleSleepTimerModal, t]);
 
   if (!isOpen) return null;
 
   const shortcuts = [
-    { keys: ['Space'], desc: 'Phát / Tạm dừng (Play / Pause)' },
-    { keys: ['←', '→'], desc: 'Tua lại / Tua tới 5 giây (Seek ±5s)' },
-    { keys: ['Shift', '← / →'], desc: 'Tua nhanh 15 giây (Seek ±15s)' },
-    { keys: ['↑', '↓'], desc: 'Tăng / Giảm âm lượng (Volume ±5%)' },
-    { keys: ['M'], desc: 'Bật / Tắt tiếng (Mute / Unmute)' },
-    { keys: ['S'], desc: 'Bật / Tắt phát trộn bài (Toggle Shuffle)' },
-    { keys: ['R'], desc: 'Chuyển chế độ lặp lại (Cycle Repeat)' },
-    { keys: ['F'], desc: 'Thêm / Bỏ yêu thích bài hiện tại (Toggle Favorite)' },
-    { keys: ['T'], desc: 'Hẹn giờ tắt nhạc (Sleep Timer)' },
-    { keys: ['?'], desc: 'Mở bảng phím tắt này (Keyboard Shortcuts)' },
+    { keys: ['Space'], desc: t('shortcuts.playPause', 'Play / Pause') },
+    { keys: ['←', '→'], desc: t('shortcuts.seek5s', 'Seek 5 seconds') },
+    { keys: ['Shift', '← / →'], desc: t('shortcuts.seek15s', 'Fast seek 15 seconds') },
+    { keys: ['↑', '↓'], desc: t('shortcuts.volumeChange', 'Volume ±5%') },
+    { keys: ['M'], desc: t('shortcuts.mute', 'Mute / Unmute') },
+    { keys: ['S'], desc: t('shortcuts.shuffle', 'Toggle Shuffle') },
+    { keys: ['R'], desc: t('shortcuts.repeat', 'Cycle Repeat') },
+    { keys: ['F'], desc: t('shortcuts.favorite', 'Toggle Favorite') },
+    { keys: ['T'], desc: t('shortcuts.sleepTimer', 'Sleep Timer') },
+    { keys: ['?'], desc: t('shortcuts.openModalDesc', 'Open this shortcuts cheatsheet') },
   ];
 
   return (
@@ -159,8 +161,8 @@ export const KeyboardShortcutsModal = memo(function KeyboardShortcutsModal() {
               <Keyboard size={20} />
             </div>
             <div>
-              <h2 className="text-base sm:text-lg font-bold font-display text-white">Phím Tắt Nhanh (Keyboard Shortcuts)</h2>
-              <p className="text-[11px] text-slate-400 font-mono">Điều khiển âm nhạc tức thì không cần chuột</p>
+              <h2 className="text-base sm:text-lg font-bold font-display text-white">{t('shortcuts.modalTitle', 'Keyboard Shortcuts')}</h2>
+              <p className="text-[11px] text-slate-400 font-mono">{t('shortcuts.modalSubtitle', 'Control music instantly with your keyboard')}</p>
             </div>
           </div>
           <button

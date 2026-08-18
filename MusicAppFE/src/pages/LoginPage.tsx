@@ -1,11 +1,13 @@
 import { Disc, ChevronRight, Loader2, Eye, EyeOff } from 'lucide-react';
 import { NavLink, useNavigate, useSearchParams } from 'react-router-dom';
 import { useState, useEffect } from 'react';
+import { useTranslation } from 'react-i18next';
 import { axiosClient } from '../api/axiosClient';
 import { useAuth } from '../context/AuthContext';
 import { BACKEND_URL } from '../api/axiosClient';
 
 export function LoginPage() {
+  const { t } = useTranslation();
   const [loginId, setLoginId] = useState('');
   const [password, setPassword] = useState('');
   const [showPassword, setShowPassword] = useState(false);
@@ -19,9 +21,9 @@ export function LoginPage() {
     const errorParam = searchParams.get('error');
     const messageParam = searchParams.get('message');
     if (errorParam === 'oauth2_failure') {
-      setError(messageParam || 'Google login failed');
+      setError(messageParam || t('auth.invalidCredentials', 'Google login failed'));
     }
-  }, [searchParams]);
+  }, [searchParams, t]);
 
   const handleGoogleLogin = (provider: string = 'google') => {
     globalThis.location.href = `${BACKEND_URL}/oauth2/authorization/${provider}`;
@@ -43,7 +45,7 @@ export function LoginPage() {
       navigate('/');
 
     } catch (err: any) {
-      setError(err.message || 'Invalid credentials');
+      setError(err.message || t('auth.invalidCredentials', 'Invalid credentials'));
     } finally {
       setLoading(false);
     }
@@ -71,11 +73,10 @@ export function LoginPage() {
               <Disc size={26} className="text-primary animate-spin-slow" />
             </div>
             <h1 className="text-3xl lg:text-4xl font-bold font-display text-white tracking-tight leading-tight">
-              Master your <br />
-              <span className="text-transparent bg-clip-text bg-gradient-to-r from-primary to-cyan-300">Audio Space</span>
+              {t('auth.brandTagline', 'Master your Audio Space')}
             </h1>
             <p className="text-xs lg:text-sm font-mono text-slate-400 mt-4 max-w-xs leading-relaxed">
-              Connect to your Rhythm workspace. Adjust frequencies, dial in the perfect tone, and sync your music library.
+              {t('auth.brandDesc', 'Connect to your Rhythm workspace. Adjust frequencies, dial in the perfect tone, and sync your music library.')}
             </p>
           </div>
 
@@ -88,8 +89,8 @@ export function LoginPage() {
 
         {/* Right Side: Login Form */}
         <div className="flex flex-col justify-center p-6 sm:p-8 lg:p-12 relative">
-          <h2 className="text-2xl font-bold font-display text-white mb-1">Welcome back</h2>
-          <p className="text-xs font-mono text-slate-400 mb-8">Sign in to sync your presets and audio library.</p>
+          <h2 className="text-2xl font-bold font-display text-white mb-1">{t('auth.welcomeBack', 'Welcome back')}</h2>
+          <p className="text-xs font-mono text-slate-400 mb-8">{t('auth.signInSubtitle', 'Sign in to sync your presets and audio library.')}</p>
 
           <form onSubmit={handleLocalLogin} className="w-full space-y-4">
 
@@ -102,13 +103,13 @@ export function LoginPage() {
             {/* Input Groups */}
             <div className="space-y-1.5">
               <label className="text-[11px] font-mono font-semibold uppercase tracking-wider text-slate-400">
-                Email or Username
+                {t('auth.emailOrUsername', 'Email or Username')}
               </label>
               <input
                 type="text"
                 value={loginId}
                 onChange={(e) => setLoginId(e.target.value)}
-                placeholder="Enter email or username"
+                placeholder={t('auth.emailPlaceholder', 'Enter email or username')}
                 required
                 className="w-full bg-white/[0.03] border border-white/[0.08] hover:border-white/20 focus:border-primary text-white text-sm rounded-xl py-3 px-3.5 outline-none transition-all placeholder:text-slate-500 font-sans focus:shadow-[0_0_15px_rgba(0,245,255,0.15)]"
               />
@@ -116,14 +117,14 @@ export function LoginPage() {
 
             <div className="space-y-1.5">
               <label className="text-[11px] font-mono font-semibold uppercase tracking-wider text-slate-400">
-                Password
+                {t('auth.password', 'Password')}
               </label>
               <div className="relative">
                 <input
                   type={showPassword ? "text" : "password"}
                   value={password}
                   onChange={(e) => setPassword(e.target.value)}
-                  placeholder="Enter password"
+                  placeholder={t('auth.passwordPlaceholder', 'Enter password')}
                   required
                   className="w-full bg-white/[0.03] border border-white/[0.08] hover:border-white/20 focus:border-primary text-white text-sm rounded-xl py-3 px-3.5 pr-10 outline-none transition-all placeholder:text-slate-500 font-sans focus:shadow-[0_0_15px_rgba(0,245,255,0.15)]"
                 />
@@ -143,7 +144,7 @@ export function LoginPage() {
                 onClick={() => navigate('/forgot-password')}
                 className="text-xs font-mono text-slate-400 hover:text-primary transition-colors"
               >
-                Forgot Password?
+                {t('auth.forgotPassword', 'Forgot Password?')}
               </button>
             </div>
 
@@ -153,7 +154,7 @@ export function LoginPage() {
               disabled={loading}
               className="w-full flex items-center justify-center gap-2 bg-primary hover:brightness-110 text-slate-950 font-bold py-3.5 rounded-xl shadow-[0_0_20px_rgba(0,245,255,0.35)] hover:shadow-[0_0_25px_rgba(0,245,255,0.5)] transition-all disabled:opacity-50 text-sm hover:scale-[1.01] active:scale-[0.99]"
             >
-              {loading ? <Loader2 size={18} className="animate-spin" /> : <span>Sign In</span>}
+              {loading ? <Loader2 size={18} className="animate-spin" /> : <span>{t('auth.signIn', 'Sign In')}</span>}
               {!loading && <ChevronRight size={16} strokeWidth={3} />}
             </button>
           </form>
@@ -162,7 +163,7 @@ export function LoginPage() {
             <div className="absolute inset-0 flex items-center">
               <div className="w-full border-t border-white/[0.06]"></div>
             </div>
-            <div className="relative px-3 bg-[#0c1626] text-[10px] font-mono text-slate-500 uppercase tracking-widest">Or continue with</div>
+            <div className="relative px-3 bg-[#0c1626] text-[10px] font-mono text-slate-500 uppercase tracking-widest">{t('auth.orContinueWith', 'Or continue with')}</div>
           </div>
 
           {/* Social / Alternative Logins */}
@@ -177,12 +178,12 @@ export function LoginPage() {
                 <path d="M5.84 14.09c-.22-.66-.35-1.36-.35-2.09s.13-1.43.35-2.09V7.07H2.18C1.43 8.55 1 10.22 1 12s.43 3.45 1.18 4.93l2.85-2.22.81-.62z" fill="#FBBC05" />
                 <path d="M12 5.38c1.62 0 3.06.56 4.21 1.64l3.15-3.15C17.45 2.09 14.97 1 12 1 7.7 1 3.99 3.47 2.18 7.07l3.66 2.84c.87-2.6 3.3-4.53 6.16-4.53z" fill="#EA4335" />
               </svg>
-              <span className="text-slate-200">Continue with Google</span>
+              <span className="text-slate-200">{t('auth.continueWithGoogle', 'Continue with Google')}</span>
             </button>
           </div>
 
           <p className="mt-6 text-xs text-center text-slate-400 font-mono">
-            Don't have an account? <NavLink to="/register" className="text-primary hover:underline font-semibold ml-1">Create one now</NavLink>
+            {t('auth.dontHaveAccount', "Don't have an account?")} <NavLink to="/register" className="text-primary hover:underline font-semibold ml-1">{t('auth.createOneNow', 'Create one now')}</NavLink>
           </p>
 
         </div>

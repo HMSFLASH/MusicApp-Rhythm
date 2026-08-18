@@ -8,6 +8,7 @@ import { useUploadQueue } from '../context/UploadContext';
 import { useLibrary } from '../context/LibraryContext';
 import { ActionMenu } from '../components/ActionMenu';
 import { AddToPlaylistModal } from '../components/AddToPlaylistModal';
+import { AddToQueueModal } from '../components/AddToQueueModal';
 import type { Track } from '../hooks/useAudioPlayer';
 import { downloadTrackFile } from '../utils/downloadUtils';
 
@@ -18,6 +19,7 @@ export function LibraryPage() {
   const { queueDirectFiles, uploadTasks } = useUploadQueue();
   const { tracks, favorites, toggleFavorite, syncLibrary, isLoading } = useLibrary();
   const [trackToPlaylist, setTrackToPlaylist] = useState<Track | null>(null);
+  const [tracksToQueueModal, setTracksToQueueModal] = useState<Track[] | null>(null);
 
   const getUploadSelection = (files: File[]) => {
     const pendingFiles: File[] = [];
@@ -69,10 +71,14 @@ export function LibraryPage() {
       <div className="mb-6 md:mb-8 flex flex-col md:flex-row justify-between items-start md:items-center gap-4 border-b border-white/[0.06] pb-6">
         <div className="min-w-0">
           <h1 className="text-2xl md:text-3xl font-bold font-display text-white tracking-tight flex items-center gap-2.5">
-            Your Library
+            {t('library.title', 'Your Library')}
           </h1>
           <p className="text-slate-400 text-xs md:text-sm mt-1 font-mono">
-            {tracks.length} songs • {albumsCount} albums • {artistsCount} artists
+            {t('library.summary', '{{songs}} songs • {{albums}} albums • {{artists}} artists', {
+              songs: tracks.length,
+              albums: albumsCount,
+              artists: artistsCount
+            })}
           </p>
         </div>
         <div className="flex w-full flex-wrap items-center gap-2.5 sm:w-auto">
@@ -87,17 +93,17 @@ export function LibraryPage() {
           <label
             htmlFor="drive-upload"
             className="flex min-w-0 flex-1 sm:flex-none items-center justify-center gap-2 px-4 py-2.5 rounded-xl border border-primary/30 bg-primary/10 hover:bg-primary/20 text-primary cursor-pointer transition-all shadow-[0_0_15px_rgba(0,245,255,0.15)] hover:shadow-[0_0_20px_rgba(0,245,255,0.3)] hover:scale-[1.02] active:scale-95"
-            title="Upload through backend metadata scan"
+            title={t('library.uploadHint', 'Upload audio files to Google Drive with automatic metadata extraction')}
           >
             <CloudUpload size={16} />
-            <span className="truncate text-xs font-bold">Upload to Drive</span>
+            <span className="truncate text-xs font-bold">{t('library.uploadToDrive', 'Upload to Drive')}</span>
           </label>
           <ActionMenu
-            ariaLabel="More library actions"
+            ariaLabel={t('albums.moreActions', 'More library actions')}
             buttonClassName="h-10 w-10 rounded-xl border border-white/[0.08] bg-white/[0.04] text-slate-300 hover:border-white/20 hover:bg-white/[0.08] hover:text-white flex items-center justify-center transition-all"
             actions={[
               {
-                label: isLoading ? 'Reloading' : 'Reload Library',
+                label: isLoading ? t('library.reloading', 'Reloading...') : t('library.reloadLibrary', 'Reload Library'),
                 icon: <RefreshCw size={14} className={isLoading ? 'animate-spin text-primary' : ''} />,
                 disabled: isLoading,
                 onSelect: () => syncLibrary(),
@@ -120,8 +126,8 @@ export function LibraryPage() {
             <Disc size={22} />
           </div>
           <div className="relative z-10">
-            <h2 className="text-base font-bold text-white mb-0.5 group-hover:text-primary transition-colors">All Songs</h2>
-            <p className="text-slate-400 text-xs font-mono">{tracks.length} tracks</p>
+            <h2 className="text-base font-bold text-white mb-0.5 group-hover:text-primary transition-colors">{t('library.allSongs', 'All Songs')}</h2>
+            <p className="text-slate-400 text-xs font-mono">{t('library.allSongsDesc', '{{count}} tracks', { count: tracks.length })}</p>
           </div>
         </div>
 
@@ -136,8 +142,8 @@ export function LibraryPage() {
             <Heart size={22} fill="currentColor" />
           </div>
           <div className="relative z-10">
-            <h2 className="text-base font-bold text-white mb-0.5 group-hover:text-rose-400 transition-colors">Favorites</h2>
-            <p className="text-slate-400 text-xs font-mono">{favorites.length} tracks</p>
+            <h2 className="text-base font-bold text-white mb-0.5 group-hover:text-rose-400 transition-colors">{t('library.favorites', 'Favorites')}</h2>
+            <p className="text-slate-400 text-xs font-mono">{t('library.favoritesDesc', '{{count}} tracks', { count: favorites.length })}</p>
           </div>
         </div>
 
@@ -152,8 +158,8 @@ export function LibraryPage() {
             <ListMusic size={22} />
           </div>
           <div className="relative z-10">
-            <h2 className="text-base font-bold text-white mb-0.5 group-hover:text-emerald-400 transition-colors">Playlists</h2>
-            <p className="text-slate-400 text-xs font-mono">Custom collections</p>
+            <h2 className="text-base font-bold text-white mb-0.5 group-hover:text-emerald-400 transition-colors">{t('library.playlists', 'Playlists')}</h2>
+            <p className="text-slate-400 text-xs font-mono">{t('library.playlistsDesc', 'Custom collections')}</p>
           </div>
         </div>
 
@@ -168,8 +174,8 @@ export function LibraryPage() {
             <Album size={22} />
           </div>
           <div className="relative z-10">
-            <h2 className="text-base font-bold text-white mb-0.5 group-hover:text-amber-400 transition-colors">Albums</h2>
-            <p className="text-slate-400 text-xs font-mono">{albumsCount} albums</p>
+            <h2 className="text-base font-bold text-white mb-0.5 group-hover:text-amber-400 transition-colors">{t('library.albums', 'Albums')}</h2>
+            <p className="text-slate-400 text-xs font-mono">{t('library.albumsDesc', '{{count}} albums', { count: albumsCount })}</p>
           </div>
         </div>
 
@@ -184,8 +190,8 @@ export function LibraryPage() {
             <Mic2 size={22} />
           </div>
           <div className="relative z-10">
-            <h2 className="text-base font-bold text-white mb-0.5 group-hover:text-indigo-400 transition-colors">Artists</h2>
-            <p className="text-slate-400 text-xs font-mono">{artistsCount} artists</p>
+            <h2 className="text-base font-bold text-white mb-0.5 group-hover:text-indigo-400 transition-colors">{t('library.artists', 'Artists')}</h2>
+            <p className="text-slate-400 text-xs font-mono">{t('library.artistsDesc', '{{count}} artists', { count: artistsCount })}</p>
           </div>
         </div>
 
@@ -200,8 +206,8 @@ export function LibraryPage() {
             <Music size={22} />
           </div>
           <div className="relative z-10">
-            <h2 className="text-base font-bold text-white mb-0.5 group-hover:text-purple-400 transition-colors">Genres</h2>
-            <p className="text-slate-400 text-xs font-mono">{genresCount} genres</p>
+            <h2 className="text-base font-bold text-white mb-0.5 group-hover:text-purple-400 transition-colors">{t('library.genres', 'Genres')}</h2>
+            <p className="text-slate-400 text-xs font-mono">{t('library.genresDesc', '{{count}} genres', { count: genresCount })}</p>
           </div>
         </div>
       </div>
@@ -212,13 +218,13 @@ export function LibraryPage() {
           <div className="flex items-center justify-between mb-4">
             <h2 className="text-lg md:text-xl font-bold font-display text-white flex items-center gap-2.5">
               <TrendingUp size={20} className="text-primary" />
-              Most Played Tracks
+              {t('library.mostPlayed', 'Most Played Tracks')}
             </h2>
             <button
               onClick={() => navigate('/tracks')}
               className="text-xs text-primary hover:underline font-mono"
             >
-              View all →
+              {t('library.viewAll', 'View all →')}
             </button>
           </div>
           <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 2xl:grid-cols-4 3xl:grid-cols-5 4k:grid-cols-6 gap-3">
@@ -240,14 +246,14 @@ export function LibraryPage() {
                 </div>
                 <div className="flex flex-col truncate flex-1 pr-1">
                   <span className="text-xs font-semibold text-slate-100 truncate group-hover:text-primary transition-colors">
-                    {track.title || playerState.getTrackMetadata(track.id)?.title || (track.fileName ? track.fileName.replace(/\.[^/.]+$/, "") : 'Unknown')}
+                    {track.title || playerState.getTrackMetadata(track.id)?.title || (track.fileName ? track.fileName.replace(/\.[^/.]+$/, "") : t('common.unknownTitle', 'Unknown'))}
                   </span>
                   <div className="flex items-center gap-1.5 mt-0.5 font-mono text-[10px] text-slate-400">
                     <span className="truncate max-w-[100px]">
-                      {track.artist || playerState.getTrackMetadata(track.id)?.artist || 'Unknown Artist'}
+                      {track.artist || playerState.getTrackMetadata(track.id)?.artist || t('common.unknownArtist', 'Unknown Artist')}
                     </span>
                     <span className="text-slate-600">•</span>
-                    <span className="text-primary/90 shrink-0 font-medium">{track.playCount ?? 0} plays</span>
+                    <span className="text-primary/90 shrink-0 font-medium">{t('library.plays', '{{count}} plays', { count: track.playCount ?? 0 })}</span>
                   </div>
                 </div>
                 <ActionMenu
@@ -255,7 +261,7 @@ export function LibraryPage() {
                   buttonClassName="p-1.5 text-slate-400 hover:text-white hover:bg-white/10 rounded-lg transition-colors shrink-0"
                   actions={[
                     { label: t('tracks.playNext', 'Play Next'), icon: <ListMusic size={14} />, onSelect: () => playerState.addToNextQueue([track]) },
-                    { label: t('tracks.addToQueue', 'Add to Queue'), icon: <ListPlus size={14} />, onSelect: () => playerState.addToCurrentQueue([track]) },
+                    { label: t('tracks.addToQueue', 'Add to Queue'), icon: <ListPlus size={14} />, onSelect: () => setTracksToQueueModal([track]) },
                     { label: t('tracks.addToPlaylist', 'Add to Playlist'), icon: <ListPlus size={14} />, onSelect: () => setTrackToPlaylist(track) },
                     ...(track.sourceType !== 'LOCAL'
                       ? [{
@@ -263,7 +269,7 @@ export function LibraryPage() {
                         icon: <Download size={14} />,
                         onSelect: () => downloadTrackFile(track)
                       }, {
-                        label: favorites.some(f => f.id === track.id) ? t('tracks.removeFavorite', 'Remove Favorite') : t('tracks.addFavorite', 'Add to Favorite'),
+                        label: favorites.some(f => f.id === track.id) ? t('tracks.removeFavorite', 'Remove from Favorites') : t('tracks.addFavorite', 'Add to Favorites'),
                         icon: <Heart size={14} fill={favorites.some(f => f.id === track.id) ? "currentColor" : "none"} className={favorites.some(f => f.id === track.id) ? "text-primary" : ""} />,
                         onSelect: () => void toggleFavorite(track)
                       }]
@@ -280,6 +286,13 @@ export function LibraryPage() {
         isOpen={!!trackToPlaylist}
         onClose={() => setTrackToPlaylist(null)}
         track={trackToPlaylist}
+      />
+
+      <AddToQueueModal
+        isOpen={!!tracksToQueueModal}
+        tracks={tracksToQueueModal || []}
+        currentPlayingTrackId={playerState.currentTrack?.id}
+        onClose={() => setTracksToQueueModal(null)}
       />
     </div>
   );

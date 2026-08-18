@@ -3,8 +3,10 @@ import { useAuth } from '../context/AuthContext';
 import { Playlist } from '../components/Playlist';
 import { useNavigate } from 'react-router-dom';
 import { ArrowLeft } from 'lucide-react';
+import { useTranslation } from 'react-i18next';
 
 export function PlaylistPage() {
+  const { t } = useTranslation();
   const { isAuthenticated } = useAuth();
   const { playerState } = useGlobalAudio();
   const navigate = useNavigate();
@@ -19,8 +21,8 @@ export function PlaylistPage() {
           <ArrowLeft size={24} />
         </button>
         <div className="min-w-0">
-          <h1 className="text-2xl md:text-3xl font-bold font-sans text-white tracking-tight truncate">Your Playlist</h1>
-          <p className="text-secondary/60 text-sm font-mono mt-1">Manage and sync your Dual-Storage tracks.</p>
+          <h1 className="text-2xl md:text-3xl font-bold font-sans text-white tracking-tight truncate">{t('playlist.title', 'Your Playlist')}</h1>
+          <p className="text-secondary/60 text-sm font-mono mt-1">{t('playlist.subtitle', 'Manage and sync your Dual-Storage tracks.')}</p>
         </div>
       </div>
       

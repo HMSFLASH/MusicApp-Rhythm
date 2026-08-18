@@ -120,7 +120,7 @@ export function useAudioPlayback(
     flacWasmOverrides,
     m4aWasmOverrides,
   } = effectsState || {};
-  const { audioContextRef, audioRef, bufferSourceRef, bufferVolumeNodeRef, initializeAudioContext, irBufferRef, setTrackLoudnessGain } = contextState;
+  const { audioContextRef, audioRef, bufferSourceRef, bufferVolumeNodeRef, initializeAudioContext, irBufferRef, masterAnalyserRef, setTrackLoudnessGain } = contextState;
   const { blobCacheRef, extractMetadata, metadataCacheRef } = metadataState;
 
   const ensureAudioContextResumed = useCallback(() => {
@@ -767,8 +767,15 @@ export function useAudioPlayback(
     if (!audioContextRef.current || !bufferVolumeNodeRef.current) return;
 
     bufferVolumeNodeRef.current.disconnect();
+    if (masterAnalyserRef?.current) {
+      try {
+        bufferVolumeNodeRef.current.connect(masterAnalyserRef.current);
+      } catch {
+        // Ignore if already connected
+      }
+    }
     bufferVolumeNodeRef.current.connect(audioContextRef.current.destination);
-  }, [audioContextRef, bufferVolumeNodeRef]);
+  }, [audioContextRef, bufferVolumeNodeRef, masterAnalyserRef]);
 
   const startBufferProgressTimer = useCallback(() => {
     if (rafRef.current) globalThis.clearInterval(rafRef.current);

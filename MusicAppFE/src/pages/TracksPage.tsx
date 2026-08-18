@@ -1,15 +1,16 @@
 import { getSecureRandom } from '../utils/randomUtils';
 import { useState, useRef } from 'react';
 import { useNavigate, useSearchParams } from 'react-router-dom';
-import { Heart, ListMusic, ListPlus, Play, ArrowLeft, Shuffle, MoreHorizontal, Info, X, ListEnd, ListStart, RefreshCw, Trash2, Cpu, ChevronDown, CheckSquare, Square, Download, DownloadCloud, Loader2, CheckCircle2, Layers } from 'lucide-react';
 import { useTranslation } from 'react-i18next';
+import { Heart, ListMusic, ListPlus, Play, ArrowLeft, Shuffle, MoreHorizontal, Info, X, ListStart, RefreshCw, Trash2, Cpu, ChevronDown, CheckSquare, Square, Download, DownloadCloud, Loader2, CheckCircle2 } from 'lucide-react';
 import { AddToPlaylistModal } from '../components/AddToPlaylistModal';
 import { AddToQueueModal } from '../components/AddToQueueModal';
 import { useGlobalAudio } from '../context/AudioContext';
 import { useAuth } from '../context/AuthContext';
-import type { Track } from '../hooks/useAudioPlayer';
+import type { Track } from '../hooks/audioTypes';
 import { useLibrary } from '../context/LibraryContext';
 import { useConfirm } from '../context/ConfirmContext';
+import { useToast } from '../context/ToastContext';
 import { getAudioExtension } from '../hooks/audioMime';
 import { ActionMenu } from '../components/ActionMenu';
 import { useOffline } from '../context/OfflineContext';
@@ -26,6 +27,7 @@ export function TracksPage() {
   const { t } = useTranslation();
   const navigate = useNavigate();
   const confirm = useConfirm();
+  const { toast } = useToast();
   const [searchParams] = useSearchParams();
   const { isAuthenticated } = useAuth();
   const { playerState } = useGlobalAudio();
@@ -70,16 +72,6 @@ export function TracksPage() {
       } else {
         playerState.setQueue([...currentQueue, track]);
       }
-    }
-    setOpenMenuId(null);
-  };
-
-  const handleAddToQueue = (track: Track, e: React.MouseEvent) => {
-    e.stopPropagation();
-    if (playerState.queue.length === 0 && !playerState.currentTrack) {
-      playerState.playTrack(track, displayTracks);
-    } else {
-      playerState.setQueue([...playerState.queue, track]);
     }
     setOpenMenuId(null);
   };
@@ -130,10 +122,6 @@ export function TracksPage() {
     }
   };
 
-  const addAllToQueue = () => {
-    playerState.setQueue([...playerState.queue, ...displayTracks]);
-  };
-
   const toggleSelection = (trackId: string, e?: React.MouseEvent) => {
     if (e) e.stopPropagation();
     setSelectedTrackIds(prev => {
@@ -180,12 +168,6 @@ export function TracksPage() {
     playerState.playTrack(track, displayTracks);
   };
 
-  const handleBatchAddToQueue = () => {
-    const selectedTracks = displayTracks.filter(t => selectedTrackIds.has(String(t.id)));
-    playerState.setQueue([...playerState.queue, ...selectedTracks]);
-    setSelectedTrackIds(new Set());
-  };
-
   const handleBatchAddToFavorites = async () => {
     const selectedTracks = displayTracks.filter(t => selectedTrackIds.has(String(t.id)));
     try {
@@ -209,23 +191,23 @@ export function TracksPage() {
 
     if (cloudTracks.length === 0) {
       if (localTracks.length > 0) {
-        alert("Cannot delete local files from library.");
+        toast.info(t('tracks.cannotDeleteLocal', 'Cannot delete local files from library.'));
       }
       return;
     }
 
     const isConfirmed = await confirm({
-      title: 'Xóa nhiều bài hát',
-      description: `Bạn có chắc chắn muốn xóa ${cloudTracks.length} bài hát khỏi thư viện? (Local files sẽ bị bỏ qua)`,
-      confirmText: 'Xóa',
+      title: t('tracks.deleteMultipleTitle', 'Delete Multiple Tracks'),
+      description: t('tracks.deleteMultipleDesc', 'Are you sure you want to remove {{count}} tracks from your library? (Local files will be skipped)', { count: cloudTracks.length }),
+      confirmText: t('tracks.confirmDelete', 'Delete'),
       confirmColor: 'bg-red-500/20 text-red-400 hover:bg-red-500/30 border-red-500/30'
     });
 
     if (isConfirmed) {
       const isConfirmed2 = await confirm({
-        title: 'Xác nhận xóa vĩnh viễn',
-        description: `Hành động này sẽ xóa vĩnh viễn ${cloudTracks.length} bài hát từ Google Drive của bạn và không thể hoàn tác. Bạn vẫn muốn tiếp tục?`,
-        confirmText: 'Xóa vĩnh viễn',
+        title: t('tracks.deleteMultiplePermanentTitle', 'Confirm Permanent Deletion'),
+        description: t('tracks.deleteMultiplePermanentDesc', 'This will permanently delete {{count}} tracks from your Google Drive and cannot be undone. Do you still want to proceed?', { count: cloudTracks.length }),
+        confirmText: t('tracks.confirmPermanentDelete', 'Delete Permanently'),
         confirmColor: 'bg-red-600 text-white hover:bg-red-700 border-red-600'
       });
       if (isConfirmed2) {
@@ -399,7 +381,7 @@ export function TracksPage() {
               buttonClassName="h-9 w-9 rounded-xl bg-white/[0.06] border border-white/[0.08] text-slate-300 hover:bg-white/[0.12] hover:text-white flex items-center justify-center transition-all"
               actions={[
                 { label: 'Play Next', icon: <ListStart size={14} />, onSelect: playAllNext },
-                { label: 'Add to Queue', icon: <ListEnd size={14} />, onSelect: addAllToQueue },
+                { label: 'Add to Queue', icon: <ListPlus size={14} />, onSelect: () => setTracksToMultiQueue(displayTracks) },
               ]}
             />
           </div>
@@ -432,8 +414,7 @@ export function TracksPage() {
               ariaLabel="Batch actions"
               buttonClassName="p-1.5 rounded-lg bg-white/5 hover:bg-white/10 text-white flex items-center justify-center transition-colors"
               actions={[
-                { label: 'Thêm vào Đa Hàng Đợi...', icon: <Layers size={16} />, onSelect: () => setTracksToMultiQueue(displayTracks.filter(t => selectedTrackIds.has(String(t.id)))) },
-                { label: 'Add to Queue', icon: <ListEnd size={16} />, onSelect: handleBatchAddToQueue },
+                { label: t('tracks.addToQueue', 'Add to Queue'), icon: <ListPlus size={16} />, onSelect: () => setTracksToMultiQueue(displayTracks.filter(t => selectedTrackIds.has(String(t.id)))) },
                 { label: 'Add to Playlist', icon: <ListPlus size={16} />, onSelect: () => setTracksToPlaylist(displayTracks.filter(t => selectedTrackIds.has(String(t.id)))) },
                 { label: 'Add to Favorites', icon: <Heart size={16} />, onSelect: handleBatchAddToFavorites },
                 { label: 'Delete', icon: <Trash2 size={16} />, onSelect: handleBatchDelete, tone: 'danger' },
@@ -566,16 +547,10 @@ export function TracksPage() {
                             <ListStart size={14} className="text-primary" /> {t('tracks.playNext', 'Play Next')}
                           </button>
                           <button
-                            onClick={(e) => handleAddToQueue(track, e)}
-                            className="w-full flex items-center gap-3 px-3.5 py-2 text-xs font-medium text-left text-slate-200 hover:bg-white/[0.06] hover:text-white transition-colors"
-                          >
-                            <ListEnd size={14} className="text-cyan-400" /> {t('tracks.addToQueue', 'Add to Queue')}
-                          </button>
-                          <button
                             onClick={(e) => { e.stopPropagation(); setTracksToMultiQueue([track]); setOpenMenuId(null); }}
                             className="w-full flex items-center gap-3 px-3.5 py-2 text-xs font-medium text-left text-slate-200 hover:bg-white/[0.06] hover:text-white transition-colors"
                           >
-                            <Layers size={14} className="text-cyan-400" /> Thêm vào Đa Hàng Đợi...
+                            <ListPlus size={14} className="text-cyan-400" /> {t('tracks.addToQueue', 'Add to Queue')}
                           </button>
                           <button
                             onClick={(e) => { e.stopPropagation(); setTrackToPlaylist(track); setOpenMenuId(null); }}
@@ -661,17 +636,18 @@ export function TracksPage() {
                             <button
                               onClick={async (e) => {
                                 e.stopPropagation();
+                                const trackName = track.title || track.fileName || t('common.unknownTitle', 'Unknown Title');
                                 const isConfirmed = await confirm({
-                                  title: 'Xóa bài hát',
-                                  description: `Bạn có chắc chắn muốn xóa bài hát "${track.title || track.fileName}" khỏi thư viện?`,
-                                  confirmText: 'Xóa',
+                                  title: t('tracks.deleteSingleTitle', 'Delete Track'),
+                                  description: t('tracks.deleteSingleDesc', 'Are you sure you want to remove "{{title}}" from your library?', { title: trackName }),
+                                  confirmText: t('tracks.confirmDelete', 'Delete'),
                                   confirmColor: 'bg-red-500/20 text-red-400 hover:bg-red-500/30 border-red-500/30'
                                 });
                                 if (isConfirmed) {
                                   const isConfirmed2 = await confirm({
-                                    title: 'Xác nhận xóa vĩnh viễn',
-                                    description: `Hành động này sẽ xóa vĩnh viễn bài hát "${track.title || track.fileName}" từ Google Drive của bạn và không thể hoàn tác. Bạn vẫn muốn tiếp tục?`,
-                                    confirmText: 'Xóa vĩnh viễn',
+                                    title: t('tracks.deleteSinglePermanentTitle', 'Confirm Permanent Deletion'),
+                                    description: t('tracks.deleteSinglePermanentDesc', 'This will permanently delete "{{title}}" from your Google Drive and cannot be undone. Do you still want to proceed?', { title: trackName }),
+                                    confirmText: t('tracks.confirmPermanentDelete', 'Delete Permanently'),
                                     confirmColor: 'bg-red-600 text-white hover:bg-red-700 border-red-600'
                                   });
                                   if (isConfirmed2) {

@@ -1,9 +1,11 @@
 import { Disc, ChevronRight, Mail, Loader2, ArrowLeft } from 'lucide-react';
 import { NavLink } from 'react-router-dom';
 import { useState } from 'react';
+import { useTranslation } from 'react-i18next';
 import { axiosClient } from '../api/axiosClient';
 
 export function ForgotPasswordPage() {
+  const { t } = useTranslation();
   const [email, setEmail] = useState('');
   const [loading, setLoading] = useState(false);
   const [success, setSuccess] = useState(false);
@@ -21,7 +23,7 @@ export function ForgotPasswordPage() {
       setSuccess(true);
     // eslint-disable-next-line @typescript-eslint/no-unused-vars, @typescript-eslint/no-explicit-any
     } catch (err: any) {
-      setError('An error occurred. Please try again later.');
+      setError(t('common.systemError', 'An error occurred. Please try again later.'));
     } finally {
       setLoading(false);
     }
@@ -41,28 +43,28 @@ export function ForgotPasswordPage() {
       <div className="z-10 w-full max-w-md bg-white/[0.02] border border-white/5 rounded-2xl md:rounded-3xl backdrop-blur-3xl shadow-2xl overflow-hidden p-5 sm:p-8 md:p-12 relative">
         <NavLink to="/login" className="absolute top-5 left-5 sm:top-8 sm:left-8 text-white/50 hover:text-white transition-colors flex items-center gap-2 text-sm">
           <ArrowLeft size={16} />
-          Back
+          {t('auth.back', 'Back')}
         </NavLink>
 
         <div className="flex flex-col items-center text-center mt-8">
           <div className="w-12 h-12 rounded-2xl bg-[#00E5FF]/10 flex items-center justify-center mb-6 shadow-[0_0_30px_rgba(0,229,255,0.2)]">
             <Disc size={26} className="text-[#00E5FF] animate-spin-slow" />
           </div>
-          <h2 className="text-2xl font-semibold text-white mb-2">Reset Password</h2>
+          <h2 className="text-2xl font-semibold text-white mb-2">{t('auth.resetPasswordTitle', 'Reset Password')}</h2>
           
           {success ? (
             <div className="mt-4">
               <div className="p-4 bg-green-500/10 border border-green-500/20 rounded-xl text-green-400 text-sm mb-6">
-                If your email is registered, you will receive a password reset link shortly.
+                {t('auth.resetLinkSent', 'If your email is registered, you will receive a password reset link shortly.')}
               </div>
               <p className="text-sm text-white/50 mb-8">
-                Please check your email inbox and spam folder.
+                {t('auth.checkInboxSpam', 'Please check your email inbox and spam folder.')}
               </p>
             </div>
           ) : (
             <>
               <p className="text-sm text-white/50 mb-8">
-                Enter your email address and we'll send you a link to reset your password.
+                {t('auth.resetPasswordDesc', "Enter your email address and we'll send you a link to reset your password.")}
               </p>
 
               <form onSubmit={handleSubmit} className="w-full space-y-4">
@@ -80,7 +82,7 @@ export function ForgotPasswordPage() {
                     type="email" 
                     value={email}
                     onChange={(e) => setEmail(e.target.value)}
-                    placeholder="Email Address"
+                    placeholder={t('auth.emailAddress', 'Email Address')}
                     required
                     className="w-full bg-black/20 border-b border-white/10 hover:border-white/30 focus:border-[#00E5FF] text-white text-sm py-4 pl-10 pr-2 outline-none transition-all placeholder:text-white/30"
                   />
@@ -91,7 +93,7 @@ export function ForgotPasswordPage() {
                   disabled={loading}
                   className="w-full flex items-center justify-center gap-2 bg-[#00E5FF] hover:bg-[#00E5FF]/90 text-black font-bold py-4 rounded-xl shadow-[0_0_20px_rgba(0,229,255,0.3)] hover:shadow-[0_0_30px_rgba(0,229,255,0.5)] transition-all mt-6 disabled:opacity-50"
                 >
-                  {loading ? <Loader2 size={18} className="animate-spin" /> : <span>Send Reset Link</span>}
+                  {loading ? <Loader2 size={18} className="animate-spin" /> : <span>{t('auth.sendResetLink', 'Send Reset Link')}</span>}
                   {!loading && <ChevronRight size={18} strokeWidth={3} />}
                 </button>
               </form>

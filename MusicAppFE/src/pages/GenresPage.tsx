@@ -1,22 +1,26 @@
 import { getSecureRandom } from '../utils/randomUtils';
 import { useState } from 'react';
 import { useNavigate } from 'react-router-dom';
+import { useTranslation } from 'react-i18next';
 import { ArrowLeft, Music, Play, ListMusic, ListPlus, Shuffle, Heart } from 'lucide-react';
 import { useGlobalAudio } from '../context/AudioContext';
 import { useLibrary } from '../context/LibraryContext';
 import type { Track } from '../hooks/useAudioPlayer';
 import { ActionMenu } from '../components/ActionMenu';
 import { AddToPlaylistModal } from '../components/AddToPlaylistModal';
+import { AddToQueueModal } from '../components/AddToQueueModal';
 import { useVirtualList } from '../hooks/useVirtualList';
 
 const GENRE_TRACK_ROW_HEIGHT = 72;
 
 export function GenresPage() {
+  const { t } = useTranslation();
   const navigate = useNavigate();
   const { playerState } = useGlobalAudio();
   const { tracks, favorites, toggleFavorite } = useLibrary();
   const [selectedGenre, setSelectedGenre] = useState<string | null>(null);
   const [trackToPlaylist, setTrackToPlaylist] = useState<Track | null>(null);
+  const [tracksToQueueModal, setTracksToQueueModal] = useState<Track[] | null>(null);
 
   const genres = Array.from(new Set(tracks.map(t => t.genre || playerState.getTrackMetadata(t.id)?.genre).filter(Boolean))) as string[];
 
@@ -27,14 +31,14 @@ export function GenresPage() {
     const metaArtist = playerState.getTrackMetadata(track.id)?.artist;
     if (metaArtist) return metaArtist;
     if (track.fileName?.includes(' - ')) return track.fileName.split(' - ')[0];
-    return 'Unknown Artist';
+    return t('common.unknownArtist', 'Unknown Artist');
   };
   
   const getTitle = (track: Track) => {
     if (track.title) return track.title;
     const metaTitle = playerState.getTrackMetadata(track.id)?.title;
     if (metaTitle) return metaTitle;
-    if (!track.fileName) return 'Unknown Title';
+    if (!track.fileName) return t('common.unknownTitle', 'Unknown Title');
     const cleanName = track.fileName.replace(/\.[^/.]+$/, '');
     if (cleanName.includes(' - ')) return cleanName.split(' - ')[1];
     return cleanName;
@@ -87,12 +91,12 @@ export function GenresPage() {
           </button>
           <div>
             <h1 className="text-2xl md:text-3xl font-bold font-display text-white tracking-tight">
-              {selectedGenre || 'Genres'}
+              {selectedGenre || t('genres.title', 'Genres')}
             </h1>
             <p className="text-slate-400 text-xs md:text-sm font-mono mt-0.5">
               {selectedGenre
-                ? `${selectedGenreTracks.length} songs in this genre.`
-                : `${genres.length} genres in your library.`}
+                ? t('genres.genreSummary', '{{count}} songs in this genre.', { count: selectedGenreTracks.length })
+                : t('genres.librarySummary', '{{count}} genres in your library.', { count: genres.length })}
             </p>
           </div>
         </div>
@@ -101,23 +105,23 @@ export function GenresPage() {
             <button
               onClick={() => playTracks(selectedGenreTracks)}
               className="px-3.5 h-8.5 rounded-xl bg-primary text-slate-950 hover:brightness-110 flex items-center gap-1.5 transition-all text-xs font-bold shadow-[0_0_15px_rgba(0,245,255,0.3)] whitespace-nowrap hover:scale-105 active:scale-95"
-              title="Play Genre"
+              title={t('genres.playGenre', 'Play Genre')}
             >
-              <Play size={13} fill="currentColor" /> Play
+              <Play size={13} fill="currentColor" /> {t('common.play', 'Play')}
             </button>
             <button
               onClick={() => shuffleTracks(selectedGenreTracks)}
               className="px-3.5 h-8.5 rounded-xl bg-white/[0.06] border border-white/[0.08] text-slate-200 hover:bg-white/[0.12] hover:text-white flex items-center gap-1.5 transition-all text-xs font-semibold whitespace-nowrap"
-              title="Shuffle Genre"
+              title={t('genres.shuffleGenre', 'Shuffle')}
             >
-              <Shuffle size={13} /> Shuffle
+              <Shuffle size={13} /> {t('common.shuffle', 'Shuffle')}
             </button>
             <ActionMenu
-              ariaLabel="More genre actions"
+              ariaLabel={t('genres.moreActions', 'More genre actions')}
               buttonClassName="h-8.5 w-8.5 rounded-xl bg-white/[0.06] border border-white/[0.08] text-slate-300 hover:bg-white/[0.12] hover:text-white flex items-center justify-center transition-all"
               actions={[
-                { label: 'Add to Queue', icon: <ListPlus size={14} />, onSelect: () => playerState.addToCurrentQueue(selectedGenreTracks) },
-                { label: 'Play Next', icon: <ListMusic size={14} />, onSelect: () => playerState.addToNextQueue(selectedGenreTracks) },
+                { label: t('tracks.addToQueue', 'Add to Queue'), icon: <ListPlus size={14} />, onSelect: () => setTracksToQueueModal(selectedGenreTracks) },
+                { label: t('tracks.playNext', 'Play Next'), icon: <ListMusic size={14} />, onSelect: () => playerState.addToNextQueue(selectedGenreTracks) },
               ]}
             />
           </div>
@@ -189,12 +193,12 @@ export function GenresPage() {
                       ariaLabel={`Song actions for ${getTitle(track)}`}
                       buttonClassName="p-1.5 text-slate-400 hover:text-white hover:bg-white/10 rounded-lg transition-colors shrink-0"
                       actions={[
-                        { label: 'Play Next', icon: <ListMusic size={14} />, onSelect: () => playerState.addToNextQueue([track]) },
-                        { label: 'Add to Queue', icon: <ListPlus size={14} />, onSelect: () => playerState.addToCurrentQueue([track]) },
-                        { label: 'Add to Playlist', icon: <ListPlus size={14} />, onSelect: () => setTrackToPlaylist(track) },
+                        { label: t('tracks.playNext', 'Play Next'), icon: <ListMusic size={14} />, onSelect: () => playerState.addToNextQueue([track]) },
+                        { label: t('tracks.addToQueue', 'Add to Queue'), icon: <ListPlus size={14} />, onSelect: () => setTracksToQueueModal([track]) },
+                        { label: t('tracks.addToPlaylist', 'Add to Playlist'), icon: <ListPlus size={14} />, onSelect: () => setTrackToPlaylist(track) },
                         ...(track.sourceType !== 'LOCAL'
                           ? [{
-                              label: favorites.some(f => f.id === track.id) ? 'Remove Favorite' : 'Add to Favorite',
+                              label: favorites.some(f => f.id === track.id) ? t('tracks.removeFavorite', 'Remove from Favorites') : t('tracks.addFavorite', 'Add to Favorites'),
                               icon: <Heart size={14} fill={favorites.some(f => f.id === track.id) ? "currentColor" : "none"} className={favorites.some(f => f.id === track.id) ? "text-primary" : "text-slate-400"} />,
                               onSelect: () => void toggleFavorite(track)
                             }]
@@ -234,15 +238,15 @@ export function GenresPage() {
                   </h3>
 
                   <div className="flex items-center justify-between pointer-events-auto">
-                    <span className="text-xs font-mono font-medium text-slate-300 bg-black/40 border border-white/10 px-2.5 py-1 rounded-lg backdrop-blur-sm shadow-sm">{count} songs</span>
+                    <span className="text-xs font-mono font-medium text-slate-300 bg-black/40 border border-white/10 px-2.5 py-1 rounded-lg backdrop-blur-sm shadow-sm">{t('genres.songsCount', '{{count}} songs', { count })}</span>
                     <ActionMenu
                       ariaLabel={`Genre actions for ${genre}`}
                       direction="up"
                       buttonClassName="h-8.5 w-8.5 rounded-full bg-white text-slate-950 hover:scale-110 flex items-center justify-center shadow-lg transition-all"
                       actions={[
-                        { label: 'Play', icon: <Play size={13} fill="currentColor" />, onSelect: () => playTracks(getGenreTracks(genre)) },
-                        { label: 'Add to Queue', icon: <ListPlus size={14} />, onSelect: () => playerState.addToCurrentQueue(getGenreTracks(genre)) },
-                        { label: 'Play Next', icon: <ListMusic size={14} />, onSelect: () => playerState.addToNextQueue(getGenreTracks(genre)) },
+                        { label: t('common.play', 'Play'), icon: <Play size={13} fill="currentColor" />, onSelect: () => playTracks(getGenreTracks(genre)) },
+                        { label: t('tracks.addToQueue', 'Add to Queue'), icon: <ListPlus size={14} />, onSelect: () => setTracksToQueueModal(getGenreTracks(genre)) },
+                        { label: t('tracks.playNext', 'Play Next'), icon: <ListMusic size={14} />, onSelect: () => playerState.addToNextQueue(getGenreTracks(genre)) },
                       ]}
                     />
                   </div>
@@ -254,7 +258,7 @@ export function GenresPage() {
       ) : (
         <div className="flex-1 flex flex-col items-center justify-center opacity-50 py-16">
           <Music size={56} className="mb-3 text-purple-400" />
-          <p className="text-sm font-mono text-slate-400">No genres found in your library.</p>
+          <p className="text-sm font-mono text-slate-400">{t('genres.noGenres', 'No genres found in your library.')}</p>
         </div>
       )}
 
@@ -262,6 +266,13 @@ export function GenresPage() {
         isOpen={!!trackToPlaylist}
         onClose={() => setTrackToPlaylist(null)}
         track={trackToPlaylist}
+      />
+
+      <AddToQueueModal
+        isOpen={!!tracksToQueueModal}
+        tracks={tracksToQueueModal || []}
+        currentPlayingTrackId={playerState.currentTrack?.id}
+        onClose={() => setTracksToQueueModal(null)}
       />
     </div>
   );

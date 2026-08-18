@@ -534,15 +534,15 @@ export function SettingsPage() {
 
               <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 gap-2.5">
                 {[
-                  { key: 'Space', desc: 'Phát / Tạm dừng' },
-                  { key: 'J / L', desc: 'Tua lùi / Tua tới 5s' },
-                  { key: '← / →', desc: 'Tua 5 giây' },
-                  { key: '↑ / ↓', desc: 'Tăng / Giảm âm lượng' },
-                  { key: 'M', desc: 'Bật / Tắt tiếng (Mute)' },
-                  { key: 'T', desc: 'Hẹn giờ tắt nhạc (Sleep Timer)' },
-                  { key: 'S', desc: 'Bật / Tắt xáo trộn (Shuffle)' },
-                  { key: 'R', desc: 'Đổi chế độ lặp (Repeat)' },
-                  { key: 'F', desc: 'Thêm / Bỏ yêu thích' },
+                  { key: 'Space', desc: t('shortcuts.playPause', 'Play / Pause') },
+                  { key: 'J / L', desc: t('shortcuts.seek10s', 'Seek backward / forward 5s') },
+                  { key: '← / →', desc: t('shortcuts.seek5s', 'Seek 5 seconds') },
+                  { key: '↑ / ↓', desc: t('shortcuts.volume', 'Increase / Decrease volume') },
+                  { key: 'M', desc: t('shortcuts.mute', 'Mute / Unmute') },
+                  { key: 'T', desc: t('shortcuts.sleepTimer', 'Sleep Timer') },
+                  { key: 'S', desc: t('shortcuts.shuffle', 'Toggle Shuffle') },
+                  { key: 'R', desc: t('shortcuts.repeat', 'Toggle Repeat') },
+                  { key: 'F', desc: t('shortcuts.favorite', 'Toggle Favorite') },
                 ].map((s) => (
                   <div key={s.key} className="flex items-center justify-between p-2.5 rounded-xl bg-white/[0.02] border border-white/[0.04]">
                     <span className="text-xs text-slate-300">{s.desc}</span>

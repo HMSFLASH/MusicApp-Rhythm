@@ -1,7 +1,11 @@
 import { useState } from 'react';
 import { X, Loader2, Plus, Check } from 'lucide-react';
+import { useTranslation } from 'react-i18next';
 import type { Track } from '../hooks/useAudioPlayer';
 import { axiosClient } from '../api/axiosClient';
+import { useGlobalAudio } from '../context/AudioContext';
+import { useLibrary } from '../context/LibraryContext';
+import { useVirtualList } from '../hooks/useVirtualList';
 
 interface AddTracksModalProps {
   isOpen: boolean;
@@ -12,13 +16,10 @@ interface AddTracksModalProps {
   onSuccess: () => void;
 }
 
-import { useGlobalAudio } from '../context/AudioContext';
-import { useLibrary } from '../context/LibraryContext';
-import { useVirtualList } from '../hooks/useVirtualList';
-
 const MODAL_TRACK_ROW_HEIGHT = 64;
 
 export function AddTracksModal({ isOpen, onClose, playlistId, playlistTracks, onSuccess }: AddTracksModalProps) {
+  const { t } = useTranslation();
   const { playerState } = useGlobalAudio();
   const { tracks: allTracks, isLoading: loading } = useLibrary();
   const [addingIds, setAddingIds] = useState<Set<string>>(new Set());
@@ -71,7 +72,7 @@ export function AddTracksModal({ isOpen, onClose, playlistId, playlistTracks, on
         onClick={(e) => e.stopPropagation()}
       >
         <div className="flex items-center justify-between gap-3 p-5 sm:p-6 border-b border-white/[0.06] shrink-0 bg-white/[0.02]">
-          <h2 className="text-base sm:text-lg font-bold font-display text-white">Add Tracks to Playlist</h2>
+          <h2 className="text-base sm:text-lg font-bold font-display text-white">{t('modals.addTracks.title', 'Add Tracks to Playlist')}</h2>
           <button 
             onClick={onClose}
             className="text-slate-400 hover:text-white hover:bg-white/[0.08] p-1.5 rounded-xl transition-colors"
@@ -85,7 +86,7 @@ export function AddTracksModal({ isOpen, onClose, playlistId, playlistTracks, on
             type="text"
             value={searchQuery}
             onChange={(e) => setSearchQuery(e.target.value)}
-            placeholder="Search your library..."
+            placeholder={t('modals.addTracks.searchPlaceholder', 'Search your library...')}
             className="w-full bg-[#060b14] border border-white/[0.1] rounded-xl px-4 py-2.5 text-xs text-white placeholder-slate-500 focus:outline-none focus:border-primary transition-all font-sans"
           />
         </div>
@@ -101,7 +102,7 @@ export function AddTracksModal({ isOpen, onClose, playlistId, playlistTracks, on
             </div>
           ) : filteredTracks.length === 0 ? (
             <div className="text-center py-8 text-slate-400 text-xs font-mono">
-              No tracks found.
+              {t('modals.addTracks.noTracks', 'No tracks found.')}
             </div>
           ) : (
             <div className="relative w-full" style={{ height: totalHeight }}>
@@ -110,23 +111,23 @@ export function AddTracksModal({ isOpen, onClose, playlistId, playlistTracks, on
                 style={{ transform: `translateY(${offsetY}px)` }}
               >
                 {visibleIndexes.map((idx) => {
-                  const t = filteredTracks[idx];
-                  if (!t) return null;
-                  const inPlaylist = isTrackInPlaylist(t.id);
-                  const isAdding = addingIds.has(t.id);
+                  const t_track = filteredTracks[idx];
+                  if (!t_track) return null;
+                  const inPlaylist = isTrackInPlaylist(t_track.id);
+                  const isAdding = addingIds.has(t_track.id);
                   return (
                     <div
-                      key={t.id}
+                      key={t_track.id}
                       style={{ height: MODAL_TRACK_ROW_HEIGHT }}
                       className="relative"
                     >
                       <div className="flex h-[56px] items-center justify-between p-3 rounded-2xl bg-white/[0.02] hover:bg-white/[0.06] border border-white/[0.04] hover:border-primary/25 transition-all group">
                         <div className="flex flex-col truncate pr-4 w-full">
-                          <span className="text-xs sm:text-sm font-semibold text-slate-200 truncate group-hover:text-primary transition-colors">{t.title || playerState.getTrackMetadata(t.id)?.title || (t.fileName ? (t.fileName.includes(' - ') ? t.fileName.split(' - ')[1].replace(/\.[^/.]+$/, "") : t.fileName.replace(/\.[^/.]+$/, "")) : 'Unknown Title')}</span>
-                          <span className="text-[11px] text-slate-400 font-mono truncate mt-0.5">{t.artist || playerState.getTrackMetadata(t.id)?.artist || (t.fileName?.includes(' - ') ? t.fileName.split(' - ')[0] : 'Unknown Artist')}</span>
+                          <span className="text-xs sm:text-sm font-semibold text-slate-200 truncate group-hover:text-primary transition-colors">{t_track.title || playerState.getTrackMetadata(t_track.id)?.title || (t_track.fileName ? (t_track.fileName.includes(' - ') ? t_track.fileName.split(' - ')[1].replace(/\.[^/.]+$/, "") : t_track.fileName.replace(/\.[^/.]+$/, "")) : t('common.unknownTitle', 'Unknown Title'))}</span>
+                          <span className="text-[11px] text-slate-400 font-mono truncate mt-0.5">{t_track.artist || playerState.getTrackMetadata(t_track.id)?.artist || (t_track.fileName?.includes(' - ') ? t_track.fileName.split(' - ')[0] : t('common.unknownArtist', 'Unknown Artist'))}</span>
                         </div>
                         <button
-                          onClick={() => !inPlaylist && !isAdding && handleAddTrack(t.id)}
+                          onClick={() => !inPlaylist && !isAdding && handleAddTrack(t_track.id)}
                           disabled={inPlaylist || isAdding}
                           className={`p-2 rounded-xl transition-all shrink-0 ${
                             inPlaylist 

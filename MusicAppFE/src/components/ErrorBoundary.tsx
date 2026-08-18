@@ -1,5 +1,6 @@
 import { Component, type ErrorInfo, type ReactNode } from 'react';
 import { AlertCircle, RefreshCw } from 'lucide-react';
+import i18next from 'i18next';
 
 interface Props {
   children?: ReactNode;
@@ -33,9 +34,9 @@ export class ErrorBoundary extends Component<Props, State> {
         <div className="min-h-screen w-full flex flex-col items-center justify-center bg-background text-white p-4">
           <div className="bg-surface border border-white/10 rounded-2xl p-8 max-w-md w-full text-center shadow-2xl flex flex-col items-center">
             <AlertCircle className="text-red-500 mb-4" size={48} />
-            <h2 className="text-2xl font-bold mb-2">Oops! Something went wrong</h2>
+            <h2 className="text-2xl font-bold mb-2">{i18next.t('errorBoundary.title', 'Oops! Something went wrong')}</h2>
             <p className="text-white/60 mb-6 text-sm">
-              We've encountered an unexpected error. Don't worry, your data is safe.
+              {i18next.t('errorBoundary.subtitle', "We've encountered an unexpected error. Don't worry, your data is safe.")}
             </p>
             {this.state.error && (
               <div className="bg-black/40 p-3 rounded-lg text-left w-full mb-6 overflow-auto max-h-32 text-xs text-red-400 font-mono">
@@ -47,7 +48,7 @@ export class ErrorBoundary extends Component<Props, State> {
               className="flex items-center justify-center gap-2 w-full bg-primary/20 text-primary hover:bg-primary/30 border border-primary/30 py-3 rounded-xl font-medium transition-colors"
             >
               <RefreshCw size={18} />
-              Reload Application
+              {i18next.t('errorBoundary.reloadBtn', 'Reload Application')}
             </button>
           </div>
         </div>

@@ -5,6 +5,7 @@ import { Search, Plus, Users, Music, Disc, X, Check, Play, ListPlus, Trash2, Lis
 import { useGlobalAudio } from '../context/AudioContext';
 import { useAuth } from '../context/AuthContext';
 import { AddToPlaylistModal } from '../components/AddToPlaylistModal';
+import { AddToQueueModal } from '../components/AddToQueueModal';
 import type { Track } from '../hooks/audioTypes';
 import { useLibrary } from '../context/LibraryContext';
 import { useConfirm } from '../context/ConfirmContext';
@@ -26,6 +27,7 @@ export function SearchPage() {
   const { tracks: allTracks, deleteTrack } = useLibrary();
   const [searchQuery, setSearchQuery] = useState('');
   const [trackToPlaylist, setTrackToPlaylist] = useState<Track | null>(null);
+  const [tracksToQueueModal, setTracksToQueueModal] = useState<Track[] | null>(null);
   const [infoTrack, setInfoTrack] = useState<Track | null>(null);
   const [searchResults, setSearchResults] = useState<Track[]>([]);
   const [isSearching, setIsSearching] = useState(false);
@@ -134,20 +136,20 @@ export function SearchPage() {
   };
 
   const handleDeleteTrack = async (track: Track) => {
-    const trackName = track.title || track.fileName;
+    const trackName = track.title || track.fileName || t('common.unknownTitle', 'Unknown Title');
     const isConfirmed = await confirm({
-      title: 'Xóa bài hát',
-      description: `Bạn có chắc chắn muốn xóa bài hát "${trackName}" khỏi thư viện?`,
-      confirmText: 'Xóa',
+      title: t('tracks.deleteSingleTitle', 'Delete Track'),
+      description: t('tracks.deleteSingleDesc', 'Are you sure you want to remove "{{title}}" from your library?', { title: trackName }),
+      confirmText: t('tracks.confirmDelete', 'Delete'),
       confirmColor: 'bg-red-500/20 text-red-400 hover:bg-red-500/30 border-red-500/30'
     });
 
     if (!isConfirmed) return;
 
     const isConfirmed2 = await confirm({
-      title: 'Xác nhận xóa vĩnh viễn',
-      description: `Hành động này sẽ xóa vĩnh viễn bài hát "${trackName}" từ Google Drive của bạn và không thể hoàn tác. Bạn vẫn muốn tiếp tục?`,
-      confirmText: 'Xóa vĩnh viễn',
+      title: t('tracks.deleteSinglePermanentTitle', 'Confirm Permanent Deletion'),
+      description: t('tracks.deleteSinglePermanentDesc', 'This will permanently delete "{{title}}" from your Google Drive and cannot be undone. Do you still want to proceed?', { title: trackName }),
+      confirmText: t('tracks.confirmPermanentDelete', 'Delete Permanently'),
       confirmColor: 'bg-red-600 text-white hover:bg-red-700 border-red-600'
     });
 
@@ -403,6 +405,8 @@ export function SearchPage() {
                               buttonClassName="p-1.5 text-slate-400 hover:text-white hover:bg-white/10 rounded-lg transition-colors"
                               actions={[
                                 { label: t('tracks.info', 'Info'), icon: <Info size={14} />, onSelect: () => setInfoTrack(track) },
+                                { label: t('tracks.playNext', 'Play Next'), icon: <ListMusic size={14} />, onSelect: () => playerState.addToNextQueue([track]) },
+                                { label: t('tracks.addToQueue', 'Add to Queue'), icon: <ListPlus size={14} />, onSelect: () => setTracksToQueueModal([track]) },
                                 { label: t('tracks.addToPlaylist', 'Add to Playlist'), icon: <ListPlus size={14} />, onSelect: () => setTrackToPlaylist(track) },
                                 ...(track.sourceType !== 'LOCAL'
                                   ? [{ label: t('tracks.downloadFile', 'Download File'), icon: <Download size={14} />, onSelect: () => downloadTrackFile(track) },
@@ -457,7 +461,7 @@ export function SearchPage() {
                             {
                               label: 'Add to Queue',
                               icon: <ListPlus size={14} />,
-                              onSelect: () => playerState.addToCurrentQueue(allTracks.filter(t => t.artist === artist || playerState.getTrackMetadata(t.id)?.artist === artist || t.fileName?.startsWith(artist + ' - '))),
+                              onSelect: () => setTracksToQueueModal(allTracks.filter(t => t.artist === artist || playerState.getTrackMetadata(t.id)?.artist === artist || t.fileName?.startsWith(artist + ' - '))),
                             },
                             {
                               label: 'Play Next',
@@ -494,17 +498,17 @@ export function SearchPage() {
                                 <Disc size={40} />
                               </div>
                             )}
-                            <div className="absolute bottom-2 right-2 z-10 opacity-0 group-hover:opacity-100 transition-opacity">
-                              <ActionMenu
-                                ariaLabel={`Album actions for ${album}`}
-                                buttonClassName="h-8 w-8 rounded-full bg-amber-500 text-slate-950 hover:scale-110 flex items-center justify-center shadow-lg transition-all"
-                                actions={[
-                                  { label: 'Play', icon: <Play size={13} fill="currentColor" />, onSelect: () => albumTracks.length > 0 && playerState.playTrack(albumTracks[0], albumTracks) },
-                                  { label: 'Add to Queue', icon: <ListPlus size={14} />, onSelect: () => playerState.addToCurrentQueue(albumTracks) },
-                                  { label: 'Play Next', icon: <ListMusic size={14} />, onSelect: () => playerState.addToNextQueue(albumTracks) },
-                                ]}
-                              />
-                            </div>
+                            <ActionMenu
+                              className="absolute bottom-2 right-2 z-10 opacity-0 group-hover:opacity-100 transition-opacity"
+                              ariaLabel={`Album actions for ${album}`}
+                              direction="up"
+                              buttonClassName="h-8 w-8 rounded-full bg-amber-500 text-slate-950 hover:scale-110 flex items-center justify-center shadow-lg transition-all"
+                              actions={[
+                                { label: 'Play', icon: <Play size={13} fill="currentColor" />, onSelect: () => albumTracks.length > 0 && playerState.playTrack(albumTracks[0], albumTracks) },
+                                { label: 'Add to Queue', icon: <ListPlus size={14} />, onSelect: () => setTracksToQueueModal(albumTracks) },
+                                { label: 'Play Next', icon: <ListMusic size={14} />, onSelect: () => playerState.addToNextQueue(albumTracks) },
+                              ]}
+                            />
                           </div>
                           <p className="text-xs sm:text-sm font-bold text-slate-100 truncate group-hover:text-amber-400 transition-colors">{album}</p>
                           <p className="text-[11px] font-mono text-slate-400 truncate mt-0.5">{track?.artist || 'Unknown'}</p>
@@ -529,6 +533,19 @@ export function SearchPage() {
           </div>
         )}
       </div>
+
+      <AddToPlaylistModal
+        isOpen={!!trackToPlaylist}
+        onClose={() => setTrackToPlaylist(null)}
+        track={trackToPlaylist}
+      />
+
+      <AddToQueueModal
+        isOpen={!!tracksToQueueModal}
+        tracks={tracksToQueueModal || []}
+        currentPlayingTrackId={playerState.currentTrack?.id}
+        onClose={() => setTracksToQueueModal(null)}
+      />
 
       {infoTrack && (
         <TrackInfoModal 

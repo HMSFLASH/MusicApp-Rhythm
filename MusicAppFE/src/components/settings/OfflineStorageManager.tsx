@@ -76,15 +76,6 @@ type PlaylistInfo = {
   tracks?: Track[];
 };
 
-const CACHE_LIMIT_OPTIONS = [
-  { label: '4 GB', value: 4 * 1024 * 1024 * 1024 },
-  { label: '8 GB', value: 8 * 1024 * 1024 * 1024 },
-  { label: '12 GB (Mặc định)', value: 12 * 1024 * 1024 * 1024 },
-  { label: '16 GB', value: 16 * 1024 * 1024 * 1024 },
-  { label: '24 GB', value: 24 * 1024 * 1024 * 1024 },
-  { label: '32 GB', value: 32 * 1024 * 1024 * 1024 },
-];
-
 export function OfflineStorageManager() {
   const { t } = useTranslation();
   const confirm = useConfirm();
@@ -123,6 +114,15 @@ export function OfflineStorageManager() {
   const [sortAsc, setSortAsc] = useState(false);
   const [selectedTrackIds, setSelectedTrackIds] = useState<Set<string>>(new Set());
   const [isDeleting, setIsDeleting] = useState(false);
+
+  const cacheLimitOptions = useMemo(() => [
+    { label: '4 GB', value: 4 * 1024 * 1024 * 1024 },
+    { label: '8 GB', value: 8 * 1024 * 1024 * 1024 },
+    { label: `12 GB (${t('common.default', 'Mặc định')})`, value: 12 * 1024 * 1024 * 1024 },
+    { label: '16 GB', value: 16 * 1024 * 1024 * 1024 },
+    { label: '24 GB', value: 24 * 1024 * 1024 * 1024 },
+    { label: '32 GB', value: 32 * 1024 * 1024 * 1024 },
+  ], [t]);
 
   const sortOptions = useMemo(() => [
     { value: 'size' as SortField, label: t('storage.sortSize', 'Dung lượng') },
@@ -699,7 +699,7 @@ export function OfflineStorageManager() {
             {/* Cache Limit Selector */}
             <CustomSelect<number>
               value={selectedLimit}
-              options={CACHE_LIMIT_OPTIONS}
+              options={cacheLimitOptions}
               onChange={(val) => handleLimitChange(val)}
               prefixLabel={t('storage.limitLabel', 'Giới hạn:')}
               ariaLabel={t('storage.limitAria', 'Chọn giới hạn bộ nhớ đệm')}
@@ -713,7 +713,7 @@ export function OfflineStorageManager() {
               disabled={isLoading}
               className="p-2 rounded-xl bg-white/[0.05] hover:bg-white/[0.1] text-slate-300 hover:text-white border border-white/10 transition-all active:scale-95 disabled:opacity-50 cursor-pointer"
               title={t('storage.refresh', 'Làm mới thống kê')}
-              aria-label="Làm mới thống kê bộ nhớ"
+              aria-label={t('storage.refreshAria', 'Làm mới thống kê bộ nhớ')}
             >
               <RefreshCw size={16} className={isLoading ? 'animate-spin text-primary' : ''} />
             </button>
@@ -897,7 +897,7 @@ export function OfflineStorageManager() {
                 <button
                   onClick={() => setSearchQuery('')}
                   className="absolute right-3 top-1/2 -translate-y-1/2 text-slate-400 hover:text-white text-xs p-1"
-                  aria-label="Xóa tìm kiếm"
+                  aria-label={t('common.clearSearch', 'Xóa tìm kiếm')}
                 >
                   ✕
                 </button>
@@ -918,8 +918,8 @@ export function OfflineStorageManager() {
                 <button
                   onClick={() => setSortAsc(!sortAsc)}
                   className="p-2 rounded-xl bg-[#0c1626]/90 border border-white/10 hover:border-white/20 text-primary hover:text-white transition-all shrink-0 cursor-pointer active:scale-95 text-xs font-mono"
-                  title={sortAsc ? 'Tăng dần' : 'Giảm dần'}
-                  aria-label={sortAsc ? 'Sắp xếp tăng dần' : 'Sắp xếp giảm dần'}
+                  title={sortAsc ? t('common.sortAsc', 'Tăng dần') : t('common.sortDesc', 'Giảm dần')}
+                  aria-label={sortAsc ? t('common.sortAscAria', 'Sắp xếp tăng dần') : t('common.sortDescAria', 'Sắp xếp giảm dần')}
                 >
                   {sortAsc ? '▲' : '▼'}
                 </button>
@@ -1005,7 +1005,7 @@ export function OfflineStorageManager() {
                     <button
                       onClick={() => toggleSelectTrack(item.id)}
                       className="text-slate-400 hover:text-primary p-1 shrink-0 cursor-pointer"
-                      aria-label="Chọn bài hát"
+                      aria-label={t('storage.selectTrackAria', 'Chọn bài hát')}
                     >
                       {isSelected ? (
                         <CheckSquare size={18} className="text-primary" />
@@ -1069,7 +1069,7 @@ export function OfflineStorageManager() {
                       disabled={isDeleting}
                       className="p-1.5 sm:p-2 rounded-xl text-slate-400 hover:text-red-400 hover:bg-red-500/10 border border-transparent hover:border-red-500/20 transition-all active:scale-95 cursor-pointer"
                       title={t('storage.deleteTrack', 'Xóa bài này khỏi bộ nhớ đệm')}
-                      aria-label={`Xóa cache của ${item.title}`}
+                      aria-label={t('storage.deleteTrackAria', 'Xóa cache của {{title}}', { title: item.title })}
                     >
                       <Trash2 size={15} className="sm:w-4 sm:h-4" />
                     </button>

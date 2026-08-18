@@ -1,5 +1,6 @@
 import { useState } from 'react';
 import { X, Key, Lock, Loader2 } from 'lucide-react';
+import { useTranslation } from 'react-i18next';
 import { axiosClient } from '../api/axiosClient';
 
 interface ChangePasswordModalProps {
@@ -8,6 +9,7 @@ interface ChangePasswordModalProps {
 }
 
 export function ChangePasswordModal({ isOpen, onClose }: ChangePasswordModalProps) {
+  const { t } = useTranslation();
   const [oldPassword, setOldPassword] = useState('');
   const [newPassword, setNewPassword] = useState('');
   const [confirmPassword, setConfirmPassword] = useState('');
@@ -22,12 +24,12 @@ export function ChangePasswordModal({ isOpen, onClose }: ChangePasswordModalProp
     setError('');
 
     if (newPassword !== confirmPassword) {
-      setError('New passwords do not match');
+      setError(t('auth.passwordsDoNotMatch', 'New passwords do not match'));
       return;
     }
 
     if (newPassword.length < 12) {
-      setError('New password must be at least 12 characters');
+      setError(t('auth.passwordLengthMin', 'New password must be at least 12 characters'));
       return;
     }
 
@@ -47,7 +49,7 @@ export function ChangePasswordModal({ isOpen, onClose }: ChangePasswordModalProp
       }, 2000);
 
     } catch (err: any) {
-      setError(err.response?.data?.message || err.message || 'Failed to change password');
+      setError(err.response?.data?.message || err.message || t('auth.changePasswordFail', 'Failed to change password'));
     } finally {
       setLoading(false);
     }
@@ -64,7 +66,7 @@ export function ChangePasswordModal({ isOpen, onClose }: ChangePasswordModalProp
             <div className="p-2.5 bg-primary/15 text-primary rounded-xl border border-primary/25">
               <Key size={18} />
             </div>
-            <h2 className="text-base sm:text-lg font-bold font-display truncate">Change Password</h2>
+            <h2 className="text-base sm:text-lg font-bold font-display truncate">{t('auth.changePasswordTitle', 'Change Password')}</h2>
           </div>
           <button
             onClick={onClose}
@@ -83,13 +85,13 @@ export function ChangePasswordModal({ isOpen, onClose }: ChangePasswordModalProp
 
           {success && (
             <div className="p-3 bg-emerald-500/10 border border-emerald-500/20 rounded-xl text-emerald-400 text-xs font-medium">
-              Password changed successfully!
+              {t('auth.passwordChangedSuccess', 'Password changed successfully!')}
             </div>
           )}
 
           <div className="space-y-4">
             <div className="flex flex-col gap-1.5">
-              <label className="text-xs font-semibold uppercase tracking-wider text-slate-300 font-mono">Old Password</label>
+              <label className="text-xs font-semibold uppercase tracking-wider text-slate-300 font-mono">{t('auth.oldPassword', 'Old Password')}</label>
               <div className="relative">
                 <div className="absolute inset-y-0 left-0 pl-3.5 flex items-center pointer-events-none text-slate-500">
                   <Lock size={15} />
@@ -99,7 +101,7 @@ export function ChangePasswordModal({ isOpen, onClose }: ChangePasswordModalProp
                   value={oldPassword}
                   onChange={(e) => setOldPassword(e.target.value)}
                   className="w-full bg-[#060b14] border border-white/[0.1] rounded-xl py-2.5 pl-10 pr-4 text-xs text-white placeholder-slate-500 focus:outline-none focus:border-primary focus:ring-1 focus:ring-primary transition-all font-sans"
-                  placeholder="Enter old password"
+                  placeholder={t('auth.oldPasswordPlaceholder', 'Enter old password')}
                   required
                   disabled={loading || success}
                 />
@@ -107,7 +109,7 @@ export function ChangePasswordModal({ isOpen, onClose }: ChangePasswordModalProp
             </div>
 
             <div className="flex flex-col gap-1.5">
-              <label className="text-xs font-semibold uppercase tracking-wider text-slate-300 font-mono">New Password</label>
+              <label className="text-xs font-semibold uppercase tracking-wider text-slate-300 font-mono">{t('auth.newPassword', 'New Password')}</label>
               <div className="relative">
                 <div className="absolute inset-y-0 left-0 pl-3.5 flex items-center pointer-events-none text-slate-500">
                   <Key size={15} />
@@ -117,7 +119,7 @@ export function ChangePasswordModal({ isOpen, onClose }: ChangePasswordModalProp
                   value={newPassword}
                   onChange={(e) => setNewPassword(e.target.value)}
                   className="w-full bg-[#060b14] border border-white/[0.1] rounded-xl py-2.5 pl-10 pr-4 text-xs text-white placeholder-slate-500 focus:outline-none focus:border-primary focus:ring-1 focus:ring-primary transition-all font-sans"
-                  placeholder="Enter new password (min. 12 characters)"
+                  placeholder={t('auth.newPasswordPlaceholder', 'Enter new password (min. 12 characters)')}
                   required
                   disabled={loading || success}
                 />
@@ -125,7 +127,7 @@ export function ChangePasswordModal({ isOpen, onClose }: ChangePasswordModalProp
             </div>
 
             <div className="flex flex-col gap-1.5">
-              <label className="text-xs font-semibold uppercase tracking-wider text-slate-300 font-mono">Confirm New Password</label>
+              <label className="text-xs font-semibold uppercase tracking-wider text-slate-300 font-mono">{t('auth.confirmNewPassword', 'Confirm New Password')}</label>
               <div className="relative">
                 <div className="absolute inset-y-0 left-0 pl-3.5 flex items-center pointer-events-none text-slate-500">
                   <Key size={15} />
@@ -135,7 +137,7 @@ export function ChangePasswordModal({ isOpen, onClose }: ChangePasswordModalProp
                   value={confirmPassword}
                   onChange={(e) => setConfirmPassword(e.target.value)}
                   className="w-full bg-[#060b14] border border-white/[0.1] rounded-xl py-2.5 pl-10 pr-4 text-xs text-white placeholder-slate-500 focus:outline-none focus:border-primary focus:ring-1 focus:ring-primary transition-all font-sans"
-                  placeholder="Confirm new password"
+                  placeholder={t('auth.confirmNewPasswordPlaceholder', 'Confirm new password')}
                   required
                   disabled={loading || success}
                 />
@@ -150,14 +152,14 @@ export function ChangePasswordModal({ isOpen, onClose }: ChangePasswordModalProp
               disabled={loading || success}
               className="px-5 py-2.5 rounded-xl text-xs font-semibold text-slate-400 hover:text-white hover:bg-white/[0.06] transition-colors"
             >
-              Cancel
+              {t('common.cancel', 'Cancel')}
             </button>
             <button
               type="submit"
               disabled={loading || success || !oldPassword || !newPassword || !confirmPassword}
               className="px-6 py-2.5 bg-primary text-slate-950 rounded-xl text-xs font-bold hover:brightness-110 active:scale-95 transition-all disabled:opacity-50 disabled:cursor-not-allowed flex items-center justify-center min-w-[120px] shadow-[0_0_15px_rgba(0,245,255,0.3)]"
             >
-              {loading ? <Loader2 size={16} className="animate-spin" /> : 'Change Password'}
+              {loading ? <Loader2 size={16} className="animate-spin" /> : t('auth.changePasswordBtn', 'Change Password')}
             </button>
           </div>
         </form>

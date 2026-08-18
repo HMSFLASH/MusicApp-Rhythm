@@ -1,13 +1,16 @@
 import { useEffect, useRef, memo } from 'react';
 
+export type VisualizerMode = 'spectrum' | 'bars' | 'mirror' | 'wave' | 'radial' | 'oscilloscope' | 'compact' | 'off';
+
 interface AudioVisualizerProps {
   analyserRef?: React.RefObject<AnalyserNode | null>;
   isPlaying?: boolean;
-  mode?: 'mirror' | 'bars' | 'wave' | 'compact';
+  mode?: VisualizerMode;
   className?: string;
   barColor?: string;
   secondaryColor?: string;
   glowColor?: string;
+  peakHoldSpeed?: number;
 }
 
 export const AudioVisualizer = memo(function AudioVisualizer({
@@ -16,8 +19,9 @@ export const AudioVisualizer = memo(function AudioVisualizer({
   mode = 'mirror',
   className = 'w-full h-14',
   barColor = '#00f5ff',
-  secondaryColor = '#6366f1',
-  glowColor = 'rgba(0, 245, 255, 0.35)',
+  secondaryColor = '#a855f7',
+  glowColor = 'rgba(0, 245, 255, 0.45)',
+  peakHoldSpeed = 0.008,
 }: AudioVisualizerProps) {
   const canvasRef = useRef<HTMLCanvasElement | null>(null);
 
@@ -29,8 +33,19 @@ export const AudioVisualizer = memo(function AudioVisualizer({
     if (!ctx) return;
 
     let animationId: number;
+
+    // Physics & smoothing buffers
     const smoothedBars: number[] = [];
+    const peakBars: number[] = [];
+    const peakHoldCounters: number[] = [];
+    const peakVelocities: number[] = [];
     let phase = 0;
+    let bassEnergySmoothed = 0;
+    let midEnergySmoothed = 0;
+    let highEnergySmoothed = 0;
+
+    // Zero-crossing buffer for oscilloscope trigger stabilization
+    let lastTimeDomain: Uint8Array | null = null;
 
     const render = () => {
       const dpr = globalThis.devicePixelRatio || 1;
@@ -54,170 +69,313 @@ export const AudioVisualizer = memo(function AudioVisualizer({
       const analyser = analyserRef?.current;
       phase += 0.04;
 
-      // -------------------------------------------------------------
-      // 1. MIRROR (SoundCloud / Modern Music Symmetrical Bars)
-      // 2. BARS (Studio Spectrum Flat Equalizer)
-      // -------------------------------------------------------------
-      if (mode === 'mirror' || mode === 'bars' || mode === 'compact') {
-        // Double bar count: 44 to 84 bars depending on width
-        const barCount = Math.min(84, Math.max(44, Math.floor(width / 4.75)));
-        const gap = 2;
-        const totalGap = gap * (barCount - 1);
-        const barWidth = Math.max(1.5, (width - totalGap) / barCount);
+      // =========================================================================
+      // 0. AUDIO DATA EXTRACTION & DYNAMIC CONTRAST DSP PROCESSING
+      // =========================================================================
+      const barCount = Math.min(56, Math.max(28, Math.floor(width / 7.0)));
+      const rawTargetBars = new Float32Array(barCount);
 
-        if (analyser && isPlaying) {
-          const bufferLength = analyser.frequencyBinCount;
-          const fullData = new Uint8Array(bufferLength);
-          analyser.getByteFrequencyData(fullData);
+      let hasRealAudio = false;
+      let rawBassEnergy = 0;
+      let rawMidEnergy = 0;
+      let rawHighEnergy = 0;
 
+      if (analyser && isPlaying) {
+        const bufferLength = analyser.frequencyBinCount;
+        const freqData = new Uint8Array(bufferLength);
+        analyser.getByteFrequencyData(freqData);
+
+        // Check overall signal level across spectrum
+        let totalSum = 0;
+        for (let i = 0; i < Math.min(128, bufferLength); i++) {
+          totalSum += freqData[i];
+        }
+        hasRealAudio = totalSum > 20;
+
+        if (hasRealAudio) {
           const sampleRate = analyser.context?.sampleRate || 44100;
           const nyquist = sampleRate / 2;
           const binWidth = nyquist / bufferLength;
 
-          // Focused musical frequency range (35 Hz to 16,000 Hz)
-          const minFreq = 20;
-          const maxFreq = Math.min(20000, nyquist);
+          // Focus on active musical frequency range (32Hz to 15,000Hz)
+          const minFreq = 32;
+          const maxFreq = Math.min(15000, nyquist * 0.85);
 
           for (let i = 0; i < barCount; i++) {
-            // Perceptual logarithmic octave distribution
-            const fStart = minFreq * Math.pow(maxFreq / minFreq, i / barCount);
-            const fEnd = minFreq * Math.pow(maxFreq / minFreq, (i + 1) / barCount);
+            const freqProgress = i / (barCount - 1 || 1);
+            const centerFreq = minFreq * Math.pow(maxFreq / minFreq, freqProgress);
 
-            const startBin = Math.max(1, Math.floor(fStart / binWidth));
-            const endBin = Math.min(bufferLength - 1, Math.ceil(fEnd / binWidth));
+            const freqStart = minFreq * Math.pow(maxFreq / minFreq, Math.max(0, i - 0.5) / (barCount - 1 || 1));
+            const freqEnd = minFreq * Math.pow(maxFreq / minFreq, Math.min(barCount - 1, i + 0.5) / (barCount - 1 || 1));
 
-            // Calculate average RMS energy in band (avoids single-bin maxVal blowout)
-            let sum = 0;
-            let count = 0;
-            for (let b = startBin; b <= endBin; b++) {
-              sum += fullData[b];
-              count++;
-            }
-            const avgEnergy = count > 0 ? sum / count : 0;
+            const startBinFloat = Math.max(1, freqStart / binWidth);
+            const endBinFloat = Math.min(bufferLength - 1, freqEnd / binWidth);
 
-            // Dynamic noise floor gate (anything below -70dB is 0)
-            const noiseFloor = 38;
-            const normalized = Math.max(0, (avgEnergy - noiseFloor) / (255 - noiseFloor));
+            let rawEnergy = 0;
 
-            // Power curve for natural rhythmic feel without automatic frequency compensation
-            const targetVal = Math.min(1.0, Math.pow(normalized, 1.3));
-
-            // Responsive Ballistics: Fast snappy attack (0.65), smooth fluid decay (0.14)
-            const prev = smoothedBars[i] ?? 0;
-            if (targetVal > prev) {
-              smoothedBars[i] = prev + (targetVal - prev) * 0.65;
+            // Low frequencies: smooth sub-bin linear interpolation
+            if (endBinFloat - startBinFloat <= 1.2) {
+              const exactBin = centerFreq / binWidth;
+              const b0 = Math.floor(exactBin);
+              const b1 = Math.min(bufferLength - 1, b0 + 1);
+              const frac = exactBin - b0;
+              const val0 = freqData[b0] || 0;
+              const val1 = freqData[b1] || 0;
+              rawEnergy = val0 * (1 - frac) + val1 * frac;
             } else {
-              smoothedBars[i] = prev + (targetVal - prev) * 0.14;
+              // Higher frequencies: mix max peak and average for sharp punch
+              const startBin = Math.floor(startBinFloat);
+              const endBin = Math.ceil(endBinFloat);
+              let sum = 0;
+              let peak = 0;
+              let count = 0;
+              for (let b = startBin; b <= endBin; b++) {
+                const v = freqData[b] || 0;
+                sum += v;
+                if (v > peak) peak = v;
+                count++;
+              }
+              const avg = count > 0 ? sum / count : 0;
+              rawEnergy = peak * 0.7 + avg * 0.3;
             }
+
+            // High-Frequency Equal-Loudness Balance (mild tilt, 0.85 to 1.35)
+            const tilt = 0.85 + 0.55 * Math.pow(freqProgress, 1.2);
+
+            // Dynamic contrast & Noise Floor Subtraction (Cuts off noise, expands rhythm hits)
+            const noiseFloor = 60;
+            const maxCeiling = 235;
+            const unclamped = (rawEnergy - noiseFloor) / (maxCeiling - noiseFloor);
+            const normalized = Math.max(0, Math.min(1.0, unclamped * tilt));
+
+            // Gamma expansion curve (1.7) separates loud drum hits from soft harmonic beds
+            const expanded = Math.pow(normalized, 1.7);
+            rawTargetBars[i] = Math.min(1.0, expanded * 1.15);
+
+            // Accumulate band energies
+            if (i < barCount * 0.25) rawBassEnergy += rawTargetBars[i];
+            else if (i < barCount * 0.7) rawMidEnergy += rawTargetBars[i];
+            else rawHighEnergy += rawTargetBars[i];
           }
+
+          rawBassEnergy /= (barCount * 0.25);
+          rawMidEnergy /= (barCount * 0.45);
+          rawHighEnergy /= (barCount * 0.3);
+        }
+      }
+
+      // Smooth energy bands for wave & radial animations
+      bassEnergySmoothed += ((hasRealAudio ? rawBassEnergy : 0.15) - bassEnergySmoothed) * 0.25;
+      midEnergySmoothed += ((hasRealAudio ? rawMidEnergy : 0.1) - midEnergySmoothed) * 0.2;
+      highEnergySmoothed += ((hasRealAudio ? rawHighEnergy : 0.08) - highEnergySmoothed) * 0.22;
+
+      // Update Bar Physics (Snappy Attack, Fluid Gravity Decay & Peak Hold)
+      for (let i = 0; i < barCount; i++) {
+        let target = 0;
+        if (hasRealAudio && isPlaying) {
+          target = rawTargetBars[i];
         } else if (isPlaying) {
-          // Ambient breathing idle wave when audio is loading or initializing
-          for (let i = 0; i < barCount; i++) {
-            const idleVal = 0.12 + Math.sin(phase * 1.5 + (i / barCount) * Math.PI * 2) * 0.08;
-            const prev = smoothedBars[i] ?? 0.1;
-            smoothedBars[i] = prev + (idleVal - prev) * 0.1;
-          }
+          // Subtle breathing baseline when playing but silent/intro
+          target = 0.03 + Math.sin(phase * 1.5 + (i / barCount) * Math.PI * 2) * 0.02;
         } else {
-          // Smooth glide down to resting idle line when paused
-          for (let i = 0; i < barCount; i++) {
-            const prev = smoothedBars[i] ?? 0;
-            smoothedBars[i] = Math.max(0, prev * 0.88 - 0.01);
-          }
+          target = 0;
         }
 
-        // Render Symmetrical / Center-mirrored Bars
-        if (mode === 'mirror' || mode === 'compact') {
-          const centerY = height / 2;
-          const maxHalfHeight = (height - 8) / 2;
-
-          for (let i = 0; i < barCount; i++) {
-            const level = smoothedBars[i] || 0;
-            const halfH = Math.max(1.5, level * maxHalfHeight);
-            const x = i * (barWidth + gap);
-            const y = centerY - halfH;
-            const barH = halfH * 2;
-
-            // Dynamic Vertical Gradient
-            const gradient = ctx.createLinearGradient(0, y, 0, y + barH);
-            gradient.addColorStop(0, secondaryColor || barColor);
-            gradient.addColorStop(0.5, barColor);
-            gradient.addColorStop(1, secondaryColor || barColor);
-
-            ctx.fillStyle = gradient;
-            ctx.shadowBlur = level > 0.3 ? 8 : 2;
-            ctx.shadowColor = glowColor;
-
-            ctx.fillRect(x, y, barWidth, barH);
-          }
+        const prev = smoothedBars[i] ?? 0;
+        if (target > prev) {
+          // Snappy attack on beat hits
+          smoothedBars[i] = prev + (target - prev) * 0.78;
+        } else {
+          // Fluid gravity falloff
+          smoothedBars[i] = Math.max(0, prev + (target - prev) * 0.18);
         }
-        // Render Studio Spectrum Flat Equalizer Bars
-        else {
-          const maxBarHeight = height - 4;
 
-          for (let i = 0; i < barCount; i++) {
-            const level = smoothedBars[i] || 0;
-            const barH = Math.max(2, level * maxBarHeight);
-            const x = i * (barWidth + gap);
-            const y = height - barH;
+        // Studio Peak Hold Caps
+        const curVal = smoothedBars[i];
+        const currentPeak = peakBars[i] ?? 0;
+        let holdCounter = peakHoldCounters[i] ?? 0;
+        let velocity = peakVelocities[i] ?? 0;
 
-            // Vertical Gradient with glowing top
-            const gradient = ctx.createLinearGradient(0, height, 0, y);
-            gradient.addColorStop(0, `${barColor}33`);
-            gradient.addColorStop(0.6, barColor);
-            gradient.addColorStop(1, secondaryColor || '#ffffff');
-
-            ctx.fillStyle = gradient;
-            ctx.shadowBlur = level > 0.3 ? 10 : 3;
-            ctx.shadowColor = glowColor;
-
-            ctx.fillRect(x, y, barWidth, barH);
+        if (curVal >= currentPeak - 0.01) {
+          peakBars[i] = curVal;
+          peakHoldCounters[i] = 10;
+          peakVelocities[i] = 0;
+        } else {
+          if (holdCounter > 0) {
+            peakHoldCounters[i] = holdCounter - 1;
+            peakBars[i] = currentPeak;
+          } else {
+            velocity += 0.003;
+            peakVelocities[i] = velocity;
+            peakBars[i] = Math.max(curVal, currentPeak - velocity);
           }
         }
       }
-      // -------------------------------------------------------------
-      // 3. WAVE (Fluid Liquid Neon Spline Waves - Apple Music / Siri)
-      // -------------------------------------------------------------
-      else if (mode === 'wave') {
-        const bufferLength = analyser ? analyser.frequencyBinCount : 256;
-        const freqData = new Uint8Array(bufferLength);
 
-        let energy = 0;
-        if (analyser && isPlaying) {
-          analyser.getByteFrequencyData(freqData);
-          let sum = 0;
-          for (let i = 0; i < 40; i++) sum += freqData[i];
-          energy = Math.min(1.0, (sum / 40) / 200);
-        } else if (isPlaying) {
-          energy = 0.35;
+      // Helper function to draw rounded rectangles
+      const drawRoundRect = (
+        rx: number,
+        ry: number,
+        rw: number,
+        rh: number,
+        radius: number
+      ) => {
+        if (rh <= 0 || rw <= 0) return;
+        const r = Math.min(radius, rw / 2, rh / 2);
+        ctx.beginPath();
+        if (typeof ctx.roundRect === 'function') {
+          ctx.roundRect(rx, ry, rw, rh, r);
+        } else {
+          ctx.moveTo(rx + r, ry);
+          ctx.lineTo(rx + rw - r, ry);
+          ctx.arcTo(rx + rw, ry, rx + rw, ry + r, r);
+          ctx.lineTo(rx + rw, ry + rh - r);
+          ctx.arcTo(rx + rw, ry + rh, rx + rw - r, ry + rh, r);
+          ctx.lineTo(rx + r, ry + rh);
+          ctx.lineTo(rx, ry + r);
+          ctx.arcTo(rx, ry, rx + r, ry, r);
+          ctx.closePath();
         }
+      };
 
+      // =========================================================================
+      // 1. MIRROR & COMPACT MODE (Symmetrical Neon Cyberpunk Studio Spectrum)
+      // =========================================================================
+      if (mode === 'mirror' || mode === 'compact') {
+        const gap = 3.0;
+        const totalGap = gap * (barCount - 1);
+        const barWidth = Math.max(2.0, (width - totalGap) / barCount);
         const centerY = height / 2;
-        const wavePoints = 36;
+        const maxHalfHeight = (height - 8) / 2;
+
+        // Draw center laser baseline
+        ctx.save();
+        ctx.strokeStyle = `${barColor}44`;
+        ctx.lineWidth = 1;
+        ctx.shadowBlur = 4;
+        ctx.shadowColor = glowColor;
+        ctx.beginPath();
+        ctx.moveTo(0, centerY);
+        ctx.lineTo(width, centerY);
+        ctx.stroke();
+        ctx.restore();
+
+        for (let i = 0; i < barCount; i++) {
+          const level = smoothedBars[i] || 0;
+          const peak = peakBars[i] || 0;
+          const halfH = Math.max(1.5, level * maxHalfHeight);
+          const x = i * (barWidth + gap);
+          const y = centerY - halfH;
+          const barH = halfH * 2;
+
+          // 3-stop vertical symmetric gradient (Secondary -> Primary -> Secondary)
+          const gradient = ctx.createLinearGradient(0, y, 0, y + barH);
+          gradient.addColorStop(0, secondaryColor);
+          gradient.addColorStop(0.5, barColor);
+          gradient.addColorStop(1, secondaryColor);
+
+          ctx.fillStyle = gradient;
+          ctx.shadowBlur = level > 0.25 ? 10 : 2;
+          ctx.shadowColor = glowColor;
+          drawRoundRect(x, y, barWidth, barH, barWidth / 2);
+          ctx.fill();
+
+          // Symmetrical Floating Peak Dots
+          if (peak > 0.12 && isPlaying) {
+            const peakTopY = centerY - Math.min(maxHalfHeight, peak * maxHalfHeight);
+            const peakBottomY = centerY + Math.min(maxHalfHeight, peak * maxHalfHeight);
+
+            ctx.fillStyle = '#ffffff';
+            ctx.shadowBlur = 6;
+            ctx.shadowColor = '#ffffff';
+            drawRoundRect(x, Math.max(1, peakTopY - 1.5), barWidth, 2, 1);
+            ctx.fill();
+            drawRoundRect(x, Math.min(height - 3, peakBottomY - 0.5), barWidth, 2, 1);
+            ctx.fill();
+          }
+        }
+      }
+
+      // =========================================================================
+      // 2. SPECTRUM & BARS MODE (Poweramp Studio FFT with Floating Peak Hold Caps)
+      // =========================================================================
+      else if (mode === 'spectrum' || mode === 'bars') {
+        const gap = 3.0;
+        const totalGap = gap * (barCount - 1);
+        const barWidth = Math.max(2.2, (width - totalGap) / barCount);
+        const maxBarHeight = height - 8;
+
+        for (let i = 0; i < barCount; i++) {
+          const level = smoothedBars[i] || 0;
+          const peak = peakBars[i] || 0;
+          const barH = Math.max(2.5, level * maxBarHeight);
+          const x = i * (barWidth + gap);
+          const y = height - barH;
+
+          // 3-stop vertical neon gradient
+          const gradient = ctx.createLinearGradient(0, height, 0, y);
+          gradient.addColorStop(0, `${barColor}22`);
+          gradient.addColorStop(0.55, barColor);
+          gradient.addColorStop(1, secondaryColor);
+
+          ctx.fillStyle = gradient;
+          ctx.shadowBlur = level > 0.25 ? 12 : 2;
+          ctx.shadowColor = glowColor;
+          drawRoundRect(x, y, barWidth, barH, barWidth / 2.5);
+          ctx.fill();
+
+          // Poweramp Floating Peak Cap with White Glow
+          if (peak > 0.08 && isPlaying) {
+            const peakY = Math.max(2, height - peak * maxBarHeight);
+            ctx.fillStyle = '#ffffff';
+            ctx.shadowBlur = 8;
+            ctx.shadowColor = '#ffffff';
+            drawRoundRect(x, peakY - 2.5, barWidth, 2.5, 1);
+            ctx.fill();
+          }
+        }
+      }
+
+      // =========================================================================
+      // 3. WAVE MODE (Real Audio-Reactive Liquid Waves - Apple Music / Monstercat)
+      // =========================================================================
+      else if (mode === 'wave') {
+        const centerY = height / 2;
+        const wavePoints = 48;
         const step = width / (wavePoints - 1);
 
-        // Layer 1: Ambient Background Glow Wave
-        const drawWaveLayer = (amplitude: number, freq: number, phaseOffset: number, color: string, alpha: number, isFill = false) => {
+        const drawReactiveWaveLayer = (
+          bandEnergy: number,
+          waveFreq: number,
+          speedMult: number,
+          phaseOffset: number,
+          strokeColor: string,
+          fillColor: string,
+          lineWidth: number,
+          alpha: number,
+          isFill: boolean
+        ) => {
           ctx.save();
           ctx.beginPath();
           ctx.moveTo(0, centerY);
 
           const points: { x: number; y: number }[] = [];
+          const effectiveAmp = (height * 0.38) * Math.max(0.08, bandEnergy);
+
           for (let i = 0; i < wavePoints; i++) {
             const x = i * step;
             const normX = i / (wavePoints - 1);
-            // Harmonic envelope (soft at edges, lively in middle)
             const envelope = Math.sin(normX * Math.PI);
 
-            // Audio-reactive modulation
-            const audioMod = analyser && isPlaying && freqData[i * 2]
-              ? (freqData[i * 2] / 255) * 0.6
-              : 0.15;
+            const barIndex = Math.min(barCount - 1, Math.floor(normX * barCount));
+            const barMod = (smoothedBars[barIndex] || 0) * (height * 0.25);
 
-            const y = centerY + Math.sin(normX * freq * Math.PI * 2 + phase + phaseOffset) * (amplitude + audioMod * height * 0.4) * envelope;
+            const oscillation = Math.sin(normX * waveFreq * Math.PI * 2 + phase * speedMult + phaseOffset);
+            const y = centerY + (oscillation * effectiveAmp + barMod * oscillation) * envelope;
             points.push({ x, y });
           }
 
-          // Smooth Catmull-Rom / Bézier spline
+          ctx.moveTo(points[0].x, points[0].y);
           for (let i = 0; i < points.length - 1; i++) {
             const xc = (points[i].x + points[i + 1].x) / 2;
             const yc = (points[i].y + points[i + 1].y) / 2;
@@ -230,26 +388,159 @@ export const AudioVisualizer = memo(function AudioVisualizer({
             ctx.lineTo(width, height);
             ctx.lineTo(0, height);
             ctx.closePath();
-            const fillGrad = ctx.createLinearGradient(0, centerY - amplitude, 0, height);
-            fillGrad.addColorStop(0, `${color}44`);
-            fillGrad.addColorStop(1, `${color}00`);
+            const fillGrad = ctx.createLinearGradient(0, centerY - effectiveAmp, 0, height);
+            fillGrad.addColorStop(0, fillColor);
+            fillGrad.addColorStop(1, 'transparent');
             ctx.fillStyle = fillGrad;
+            ctx.globalAlpha = alpha;
             ctx.fill();
           } else {
-            ctx.strokeStyle = color;
+            ctx.strokeStyle = strokeColor;
             ctx.globalAlpha = alpha;
-            ctx.lineWidth = 2.5;
-            ctx.shadowBlur = 12;
+            ctx.lineWidth = lineWidth;
+            ctx.shadowBlur = 14;
             ctx.shadowColor = glowColor;
             ctx.stroke();
           }
           ctx.restore();
         };
 
-        // Draw multi-layer harmonic liquid waves
-        drawWaveLayer(height * 0.28 * Math.max(0.2, energy), 2.2, 0, barColor, 1.0, true);
-        drawWaveLayer(height * 0.22 * Math.max(0.2, energy), 3.0, 1.5, secondaryColor, 0.7, false);
-        drawWaveLayer(height * 0.15 * Math.max(0.2, energy), 4.0, 3.0, '#ffffff', 0.9, false);
+        // Layer 1: Bass Wave (Deep swelling neon body)
+        drawReactiveWaveLayer(bassEnergySmoothed, 1.8, 1.2, 0, barColor, `${barColor}44`, 2.5, 0.7, true);
+        // Layer 2: Mid Harmonic Wave (Vibrant secondary layer)
+        drawReactiveWaveLayer(midEnergySmoothed, 2.8, 1.6, 2.0, secondaryColor, `${secondaryColor}25`, 2.0, 0.85, false);
+        // Layer 3: Highs / Shimmer Wave (Crisp luminous surface trace)
+        drawReactiveWaveLayer(highEnergySmoothed, 4.2, 2.2, 4.0, '#ffffff', 'transparent', 1.5, 0.95, false);
+      }
+
+      // =========================================================================
+      // 4. RADIAL MODE (360° Circular DJ Halo with Pulsing Bass Core)
+      // =========================================================================
+      else if (mode === 'radial') {
+        const centerX = width / 2;
+        const centerY = height / 2;
+        const minDimension = Math.min(width, height);
+        const baseRadius = minDimension * 0.22;
+        const pulseRadius = baseRadius + bassEnergySmoothed * (minDimension * 0.08);
+        const maxRayLen = minDimension * 0.24;
+        const rays = Math.min(64, barCount);
+
+        ctx.save();
+
+        // Glowing center pulsing ring
+        ctx.beginPath();
+        ctx.arc(centerX, centerY, pulseRadius, 0, Math.PI * 2);
+        ctx.strokeStyle = barColor;
+        ctx.lineWidth = 2.0;
+        ctx.shadowBlur = 12;
+        ctx.shadowColor = glowColor;
+        ctx.stroke();
+
+        for (let i = 0; i < rays; i++) {
+          const angle = (i / rays) * Math.PI * 2 + phase * 0.15;
+          const barIdx = Math.floor((i / rays) * barCount);
+          const level = smoothedBars[barIdx] || 0;
+          const peak = peakBars[barIdx] || 0;
+
+          const r1 = pulseRadius + 2;
+          const r2 = r1 + Math.max(3, level * maxRayLen);
+
+          const x1 = centerX + Math.cos(angle) * r1;
+          const y1 = centerY + Math.sin(angle) * r1;
+          const x2 = centerX + Math.cos(angle) * r2;
+          const y2 = centerY + Math.sin(angle) * r2;
+
+          const gradient = ctx.createLinearGradient(x1, y1, x2, y2);
+          gradient.addColorStop(0, barColor);
+          gradient.addColorStop(1, secondaryColor);
+
+          ctx.beginPath();
+          ctx.moveTo(x1, y1);
+          ctx.lineTo(x2, y2);
+          ctx.strokeStyle = gradient;
+          ctx.lineWidth = 2.2;
+          ctx.shadowBlur = level > 0.25 ? 8 : 2;
+          ctx.shadowColor = glowColor;
+          ctx.stroke();
+
+          // Orbiting peak dots
+          if (peak > 0.15 && isPlaying) {
+            const peakR = r1 + peak * maxRayLen;
+            const px = centerX + Math.cos(angle) * peakR;
+            const py = centerY + Math.sin(angle) * peakR;
+            ctx.fillStyle = '#ffffff';
+            ctx.beginPath();
+            ctx.arc(px, py, 1.5, 0, Math.PI * 2);
+            ctx.fill();
+          }
+        }
+        ctx.restore();
+      }
+
+      // =========================================================================
+      // 5. OSCILLOSCOPE (CRT Phosphor Laser with Trigger Stabilization)
+      // =========================================================================
+      else if (mode === 'oscilloscope') {
+        const bufferLength = analyser ? analyser.fftSize : 512;
+        const timeData = new Uint8Array(bufferLength);
+
+        if (analyser && isPlaying) {
+          analyser.getByteTimeDomainData(timeData);
+          lastTimeDomain = timeData;
+        }
+
+        ctx.save();
+        ctx.beginPath();
+
+        // Zero-crossing trigger search for stable oscilloscope display
+        let startIdx = 0;
+        if (analyser && isPlaying) {
+          for (let i = 0; i < bufferLength - 1; i++) {
+            if (timeData[i] < 128 && timeData[i + 1] >= 128) {
+              startIdx = i;
+              break;
+            }
+          }
+        }
+
+        const renderPoints = Math.floor(bufferLength * 0.75);
+        const sliceWidth = width / (renderPoints - 1);
+        let x = 0;
+
+        for (let i = 0; i < renderPoints; i++) {
+          const idx = (startIdx + i) % bufferLength;
+          let v = 0.5;
+          if (analyser && isPlaying && lastTimeDomain) {
+            v = (lastTimeDomain[idx] - 128) / 128.0;
+            v = 0.5 + v * 0.45;
+          } else if (isPlaying) {
+            v = 0.5 + Math.sin(phase * 2 + (i / renderPoints) * Math.PI * 4) * 0.12;
+          }
+          const y = v * height;
+
+          if (i === 0) ctx.moveTo(x, y);
+          else ctx.lineTo(x, y);
+
+          x += sliceWidth;
+        }
+
+        // Phosphor diffuse bloom outer layer
+        ctx.lineWidth = 3.5;
+        ctx.strokeStyle = barColor;
+        ctx.shadowBlur = 16;
+        ctx.shadowColor = glowColor;
+        ctx.globalAlpha = 0.7;
+        ctx.stroke();
+
+        // Sharp bright white core laser
+        ctx.lineWidth = 1.4;
+        ctx.strokeStyle = '#ffffff';
+        ctx.globalAlpha = 0.95;
+        ctx.shadowBlur = 4;
+        ctx.shadowColor = '#ffffff';
+        ctx.stroke();
+
+        ctx.restore();
       }
 
       ctx.restore();
@@ -261,7 +552,9 @@ export const AudioVisualizer = memo(function AudioVisualizer({
     return () => {
       cancelAnimationFrame(animationId);
     };
-  }, [analyserRef, isPlaying, mode, barColor, secondaryColor, glowColor]);
+  }, [analyserRef, isPlaying, mode, barColor, secondaryColor, glowColor, peakHoldSpeed]);
+
+  if (mode === 'off') return null;
 
   return (
     <canvas

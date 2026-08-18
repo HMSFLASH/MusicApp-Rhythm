@@ -1,5 +1,6 @@
 import React, { useState } from 'react';
 import { X, Info, Tag, Image as ImageIcon, Plus, Trash2, Check, Copy, Music, Download, ExternalLink } from 'lucide-react';
+import { useTranslation } from 'react-i18next';
 import type { Track } from '../hooks/audioTypes';
 import { useToast } from '../context/ToastContext';
 
@@ -11,6 +12,7 @@ interface TrackInfoModalProps {
 }
 
 export function TrackInfoModal({ track, trackMetadata, onClose, onUpdateMetadata }: TrackInfoModalProps) {
+  const { t } = useTranslation();
   const { toast } = useToast();
   const [activeTab, setActiveTab] = useState<'details' | 'metadata' | 'cover'>('details');
 
@@ -52,24 +54,24 @@ export function TrackInfoModal({ track, trackMetadata, onClose, onUpdateMetadata
   const handleCopyPath = () => {
     if (track.fileName) {
       navigator.clipboard.writeText(track.fileName);
-      toast.success('Đã sao chép tên file!');
+      toast.success(t('modals.trackInfo.copiedFilename', 'Copied filename!'));
     }
   };
 
   const handleAddTag = () => {
     if (!newKey.trim()) {
-      toast.info('Vui lòng nhập tên Key!');
+      toast.info(t('modals.trackInfo.enterKeyName', 'Please enter a key name!'));
       return;
     }
     setTags(prev => [...prev, { key: newKey.trim().toUpperCase(), value: newValue.trim(), isNew: true }]);
     setNewKey('');
     setNewValue('');
-    toast.success(`Đã thêm cặp key: ${newKey.toUpperCase()}`);
+    toast.success(t('modals.trackInfo.tagAdded', 'Added tag: {{key}}', { key: newKey.toUpperCase() }));
   };
 
   const handleRemoveTag = (index: number) => {
     setTags(prev => prev.filter((_, i) => i !== index));
-    toast.info('Đã xóa cặp Key-Value');
+    toast.info(t('modals.trackInfo.tagRemoved', 'Removed Key-Value pair'));
   };
 
   const handleUpdateTagValue = (index: number, val: string) => {
@@ -84,12 +86,12 @@ export function TrackInfoModal({ track, trackMetadata, onClose, onUpdateMetadata
     if (onUpdateMetadata) {
       onUpdateMetadata(record);
     }
-    toast.success('Đã cập nhật toàn bộ Metadata bộ nhớ tạm thành công!');
+    toast.success(t('modals.trackInfo.savedCachedTags', 'Updated metadata cache successfully!'));
   };
 
   const handleDownloadCover = () => {
     if (!coverUrl) {
-      toast.info('Bài hát này không có ảnh bìa để tải về');
+      toast.info(t('modals.trackInfo.noCoverToDownload', 'This track has no cover art to download'));
       return;
     }
     const cleanTitle = (track.title || track.fileName || 'cover').replace(/[\\/:*?"<>|]/g, '_');
@@ -103,7 +105,7 @@ export function TrackInfoModal({ track, trackMetadata, onClose, onUpdateMetadata
         document.body.appendChild(link);
         link.click();
         document.body.removeChild(link);
-        toast.success(`Đã tải ảnh bìa: ${filename}`);
+        toast.success(t('modals.trackInfo.downloadedCover', 'Downloaded cover art: {{filename}}', { filename }));
       } else {
         fetch(coverUrl)
           .then(res => res.blob())
@@ -116,11 +118,11 @@ export function TrackInfoModal({ track, trackMetadata, onClose, onUpdateMetadata
             link.click();
             document.body.removeChild(link);
             URL.revokeObjectURL(blobUrl);
-            toast.success(`Đã tải ảnh bìa: ${filename}`);
+            toast.success(t('modals.trackInfo.downloadedCover', 'Downloaded cover art: {{filename}}', { filename }));
           })
           .catch(() => {
             window.open(coverUrl, '_blank');
-            toast.info('Đang mở ảnh bìa trong tab mới');
+            toast.info(t('modals.trackInfo.openingCoverNewTab', 'Opening cover art in a new tab'));
           });
       }
     } catch {
@@ -131,7 +133,7 @@ export function TrackInfoModal({ track, trackMetadata, onClose, onUpdateMetadata
   const handleCopyCoverUrl = () => {
     if (coverUrl) {
       navigator.clipboard.writeText(coverUrl);
-      toast.success('Đã sao chép liên kết ảnh bìa!');
+      toast.success(t('modals.trackInfo.copiedCoverLink', 'Copied cover art URL!'));
     }
   };
 
@@ -142,17 +144,17 @@ export function TrackInfoModal({ track, trackMetadata, onClose, onUpdateMetadata
   };
 
   const technicalItems = [
-    { label: 'Tên Tệp / Đường Dẫn', value: track.fileName || track.title || track.id, full: true, canCopy: true },
-    { label: 'Định Dạng Âm Thanh', value: track.fileFormat ? track.fileFormat.toUpperCase() : 'N/A' },
-    { label: 'Codec Giải Mã', value: track.codec || trackMetadata?.codec || 'PCM / Direct' },
-    { label: 'Chế Độ Mã Hóa', value: isLossless ? 'Lossless PCM / Hi-Res' : 'Lossy VBR/CBR' },
-    { label: 'Tốc Độ Bit (Bitrate)', value: bitrate ? `${Math.round(bitrate / 1000)} kbps` : 'N/A' },
-    { label: 'Tần Số Lấy Mẫu (Sample Rate)', value: sampleRate ? `${sampleRate >= 1000 ? `${(sampleRate / 1000).toFixed(3)} kHz` : `${sampleRate} Hz`}` : 'N/A' },
-    { label: 'Độ Sâu Bit (Bit Depth)', value: bitsPerSample ? `${bitsPerSample}-bit` : (isLossless ? '24-bit (Hi-Res)' : '16-bit') },
-    { label: 'Kênh Âm Thanh', value: channels ? (channels === 1 ? '1 (Mono)' : channels === 2 ? '2 (Stereo)' : `${channels} Channels`) : '2 (Stereo)' },
-    { label: 'Dung Lượng Tệp', value: formatFileSize(fileSize) },
-    { label: 'Thời Lượng Bài Hát', value: durationSeconds ? `${Math.floor(durationSeconds / 60)}:${Math.floor(durationSeconds % 60).toString().padStart(2, '0')} (${durationSeconds}s)` : 'N/A' },
-    { label: 'Bộ Xử Lý Phần Cứng', value: 'Direct DAC Audio Offload / WebAudio DSP' },
+    { label: t('modals.trackInfo.fileNamePath', 'File Name / Path'), value: track.fileName || track.title || track.id, full: true, canCopy: true },
+    { label: t('modals.trackInfo.audioFormat', 'Audio Format'), value: track.fileFormat ? track.fileFormat.toUpperCase() : 'N/A' },
+    { label: t('modals.trackInfo.codec', 'Decoder Codec'), value: track.codec || trackMetadata?.codec || 'PCM / Direct' },
+    { label: t('modals.trackInfo.encodingMode', 'Encoding Mode'), value: isLossless ? 'Lossless PCM / Hi-Res' : 'Lossy VBR/CBR' },
+    { label: t('modals.trackInfo.bitrate', 'Bitrate'), value: bitrate ? `${Math.round(bitrate / 1000)} kbps` : 'N/A' },
+    { label: t('modals.trackInfo.sampleRate', 'Sample Rate'), value: sampleRate ? `${sampleRate >= 1000 ? `${(sampleRate / 1000).toFixed(3)} kHz` : `${sampleRate} Hz`}` : 'N/A' },
+    { label: t('modals.trackInfo.bitDepth', 'Bit Depth'), value: bitsPerSample ? `${bitsPerSample}-bit` : (isLossless ? '24-bit (Hi-Res)' : '16-bit') },
+    { label: t('modals.trackInfo.channels', 'Audio Channels'), value: channels ? (channels === 1 ? '1 (Mono)' : channels === 2 ? '2 (Stereo)' : `${channels} Channels`) : '2 (Stereo)' },
+    { label: t('modals.trackInfo.fileSize', 'File Size'), value: formatFileSize(fileSize) },
+    { label: t('modals.trackInfo.duration', 'Track Duration'), value: durationSeconds ? `${Math.floor(durationSeconds / 60)}:${Math.floor(durationSeconds % 60).toString().padStart(2, '0')} (${durationSeconds}s)` : 'N/A' },
+    { label: t('modals.trackInfo.hardwarePipeline', 'Audio Processing'), value: 'Direct DAC Audio Offload / WebAudio DSP' },
   ];
 
   return (
@@ -179,13 +181,13 @@ export function TrackInfoModal({ track, trackMetadata, onClose, onUpdateMetadata
             </div>
             <div>
               <h2 className="text-base sm:text-lg font-bold font-display text-white tracking-tight leading-none">
-                Chi Tiết & Quản Lý Bài Hát
+                {t('modals.trackInfo.title', 'Track Details & Metadata')}
               </h2>
-              <p className="text-xs text-slate-400 mt-1 line-clamp-1">{track.title || track.fileName} • {track.artist || 'Unknown'}</p>
+              <p className="text-xs text-slate-400 mt-1 line-clamp-1">{track.title || track.fileName} • {track.artist || t('common.unknownArtist', 'Unknown Artist')}</p>
             </div>
           </div>
           <button 
-            aria-label="Đóng"
+            aria-label={t('common.close', 'Close')}
             onClick={onClose}
             className="text-slate-400 hover:text-white hover:bg-white/[0.08] p-2 rounded-xl transition-colors"
           >
@@ -204,7 +206,7 @@ export function TrackInfoModal({ track, trackMetadata, onClose, onUpdateMetadata
             }`}
           >
             <Info size={15} />
-            Thông Số Kỹ Thuật
+            {t('modals.trackInfo.tabDetails', 'Technical Specifications')}
           </button>
 
           <button
@@ -216,7 +218,7 @@ export function TrackInfoModal({ track, trackMetadata, onClose, onUpdateMetadata
             }`}
           >
             <Tag size={15} />
-            Metadata (Key-Value)
+            {t('modals.trackInfo.tabMetadata', 'Metadata (Key-Value)')}
           </button>
 
           <button
@@ -228,7 +230,7 @@ export function TrackInfoModal({ track, trackMetadata, onClose, onUpdateMetadata
             }`}
           >
             <ImageIcon size={15} />
-            Tải Ảnh Bìa
+            {t('modals.trackInfo.tabCover', 'Cover Art')}
           </button>
         </div>
 
@@ -251,7 +253,7 @@ export function TrackInfoModal({ track, trackMetadata, onClose, onUpdateMetadata
                       {item.canCopy && (
                         <button
                           onClick={handleCopyPath}
-                          title="Sao chép tên file"
+                          title={t('modals.trackInfo.copyFileName', 'Copy filename')}
                           className="p-1 rounded-lg text-slate-400 hover:text-cyan-400 hover:bg-white/[0.08] transition-colors"
                         >
                           <Copy size={13} />
@@ -268,35 +270,35 @@ export function TrackInfoModal({ track, trackMetadata, onClose, onUpdateMetadata
           {activeTab === 'metadata' && (
             <div className="flex flex-col gap-4">
               <div className="flex items-center justify-between">
-                <span className="text-xs font-bold text-slate-300">Danh Sách Cặp Thẻ Key - Value ({tags.length})</span>
+                <span className="text-xs font-bold text-slate-300">{t('modals.trackInfo.tagsListTitle', 'Key - Value Tags ({{count}})', { count: tags.length })}</span>
                 <button
                   onClick={handleSaveTags}
                   className="flex items-center gap-1.5 px-3 py-1.5 bg-cyan-500/20 hover:bg-cyan-500/30 text-cyan-300 border border-cyan-500/40 rounded-xl text-xs font-semibold transition-all shadow-[0_0_15px_rgba(0,245,255,0.2)]"
                 >
                   <Check size={14} />
-                  Lưu Tạm
+                  {t('modals.trackInfo.saveTemporary', 'Save Cache')}
                 </button>
               </div>
 
               <div className="flex flex-col gap-2 max-h-[260px] overflow-y-auto no-scrollbar pr-1">
-                {tags.map((t, index) => (
+                {tags.map((tag, index) => (
                   <div key={index} className="flex items-center gap-2 bg-white/[0.03] border border-white/[0.06] p-2 rounded-xl">
                     <div className="w-28 flex-shrink-0">
                       <span className="text-[10px] font-mono font-bold text-cyan-400 bg-cyan-500/10 px-2 py-1 rounded-md border border-cyan-500/20 block truncate">
-                        {t.key}
+                        {tag.key}
                       </span>
                     </div>
                     <input
                       type="text"
-                      value={t.value}
+                      value={tag.value}
                       onChange={(e) => handleUpdateTagValue(index, e.target.value)}
                       className="flex-1 bg-black/40 border border-white/[0.08] text-white text-xs rounded-lg px-2.5 py-1.5 focus:outline-none focus:border-cyan-500/50"
-                      placeholder="Giá trị tag..."
+                      placeholder={t('modals.trackInfo.tagValuePlaceholder', 'Tag value...')}
                     />
                     <button
                       onClick={() => handleRemoveTag(index)}
                       className="text-slate-500 hover:text-red-400 p-1.5 rounded-lg hover:bg-white/[0.05] transition-colors"
-                      title="Xóa tag"
+                      title={t('modals.trackInfo.deleteTag', 'Delete tag')}
                     >
                       <Trash2 size={14} />
                     </button>
@@ -307,28 +309,28 @@ export function TrackInfoModal({ track, trackMetadata, onClose, onUpdateMetadata
               {/* Add New Key-Value */}
               <div className="bg-black/30 border border-white/[0.08] p-3 rounded-2xl flex flex-col gap-2">
                 <span className="text-[11px] font-semibold text-slate-300 flex items-center gap-1.5">
-                  <Plus size={13} className="text-cyan-400" /> Thêm Cặp Key-Value Mới
+                  <Plus size={13} className="text-cyan-400" /> {t('modals.trackInfo.addNewTagTitle', 'Add New Key-Value Pair')}
                 </span>
                 <div className="flex items-center gap-2">
                   <input
                     type="text"
                     value={newKey}
                     onChange={(e) => setNewKey(e.target.value)}
-                    placeholder="Tên Key (VD: COMPOSER)..."
+                    placeholder={t('modals.trackInfo.keyPlaceholder', 'Key (e.g. COMPOSER)...')}
                     className="w-1/3 bg-black/50 border border-white/[0.1] text-white text-xs rounded-lg px-2.5 py-1.5 focus:outline-none focus:border-cyan-500/50 uppercase"
                   />
                   <input
                     type="text"
                     value={newValue}
                     onChange={(e) => setNewValue(e.target.value)}
-                    placeholder="Giá trị..."
+                    placeholder={t('modals.trackInfo.valPlaceholder', 'Value...')}
                     className="flex-1 bg-black/50 border border-white/[0.1] text-white text-xs rounded-lg px-2.5 py-1.5 focus:outline-none focus:border-cyan-500/50"
                   />
                   <button
                     onClick={handleAddTag}
                     className="px-3 py-1.5 bg-cyan-500 text-black font-bold text-xs rounded-lg hover:bg-cyan-400 transition-colors"
                   >
-                    Thêm
+                    {t('common.add', 'Add')}
                   </button>
                 </div>
               </div>
@@ -344,7 +346,7 @@ export function TrackInfoModal({ track, trackMetadata, onClose, onUpdateMetadata
                 ) : (
                   <div className="flex flex-col items-center gap-2 text-slate-500">
                     <ImageIcon size={48} className="opacity-40" />
-                    <span className="text-xs">Bài hát này không có ảnh bìa</span>
+                    <span className="text-xs">{t('modals.trackInfo.noCoverArt', 'This track has no cover art')}</span>
                   </div>
                 )}
               </div>
@@ -356,7 +358,7 @@ export function TrackInfoModal({ track, trackMetadata, onClose, onUpdateMetadata
                     className="flex items-center gap-2 px-4 py-2.5 bg-cyan-500/20 hover:bg-cyan-500/30 text-cyan-300 border border-cyan-500/40 rounded-xl text-xs font-bold transition-all shadow-[0_0_20px_rgba(0,245,255,0.25)] hover:scale-105"
                   >
                     <Download size={15} />
-                    Tải Ảnh Bìa Về Máy
+                    {t('modals.trackInfo.downloadCoverBtn', 'Download Cover Image')}
                   </button>
 
                   <button
@@ -364,7 +366,7 @@ export function TrackInfoModal({ track, trackMetadata, onClose, onUpdateMetadata
                     className="flex items-center gap-1.5 px-3 py-2 bg-white/[0.05] hover:bg-white/[0.1] text-slate-300 border border-white/[0.1] rounded-xl text-xs font-medium transition-colors"
                   >
                     <ExternalLink size={14} />
-                    Xem Toàn Màn Hình
+                    {t('modals.trackInfo.viewFullScreen', 'View Full Screen')}
                   </button>
 
                   <button
@@ -372,7 +374,7 @@ export function TrackInfoModal({ track, trackMetadata, onClose, onUpdateMetadata
                     className="flex items-center gap-1.5 px-3 py-2 bg-white/[0.05] hover:bg-white/[0.1] text-slate-300 border border-white/[0.1] rounded-xl text-xs font-medium transition-colors"
                   >
                     <Copy size={14} />
-                    Sao Chép Link
+                    {t('modals.trackInfo.copyCoverLink', 'Copy Link')}
                   </button>
                 </div>
               )}

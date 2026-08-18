@@ -1,11 +1,13 @@
 import { Disc, ChevronRight, Mail, Eye, EyeOff, IdCard } from 'lucide-react';
 import { NavLink, useNavigate } from 'react-router-dom';
 import { useState } from 'react';
+import { useTranslation } from 'react-i18next';
 import { axiosClient } from '../api/axiosClient';
 import { useAuth } from '../context/AuthContext';
 import { BACKEND_URL } from '../api/axiosClient';
 
 export function RegisterPage() {
+  const { t } = useTranslation();
   const [email, setEmail] = useState('');
   const [displayName, setDisplayName] = useState('');
   const [password, setPassword] = useState('');
@@ -25,11 +27,11 @@ export function RegisterPage() {
   const handleRegister = async (e: React.FormEvent) => {
     e.preventDefault();
     if (!email || !displayName || !password || !confirmPassword) {
-      setError('Please fill in all fields');
+      setError(t('auth.fillAllFields', 'Please fill in all fields'));
       return;
     }
     if (password !== confirmPassword) {
-      setError('Passwords do not match');
+      setError(t('auth.passwordsDoNotMatch', 'Passwords do not match'));
       return;
     }
 
@@ -46,7 +48,7 @@ export function RegisterPage() {
       navigate('/');
 
     } catch (err: any) {
-      setError(err.response?.data?.message || err.message || 'Registration failed. Email or username might already exist.');
+      setError(err.response?.data?.message || err.message || t('auth.registerFail', 'Registration failed. Email or username might already exist.'));
     } finally {
       setLoading(false);
     }
@@ -74,11 +76,10 @@ export function RegisterPage() {
               <Disc size={26} className="text-primary animate-spin-slow" />
             </div>
             <h1 className="text-3xl lg:text-4xl font-bold font-display text-white tracking-tight leading-tight">
-              Join the <br />
-              <span className="text-transparent bg-clip-text bg-gradient-to-r from-primary to-cyan-300">Rhythm Experience</span>
+              {t('auth.brandTagline', 'Master your Audio Space')}
             </h1>
             <p className="text-xs lg:text-sm font-mono text-slate-400 mt-4 max-w-xs leading-relaxed">
-              Create an account to unlock cloud music storage, synced audio profiles, and studio-grade DSP features.
+              {t('auth.brandDesc', 'Connect to your Rhythm workspace. Adjust frequencies, dial in the perfect tone, and sync your music library.')}
             </p>
           </div>
 
@@ -91,8 +92,8 @@ export function RegisterPage() {
 
         {/* Right Side: Register Form */}
         <div className="flex flex-col justify-center p-6 sm:p-8 lg:p-12 relative">
-          <h2 className="text-2xl font-bold font-display text-white mb-1">Create Account</h2>
-          <p className="text-xs font-mono text-slate-400 mb-6">Join Rhythm to sync and manage your music.</p>
+          <h2 className="text-2xl font-bold font-display text-white mb-1">{t('auth.createAccount', 'Create Account')}</h2>
+          <p className="text-xs font-mono text-slate-400 mb-6">{t('auth.joinRhythm', 'Join Rhythm to sync and manage your music.')}</p>
 
           <form onSubmit={handleRegister} className="w-full space-y-3.5">
 
@@ -105,7 +106,7 @@ export function RegisterPage() {
             {/* Input Groups */}
             <div className="space-y-1">
               <label className="text-[11px] font-mono font-semibold uppercase tracking-wider text-slate-400">
-                Email Address
+                {t('auth.emailAddress', 'Email Address')}
               </label>
               <div className="relative">
                 <input
@@ -124,14 +125,14 @@ export function RegisterPage() {
 
             <div className="space-y-1">
               <label className="text-[11px] font-mono font-semibold uppercase tracking-wider text-slate-400">
-                Display Name
+                {t('auth.displayName', 'Display Name')}
               </label>
               <div className="relative">
                 <input
                   type="text"
                   value={displayName}
                   onChange={(e) => setDisplayName(e.target.value)}
-                  placeholder="Your username"
+                  placeholder={t('auth.yourUsername', 'Your username')}
                   required
                   className="w-full bg-white/[0.03] border border-white/[0.08] hover:border-white/20 focus:border-primary text-white text-sm rounded-xl py-2.5 pl-9 pr-3.5 outline-none transition-all placeholder:text-slate-500 font-sans focus:shadow-[0_0_15px_rgba(0,245,255,0.15)]"
                 />
@@ -143,14 +144,14 @@ export function RegisterPage() {
 
             <div className="space-y-1">
               <label className="text-[11px] font-mono font-semibold uppercase tracking-wider text-slate-400">
-                Password
+                {t('auth.password', 'Password')}
               </label>
               <div className="relative">
                 <input
                   type={showPassword ? "text" : "password"}
                   value={password}
                   onChange={(e) => setPassword(e.target.value)}
-                  placeholder="Create a password"
+                  placeholder={t('auth.createPassword', 'Create a password')}
                   required
                   className="w-full bg-white/[0.03] border border-white/[0.08] hover:border-white/20 focus:border-primary text-white text-sm rounded-xl py-2.5 px-3.5 pr-10 outline-none transition-all placeholder:text-slate-500 font-sans focus:shadow-[0_0_15px_rgba(0,245,255,0.15)]"
                 />
@@ -166,14 +167,14 @@ export function RegisterPage() {
 
             <div className="space-y-1">
               <label className="text-[11px] font-mono font-semibold uppercase tracking-wider text-slate-400">
-                Confirm Password
+                {t('auth.confirmPassword', 'Confirm Password')}
               </label>
               <div className="relative">
                 <input
                   type={showConfirmPassword ? "text" : "password"}
                   value={confirmPassword}
                   onChange={(e) => setConfirmPassword(e.target.value)}
-                  placeholder="Repeat password"
+                  placeholder={t('auth.repeatPassword', 'Repeat password')}
                   required
                   className="w-full bg-white/[0.03] border border-white/[0.08] hover:border-white/20 focus:border-primary text-white text-sm rounded-xl py-2.5 px-3.5 pr-10 outline-none transition-all placeholder:text-slate-500 font-sans focus:shadow-[0_0_15px_rgba(0,245,255,0.15)]"
                 />
@@ -193,7 +194,7 @@ export function RegisterPage() {
               disabled={loading}
               className="w-full flex items-center justify-center gap-2 bg-primary hover:brightness-110 text-slate-950 font-bold py-3.5 rounded-xl shadow-[0_0_20px_rgba(0,245,255,0.35)] hover:shadow-[0_0_25px_rgba(0,245,255,0.5)] transition-all mt-4 disabled:opacity-50 text-sm hover:scale-[1.01] active:scale-[0.99]"
             >
-              <span>{loading ? 'Creating Account...' : 'Create Account'}</span>
+              <span>{loading ? t('auth.creatingAccount', 'Creating Account...') : t('auth.createAccount', 'Create Account')}</span>
               {!loading && <ChevronRight size={16} strokeWidth={3} />}
             </button>
           </form>
@@ -202,7 +203,7 @@ export function RegisterPage() {
             <div className="absolute inset-0 flex items-center">
               <div className="w-full border-t border-white/[0.06]"></div>
             </div>
-            <div className="relative px-3 bg-[#0c1626] text-[10px] font-mono text-slate-500 uppercase tracking-widest">Or continue with</div>
+            <div className="relative px-3 bg-[#0c1626] text-[10px] font-mono text-slate-500 uppercase tracking-widest">{t('auth.orContinueWith', 'Or continue with')}</div>
           </div>
 
           {/* Social / Alternative Logins */}
@@ -217,12 +218,12 @@ export function RegisterPage() {
                 <path d="M5.84 14.09c-.22-.66-.35-1.36-.35-2.09s.13-1.43.35-2.09V7.07H2.18C1.43 8.55 1 10.22 1 12s.43 3.45 1.18 4.93l2.85-2.22.81-.62z" fill="#FBBC05" />
                 <path d="M12 5.38c1.62 0 3.06.56 4.21 1.64l3.15-3.15C17.45 2.09 14.97 1 12 1 7.7 1 3.99 3.47 2.18 7.07l3.66 2.84c.87-2.6 3.3-4.53 6.16-4.53z" fill="#EA4335" />
               </svg>
-              <span className="text-slate-200">Sign up with Google</span>
+              <span className="text-slate-200">{t('auth.signUpWithGoogle', 'Sign up with Google')}</span>
             </button>
           </div>
 
           <p className="mt-5 text-xs text-center text-slate-400 font-mono">
-            Already have an account? <NavLink to="/login" className="text-primary hover:underline font-semibold ml-1">Sign in here</NavLink>
+            {t('auth.alreadyHaveAccount', 'Already have an account?')} <NavLink to="/login" className="text-primary hover:underline font-semibold ml-1">{t('auth.signInHere', 'Sign in here')}</NavLink>
           </p>
 
         </div>

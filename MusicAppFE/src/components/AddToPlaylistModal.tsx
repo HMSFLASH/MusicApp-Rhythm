@@ -1,7 +1,10 @@
 import { useState, useEffect } from 'react';
 import { X, Loader2, ListPlus } from 'lucide-react';
+import { useTranslation } from 'react-i18next';
 import type { Track } from '../hooks/useAudioPlayer';
 import { axiosClient } from '../api/axiosClient';
+import { useGlobalAudio } from '../context/AudioContext';
+import { useAuth } from '../context/AuthContext';
 
 interface AddToPlaylistModalProps {
   isOpen: boolean;
@@ -11,10 +14,8 @@ interface AddToPlaylistModalProps {
   tracks?: Track[];
 }
 
-import { useGlobalAudio } from '../context/AudioContext';
-import { useAuth } from '../context/AuthContext';
-
 export function AddToPlaylistModal({ isOpen, onClose, track, tracks }: AddToPlaylistModalProps) {
+  const { t } = useTranslation();
   const { isAuthenticated } = useAuth();
   const { playerState } = useGlobalAudio();
 
@@ -33,10 +34,10 @@ export function AddToPlaylistModal({ isOpen, onClose, track, tracks }: AddToPlay
       axiosClient.get('/api/playlists')
 
         .then((data: any) => setPlaylists(data))
-        .catch(() => setError('Failed to load playlists'))
+        .catch(() => setError(t('modals.addToPlaylist.loadFail', 'Failed to load playlists')))
         .finally(() => setLoading(false));
     }
-  }, [isOpen, isAuthenticated]);
+  }, [isOpen, isAuthenticated, t]);
 
   const items = tracks && tracks.length > 0 ? tracks : (track ? [track] : []);
   if (!isOpen || items.length === 0) return null;
@@ -52,21 +53,19 @@ export function AddToPlaylistModal({ isOpen, onClose, track, tracks }: AddToPlay
         const nameParam = item ? `?name=${encodeURIComponent(item.fileName || '')}` : '';
         await axiosClient.post(`/api/playlists/${playlistId}/tracks/${item.id}${nameParam}`);
       } else {
-        // Add multiple tracks sequentially to avoid concurrent issues or implement a batch API if available.
-        // Assuming no batch API, we do it via Promise.all
         await Promise.all(items.map(item => {
           const nameParam = item ? `?name=${encodeURIComponent(item.fileName || '')}` : '';
           return axiosClient.post(`/api/playlists/${playlistId}/tracks/${item.id}${nameParam}`);
         }));
       }
 
-      setSuccessMsg('Added to playlist successfully!');
+      setSuccessMsg(t('modals.addToPlaylist.success', 'Added to playlist successfully!'));
       setTimeout(() => {
         onClose();
       }, 1500);
 
     } catch (err: any) {
-      setError(err.message || 'An error occurred');
+      setError(err.message || t('common.systemError', 'An error occurred'));
     } finally {
       setAddingId(null);
     }
@@ -80,11 +79,11 @@ export function AddToPlaylistModal({ isOpen, onClose, track, tracks }: AddToPlay
       >
         <div className="flex items-center justify-between gap-3 p-4 sm:p-5 border-b border-white/[0.06] shrink-0 bg-white/[0.02]">
           <div className="min-w-0">
-            <h2 className="text-base sm:text-lg font-bold font-display text-white">Add to Playlist</h2>
+            <h2 className="text-base sm:text-lg font-bold font-display text-white">{t('modals.addToPlaylist.title', 'Add to Playlist')}</h2>
             <p className="text-xs text-slate-400 font-mono truncate mt-0.5">
               {items.length === 1
-                ? (items[0].title || playerState.getTrackMetadata(items[0].id)?.title || (items[0].fileName ? (items[0].fileName.includes(' - ') ? items[0].fileName.split(' - ')[1].replace(/\.[^/.]+$/, "") : items[0].fileName.replace(/\.[^/.]+$/, "")) : 'Unknown Title'))
-                : `${items.length} tracks selected`}
+                ? (items[0].title || playerState.getTrackMetadata(items[0].id)?.title || (items[0].fileName ? (items[0].fileName.includes(' - ') ? items[0].fileName.split(' - ')[1].replace(/\.[^/.]+$/, "") : items[0].fileName.replace(/\.[^/.]+$/, "")) : t('common.unknownTitle', 'Unknown Title')))
+                : t('modals.addToPlaylist.selectedTracks', '{{count}} tracks selected', { count: items.length })}
             </p>
           </div>
           <button
@@ -113,7 +112,7 @@ export function AddToPlaylistModal({ isOpen, onClose, track, tracks }: AddToPlay
             </div>
           ) : playlists.length === 0 ? (
             <div className="text-center py-8 text-slate-400 text-xs font-mono">
-              You don't have any playlists yet.
+              {t('modals.addToPlaylist.noPlaylists', "You don't have any playlists yet.")}
             </div>
           ) : (
             playlists.map(p => (
@@ -125,7 +124,7 @@ export function AddToPlaylistModal({ isOpen, onClose, track, tracks }: AddToPlay
               >
                 <div className="flex min-w-0 flex-col truncate pr-4">
                   <span className="text-xs sm:text-sm font-semibold text-slate-200 group-hover:text-primary transition-colors truncate">{p.name}</span>
-                  <span className="text-[11px] text-slate-400 font-mono mt-0.5">{p.trackCount} tracks</span>
+                  <span className="text-[11px] text-slate-400 font-mono mt-0.5">{t('playlist.trackCount', '{{count}} tracks', { count: p.trackCount })}</span>
                 </div>
                 {addingId === p.id ? (
                   <Loader2 size={16} className="text-primary animate-spin shrink-0" />

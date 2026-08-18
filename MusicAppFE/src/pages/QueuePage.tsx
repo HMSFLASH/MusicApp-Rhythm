@@ -103,11 +103,11 @@ export function QueuePage() {
   const viewingQueue = useMemo(() => {
     return multiQueues.find((q) => q.id === selectedQueueId) || multiQueues[0] || {
       id: 'queue-1',
-      name: 'Hàng Đợi 1 (Chính)',
+      name: t('queue.defaultName', 'Queue 1 (Main)', { index: 1 }),
       tracks: queue,
       createdAt: Date.now(),
     };
-  }, [multiQueues, selectedQueueId, queue]);
+  }, [multiQueues, selectedQueueId, queue, t]);
 
   const displayTracks = viewingQueue.tracks;
   const isViewingActivePlayingQueue = selectedQueueId === activeQueueId;
@@ -140,12 +140,12 @@ export function QueuePage() {
   // Queue Operations
   const handleCreateNewQueue = () => {
     if (multiQueues.length >= MAX_QUEUES) {
-      toast.info(`Đã đạt giới hạn tối đa ${MAX_QUEUES} hàng đợi.`);
+      toast.info(t('queue.maxQueuesReached', 'Maximum limit of {{max}} queues reached.', { max: MAX_QUEUES }));
       return;
     }
     const newQueue: MultiQueue = {
       id: `queue-${Date.now()}`,
-      name: `Hàng Đợi ${multiQueues.length + 1}`,
+      name: t('queue.queueName', 'Queue {{index}}', { index: multiQueues.length + 1 }),
       tracks: [],
       currentTrackId: null,
       createdAt: Date.now(),
@@ -154,12 +154,12 @@ export function QueuePage() {
     setMultiQueues(updated);
     setSelectedQueueId(newQueue.id);
     saveMultiQueues(updated, activeQueueId);
-    toast.success(`Đã tạo "${newQueue.name}"!`);
+    toast.success(t('queue.queueCreated', 'Created "{{name}}"!', { name: newQueue.name }));
   };
 
   const handleSwitchPlaybackToViewingQueue = (startTrack?: Track) => {
     if (displayTracks.length === 0) {
-      toast.info('Hàng đợi này chưa có bài hát nào.');
+      toast.info(t('queue.noTracksInQueue', 'This queue has no tracks.'));
       return;
     }
     setActiveQueueId(selectedQueueId);
@@ -168,7 +168,7 @@ export function QueuePage() {
 
     const trackToPlay = startTrack || displayTracks[0];
     playTrack(trackToPlay, displayTracks, true);
-    toast.success(`Đang phát "${viewingQueue.name}"`);
+    toast.success(t('queue.playingQueue', 'Now playing "{{name}}"', { name: viewingQueue.name }));
   };
 
   const handleUpdateViewingTracks = (newTracks: Track[]) => {
@@ -193,17 +193,17 @@ export function QueuePage() {
     setMultiQueues(updated);
     saveMultiQueues(updated, activeQueueId);
     setEditingQueueName(false);
-    toast.success('Đã đổi tên hàng đợi!');
+    toast.success(t('queue.queueRenamed', 'Queue renamed successfully!'));
   };
 
   const handleCloneQueue = () => {
     if (multiQueues.length >= MAX_QUEUES) {
-      toast.info(`Đã đạt giới hạn tối đa ${MAX_QUEUES} hàng đợi.`);
+      toast.info(t('queue.maxQueuesReached', 'Maximum limit of {{max}} queues reached.', { max: MAX_QUEUES }));
       return;
     }
     const newQueue: MultiQueue = {
       id: `queue-${Date.now()}`,
-      name: `${viewingQueue.name} (Bản Sao)`,
+      name: `${viewingQueue.name} ${t('queue.cloneSuffix', '(Copy)')}`,
       tracks: [...viewingQueue.tracks],
       currentTrackId: null,
       createdAt: Date.now(),
@@ -212,31 +212,36 @@ export function QueuePage() {
     setMultiQueues(updated);
     setSelectedQueueId(newQueue.id);
     saveMultiQueues(updated, activeQueueId);
-    toast.success(`Đã nhân bản thành "${newQueue.name}"!`);
+    toast.success(t('queue.clonedQueue', 'Cloned as "{{name}}"!', { name: newQueue.name }));
   };
 
   const handleClearViewingQueue = async () => {
     const ok = await confirm({
-      title: 'Xóa Sạch Hàng Đợi',
-      description: `Bạn có chắc muốn xóa toàn bộ ${displayTracks.length} bài hát trong "${viewingQueue.name}"?`,
-      confirmText: 'Xóa Sạch',
+      title: t('queue.clearConfirmTitle', 'Clear Queue'),
+      description: t('queue.clearConfirmDesc', 'Are you sure you want to clear all {{count}} tracks in "{{name}}"?', {
+        count: displayTracks.length,
+        name: viewingQueue.name,
+      }),
+      confirmText: t('queue.clearConfirmBtn', 'Clear'),
       confirmColor: 'bg-red-500/20 text-red-400 hover:bg-red-500/30 border-red-500/30',
     });
     if (!ok) return;
 
     handleUpdateViewingTracks([]);
-    toast.info(`Đã làm trống "${viewingQueue.name}"`);
+    toast.info(t('queue.queueCleared', 'Cleared "{{name}}"', { name: viewingQueue.name }));
   };
 
   const handleDeleteQueue = async () => {
     if (multiQueues.length <= 1) {
-      toast.info('Không thể xóa khi chỉ còn 1 hàng đợi.');
+      toast.info(t('queue.cannotDeleteSingle', 'Cannot delete when only 1 queue remains.'));
       return;
     }
     const ok = await confirm({
-      title: 'Xóa Hàng Đợi',
-      description: `Bạn có chắc chắn muốn xóa hẳn "${viewingQueue.name}"?`,
-      confirmText: 'Xóa Hàng Đợi',
+      title: t('queue.deleteConfirmTitle', 'Delete Queue'),
+      description: t('queue.deleteConfirmDesc', 'Are you sure you want to delete "{{name}}"?', {
+        name: viewingQueue.name,
+      }),
+      confirmText: t('queue.deleteConfirmBtn', 'Delete Queue'),
       confirmColor: 'bg-red-600 text-white hover:bg-red-700 border-red-600',
     });
     if (!ok) return;
@@ -251,7 +256,7 @@ export function QueuePage() {
     if (activeQueueId === selectedQueueId) {
       setQueue(remaining[0].tracks);
     }
-    toast.success(`Đã xóa hàng đợi!`);
+    toast.success(t('queue.queueDeleted', 'Queue deleted!'));
   };
 
   const handleRemoveTrack = (e: React.MouseEvent, trackId: string | number) => {
@@ -346,7 +351,7 @@ export function QueuePage() {
         })
       );
       setSelectedIndexes(new Set());
-      toast.success(`Đã thêm ${selectedTracks.length} bài hát vào Yêu thích!`);
+      toast.success(t('queue.batchAddedFavorites', 'Added {{count}} tracks to Favorites!', { count: selectedTracks.length }));
     } catch (err) {
       console.error(err);
     }
@@ -423,14 +428,14 @@ export function QueuePage() {
             <div>
               <div className="flex items-center gap-2">
                 <h1 className="text-xl sm:text-2xl font-bold font-display text-white tracking-tight">
-                  Đa Hàng Đợi (Multi-Queue)
+                  {t('queue.title', 'Multi-Queue')}
                 </h1>
                 <span className="text-[11px] font-mono font-bold px-2 py-0.5 rounded-md bg-cyan-500/15 border border-cyan-500/30 text-cyan-300">
                   {multiQueues.length}/{MAX_QUEUES}
                 </span>
               </div>
               <p className="text-slate-400 text-xs font-mono mt-0.5">
-                Quản lý tới 20 hàng đợi độc lập song song (chuẩn Musicolet)
+                {t('queue.subtitle', 'Manage up to {{max}} independent playback queues', { max: MAX_QUEUES })}
               </p>
             </div>
           </div>
@@ -442,7 +447,7 @@ export function QueuePage() {
               className="flex items-center gap-1.5 px-3.5 py-2 bg-cyan-500/15 hover:bg-cyan-500/25 text-cyan-300 border border-cyan-500/30 rounded-xl text-xs font-bold transition-all hover:scale-105 shadow-[0_0_15px_rgba(0,245,255,0.15)]"
             >
               <Plus size={15} />
-              Tạo Hàng Đợi Mới
+              {t('queue.createNewQueue', 'New Queue')}
             </button>
           )}
         </div>
@@ -460,20 +465,18 @@ export function QueuePage() {
                   setSelectedQueueId(q.id);
                   setEditingQueueName(false);
                 }}
-                className={`flex items-center gap-2 px-3.5 py-2 rounded-2xl border text-xs font-semibold whitespace-nowrap transition-all select-none ${
-                  isSelected
-                    ? 'bg-cyan-500/20 text-cyan-300 border-cyan-500/50 shadow-[0_0_20px_rgba(0,245,255,0.25)] scale-[1.02]'
-                    : 'bg-white/[0.03] hover:bg-white/[0.07] text-slate-400 hover:text-slate-200 border-white/[0.06]'
-                }`}
+                className={`flex items-center gap-2 px-3.5 py-2 rounded-2xl border text-xs font-semibold whitespace-nowrap transition-all select-none ${isSelected
+                  ? 'bg-cyan-500/20 text-cyan-300 border-cyan-500/50 shadow-[0_0_20px_rgba(0,245,255,0.25)] scale-[1.02]'
+                  : 'bg-white/[0.03] hover:bg-white/[0.07] text-slate-400 hover:text-slate-200 border-white/[0.06]'
+                  }`}
               >
                 {isPlayingThis && (
                   <span className="w-2 h-2 rounded-full bg-cyan-400 animate-pulse shadow-[0_0_8px_rgba(0,245,255,0.9)]" />
                 )}
-                <span className="truncate max-w-[140px]">{q.name || `Hàng Đợi ${idx + 1}`}</span>
+                <span className="truncate max-w-[140px]">{q.name || t('queue.queueName', 'Queue {{index}}', { index: idx + 1 })}</span>
                 <span
-                  className={`text-[10px] font-mono px-1.5 py-0.2 rounded-md ${
-                    isSelected ? 'bg-black/40 text-cyan-300' : 'bg-white/[0.06] text-slate-500'
-                  }`}
+                  className={`text-[10px] font-mono px-1.5 py-0.2 rounded-md ${isSelected ? 'bg-black/40 text-cyan-300' : 'bg-white/[0.06] text-slate-500'
+                    }`}
                 >
                   {q.tracks.length}
                 </span>
@@ -500,7 +503,7 @@ export function QueuePage() {
                 onClick={handleRenameQueue}
                 className="px-3 py-1.5 bg-cyan-500 text-black text-xs font-bold rounded-xl"
               >
-                Lưu
+                {t('queue.save', 'Save')}
               </button>
             </div>
           ) : (
@@ -514,17 +517,17 @@ export function QueuePage() {
                   setEditingQueueName(true);
                 }}
                 className="p-1 text-slate-400 hover:text-cyan-400 rounded-lg hover:bg-white/[0.06]"
-                title="Đổi tên hàng đợi"
+                title={t('queue.rename', 'Rename queue')}
               >
                 <Edit2 size={13} />
               </button>
               {isViewingActivePlayingQueue ? (
                 <span className="text-[10px] font-mono font-bold text-cyan-400 bg-cyan-500/15 border border-cyan-500/30 px-2 py-0.5 rounded-md">
-                  Đang Phát
+                  {t('queue.nowPlayingBadge', 'Now Playing')}
                 </span>
               ) : (
                 <span className="text-[10px] font-mono text-slate-400 bg-white/[0.04] px-2 py-0.5 rounded-md">
-                  Chế Độ Xem
+                  {t('queue.viewModeBadge', 'Viewing')}
                 </span>
               )}
             </div>
@@ -539,27 +542,27 @@ export function QueuePage() {
               className="flex items-center gap-1.5 px-3 py-1.5 bg-cyan-500 text-black rounded-xl text-xs font-bold hover:bg-cyan-400 transition-all shadow-[0_0_15px_rgba(0,245,255,0.3)] hover:scale-105"
             >
               <Play size={13} fill="currentColor" />
-              Phát Hàng Đợi Này
+              {t('queue.playThisQueue', 'Play This Queue')}
             </button>
           )}
 
           <button
             onClick={handleCloneQueue}
             className="flex items-center gap-1.5 px-2.5 py-1.5 bg-white/[0.04] hover:bg-white/[0.08] text-slate-300 border border-white/[0.08] rounded-xl text-xs font-medium transition-colors"
-            title="Nhân bản hàng đợi này"
+            title={t('queue.cloneTitle', 'Clone this queue')}
           >
             <Copy size={13} />
-            <span className="hidden sm:inline">Nhân Bản</span>
+            <span className="hidden sm:inline">{t('queue.cloneQueue', 'Clone')}</span>
           </button>
 
           {displayTracks.length > 0 && (
             <button
               onClick={() => setTracksToPlaylist(displayTracks)}
               className="flex items-center gap-1.5 px-2.5 py-1.5 bg-white/[0.04] hover:bg-white/[0.08] text-slate-300 border border-white/[0.08] rounded-xl text-xs font-medium transition-colors"
-              title="Lưu tất cả bài hát thành Playlist mới"
+              title={t('queue.saveAsPlaylistTitle', 'Save all tracks in this queue as a new Playlist')}
             >
               <FolderPlus size={13} />
-              <span className="hidden sm:inline">Lưu Thành Playlist</span>
+              <span className="hidden sm:inline">{t('queue.saveAsPlaylist', 'Save as Playlist')}</span>
             </button>
           )}
 
@@ -567,10 +570,10 @@ export function QueuePage() {
             <button
               onClick={handleClearViewingQueue}
               className="flex items-center gap-1.5 px-2.5 py-1.5 bg-white/[0.04] hover:bg-red-500/15 text-slate-400 hover:text-red-400 border border-white/[0.08] rounded-xl text-xs font-medium transition-colors"
-              title="Xóa sạch bài hát trong hàng đợi"
+              title={t('queue.clearQueueTitle', 'Clear all tracks in queue')}
             >
               <Trash2 size={13} />
-              <span className="hidden sm:inline">Xóa Sạch</span>
+              <span className="hidden sm:inline">{t('queue.clearQueue', 'Clear')}</span>
             </button>
           )}
 
@@ -578,7 +581,7 @@ export function QueuePage() {
             <button
               onClick={handleDeleteQueue}
               className="p-1.5 bg-red-500/10 hover:bg-red-500/20 text-red-400 border border-red-500/30 rounded-xl text-xs font-medium transition-colors"
-              title="Xóa hẳn hàng đợi này"
+              title={t('queue.deleteQueueTitle', 'Delete this queue')}
             >
               <X size={15} />
             </button>
@@ -610,12 +613,12 @@ export function QueuePage() {
         <div className="sticky top-0 z-20 mb-4 flex flex-wrap items-center justify-between gap-y-2 gap-x-3 bg-[#0c1626]/95 backdrop-blur-xl border border-cyan-500/30 rounded-xl p-3 shadow-2xl mx-2 sm:mx-0">
           <div className="flex items-center gap-2 sm:gap-3 flex-wrap">
             <span className="text-cyan-400 text-xs font-bold whitespace-nowrap">
-              {selectedIndexes.size} bài được chọn
+              {t('queue.selectedCount', '{{count}} tracks selected', { count: selectedIndexes.size })}
             </span>
             <button
               onClick={() => setSelectedIndexes(new Set())}
               className="text-slate-400 hover:text-white transition-colors shrink-0 p-1"
-              title="Bỏ chọn"
+              title={t('queue.deselect', 'Deselect')}
             >
               <X size={16} />
             </button>
@@ -634,17 +637,17 @@ export function QueuePage() {
               ) : (
                 <Square size={14} />
               )}
-              <span className="hidden md:inline">Chọn Tất Cả</span>
+              <span className="hidden md:inline">{t('queue.selectAll', 'Select All')}</span>
             </button>
           </div>
 
           <div className="flex items-center gap-2 flex-wrap">
             <ActionMenu
-              ariaLabel="Tác vụ hàng loạt"
+              ariaLabel={t('queue.batchActions', 'Batch Actions')}
               buttonClassName="p-1.5 rounded-lg bg-white/5 hover:bg-white/10 text-white flex items-center justify-center transition-colors"
               actions={[
                 {
-                  label: 'Thêm vào Hàng Đợi Khác...',
+                  label: t('queue.addToOtherQueue', 'Add to Another Queue...'),
                   icon: <Layers size={16} />,
                   onSelect: () =>
                     setTargetMoveTracks(
@@ -654,7 +657,7 @@ export function QueuePage() {
                     ),
                 },
                 {
-                  label: 'Thêm vào Playlist',
+                  label: t('queue.addToPlaylist', 'Add to Playlist'),
                   icon: <ListPlus size={16} />,
                   onSelect: () =>
                     setTracksToPlaylist(
@@ -664,12 +667,12 @@ export function QueuePage() {
                     ),
                 },
                 {
-                  label: 'Thêm vào Yêu Thích',
+                  label: t('queue.addToFavorites', 'Add to Favorites'),
                   icon: <Heart size={16} />,
                   onSelect: handleBatchAddToFavorites,
                 },
                 {
-                  label: 'Xóa khỏi Hàng Đợi',
+                  label: t('queue.removeFromQueue', 'Remove from Queue'),
                   icon: <Trash2 size={16} />,
                   onSelect: handleBatchRemove,
                   tone: 'danger',
@@ -690,8 +693,8 @@ export function QueuePage() {
         {displayTracks.length === 0 ? (
           <div className="flex flex-col items-center justify-center h-64 text-slate-500 font-mono text-sm gap-2">
             <Layers size={40} className="opacity-30 text-cyan-400" />
-            <p>Hàng đợi "{viewingQueue.name}" đang trống</p>
-            <p className="text-xs text-slate-600">Thêm bài hát từ Thư Viện, Album hoặc tạo hàng đợi mới.</p>
+            <p>{t('queue.emptyQueueTitle', 'Queue "{{name}}" is empty', { name: viewingQueue.name })}</p>
+            <p className="text-xs text-slate-600">{t('queue.emptyQueueDesc', 'Add tracks from Library, Album, or create a new queue.')}</p>
           </div>
         ) : (
           <div className="relative" style={{ height: totalHeight }}>
@@ -728,13 +731,11 @@ export function QueuePage() {
                         }
                       }}
                       onClick={(e) => handleTrackClick(track, index, e)}
-                      className={`group flex h-[76px] items-center gap-3 sm:gap-3.5 p-2.5 sm:p-3 rounded-xl transition-all cursor-pointer select-none relative ${
-                        openMenuIndex === index ? 'z-40 ring-1 ring-cyan-400/40' : 'z-0'
-                      } ${
-                        isCurrent
+                      className={`group flex h-[76px] items-center gap-3 sm:gap-3.5 p-2.5 sm:p-3 rounded-xl transition-all cursor-pointer select-none relative ${openMenuIndex === index ? 'z-40 ring-1 ring-cyan-400/40' : 'z-0'
+                        } ${isCurrent
                           ? 'bg-cyan-500/15 border border-cyan-500/40 text-cyan-300 shadow-[inset_0_0_15px_rgba(0,245,255,0.15)]'
                           : 'bg-white/[0.02] hover:bg-white/[0.06] border border-white/[0.05] hover:border-cyan-500/25 backdrop-blur-md'
-                      } ${draggedIndex === index ? 'opacity-50' : 'opacity-100'}`}
+                        } ${draggedIndex === index ? 'opacity-50' : 'opacity-100'}`}
                     >
                       {selectedIndexes.size > 0 ? (
                         <button
@@ -767,9 +768,8 @@ export function QueuePage() {
                         )}
 
                         <div
-                          className={`absolute inset-0 flex items-center justify-center bg-black/60 transition-opacity ${
-                            isCurrent && isPlaying ? 'opacity-100' : 'opacity-100 lg:opacity-0 lg:group-hover:opacity-100'
-                          }`}
+                          className={`absolute inset-0 flex items-center justify-center bg-black/60 transition-opacity ${isCurrent && isPlaying ? 'opacity-100' : 'opacity-100 lg:opacity-0 lg:group-hover:opacity-100'
+                            }`}
                         >
                           {isCurrent && isPlaying ? (
                             <div className="flex items-end justify-center gap-0.5 h-3">
@@ -785,9 +785,8 @@ export function QueuePage() {
 
                       <div className="flex-1 min-w-0">
                         <span
-                          className={`block text-xs sm:text-sm font-semibold truncate ${
-                            isCurrent ? 'text-cyan-300' : 'text-slate-100'
-                          }`}
+                          className={`block text-xs sm:text-sm font-semibold truncate ${isCurrent ? 'text-cyan-300' : 'text-slate-100'
+                            }`}
                         >
                           {getDisplayTitle(track, playerState.getTrackMetadata(track.id))}
                         </span>
@@ -799,16 +798,15 @@ export function QueuePage() {
 
                       <div className="relative flex items-center gap-1.5">
                         <button
-                          aria-label="Tùy chọn khác"
+                          aria-label={t('queue.moreOptions', 'More options')}
                           onClick={(e) => {
                             e.stopPropagation();
                             setOpenMenuIndex(openMenuIndex === index ? null : index);
                           }}
-                          className={`p-1.5 rounded-lg transition-colors opacity-100 lg:opacity-0 lg:group-hover:opacity-100 ${
-                            openMenuIndex === index
-                              ? 'text-cyan-400 bg-cyan-500/10 opacity-100'
-                              : 'text-slate-400 hover:text-white hover:bg-white/10'
-                          }`}
+                          className={`p-1.5 rounded-lg transition-colors opacity-100 lg:opacity-0 lg:group-hover:opacity-100 ${openMenuIndex === index
+                            ? 'text-cyan-400 bg-cyan-500/10 opacity-100'
+                            : 'text-slate-400 hover:text-white hover:bg-white/10'
+                            }`}
                         >
                           <MoreHorizontal size={17} />
                         </button>
@@ -820,28 +818,28 @@ export function QueuePage() {
                               onClick={(e) => moveTrack(e, index, 'top')}
                               className="w-full flex items-center gap-3 px-3.5 py-2.5 text-xs font-medium text-left text-slate-200 hover:bg-white/[0.08] hover:text-white transition-colors disabled:opacity-30 disabled:cursor-not-allowed"
                             >
-                              <ChevronsUp size={14} className="text-cyan-400" /> Đưa Lên Đầu
+                              <ChevronsUp size={14} className="text-cyan-400" /> {t('queue.moveToTop', 'Move to Top')}
                             </button>
                             <button
                               disabled={index === 0}
                               onClick={(e) => moveTrack(e, index, 'up')}
                               className="w-full flex items-center gap-3 px-3.5 py-2.5 text-xs font-medium text-left text-slate-200 hover:bg-white/[0.08] hover:text-white transition-colors disabled:opacity-30 disabled:cursor-not-allowed"
                             >
-                              <ArrowUp size={14} /> Chuyển Lên Trên
+                              <ArrowUp size={14} /> {t('queue.moveUp', 'Move Up')}
                             </button>
                             <button
                               disabled={index === displayTracks.length - 1}
                               onClick={(e) => moveTrack(e, index, 'down')}
                               className="w-full flex items-center gap-3 px-3.5 py-2.5 text-xs font-medium text-left text-slate-200 hover:bg-white/[0.08] hover:text-white transition-colors disabled:opacity-30 disabled:cursor-not-allowed"
                             >
-                              <ArrowDown size={14} /> Chuyển Xuống Dưới
+                              <ArrowDown size={14} /> {t('queue.moveDown', 'Move Down')}
                             </button>
                             <button
                               disabled={index === displayTracks.length - 1}
                               onClick={(e) => moveTrack(e, index, 'bottom')}
                               className="w-full flex items-center gap-3 px-3.5 py-2.5 text-xs font-medium text-left text-slate-200 hover:bg-white/[0.08] hover:text-white transition-colors disabled:opacity-30 disabled:cursor-not-allowed"
                             >
-                              <ChevronsDown size={14} /> Đưa Xuống Cuối
+                              <ChevronsDown size={14} /> {t('queue.moveToBottom', 'Move to Bottom')}
                             </button>
 
                             <div className="h-px bg-white/[0.06] my-1" />
@@ -854,7 +852,7 @@ export function QueuePage() {
                               }}
                               className="w-full flex items-center gap-3 px-3.5 py-2.5 text-xs font-medium text-left text-cyan-300 hover:bg-white/[0.08] transition-colors"
                             >
-                              <Layers size={14} /> Thêm vào Hàng Đợi Khác...
+                              <Layers size={14} /> {t('queue.addToOtherQueue', 'Add to Another Queue...')}
                             </button>
 
                             {track.sourceType !== 'LOCAL' && (
@@ -865,7 +863,7 @@ export function QueuePage() {
                                   setOpenMenuIndex(null);
                                 }}
                                 className="w-full flex items-center gap-3 px-3.5 py-2.5 text-xs font-medium text-left text-slate-200 hover:bg-white/[0.08] hover:text-white transition-colors"
-                                title="Tải file âm thanh về thiết bị"
+                                title={t('tracks.tooltipDownload', 'Download audio file to device')}
                               >
                                 <Download size={14} className="text-slate-400" />{' '}
                                 {t('tracks.downloadFile', 'Download File')}
@@ -904,16 +902,16 @@ export function QueuePage() {
                               }}
                               className="w-full flex items-center gap-3 px-3.5 py-2.5 text-xs font-medium text-left text-rose-400 hover:bg-rose-500/10 hover:text-rose-300 transition-colors"
                             >
-                              <Trash2 size={14} /> Xóa khỏi Hàng Đợi Này
+                              <Trash2 size={14} /> {t('queue.removeFromThisQueue', 'Remove from This Queue')}
                             </button>
                           </div>
                         )}
 
                         <button
-                          aria-label="Xóa khỏi hàng đợi"
+                          aria-label={t('queue.removeFromQueueAria', 'Remove from queue')}
                           onClick={(e) => handleRemoveTrack(e, track.id)}
                           className="p-1.5 text-slate-500 hover:text-rose-400 hover:bg-white/10 rounded-lg transition-colors opacity-100 lg:opacity-0 lg:group-hover:opacity-100 hidden sm:block"
-                          title="Xóa khỏi hàng đợi"
+                          title={t('queue.removeFromQueueAria', 'Remove from queue')}
                         >
                           <Trash2 size={16} />
                         </button>

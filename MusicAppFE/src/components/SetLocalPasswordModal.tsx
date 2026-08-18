@@ -1,5 +1,6 @@
 import { useState } from 'react';
 import { X, Key, User, Lock, Loader2 } from 'lucide-react';
+import { useTranslation } from 'react-i18next';
 import { axiosClient } from '../api/axiosClient';
 import { useAuth } from '../context/AuthContext';
 
@@ -10,6 +11,7 @@ interface SetLocalPasswordModalProps {
 }
 
 export function SetLocalPasswordModal({ isOpen, onClose, defaultEmail = '' }: SetLocalPasswordModalProps) {
+  const { t } = useTranslation();
   const [loginId, setLoginId] = useState(defaultEmail);
   const [password, setPassword] = useState('');
   const [confirmPassword, setConfirmPassword] = useState('');
@@ -26,12 +28,12 @@ export function SetLocalPasswordModal({ isOpen, onClose, defaultEmail = '' }: Se
     setError('');
 
     if (password !== confirmPassword) {
-      setError('Passwords do not match');
+      setError(t('auth.passwordsDoNotMatch', 'Passwords do not match'));
       return;
     }
 
     if (password.length < 12) {
-      setError('Password must be at least 12 characters');
+      setError(t('auth.passwordLengthMin', 'Password must be at least 12 characters'));
       return;
     }
 
@@ -51,7 +53,7 @@ export function SetLocalPasswordModal({ isOpen, onClose, defaultEmail = '' }: Se
       }, 2000);
 
     } catch (err: any) {
-      setError(err.message || 'Failed to set password');
+      setError(err.message || t('auth.setPasswordFail', 'Failed to set password'));
     } finally {
       setLoading(false);
     }
@@ -71,14 +73,14 @@ export function SetLocalPasswordModal({ isOpen, onClose, defaultEmail = '' }: Se
           <div className="w-12 h-12 rounded-2xl bg-primary/15 flex items-center justify-center mb-4 text-primary border border-primary/25">
             <Key size={22} />
           </div>
-          <h2 className="text-lg sm:text-xl font-bold font-display text-white mb-1.5">Set Local Password</h2>
+          <h2 className="text-lg sm:text-xl font-bold font-display text-white mb-1.5">{t('auth.setLocalPasswordTitle', 'Set Local Password')}</h2>
           <p className="text-xs text-slate-400 font-mono mb-6">
-            Create a password to log in with username/email directly without Google.
+            {t('auth.setLocalPasswordSubtitle', 'Create a password to log in with username/email directly without Google.')}
           </p>
 
           {success ? (
             <div className="p-4 bg-emerald-500/10 border border-emerald-500/20 rounded-2xl text-emerald-400 text-xs text-center font-medium">
-              Password set successfully!
+              {t('auth.passwordSetSuccess', 'Password set successfully!')}
             </div>
           ) : (
             <form onSubmit={handleSubmit} className="space-y-4">
@@ -90,7 +92,7 @@ export function SetLocalPasswordModal({ isOpen, onClose, defaultEmail = '' }: Se
 
               <div className="group/input relative">
                 <div className="absolute -top-2.5 left-3 bg-[#0c1626] px-1 text-[10px] uppercase font-mono font-semibold text-slate-400">
-                  Email or Username
+                  {t('auth.emailOrUsername', 'Email or Username')}
                 </div>
                 <div className="absolute inset-y-0 left-0 pl-3.5 flex items-center pointer-events-none">
                   <User size={15} className="text-slate-500 group-focus-within/input:text-primary transition-colors" />
@@ -100,14 +102,14 @@ export function SetLocalPasswordModal({ isOpen, onClose, defaultEmail = '' }: Se
                   value={loginId}
                   onChange={(e) => setLoginId(e.target.value)}
                   className="w-full bg-[#060b14] border border-white/[0.1] hover:border-white/[0.2] focus:border-primary text-white text-xs py-3 pl-10 pr-3 rounded-xl outline-none transition-all font-sans"
-                  placeholder="Your username or email"
+                  placeholder={t('auth.usernameOrEmailPlaceholder', 'Your username or email')}
                   required
                 />
               </div>
 
               <div className="group/input relative">
                 <div className="absolute -top-2.5 left-3 bg-[#0c1626] px-1 text-[10px] uppercase font-mono font-semibold text-slate-400">
-                  New Password
+                  {t('auth.newPassword', 'New Password')}
                 </div>
                 <div className="absolute inset-y-0 left-0 pl-3.5 flex items-center pointer-events-none">
                   <Lock size={15} className="text-slate-500 group-focus-within/input:text-primary transition-colors" />
@@ -123,7 +125,7 @@ export function SetLocalPasswordModal({ isOpen, onClose, defaultEmail = '' }: Se
 
               <div className="group/input relative">
                 <div className="absolute -top-2.5 left-3 bg-[#0c1626] px-1 text-[10px] uppercase font-mono font-semibold text-slate-400">
-                  Confirm Password
+                  {t('auth.confirmPassword', 'Confirm Password')}
                 </div>
                 <div className="absolute inset-y-0 left-0 pl-3.5 flex items-center pointer-events-none">
                   <Lock size={15} className="text-slate-500 group-focus-within/input:text-primary transition-colors" />
@@ -142,7 +144,7 @@ export function SetLocalPasswordModal({ isOpen, onClose, defaultEmail = '' }: Se
                 disabled={loading}
                 className="w-full flex items-center justify-center gap-2 bg-primary hover:brightness-110 text-slate-950 font-bold py-3 rounded-xl shadow-[0_0_15px_rgba(0,245,255,0.3)] transition-all mt-4 disabled:opacity-50 text-xs active:scale-95"
               >
-                {loading ? <Loader2 size={16} className="animate-spin" /> : 'Save Password'}
+                {loading ? <Loader2 size={16} className="animate-spin" /> : t('auth.savePasswordBtn', 'Save Password')}
               </button>
             </form>
           )}

@@ -2,8 +2,8 @@ import { getSecureRandom } from '../utils/randomUtils';
 import { useState, useEffect } from 'react';
 import { useSearchParams } from 'react-router-dom';
 import { useTranslation } from 'react-i18next';
-import type { Track } from '../hooks/useAudioPlayer';
-import { Cloud, Play, Plus, ListMusic, ChevronLeft, Trash2, ListPlus, X, Shuffle, Pencil, Check, MoreHorizontal, Heart, Info, ListStart, ListEnd, Download, Layers } from 'lucide-react';
+import type { Track } from '../hooks/audioTypes';
+import { Cloud, Play, Plus, ListMusic, ChevronLeft, Trash2, ListPlus, X, Shuffle, Pencil, Check, MoreHorizontal, Heart, Info, ListStart, Download } from 'lucide-react';
 import { CreatePlaylistModal } from './CreatePlaylistModal';
 import { AddTracksModal } from './AddTracksModal';
 import { TrackInfoModal } from './TrackInfoModal';
@@ -119,16 +119,6 @@ export function Playlist({ isAuthenticated, onPlay, currentTrackId }: PlaylistPr
       } else {
         playerState.setQueue([...currentQueue, track]);
       }
-    }
-    setOpenMenuId(null);
-  };
-
-  const handleAddToQueue = (track: Track, e: React.MouseEvent) => {
-    e.stopPropagation();
-    if (playerState.queue.length === 0 && !playerState.currentTrack) {
-      playerState.playTrack(track, selectedPlaylistDetails?.tracks || []);
-    } else {
-      playerState.setQueue([...playerState.queue, track]);
     }
     setOpenMenuId(null);
   };
@@ -411,7 +401,7 @@ export function Playlist({ isAuthenticated, onPlay, currentTrackId }: PlaylistPr
                     {
                       label: t('playlist.addToQueue'),
                       icon: <ListPlus size={14} />,
-                      onSelect: () => playerState.addToCurrentQueue(selectedPlaylistDetails.tracks),
+                      onSelect: () => setTracksToMultiQueue(selectedPlaylistDetails.tracks),
                     },
                     {
                       label: t('playlist.nextQueue'),
@@ -620,16 +610,10 @@ export function Playlist({ isAuthenticated, onPlay, currentTrackId }: PlaylistPr
                                   <ListStart size={14} className="text-slate-400" /> {t('tracks.playNext', 'Play Next')}
                                 </button>
                                 <button
-                                  onClick={(e) => handleAddToQueue(track, e)}
+                                  onClick={(e) => { e.stopPropagation(); setTracksToMultiQueue([track]); setOpenMenuId(null); }}
                                   className="w-full flex items-center gap-3 px-3.5 py-2 text-xs font-medium text-left text-slate-200 hover:text-white hover:bg-white/[0.08] transition-colors"
                                 >
-                                  <ListEnd size={14} className="text-slate-400" /> {t('tracks.addToQueue', 'Add to Queue')}
-                                </button>
-                                <button
-                                  onClick={(e) => { e.stopPropagation(); setTracksToMultiQueue([track]); setOpenMenuId(null); }}
-                                  className="w-full flex items-center gap-3 px-3.5 py-2 text-xs font-medium text-left text-cyan-300 hover:text-white hover:bg-white/[0.08] transition-colors"
-                                >
-                                  <Layers size={14} /> Thêm vào Đa Hàng Đợi...
+                                  <ListPlus size={14} className="text-cyan-400" /> {t('tracks.addToQueue', 'Add to Queue')}
                                 </button>
                                 {track.sourceType !== 'LOCAL' && (
                                   <button
