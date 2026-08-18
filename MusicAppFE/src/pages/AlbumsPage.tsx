@@ -7,6 +7,9 @@ import { useLibrary } from '../context/LibraryContext';
 import type { Track } from '../hooks/useAudioPlayer';
 import { ActionMenu } from '../components/ActionMenu';
 import { AddToPlaylistModal } from '../components/AddToPlaylistModal';
+import { useVirtualList } from '../hooks/useVirtualList';
+
+const ALBUM_TRACK_ROW_HEIGHT = 72;
 
 export function AlbumsPage() {
   const navigate = useNavigate();
@@ -79,6 +82,18 @@ export function AlbumsPage() {
     navigate('/library');
   };
 
+  const albumTracksList = selectedAlbumGroup?.tracks || [];
+  const {
+    containerRef: albumTracksContainerRef,
+    handleScroll: handleAlbumTracksScroll,
+    offsetY: albumTracksOffsetY,
+    totalHeight: albumTracksTotalHeight,
+    visibleIndexes: albumTracksVisibleIndexes,
+  } = useVirtualList({
+    itemCount: albumTracksList.length,
+    itemHeight: ALBUM_TRACK_ROW_HEIGHT,
+  });
+
   return (
     <div className="w-full h-full flex flex-col max-w-6xl 2xl:max-w-none mx-auto pb-28 md:pb-32 overflow-y-auto no-scrollbar">
       <div className="mb-6 md:mb-8 border-b border-white/[0.06] pb-4 md:pb-6 flex flex-col sm:flex-row sm:items-center justify-between gap-4">
@@ -126,70 +141,87 @@ export function AlbumsPage() {
       </div>
 
       {selectedAlbumGroup ? (
-        <div className="flex flex-col gap-2">
-          {selectedAlbumGroup.tracks.map((track, idx) => {
-            const isActive = playerState.currentTrack?.id === track.id;
-            return (
-              <div
-                key={track.id}
-                onClick={() => playerState.playTrack(track, selectedAlbumGroup.tracks)}
-                className={`flex items-center gap-3 sm:gap-3.5 p-2.5 sm:p-3 rounded-xl border transition-all duration-200 group cursor-pointer ${isActive
-                  ? 'bg-primary/15 border-primary/30 text-primary shadow-[inset_0_0_15px_rgba(0,245,255,0.1)]'
-                  : 'bg-white/[0.02] border-white/[0.05] hover:bg-white/[0.06] hover:border-primary/25 backdrop-blur-md'
-                  }`}
-              >
-                <div className="w-5 text-center shrink-0">
-                  {isActive && playerState.isPlaying ? (
-                    <div className="flex items-end justify-center gap-0.5 h-3">
-                      <span className="w-0.5 bg-primary rounded-full animate-eq-1" />
-                      <span className="w-0.5 bg-primary rounded-full animate-eq-2" />
-                      <span className="w-0.5 bg-primary rounded-full animate-eq-3" />
-                    </div>
-                  ) : (
-                    <span className="hidden sm:block text-[11px] font-mono text-slate-500">{idx + 1}</span>
-                  )}
-                </div>
-                <button
-                  aria-label="Play track"
-                  onClick={(e) => { e.stopPropagation(); playerState.playTrack(track, selectedAlbumGroup.tracks); }}
-                  className="hidden md:group-hover:flex w-5 items-center justify-center rounded-full transition-colors text-primary"
+        <div
+          ref={albumTracksContainerRef}
+          onScroll={handleAlbumTracksScroll}
+          className="relative w-full"
+          style={{ height: albumTracksTotalHeight }}
+        >
+          <div
+            className="absolute inset-x-0 top-0 will-change-transform"
+            style={{ transform: `translateY(${albumTracksOffsetY}px)` }}
+          >
+            {albumTracksVisibleIndexes.map((idx) => {
+              const track = albumTracksList[idx];
+              if (!track) return null;
+              const isActive = playerState.currentTrack?.id === track.id;
+              return (
+                <div
+                  key={track.id}
+                  style={{ height: ALBUM_TRACK_ROW_HEIGHT }}
+                  className="relative"
                 >
-                  <Play size={13} fill="currentColor" />
-                </button>
-                <div className="w-10 h-10 rounded-lg bg-slate-800 flex items-center justify-center shrink-0 overflow-hidden border border-white/10 shadow-sm">
-                  {track.imageUrl || playerState.getTrackImage(track.id) ? (
-                    <img src={track.imageUrl || playerState.getTrackImage(track.id)} alt="Cover" className="w-full h-full object-cover group-hover:scale-105 transition-transform" />
-                  ) : (
-                    <ListMusic size={16} className="text-slate-500" />
-                  )}
-                </div>
-                <div className="flex flex-col truncate flex-1 pr-2">
-                  <span className={`text-xs sm:text-sm font-semibold truncate ${isActive ? 'text-primary' : 'text-slate-100'}`}>
-                    {getTitle(track)}
-                  </span>
-                  <div className="flex items-center gap-1.5 mt-0.5 font-mono text-[11px] text-slate-400">
-                    <span className="truncate">{getArtist(track)}</span>
+                  <div
+                    onClick={() => playerState.playTrack(track, selectedAlbumGroup.tracks)}
+                    className={`flex h-[64px] items-center gap-3 sm:gap-3.5 p-2.5 sm:p-3 rounded-xl border transition-all duration-200 group cursor-pointer ${isActive
+                      ? 'bg-primary/15 border-primary/30 text-primary shadow-[inset_0_0_15px_rgba(0,245,255,0.1)]'
+                      : 'bg-white/[0.02] border-white/[0.05] hover:bg-white/[0.06] hover:border-primary/25 backdrop-blur-md'
+                      }`}
+                  >
+                    <div className="w-5 text-center shrink-0">
+                      {isActive && playerState.isPlaying ? (
+                        <div className="flex items-end justify-center gap-0.5 h-3">
+                          <span className="w-0.5 bg-primary rounded-full animate-eq-1" />
+                          <span className="w-0.5 bg-primary rounded-full animate-eq-2" />
+                          <span className="w-0.5 bg-primary rounded-full animate-eq-3" />
+                        </div>
+                      ) : (
+                        <span className="hidden sm:block text-[11px] font-mono text-slate-500">{idx + 1}</span>
+                      )}
+                    </div>
+                    <button
+                      aria-label="Play track"
+                      onClick={(e) => { e.stopPropagation(); playerState.playTrack(track, selectedAlbumGroup.tracks); }}
+                      className="hidden md:group-hover:flex w-5 items-center justify-center rounded-full transition-colors text-primary"
+                    >
+                      <Play size={13} fill="currentColor" />
+                    </button>
+                    <div className="w-10 h-10 rounded-lg bg-slate-800 flex items-center justify-center shrink-0 overflow-hidden border border-white/10 shadow-sm">
+                      {track.imageUrl || playerState.getTrackImage(track.id) ? (
+                        <img src={track.imageUrl || playerState.getTrackImage(track.id)} alt="Cover" className="w-full h-full object-cover group-hover:scale-105 transition-transform" />
+                      ) : (
+                        <ListMusic size={16} className="text-slate-500" />
+                      )}
+                    </div>
+                    <div className="flex flex-col truncate flex-1 pr-2">
+                      <span className={`text-xs sm:text-sm font-semibold truncate ${isActive ? 'text-primary' : 'text-slate-100'}`}>
+                        {getTitle(track)}
+                      </span>
+                      <div className="flex items-center gap-1.5 mt-0.5 font-mono text-[11px] text-slate-400">
+                        <span className="truncate">{getArtist(track)}</span>
+                      </div>
+                    </div>
+                    <ActionMenu
+                      ariaLabel={`Song actions for ${getTitle(track)}`}
+                      buttonClassName="p-1.5 text-slate-400 hover:text-white hover:bg-white/10 rounded-lg transition-colors shrink-0"
+                      actions={[
+                        { label: 'Play Next', icon: <ListMusic size={14} />, onSelect: () => playerState.addToNextQueue([track]) },
+                        { label: 'Add to Queue', icon: <ListPlus size={14} />, onSelect: () => playerState.addToCurrentQueue([track]) },
+                        { label: 'Add to Playlist', icon: <ListPlus size={14} />, onSelect: () => setTrackToPlaylist(track) },
+                        ...(track.sourceType !== 'LOCAL'
+                          ? [{
+                              label: favorites.some(f => f.id === track.id) ? 'Remove Favorite' : 'Add to Favorite',
+                              icon: <Heart size={14} fill={favorites.some(f => f.id === track.id) ? "currentColor" : "none"} className={favorites.some(f => f.id === track.id) ? "text-primary" : "text-slate-400"} />,
+                              onSelect: () => void toggleFavorite(track)
+                            }]
+                          : [])
+                      ]}
+                    />
                   </div>
                 </div>
-                <ActionMenu
-                  ariaLabel={`Song actions for ${getTitle(track)}`}
-                  buttonClassName="p-1.5 text-slate-400 hover:text-white hover:bg-white/10 rounded-lg transition-colors shrink-0"
-                  actions={[
-                    { label: 'Play Next', icon: <ListMusic size={14} />, onSelect: () => playerState.addToNextQueue([track]) },
-                    { label: 'Add to Queue', icon: <ListPlus size={14} />, onSelect: () => playerState.addToCurrentQueue([track]) },
-                    { label: 'Add to Playlist', icon: <ListPlus size={14} />, onSelect: () => setTrackToPlaylist(track) },
-                    ...(track.sourceType !== 'LOCAL'
-                      ? [{
-                          label: favorites.some(f => f.id === track.id) ? 'Remove Favorite' : 'Add to Favorite',
-                          icon: <Heart size={14} fill={favorites.some(f => f.id === track.id) ? "currentColor" : "none"} className={favorites.some(f => f.id === track.id) ? "text-primary" : "text-slate-400"} />,
-                          onSelect: () => void toggleFavorite(track)
-                        }]
-                      : [])
-                  ]}
-                />
-              </div>
-            );
-          })}
+              );
+            })}
+          </div>
         </div>
       ) : albumGroups.length > 0 ? (
         <div className="grid grid-cols-2 sm:grid-cols-3 lg:grid-cols-4 xl:grid-cols-5 2xl:grid-cols-6 3xl:grid-cols-8 4k:grid-cols-10 gap-3.5 md:gap-4.5">

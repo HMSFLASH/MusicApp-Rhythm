@@ -64,7 +64,7 @@ const createPaddedChannelData = (
   const decodedSamples = getDecodedSampleCount(decoded);
   const missingSamples = targetSamples - decodedSamples;
   if (missingSamples <= 0) {
-    return decoded.channelData.map((channel) => new Float32Array(channel));
+    return decoded.channelData;
   }
 
   const insertOffset = getSilenceInsertOffset(decoded, decodedSamples);
@@ -102,7 +102,7 @@ export const decodeFlacToAudioBuffer = async (
       decoded.sampleRate,
     );
 
-    channelData.forEach((channel, index) => {
+    channelData.forEach((channel: any, index: number) => {
       audioBuffer.copyToChannel(channel, index);
     });
 
@@ -110,8 +110,17 @@ export const decodeFlacToAudioBuffer = async (
       console.warn('[Audio] FLAC WASM decoded with recoverable errors', decoded.errors);
     }
 
+    // Explicit cleanup of intermediate decoded channel references
+    if (decoded.channelData) {
+      decoded.channelData.length = 0;
+    }
+
     return audioBuffer;
   } finally {
-    decoder.free();
+    try {
+      decoder.free();
+    } catch {
+      // Ignore if decoder was already freed or failed to initialize
+    }
   }
 };

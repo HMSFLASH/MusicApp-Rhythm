@@ -34,7 +34,9 @@ public class OAuth2LoginFailureHandler extends SimpleUrlAuthenticationFailureHan
         String targetUrl = UriComponentsBuilder.fromUriString(frontendUrl.replaceAll("/$", "") + "/login")
                 .queryParam("error", "oauth2_failure")
                 .queryParam("message", "Google authentication failed. Please try again.")
-                .build().encode().toUriString();
+                .build()
+                .encode()
+                .toUriString();
 
         getRedirectStrategy().sendRedirect(request, response, targetUrl);
     }

@@ -41,6 +41,7 @@ import { loadTrackAudioUrl } from './audioTrackLoader';
 import { getAudioExtension } from './audioMime';
 import { decodeFlacToAudioBuffer } from './flacDecoder';
 import { decodeAacToAudioBuffer } from './aacDecoder';
+import { explicitReleaseAudioBuffer, clearAudioBufferCache } from './audioMemory';
 import { saveCover } from '../utils/idb';
 import { BACKEND_URL } from '../api/axiosClient';
 import { hasCachedAudio } from '../utils/mediaCache';
@@ -540,6 +541,11 @@ export function useAudioPlayback(
         renderedAudioRef.current = null;
       }
       revokeRenderedAudioUrl();
+      if (audioBufferRef.current) {
+        explicitReleaseAudioBuffer(audioBufferRef.current);
+        audioBufferRef.current = null;
+      }
+      clearAudioBufferCache(precalculatedQueueBuffersRef.current);
       if (audioContextRef.current && audioContextRef.current.state !== 'closed') {
         audioContextRef.current.close().catch(console.error);
         audioContextRef.current = null;
@@ -687,11 +693,18 @@ export function useAudioPlayback(
       blobCacheRef.current.delete(trackId);
     }
     blobLoadingPromisesRef.current.delete(trackId);
-    precalculatedQueueBuffersRef.current.delete(trackId);
+    const existingBuffer = precalculatedQueueBuffersRef.current.get(trackId);
+    if (existingBuffer) {
+      explicitReleaseAudioBuffer(existingBuffer);
+      precalculatedQueueBuffersRef.current.delete(trackId);
+    }
     loudnessGainCacheRef.current.delete(trackId);
     inFlightRef.current.delete(trackId);
 
     if (precalculatedNextBufferRef.current?.trackId === trackId) {
+      if (precalculatedNextBufferRef.current.buffer) {
+        explicitReleaseAudioBuffer(precalculatedNextBufferRef.current.buffer);
+      }
       precalculatedNextBufferRef.current = null;
     }
   }, [blobCacheRef]);
@@ -933,9 +946,10 @@ export function useAudioPlayback(
     if (!fullQueuePrecalculateCacheRef.current && !queuePrecalculateSessionRef.current) return;
 
     const queueIds = new Set(currentQueue.map((track: Track) => String(track.id)));
-    for (const key of precalculatedQueueBuffersRef.current.keys()) {
+    for (const [key, buffer] of precalculatedQueueBuffersRef.current.entries()) {
       if (!queueIds.has(String(key))) {
         precalculatedQueueBuffersRef.current.delete(key);
+        explicitReleaseAudioBuffer(buffer);
       }
     }
 
@@ -943,6 +957,9 @@ export function useAudioPlayback(
       precalculatedNextBufferRef.current &&
       !queueIds.has(precalculatedNextBufferRef.current.trackId)
     ) {
+      if (precalculatedNextBufferRef.current.buffer) {
+        explicitReleaseAudioBuffer(precalculatedNextBufferRef.current.buffer);
+      }
       precalculatedNextBufferRef.current = null;
     }
 
@@ -986,8 +1003,11 @@ export function useAudioPlayback(
     const transitionSessionId = Symbol();
     decodeSessionRef.current = transitionSessionId;
     isDecodingRef.current = false;
+    if (precalculatedNextBufferRef.current?.buffer) {
+      explicitReleaseAudioBuffer(precalculatedNextBufferRef.current.buffer);
+    }
     precalculatedNextBufferRef.current = null;
-    precalculatedQueueBuffersRef.current.clear();
+    clearAudioBufferCache(precalculatedQueueBuffersRef.current);
     queuePrecalculateSessionRef.current = null;
     stopQueuePrecalculateStatusSoon();
     releaseRenderedAudioSource();
@@ -1137,6 +1157,7 @@ export function useAudioPlayback(
         ? normalizedGain
         : normalizedGain * dbToGain(downstreamGainDb);
       loudnessGainCacheRef.current.set(trackId, gain);
+      explicitReleaseAudioBuffer(audioBuffer);
       return gain;
     } catch (error) {
       console.warn('[Audio] Loudness measurement failed; using unity gain.', error);
@@ -1227,14 +1248,25 @@ export function useAudioPlayback(
         );
 
         if (checkAborted?.()) {
+          if (audioBuffer) {
+            explicitReleaseAudioBuffer(audioBuffer);
+          }
           throw new Error('Precalculation aborted before rendering');
         }
 
-        const finalRenderedBuffer = await withRenderTimeout(
-          performOfflineRender(audioBuffer),
-          PRECALCULATE_TIMEOUT_MS,
-          `render(${trackId})`
-        );
+        let finalRenderedBuffer: AudioBuffer;
+        try {
+          finalRenderedBuffer = await withRenderTimeout(
+            performOfflineRender(audioBuffer),
+            PRECALCULATE_TIMEOUT_MS,
+            `render(${trackId})`
+          );
+        } finally {
+          // Explicitly release intermediate raw audioBuffer once offline render is complete
+          if (audioBuffer) {
+            explicitReleaseAudioBuffer(audioBuffer);
+          }
+        }
 
         if (renderSettingsVersionRef.current !== renderVersion) {
           throw new Error('Audio settings changed while pre-calculating');
@@ -1574,7 +1606,13 @@ export function useAudioPlayback(
 
     // Clear old state immediately so if the new track fails to load,
     // we don't accidentally play the old track on subsequent play button clicks.
-    audioBufferRef.current = null;
+    if (audioBufferRef.current) {
+      const isStillCached = Array.from(precalculatedQueueBuffersRef.current.values()).includes(audioBufferRef.current);
+      if (!isStillCached) {
+        explicitReleaseAudioBuffer(audioBufferRef.current);
+      }
+      audioBufferRef.current = null;
+    }
     releaseAudioElementSource();
     releaseRenderedAudioSource();
 
@@ -2121,7 +2159,10 @@ export function useAudioPlayback(
       decodeSessionRef.current = Symbol();
       isDecodingRef.current = false;
       stopBufferPlayback();
-      audioBufferRef.current = null;
+      if (audioBufferRef.current) {
+        explicitReleaseAudioBuffer(audioBufferRef.current);
+        audioBufferRef.current = null;
+      }
       bufferPausedTimeRef.current = 0;
       usingBufferPlaybackRef.current = false;
       setCurrentTime(0);
@@ -2148,8 +2189,15 @@ export function useAudioPlayback(
         blobCacheRef.current.delete(deletedTrackId);
       }
       blobLoadingPromisesRef.current.delete(deletedTrackId);
-      precalculatedQueueBuffersRef.current.delete(deletedTrackId);
+      const existingBuffer = precalculatedQueueBuffersRef.current.get(deletedTrackId);
+      if (existingBuffer) {
+        explicitReleaseAudioBuffer(existingBuffer);
+        precalculatedQueueBuffersRef.current.delete(deletedTrackId);
+      }
       if (precalculatedNextBufferRef.current?.trackId === deletedTrackId) {
+        if (precalculatedNextBufferRef.current.buffer) {
+          explicitReleaseAudioBuffer(precalculatedNextBufferRef.current.buffer);
+        }
         precalculatedNextBufferRef.current = null;
       }
 

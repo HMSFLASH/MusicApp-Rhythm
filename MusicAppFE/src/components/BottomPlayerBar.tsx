@@ -3,12 +3,13 @@ import { useNavigate, useLocation } from 'react-router-dom';
 import { useGlobalAudio } from '../context/AudioContext';
 import { useAuth } from '../context/AuthContext';
 import { useLibrary } from '../context/LibraryContext';
-import { Play, Pause, SkipForward, SkipBack, Cloud, Disc, Heart, Shuffle, Repeat, Repeat1, Square, PauseCircle, ListX, ListPlus, Maximize2, Info, ListMusic, Volume2, VolumeX, X, ArrowRight, Loader2, RefreshCw, Download } from 'lucide-react';
+import { Play, Pause, SkipForward, SkipBack, Cloud, Disc, Heart, Shuffle, Repeat, Repeat1, Square, PauseCircle, ListX, ListPlus, Maximize2, Info, ListMusic, Volume2, VolumeX, X, ArrowRight, Loader2, RefreshCw, Download, Moon } from 'lucide-react';
 import { HorizontalSlider } from './HorizontalSlider';
 import { useTranslation } from 'react-i18next';
 import { ActionMenu } from './ActionMenu';
 import { useVirtualList } from '../hooks/useVirtualList';
 import { downloadTrackFile } from '../utils/downloadUtils';
+import { useSleepTimer } from '../context/SleepTimerContext';
 
 const QUEUE_POPOVER_ITEM_HEIGHT = 58;
 
@@ -25,6 +26,7 @@ export function BottomPlayerBar() {
   const { isAuthenticated } = useAuth();
   const { playerState } = useGlobalAudio();
   const { favorites, toggleFavorite: libraryToggleFavorite } = useLibrary();
+  const { state: sleepTimerState, openModal: openSleepTimerModal } = useSleepTimer();
   const { 
     currentTrack, isPlaying, isLoadingTrack, currentTime, duration, 
     togglePlay, seek, playNext, playPrevious,
@@ -434,6 +436,15 @@ export function BottomPlayerBar() {
                 }]
               : []),
             { label: t('bottomPlayer.trackMetadata', 'Track Metadata'), icon: <Info size={14} />, onSelect: () => setShowMetadata(true) },
+            {
+              label: sleepTimerState.isActive
+                ? (sleepTimerState.mode === 'time'
+                    ? `${t('sleepTimer.title', 'Hẹn Giờ Tắt')} (${formatTime(sleepTimerState.remainingSeconds)})`
+                    : `${t('sleepTimer.title', 'Hẹn Giờ Tắt')} (${t('sleepTimer.endOfTrack', 'Hết bài')})`)
+                : t('sleepTimer.title', 'Hẹn Giờ Tắt Nhạc'),
+              icon: <Moon size={14} className={sleepTimerState.isActive ? 'text-primary animate-pulse' : ''} />,
+              onSelect: openSleepTimerModal,
+            },
             { label: t('bottomPlayer.queueTitle', 'Queue'), icon: <ListMusic size={14} />, onSelect: () => navigate('/queue') },
             {
               label: isShuffle ? t('bottomPlayer.shuffleOn', 'Shuffle On') : t('bottomPlayer.shuffleOff', 'Shuffle Off'),
@@ -483,6 +494,25 @@ export function BottomPlayerBar() {
             <RefreshCw size={15} className={isLoadingTrack ? 'animate-spin text-primary' : ''} />
           </button>
         )}
+        <button
+          onClick={openSleepTimerModal}
+          className={`p-2 rounded-lg transition-all flex items-center gap-1 ${
+            sleepTimerState.isActive
+              ? 'text-primary bg-primary/15 border border-primary/30 shadow-[0_0_10px_rgba(0,245,255,0.25)]'
+              : 'hover:bg-white/[0.05] hover:text-white'
+          }`}
+          aria-label={t('sleepTimer.title', 'Sleep Timer')}
+          title={t('sleepTimer.title', 'Sleep Timer')}
+        >
+          <Moon size={16} className={sleepTimerState.isActive ? 'text-primary animate-pulse' : ''} />
+          {sleepTimerState.isActive && (
+            <span className="text-[10px] font-mono font-bold text-primary">
+              {sleepTimerState.mode === 'time'
+                ? formatTime(sleepTimerState.remainingSeconds)
+                : t('sleepTimer.endOfTrack', 'End of Track')}
+            </span>
+          )}
+        </button>
         <button onClick={() => setShowMetadata(true)} className="p-2 rounded-lg hover:bg-white/[0.05] hover:text-white transition-colors" aria-label="Track Information" title="Track Info">
           <Info size={16} />
         </button>

@@ -17,17 +17,20 @@ import {
   Menu,
   Languages,
   Keyboard,
+  Moon,
   X as CloseIcon
 } from 'lucide-react';
 import { useState, useEffect } from 'react';
 import { useTranslation } from 'react-i18next';
 import { axiosClient } from '../api/axiosClient';
 import { BottomPlayerBar } from './BottomPlayerBar';
+import { useSleepTimer } from '../context/SleepTimerContext';
 import { useAuth } from '../context/AuthContext';
 import { LocalFilePicker } from './LocalFilePicker';
 import { UploadQueuePanel } from './UploadQueuePanel';
 import { SetLocalPasswordModal } from './SetLocalPasswordModal';
 import { ChangePasswordModal } from './ChangePasswordModal';
+import { SleepTimerModal } from './SleepTimerModal';
 import { db } from '../lib/db';
 import { clearCachedAudio } from '../utils/mediaCache';
 import { clearCovers } from '../utils/idb';
@@ -45,6 +48,7 @@ export function Layout() {
   const { isAuthenticated, setIsAuthenticated, user } = useAuth();
   const { playerState } = useGlobalAudio();
   const { isOfflineMode } = useOffline();
+  const { state: sleepTimerState, openModal: openSleepTimerModal } = useSleepTimer();
   const [syncing, setSyncing] = useState(false);
   const [isLoggingOut, setIsLoggingOut] = useState(false);
   const [isPasswordModalOpen, setIsPasswordModalOpen] = useState(false);
@@ -273,6 +277,32 @@ export function Layout() {
                     <span>{item.name}</span>
                   </NavLink>
                 ))}
+                <button
+                  type="button"
+                  onClick={() => {
+                    setIsMobileMenuOpen(false);
+                    openSleepTimerModal();
+                  }}
+                  className={`w-full group flex items-center justify-between px-3 py-2.5 rounded-xl text-sm font-medium transition-all duration-200 border ${
+                    sleepTimerState.isActive
+                      ? 'bg-primary/15 text-primary shadow-[inset_0_0_12px_rgba(0,245,255,0.1)] border-primary/25 font-semibold'
+                      : 'text-slate-400 hover:text-slate-100 hover:bg-white/[0.04] border-transparent'
+                  }`}
+                >
+                  <div className="flex items-center gap-3">
+                    <span className="transition-transform group-hover:scale-110 duration-200">
+                      <Moon size={20} className={sleepTimerState.isActive ? 'text-primary animate-pulse' : ''} />
+                    </span>
+                    <span>{t('sleepTimer.title', 'Hẹn Giờ Tắt Nhạc')}</span>
+                  </div>
+                  {sleepTimerState.isActive && (
+                    <span className="text-[10px] font-mono px-2 py-0.5 rounded-full bg-primary/20 text-primary border border-primary/30 font-bold">
+                      {sleepTimerState.mode === 'time'
+                        ? `${Math.ceil(sleepTimerState.remainingSeconds / 60)}m`
+                        : 'Track'}
+                    </span>
+                  )}
+                </button>
               </div>
             </div>
 
@@ -331,6 +361,18 @@ export function Layout() {
             <div className="flex items-center justify-between mb-2.5 px-1.5">
               <span className="text-[11px] font-mono text-slate-400 tracking-wider">{t('layout.language', 'Ngôn ngữ')}</span>
               <div className="flex items-center gap-1.5">
+                <button
+                  onClick={openSleepTimerModal}
+                  className={`p-1 rounded-lg transition-all border ${
+                    sleepTimerState.isActive
+                      ? 'bg-primary/20 text-primary border-primary/40 shadow-[0_0_10px_rgba(0,245,255,0.3)]'
+                      : 'bg-white/[0.05] hover:bg-white/[0.1] text-slate-300 hover:text-primary border-white/[0.06]'
+                  }`}
+                  title={t('sleepTimer.title', 'Hẹn giờ tắt nhạc (T)')}
+                  aria-label="Sleep Timer"
+                >
+                  <Moon size={13} className={sleepTimerState.isActive ? 'text-primary animate-pulse' : ''} />
+                </button>
                 <button
                   onClick={() => {
                     window.dispatchEvent(new KeyboardEvent('keydown', { key: '?' }));
@@ -453,15 +495,29 @@ export function Layout() {
                 </h1>
               </Link>
             </div>
-            {isAuthenticated ? (
-              <div className="w-7 h-7 rounded-full bg-primary/20 border border-primary/30 flex items-center justify-center overflow-hidden">
-                {user?.avatarUrl ? <img src={user.avatarUrl} alt="" className="w-full h-full object-cover" /> : <User size={14} className="text-primary" />}
-              </div>
-            ) : (
-              <Link to="/login" className="text-xs font-semibold px-2.5 py-1 rounded-lg bg-primary/10 text-primary border border-primary/20">
-                Login
-              </Link>
-            )}
+            <div className="flex items-center gap-2">
+              <button
+                onClick={openSleepTimerModal}
+                className={`p-1.5 rounded-lg border transition-all ${
+                  sleepTimerState.isActive
+                    ? 'bg-primary/20 text-primary border-primary/40 shadow-sm'
+                    : 'bg-white/[0.05] text-slate-300 hover:text-white border-white/[0.06]'
+                }`}
+                title={t('sleepTimer.title', 'Sleep Timer')}
+                aria-label="Sleep Timer"
+              >
+                <Moon size={16} className={sleepTimerState.isActive ? 'text-primary animate-pulse' : ''} />
+              </button>
+              {isAuthenticated ? (
+                <div className="w-7 h-7 rounded-full bg-primary/20 border border-primary/30 flex items-center justify-center overflow-hidden">
+                  {user?.avatarUrl ? <img src={user.avatarUrl} alt="" className="w-full h-full object-cover" /> : <User size={14} className="text-primary" />}
+                </div>
+              ) : (
+                <Link to="/login" className="text-xs font-semibold px-2.5 py-1 rounded-lg bg-primary/10 text-primary border border-primary/20">
+                  Login
+                </Link>
+              )}
+            </div>
           </div>
 
           <main className="flex-1 overflow-y-auto w-full relative">
@@ -559,6 +615,7 @@ export function Layout() {
         isOpen={isChangePasswordModalOpen}
         onClose={() => setIsChangePasswordModalOpen(false)}
       />
+      <SleepTimerModal />
     </div>
   );
 }

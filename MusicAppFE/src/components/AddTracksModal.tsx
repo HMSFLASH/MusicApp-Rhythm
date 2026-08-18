@@ -14,12 +14,31 @@ interface AddTracksModalProps {
 
 import { useGlobalAudio } from '../context/AudioContext';
 import { useLibrary } from '../context/LibraryContext';
+import { useVirtualList } from '../hooks/useVirtualList';
+
+const MODAL_TRACK_ROW_HEIGHT = 64;
 
 export function AddTracksModal({ isOpen, onClose, playlistId, playlistTracks, onSuccess }: AddTracksModalProps) {
   const { playerState } = useGlobalAudio();
   const { tracks: allTracks, isLoading: loading } = useLibrary();
   const [addingIds, setAddingIds] = useState<Set<string>>(new Set());
   const [searchQuery, setSearchQuery] = useState('');
+
+  const filteredTracks = allTracks.filter(t => 
+    (t.title || t.fileName).toLowerCase().includes(searchQuery.toLowerCase()) || 
+    (t.artist || '').toLowerCase().includes(searchQuery.toLowerCase())
+  );
+
+  const {
+    containerRef,
+    handleScroll,
+    offsetY,
+    totalHeight,
+    visibleIndexes,
+  } = useVirtualList({
+    itemCount: filteredTracks.length,
+    itemHeight: MODAL_TRACK_ROW_HEIGHT,
+  });
 
   if (!isOpen) return null;
 
@@ -40,11 +59,6 @@ export function AddTracksModal({ isOpen, onClose, playlistId, playlistTracks, on
       });
     }
   };
-
-  const filteredTracks = allTracks.filter(t => 
-    (t.title || t.fileName).toLowerCase().includes(searchQuery.toLowerCase()) || 
-    (t.artist || '').toLowerCase().includes(searchQuery.toLowerCase())
-  );
 
   const isTrackInPlaylist = (trackId: string) => {
     return playlistTracks.some(pt => pt.id === trackId);
@@ -76,7 +90,11 @@ export function AddTracksModal({ isOpen, onClose, playlistId, playlistTracks, on
           />
         </div>
 
-        <div className="p-3 overflow-y-auto flex-1 no-scrollbar flex flex-col gap-1.5">
+        <div
+          ref={containerRef}
+          onScroll={handleScroll}
+          className="p-3 overflow-y-auto flex-1 no-scrollbar relative"
+        >
           {loading ? (
             <div className="flex justify-center py-8">
               <Loader2 size={24} className="text-primary animate-spin" />
@@ -86,35 +104,50 @@ export function AddTracksModal({ isOpen, onClose, playlistId, playlistTracks, on
               No tracks found.
             </div>
           ) : (
-            filteredTracks.map(t => {
-              const inPlaylist = isTrackInPlaylist(t.id);
-              const isAdding = addingIds.has(t.id);
-              return (
-                <div key={t.id} className="flex items-center justify-between p-3 rounded-2xl bg-white/[0.02] hover:bg-white/[0.06] border border-white/[0.04] hover:border-primary/25 transition-all group">
-                  <div className="flex flex-col truncate pr-4 w-full">
-                    <span className="text-xs sm:text-sm font-semibold text-slate-200 truncate group-hover:text-primary transition-colors">{t.title || playerState.getTrackMetadata(t.id)?.title || (t.fileName ? (t.fileName.includes(' - ') ? t.fileName.split(' - ')[1].replace(/\.[^/.]+$/, "") : t.fileName.replace(/\.[^/.]+$/, "")) : 'Unknown Title')}</span>
-                    <span className="text-[11px] text-slate-400 font-mono truncate mt-0.5">{t.artist || playerState.getTrackMetadata(t.id)?.artist || (t.fileName?.includes(' - ') ? t.fileName.split(' - ')[0] : 'Unknown Artist')}</span>
-                  </div>
-                  <button
-                    onClick={() => !inPlaylist && !isAdding && handleAddTrack(t.id)}
-                    disabled={inPlaylist || isAdding}
-                    className={`p-2 rounded-xl transition-all shrink-0 ${
-                      inPlaylist 
-                        ? 'bg-emerald-500/20 text-emerald-400 cursor-default'
-                        : 'bg-white/[0.05] text-slate-400 hover:bg-primary hover:text-slate-950 active:scale-95'
-                    }`}
-                  >
-                    {isAdding ? (
-                      <Loader2 size={15} className="animate-spin text-primary" />
-                    ) : inPlaylist ? (
-                      <Check size={15} />
-                    ) : (
-                      <Plus size={15} />
-                    )}
-                  </button>
-                </div>
-              );
-            })
+            <div className="relative w-full" style={{ height: totalHeight }}>
+              <div
+                className="absolute inset-x-0 top-0 will-change-transform"
+                style={{ transform: `translateY(${offsetY}px)` }}
+              >
+                {visibleIndexes.map((idx) => {
+                  const t = filteredTracks[idx];
+                  if (!t) return null;
+                  const inPlaylist = isTrackInPlaylist(t.id);
+                  const isAdding = addingIds.has(t.id);
+                  return (
+                    <div
+                      key={t.id}
+                      style={{ height: MODAL_TRACK_ROW_HEIGHT }}
+                      className="relative"
+                    >
+                      <div className="flex h-[56px] items-center justify-between p-3 rounded-2xl bg-white/[0.02] hover:bg-white/[0.06] border border-white/[0.04] hover:border-primary/25 transition-all group">
+                        <div className="flex flex-col truncate pr-4 w-full">
+                          <span className="text-xs sm:text-sm font-semibold text-slate-200 truncate group-hover:text-primary transition-colors">{t.title || playerState.getTrackMetadata(t.id)?.title || (t.fileName ? (t.fileName.includes(' - ') ? t.fileName.split(' - ')[1].replace(/\.[^/.]+$/, "") : t.fileName.replace(/\.[^/.]+$/, "")) : 'Unknown Title')}</span>
+                          <span className="text-[11px] text-slate-400 font-mono truncate mt-0.5">{t.artist || playerState.getTrackMetadata(t.id)?.artist || (t.fileName?.includes(' - ') ? t.fileName.split(' - ')[0] : 'Unknown Artist')}</span>
+                        </div>
+                        <button
+                          onClick={() => !inPlaylist && !isAdding && handleAddTrack(t.id)}
+                          disabled={inPlaylist || isAdding}
+                          className={`p-2 rounded-xl transition-all shrink-0 ${
+                            inPlaylist 
+                              ? 'bg-emerald-500/20 text-emerald-400 cursor-default'
+                              : 'bg-white/[0.05] text-slate-400 hover:bg-primary hover:text-slate-950 active:scale-95'
+                          }`}
+                        >
+                          {isAdding ? (
+                            <Loader2 size={15} className="animate-spin text-primary" />
+                          ) : inPlaylist ? (
+                            <Check size={15} />
+                          ) : (
+                            <Plus size={15} />
+                          )}
+                        </button>
+                      </div>
+                    </div>
+                  );
+                })}
+              </div>
+            </div>
           )}
         </div>
       </div>

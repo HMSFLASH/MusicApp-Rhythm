@@ -259,5 +259,30 @@
     "downloading": "Downloading...",
     "downloaded": "Downloaded",
     "notCached": "Not downloaded"
+  },
+  "sleepTimer": {
+    "title": "Sleep Timer",
+    "subtitle": "Automatically pause playback when time is up",
+    "runningSubtitle": "Music will automatically pause according to timer",
+    "activeBadge": "Running",
+    "presets": "Preset Times",
+    "minShort": "min",
+    "minutes": "minutes",
+    "endOfTrack": "End of Current Track",
+    "endOfTrackActiveTitle": "Stop after current track ends",
+    "customDuration": "Custom Duration",
+    "fadeOutTitle": "Smooth Volume Fade-Out",
+    "fadeOutDesc": "Gradually lower volume over the last 30s for better sleep",
+    "startTimer": "Start Sleep Timer",
+    "startEndOfTrack": "Set Timer: End of Track",
+    "cancel": "Cancel Sleep Timer",
+    "add5Min": "+5 min",
+    "add15Min": "+15 min",
+    "add30Min": "+30 min",
+    "stopsAt": "Stops at",
+    "stoppedNotification": "Sleep Timer: Playback stopped",
+    "openSleepTimer": "Open Sleep Timer",
+    "sleepTimerOff": "Sleep Timer: Off",
+    "sleepTimerActive": "Sleep Timer: Active"
   }
 }

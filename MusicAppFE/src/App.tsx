@@ -24,6 +24,7 @@ import { LibraryProvider } from './context/LibraryContext';
 import { ConfirmProvider } from './context/ConfirmContext';
 import { OfflineProvider } from './context/OfflineContext';
 import { ToastProvider } from './context/ToastContext';
+import { SleepTimerProvider } from './context/SleepTimerContext';
 import { KeyboardShortcutsModal } from './components/KeyboardShortcutsModal';
 
 function ProtectedRoute({ children }: { children: React.ReactNode }) {
@@ -90,7 +91,9 @@ function AppProviders() {
           <OfflineProvider>
             <ToastProvider>
               <ConfirmProvider>
-                <App />
+                <SleepTimerProvider>
+                  <App />
+                </SleepTimerProvider>
               </ConfirmProvider>
             </ToastProvider>
           </OfflineProvider>

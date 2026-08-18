@@ -3,12 +3,14 @@ import { Keyboard, X } from 'lucide-react';
 import { useGlobalAudio } from '../context/AudioContext';
 import { useLibrary } from '../context/LibraryContext';
 import { useToast } from '../context/ToastContext';
+import { useSleepTimer } from '../context/SleepTimerContext';
 
 export const KeyboardShortcutsModal = memo(function KeyboardShortcutsModal() {
   const [isOpen, setIsOpen] = useState(false);
   const { playerState } = useGlobalAudio();
   const { toggleFavorite, favorites } = useLibrary();
   const { toast } = useToast();
+  const { toggleModal: toggleSleepTimerModal } = useSleepTimer();
 
   const {
     isPlaying, togglePlay, seek, currentTime, duration,
@@ -115,11 +117,17 @@ export const KeyboardShortcutsModal = memo(function KeyboardShortcutsModal() {
         toast.success(isFav ? 'Đã xóa khỏi yêu thích' : 'Đã thêm vào bài hát yêu thích');
         return;
       }
+
+      if (e.code === 'KeyT') {
+        e.preventDefault();
+        toggleSleepTimerModal();
+        return;
+      }
     };
 
     window.addEventListener('keydown', handleKeyDown);
     return () => window.removeEventListener('keydown', handleKeyDown);
-  }, [isOpen, isPlaying, togglePlay, seek, currentTime, duration, volume, setVolume, isShuffle, setIsShuffle, songEndMode, setSongEndMode, queueEndMode, setQueueEndMode, currentTrack, toggleFavorite, favorites, toast]);
+  }, [isOpen, isPlaying, togglePlay, seek, currentTime, duration, volume, setVolume, isShuffle, setIsShuffle, songEndMode, setSongEndMode, queueEndMode, setQueueEndMode, currentTrack, toggleFavorite, favorites, toast, toggleSleepTimerModal]);
 
   if (!isOpen) return null;
 
@@ -132,6 +140,7 @@ export const KeyboardShortcutsModal = memo(function KeyboardShortcutsModal() {
     { keys: ['S'], desc: 'Bật / Tắt phát trộn bài (Toggle Shuffle)' },
     { keys: ['R'], desc: 'Chuyển chế độ lặp lại (Cycle Repeat)' },
     { keys: ['F'], desc: 'Thêm / Bỏ yêu thích bài hiện tại (Toggle Favorite)' },
+    { keys: ['T'], desc: 'Hẹn giờ tắt nhạc (Sleep Timer)' },
     { keys: ['?'], desc: 'Mở bảng phím tắt này (Keyboard Shortcuts)' },
   ];
 

@@ -85,3 +85,5 @@ coverage/
 MusicAppFE/sonar-project.properties
 MusicAppFE/.scannerwork/
 scratch/
+.agents/
+graphify-out/

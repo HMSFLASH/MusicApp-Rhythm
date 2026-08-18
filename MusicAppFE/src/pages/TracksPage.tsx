@@ -14,7 +14,11 @@ import { ActionMenu } from '../components/ActionMenu';
 import { useOffline } from '../context/OfflineContext';
 import { downloadTrackFile } from '../utils/downloadUtils';
 
+import { useVirtualList } from '../hooks/useVirtualList';
+
 type SortMode = 'default' | 'leastPlayed' | 'mostPlayed';
+
+const TRACK_ROW_HEIGHT = 72;
 
 export function TracksPage() {
   const { t } = useTranslation();
@@ -35,9 +39,6 @@ export function TracksPage() {
   const [tracksToPlaylist, setTracksToPlaylist] = useState<Track[] | null>(null);
   const longPressTimer = useRef<NodeJS.Timeout | null>(null);
   const isLongPressTriggered = useRef(false);
-
-  const [currentPage, setCurrentPage] = useState(1);
-  const ITEMS_PER_PAGE = 20;
 
   const [downloadProgress, setDownloadProgress] = useState<{ current: number, total: number } | null>(null);
   const isDownloadingAllRef = useRef(false);
@@ -235,9 +236,6 @@ export function TracksPage() {
     }
   };
 
-  const totalPages = Math.ceil(displayTracks.length / ITEMS_PER_PAGE);
-  const boundedCurrentPage = Math.min(currentPage, Math.max(1, totalPages));
-  const currentTracks = displayTracks.slice((boundedCurrentPage - 1) * ITEMS_PER_PAGE, boundedCurrentPage * ITEMS_PER_PAGE);
   const infoTrackMetadata = infoTrack ? playerState.getTrackMetadata(infoTrack.id) : undefined;
   const infoTrackFileSize = infoTrack?.fileSize ?? infoTrackMetadata?.fileSize;
   const infoTrackBitrate = infoTrack?.bitrate ?? infoTrackMetadata?.bitrate;
@@ -246,6 +244,17 @@ export function TracksPage() {
   const infoTrackBitsPerSample = infoTrack?.bitsPerSample ?? infoTrackMetadata?.bitsPerSample;
   
   const uncachedCount = displayTracks.filter(t => !isCached(t) && t.sourceType !== 'LOCAL').length;
+
+  const {
+    containerRef,
+    handleScroll,
+    offsetY,
+    totalHeight,
+    visibleIndexes,
+  } = useVirtualList({
+    itemCount: displayTracks.length,
+    itemHeight: TRACK_ROW_HEIGHT,
+  });
 
 
 
@@ -364,7 +373,6 @@ export function TracksPage() {
                         key={option.value}
                         onClick={() => {
                           setSortMode(option.value as SortMode);
-                          setCurrentPage(1);
                           setIsSortMenuOpen(false);
                         }}
                         className={`px-3.5 py-2 text-xs text-left transition-colors flex items-center gap-2 ${sortMode === option.value ? 'bg-primary/15 text-primary font-semibold' : 'text-slate-300 hover:bg-white/[0.06] hover:text-white'}`}
@@ -402,299 +410,298 @@ export function TracksPage() {
         )}
       </div>
 
-      <div className="flex flex-col gap-2">
-        {selectedTrackIds.size > 0 && (
-          <div className="sticky top-0 z-20 mb-2 flex flex-wrap items-center justify-between gap-y-2 gap-x-3 bg-[#0c1626]/95 backdrop-blur-xl border border-primary/30 rounded-xl p-3 shadow-2xl">
-            <div className="flex items-center gap-2 sm:gap-3 flex-wrap">
-              <span className="text-primary text-xs font-bold whitespace-nowrap">{selectedTrackIds.size} selected</span>
-              <button onClick={() => setSelectedTrackIds(new Set())} className="text-slate-400 hover:text-white transition-colors shrink-0 p-1" title="Clear selection">
-                <X size={16} />
-              </button>
-              <button
-                onClick={() => {
-                  if (selectedTrackIds.size === displayTracks.length && displayTracks.length > 0) {
-                    setSelectedTrackIds(new Set());
-                  } else {
-                    setSelectedTrackIds(new Set(displayTracks.map(t => String(t.id))));
-                  }
-                }}
-                className="p-1 rounded-lg bg-white/5 border border-white/10 hover:bg-white/10 text-slate-300 hover:text-white transition-colors flex items-center gap-1.5 px-2.5 text-xs ml-1 shrink-0 whitespace-nowrap"
-              >
-                {selectedTrackIds.size === displayTracks.length && displayTracks.length > 0 ? <CheckSquare size={14} className="text-primary" /> : <Square size={14} />}
-                <span className="hidden md:inline">Select All</span>
-              </button>
-            </div>
-            <div className="flex items-center gap-2 flex-wrap">
-              <ActionMenu
-                ariaLabel="Batch actions"
-                buttonClassName="p-1.5 rounded-lg bg-white/5 hover:bg-white/10 text-white flex items-center justify-center transition-colors"
-                actions={[
-                  { label: 'Add to Queue', icon: <ListEnd size={16} />, onSelect: handleBatchAddToQueue },
-                  { label: 'Add to Playlist', icon: <ListPlus size={16} />, onSelect: () => setTracksToPlaylist(displayTracks.filter(t => selectedTrackIds.has(String(t.id)))) },
-                  { label: 'Add to Favorites', icon: <Heart size={16} />, onSelect: handleBatchAddToFavorites },
-                  { label: 'Delete', icon: <Trash2 size={16} />, onSelect: handleBatchDelete, tone: 'danger' },
-                ]}
-              />
-            </div>
-          </div>
-        )}
-        {currentTracks.map((track, idx) => {
-          const isActive = playerState.currentTrack?.id === track.id;
-          return (
-            <div
-              key={track.id}
-              onPointerDown={(e) => {
-                if (isOfflineMode && !isCached(track)) return;
-                handlePointerDown(String(track.id), e);
-              }}
-              onPointerUp={handlePointerUpOrLeave}
-              onPointerCancel={handlePointerUpOrLeave}
-              onMouseLeave={() => {
-                setOpenMenuId(null);
-                handlePointerUpOrLeave();
-              }}
-              onContextMenu={(e) => {
-                if (isLongPressTriggered.current || ('ontouchstart' in window && selectedTrackIds.size > 0)) {
-                  e.preventDefault();
+      {selectedTrackIds.size > 0 && (
+        <div className="sticky top-0 z-20 mb-2 flex flex-wrap items-center justify-between gap-y-2 gap-x-3 bg-[#0c1626]/95 backdrop-blur-xl border border-primary/30 rounded-xl p-3 shadow-2xl">
+          <div className="flex items-center gap-2 sm:gap-3 flex-wrap">
+            <span className="text-primary text-xs font-bold whitespace-nowrap">{selectedTrackIds.size} selected</span>
+            <button onClick={() => setSelectedTrackIds(new Set())} className="text-slate-400 hover:text-white transition-colors shrink-0 p-1" title="Clear selection">
+              <X size={16} />
+            </button>
+            <button
+              onClick={() => {
+                if (selectedTrackIds.size === displayTracks.length && displayTracks.length > 0) {
+                  setSelectedTrackIds(new Set());
+                } else {
+                  setSelectedTrackIds(new Set(displayTracks.map(t => String(t.id))));
                 }
               }}
-              onClick={(e) => {
-                if (isOfflineMode && !isCached(track)) return;
-                handleTrackClick(track, e);
-              }}
-              className={`flex items-center gap-3 sm:gap-3.5 p-2.5 sm:p-3 rounded-xl border transition-all duration-200 group cursor-pointer select-none relative ${openMenuId === track.id ? 'z-40 ring-1 ring-primary/40' : 'z-0'} ${isOfflineMode && !isCached(track) ? 'opacity-40 grayscale pointer-events-none' :
-                  isActive
-                    ? 'bg-primary/15 border-primary/30 text-primary shadow-[inset_0_0_15px_rgba(0,245,255,0.1)]'
-                    : 'bg-white/[0.02] border-white/[0.05] hover:bg-white/[0.06] hover:border-primary/25 backdrop-blur-md'
-                }`}
+              className="p-1 rounded-lg bg-white/5 border border-white/10 hover:bg-white/10 text-slate-300 hover:text-white transition-colors flex items-center gap-1.5 px-2.5 text-xs ml-1 shrink-0 whitespace-nowrap"
             >
-              {selectedTrackIds.size > 0 ? (
-                <button
-                  onClick={(e) => toggleSelection(String(track.id), e)}
-                  className="w-5 flex items-center justify-center transition-colors shrink-0"
-                >
-                  {selectedTrackIds.has(String(track.id)) ? <CheckSquare size={17} className="text-primary" /> : <Square size={17} className="text-slate-500" />}
-                </button>
-              ) : (
-                <div className="w-5 text-center shrink-0">
-                  {isActive && playerState.isPlaying ? (
-                    <div className="flex items-end justify-center gap-0.5 h-3">
-                      <span className="w-0.5 bg-primary rounded-full animate-eq-1" />
-                      <span className="w-0.5 bg-primary rounded-full animate-eq-2" />
-                      <span className="w-0.5 bg-primary rounded-full animate-eq-3" />
-                    </div>
-                  ) : (
-                    <span className="hidden sm:block text-[11px] font-mono text-slate-500">{(currentPage - 1) * ITEMS_PER_PAGE + idx + 1}</span>
-                  )}
-                </div>
-              )}
-              <button
-                aria-label="Play track"
-                onClick={(e) => { e.stopPropagation(); playerState.playTrack(track, displayTracks); }}
-                className="hidden lg:group-hover:flex w-5 items-center justify-center rounded-full transition-colors text-primary"
-              >
-                <Play size={14} fill="currentColor" />
-              </button>
-              <div className="w-10 h-10 rounded-lg bg-slate-800 flex items-center justify-center shrink-0 overflow-hidden border border-white/10 shadow-sm">
-                {track.imageUrl || playerState.getTrackImage(track.id) ? (
-                  <img src={track.imageUrl || playerState.getTrackImage(track.id)} alt="Cover" className="w-full h-full object-cover group-hover:scale-105 transition-transform" />
-                ) : (
-                  <ListMusic size={16} className="text-slate-500" />
-                )}
-              </div>
-              <div className="flex flex-col truncate flex-1 pr-2">
-                <span className={`text-xs sm:text-sm font-semibold truncate ${isActive ? 'text-primary' : 'text-slate-100'}`}>
-                  {track.title || playerState.getTrackMetadata(track.id)?.title || (track.fileName ? (track.fileName.includes(' - ') ? track.fileName.split(' - ')[1].replace(/\.[^/.]+$/, "") : track.fileName.replace(/\.[^/.]+$/, "")) : 'Unknown Title')}
-                </span>
-                <div className="flex min-w-0 items-center gap-2 mt-0.5 font-mono text-[11px] text-slate-400">
-                  {track.sourceType === 'DRIVE' && (
-                    <span className="inline-flex items-center gap-0.5 text-primary text-[10px] bg-primary/10 px-1 py-0.2 rounded border border-primary/20 shrink-0">
-                      Drive
-                    </span>
-                  )}
-                  <span className="truncate">{track.artist || playerState.getTrackMetadata(track.id)?.artist || (track.fileName?.includes(' - ') ? track.fileName.split(' - ')[0] : 'Unknown Artist')}</span>
-                  {track.album && (
-                    <>
-                      <span className="hidden md:inline text-slate-600">•</span>
-                      <span className="hidden md:inline truncate text-slate-500">{track.album}</span>
-                    </>
-                  )}
-                </div>
-              </div>
-              <div className={`relative flex items-center gap-1.5 transition-opacity ${openMenuId === track.id ? 'opacity-100' : 'opacity-100 lg:opacity-0 lg:group-hover:opacity-100'}`}>
-                <button
-                  aria-label="More options"
-                  onClick={(e) => { e.stopPropagation(); setOpenMenuId(openMenuId === track.id ? null : track.id); }}
-                  className={`p-1.5 rounded-lg transition-colors pointer-events-auto ${openMenuId === track.id ? 'text-primary bg-primary/10' : 'text-slate-400 hover:text-white hover:bg-white/10'}`}
-                  title="More options"
-                >
-                  <MoreHorizontal size={17} />
-                </button>
-
-                {openMenuId === track.id && (
-                  <div className="absolute right-0 top-full mt-1.5 w-56 max-w-[calc(100vw_-_2rem)] bg-[#0c1626]/98 border border-white/[0.12] rounded-2xl shadow-[0_20px_60px_rgba(0,0,0,0.95)] overflow-hidden z-50 py-1.5 backdrop-blur-2xl animate-in zoom-in-95 duration-150">
-                    <button
-                      onClick={(e) => handlePlayNext(track, e)}
-                      className="w-full flex items-center gap-3 px-3.5 py-2 text-xs font-medium text-left text-slate-200 hover:bg-white/[0.06] hover:text-white transition-colors"
-                    >
-                      <ListStart size={14} className="text-primary" /> Play Next
-                    </button>
-                    <button
-                      onClick={(e) => handleAddToQueue(track, e)}
-                      className="w-full flex items-center gap-3 px-3.5 py-2 text-xs font-medium text-left text-slate-200 hover:bg-white/[0.06] hover:text-white transition-colors"
-                    >
-                      <ListEnd size={14} className="text-cyan-400" /> Add to Queue
-                    </button>
-                    <button
-                      onClick={(e) => { e.stopPropagation(); setTrackToPlaylist(track); setOpenMenuId(null); }}
-                      className="w-full flex items-center gap-3 px-3.5 py-2 text-xs font-medium text-left text-slate-200 hover:bg-white/[0.06] hover:text-white transition-colors"
-                    >
-                      <ListPlus size={14} className="text-emerald-400" /> Add to Playlist
-                    </button>
-                    {track.sourceType !== 'LOCAL' && (
-                      <button
-                        onClick={(e) => { e.stopPropagation(); downloadTrackFile(track); setOpenMenuId(null); }}
-                        className="w-full flex items-center gap-3 px-3.5 py-2 text-xs font-medium text-left text-slate-200 hover:bg-white/[0.06] hover:text-white transition-colors"
-                      >
-                        <Download size={14} className="text-slate-400" /> Download File
-                      </button>
-                    )}
-                    {!isOfflineMode && track.sourceType !== 'LOCAL' && (
-                      <button
-                        onClick={async (e) => {
-                          e.stopPropagation();
-                          if (!isCached(track) && !downloadingTrackIds.has(String(track.id))) {
-                            await downloadTrack(track);
-                          }
-                        }}
-                        className="w-full flex items-center gap-3 px-3.5 py-2 text-xs font-medium text-left text-slate-200 hover:bg-white/[0.06] hover:text-white transition-colors"
-                      >
-                        {(() => {
-                          if (isCached(track)) return <CheckCircle2 size={14} className="text-green-400" />;
-                          if (downloadingTrackIds.has(String(track.id))) return <Loader2 size={14} className="animate-spin text-primary" />;
-                          return <DownloadCloud size={14} className="text-blue-400" />;
-                        })()}
-                        <span>
-                          {isCached(track) ? t('offline.downloaded', 'Downloaded (Offline)') : (downloadingTrackIds.has(String(track.id)) ? t('offline.downloading', 'Downloading...') : t('offline.downloadTrack', 'Save for Offline'))}
-                        </span>
-                      </button>
-                    )}
-                    {track.sourceType !== 'LOCAL' && (
-                      <button
-                        onClick={(e) => toggleFavorite(track, e)}
-                        className="w-full flex items-center gap-3 px-3.5 py-2 text-xs font-medium text-left text-slate-200 hover:bg-white/[0.06] hover:text-white transition-colors"
-                      >
-                        <Heart size={14} fill={favorites.some(f => f.id === track.id) ? "currentColor" : "none"} className={favorites.some(f => f.id === track.id) ? "text-primary" : "text-slate-400"} />
-                        {favorites.some(f => f.id === track.id) ? "Remove Favorite" : "Add to Favorite"}
-                      </button>
-                    )}
-                    {getAudioExtension(track.fileName) === 'flac' && (
-                      <button
-                        onClick={(e) => {
-                          e.stopPropagation();
-                          playerState.toggleFlacWasmForTrack(track);
-                          setOpenMenuId(null);
-                        }}
-                        className="w-full flex items-center gap-3 px-3.5 py-2 text-xs font-medium text-left text-slate-200 hover:bg-white/[0.06] hover:text-white transition-colors"
-                      >
-                        <Cpu size={14} className={playerState.isFlacWasmEnabled(track) ? 'text-primary' : 'text-slate-400'} />
-                        {playerState.isFlacWasmEnabled(track) ? 'Use Normal FLAC' : 'Use FLAC WASM'}
-                      </button>
-                    )}
-                    {(getAudioExtension(track.fileName) === 'm4a' || getAudioExtension(track.fileName) === 'aac') && (
-                      <button
-                        onClick={async (e) => {
-                          e.stopPropagation();
-                          playerState.toggleM4aWasmForTrack(track);
-                          setOpenMenuId(null);
-                          if (playerState.currentTrack?.id === track.id && track.sourceType !== 'LOCAL') {
-                            await playerState.reloadCurrentTrackFromDrive();
-                          }
-                        }}
-                        className="w-full flex items-center gap-3 px-3.5 py-2 text-xs font-medium text-left text-slate-200 hover:bg-white/[0.06] hover:text-white transition-colors"
-                      >
-                        <Cpu size={14} className={playerState.isM4aWasmEnabled(track) ? 'text-primary' : 'text-slate-400'} />
-                        {playerState.isM4aWasmEnabled(track) ? 'Use Normal M4A' : 'Use M4A WASM'}
-                      </button>
-                    )}
-                    <button
-                      onClick={async (e) => {
-                        e.stopPropagation();
-                        playerState.toggleLegacyMetadataForTrack(track);
-                        setOpenMenuId(null);
-                        if (playerState.currentTrack?.id === track.id && track.sourceType !== 'LOCAL') {
-                          await playerState.reloadCurrentTrackFromDrive();
-                        }
-                      }}
-                      className="w-full flex items-center gap-3 px-3.5 py-2 text-xs font-medium text-left text-slate-200 hover:bg-white/[0.06] hover:text-white transition-colors"
-                    >
-                      <Tags size={14} className={playerState.isLegacyMetadataEnabled(track) ? 'text-primary' : 'text-slate-400'} />
-                      {playerState.isLegacyMetadataEnabled(track) ? 'Use New Metadata Parser' : 'Use Legacy Metadata Parser'}
-                    </button>
-                    <button
-                      onClick={(e) => { e.stopPropagation(); setInfoTrack(track); setOpenMenuId(null); }}
-                      className="w-full flex items-center gap-3 px-3.5 py-2 text-xs font-medium text-left text-slate-200 hover:bg-white/[0.06] hover:text-white transition-colors border-t border-white/[0.06]"
-                    >
-                      <Info size={14} className="text-slate-400" /> Info
-                    </button>
-                    {track.sourceType !== 'LOCAL' && (
-                      <button
-                        onClick={async (e) => {
-                          e.stopPropagation();
-                          const isConfirmed = await confirm({
-                            title: 'Xóa bài hát',
-                            description: `Bạn có chắc chắn muốn xóa bài hát "${track.title || track.fileName}" khỏi thư viện?`,
-                            confirmText: 'Xóa',
-                            confirmColor: 'bg-red-500/20 text-red-400 hover:bg-red-500/30 border-red-500/30'
-                          });
-                          if (isConfirmed) {
-                            const isConfirmed2 = await confirm({
-                              title: 'Xác nhận xóa vĩnh viễn',
-                              description: `Hành động này sẽ xóa vĩnh viễn bài hát "${track.title || track.fileName}" từ Google Drive của bạn và không thể hoàn tác. Bạn vẫn muốn tiếp tục?`,
-                              confirmText: 'Xóa vĩnh viễn',
-                              confirmColor: 'bg-red-600 text-white hover:bg-red-700 border-red-600'
-                            });
-                            if (isConfirmed2) {
-                              await deleteTrack(track);
-                              setOpenMenuId(null);
-                            }
-                          }
-                        }}
-                        className="w-full flex items-center gap-3 px-3.5 py-2 text-xs font-medium text-left text-rose-400 hover:bg-rose-500/10 hover:text-rose-300 transition-colors"
-                      >
-                        <Trash2 size={14} /> Delete
-                      </button>
-                    )}
-                  </div>
-                )}
-              </div>
-            </div>
-          );
-        })}
-      </div>
-
-      {/* Pagination Controls */}
-      {totalPages > 1 && (
-        <div className="flex flex-wrap justify-center items-center gap-3 sm:gap-4 mt-8 pb-4">
-          <button
-            aria-label="Previous page"
-            onClick={() => setCurrentPage(p => Math.max(1, p - 1))}
-            disabled={boundedCurrentPage === 1}
-            className="px-4 py-2 rounded-xl bg-white/[0.04] border border-white/[0.08] hover:bg-white/[0.08] hover:text-white disabled:opacity-30 disabled:cursor-not-allowed text-xs font-semibold transition-all"
-          >
-            Previous
-          </button>
-          <div className="text-xs font-mono text-slate-400">
-            Page <span className="text-primary font-bold">{boundedCurrentPage}</span> of <span className="text-slate-200 font-bold">{totalPages}</span>
+              {selectedTrackIds.size === displayTracks.length && displayTracks.length > 0 ? <CheckSquare size={14} className="text-primary" /> : <Square size={14} />}
+              <span className="hidden md:inline">Select All</span>
+            </button>
           </div>
-          <button
-            aria-label="Next page"
-            onClick={() => setCurrentPage(p => Math.min(totalPages, p + 1))}
-            disabled={boundedCurrentPage === totalPages}
-            className="px-4 py-2 rounded-xl bg-white/[0.04] border border-white/[0.08] hover:bg-white/[0.08] hover:text-white disabled:opacity-30 disabled:cursor-not-allowed text-xs font-semibold transition-all"
+          <div className="flex items-center gap-2 flex-wrap">
+            <ActionMenu
+              ariaLabel="Batch actions"
+              buttonClassName="p-1.5 rounded-lg bg-white/5 hover:bg-white/10 text-white flex items-center justify-center transition-colors"
+              actions={[
+                { label: 'Add to Queue', icon: <ListEnd size={16} />, onSelect: handleBatchAddToQueue },
+                { label: 'Add to Playlist', icon: <ListPlus size={16} />, onSelect: () => setTracksToPlaylist(displayTracks.filter(t => selectedTrackIds.has(String(t.id)))) },
+                { label: 'Add to Favorites', icon: <Heart size={16} />, onSelect: handleBatchAddToFavorites },
+                { label: 'Delete', icon: <Trash2 size={16} />, onSelect: handleBatchDelete, tone: 'danger' },
+              ]}
+            />
+          </div>
+        </div>
+      )}
+
+      {displayTracks.length === 0 ? (
+        <div className="flex flex-col items-center justify-center h-64 text-slate-500 font-mono text-sm">
+          <p>{activeTab === 'all' ? 'No songs in your library' : 'No favorite songs yet'}</p>
+        </div>
+      ) : (
+        <div
+          ref={containerRef}
+          onScroll={handleScroll}
+          className="relative w-full"
+          style={{ height: totalHeight }}
+        >
+          <div
+            className="absolute inset-x-0 top-0 will-change-transform"
+            style={{ transform: `translateY(${offsetY}px)` }}
           >
-            Next
-          </button>
+            {visibleIndexes.map((index) => {
+              const track = displayTracks[index];
+              if (!track) return null;
+              const isActive = playerState.currentTrack?.id === track.id;
+              return (
+                <div
+                  key={track.id}
+                  className={`relative ${openMenuId === track.id ? 'z-40' : 'z-0'}`}
+                  style={{ height: TRACK_ROW_HEIGHT }}
+                >
+                  <div
+                    onPointerDown={(e) => {
+                      if (isOfflineMode && !isCached(track)) return;
+                      handlePointerDown(String(track.id), e);
+                    }}
+                    onPointerUp={handlePointerUpOrLeave}
+                    onPointerCancel={handlePointerUpOrLeave}
+                    onMouseLeave={() => {
+                      setOpenMenuId(null);
+                      handlePointerUpOrLeave();
+                    }}
+                    onContextMenu={(e) => {
+                      if (isLongPressTriggered.current || ('ontouchstart' in window && selectedTrackIds.size > 0)) {
+                        e.preventDefault();
+                      }
+                    }}
+                    onClick={(e) => {
+                      if (isOfflineMode && !isCached(track)) return;
+                      handleTrackClick(track, e);
+                    }}
+                    className={`flex h-[64px] items-center gap-3 sm:gap-3.5 p-2.5 sm:p-3 rounded-xl border transition-all duration-200 group cursor-pointer select-none relative ${openMenuId === track.id ? 'z-40 ring-1 ring-primary/40' : 'z-0'} ${isOfflineMode && !isCached(track) ? 'opacity-40 grayscale pointer-events-none' :
+                        isActive
+                          ? 'bg-primary/15 border-primary/30 text-primary shadow-[inset_0_0_15px_rgba(0,245,255,0.1)]'
+                          : 'bg-white/[0.02] border-white/[0.05] hover:bg-white/[0.06] hover:border-primary/25 backdrop-blur-md'
+                      }`}
+                  >
+                    {selectedTrackIds.size > 0 ? (
+                      <button
+                        onClick={(e) => toggleSelection(String(track.id), e)}
+                        className="w-5 flex items-center justify-center transition-colors shrink-0"
+                      >
+                        {selectedTrackIds.has(String(track.id)) ? <CheckSquare size={17} className="text-primary" /> : <Square size={17} className="text-slate-500" />}
+                      </button>
+                    ) : (
+                      <div className="w-5 text-center shrink-0">
+                        {isActive && playerState.isPlaying ? (
+                          <div className="flex items-end justify-center gap-0.5 h-3">
+                            <span className="w-0.5 bg-primary rounded-full animate-eq-1" />
+                            <span className="w-0.5 bg-primary rounded-full animate-eq-2" />
+                            <span className="w-0.5 bg-primary rounded-full animate-eq-3" />
+                          </div>
+                        ) : (
+                          <span className="hidden sm:block text-[11px] font-mono text-slate-500">{index + 1}</span>
+                        )}
+                      </div>
+                    )}
+                    <button
+                      aria-label="Play track"
+                      onClick={(e) => { e.stopPropagation(); playerState.playTrack(track, displayTracks); }}
+                      className="hidden lg:group-hover:flex w-5 items-center justify-center rounded-full transition-colors text-primary"
+                    >
+                      <Play size={14} fill="currentColor" />
+                    </button>
+                    <div className="w-10 h-10 rounded-lg bg-slate-800 flex items-center justify-center shrink-0 overflow-hidden border border-white/10 shadow-sm">
+                      {track.imageUrl || playerState.getTrackImage(track.id) ? (
+                        <img src={track.imageUrl || playerState.getTrackImage(track.id)} alt="Cover" className="w-full h-full object-cover group-hover:scale-105 transition-transform" />
+                      ) : (
+                        <ListMusic size={16} className="text-slate-500" />
+                      )}
+                    </div>
+                    <div className="flex flex-col truncate flex-1 pr-2">
+                      <span className={`text-xs sm:text-sm font-semibold truncate ${isActive ? 'text-primary' : 'text-slate-100'}`}>
+                        {track.title || playerState.getTrackMetadata(track.id)?.title || (track.fileName ? (track.fileName.includes(' - ') ? track.fileName.split(' - ')[1].replace(/\.[^/.]+$/, "") : track.fileName.replace(/\.[^/.]+$/, "")) : 'Unknown Title')}
+                      </span>
+                      <div className="flex min-w-0 items-center gap-2 mt-0.5 font-mono text-[11px] text-slate-400">
+                        {track.sourceType === 'DRIVE' && (
+                          <span className="inline-flex items-center gap-0.5 text-primary text-[10px] bg-primary/10 px-1 py-0.2 rounded border border-primary/20 shrink-0">
+                            Drive
+                          </span>
+                        )}
+                        <span className="truncate">{track.artist || playerState.getTrackMetadata(track.id)?.artist || (track.fileName?.includes(' - ') ? track.fileName.split(' - ')[0] : 'Unknown Artist')}</span>
+                        {track.album && (
+                          <>
+                            <span className="hidden md:inline text-slate-600">•</span>
+                            <span className="hidden md:inline truncate text-slate-500">{track.album}</span>
+                          </>
+                        )}
+                      </div>
+                    </div>
+                    <div className={`relative flex items-center gap-1.5 transition-opacity ${openMenuId === track.id ? 'opacity-100' : 'opacity-100 lg:opacity-0 lg:group-hover:opacity-100'}`}>
+                      <button
+                        aria-label="More options"
+                        onClick={(e) => { e.stopPropagation(); setOpenMenuId(openMenuId === track.id ? null : track.id); }}
+                        className={`p-1.5 rounded-lg transition-colors pointer-events-auto ${openMenuId === track.id ? 'text-primary bg-primary/10' : 'text-slate-400 hover:text-white hover:bg-white/10'}`}
+                        title="More options"
+                      >
+                        <MoreHorizontal size={17} />
+                      </button>
+
+                      {openMenuId === track.id && (
+                        <div className="absolute right-0 top-full mt-1.5 w-56 max-w-[calc(100vw_-_2rem)] bg-[#0c1626]/98 border border-white/[0.12] rounded-2xl shadow-[0_20px_60px_rgba(0,0,0,0.95)] overflow-hidden z-50 py-1.5 backdrop-blur-2xl animate-in zoom-in-95 duration-150">
+                          <button
+                            onClick={(e) => handlePlayNext(track, e)}
+                            className="w-full flex items-center gap-3 px-3.5 py-2 text-xs font-medium text-left text-slate-200 hover:bg-white/[0.06] hover:text-white transition-colors"
+                          >
+                            <ListStart size={14} className="text-primary" /> Play Next
+                          </button>
+                          <button
+                            onClick={(e) => handleAddToQueue(track, e)}
+                            className="w-full flex items-center gap-3 px-3.5 py-2 text-xs font-medium text-left text-slate-200 hover:bg-white/[0.06] hover:text-white transition-colors"
+                          >
+                            <ListEnd size={14} className="text-cyan-400" /> Add to Queue
+                          </button>
+                          <button
+                            onClick={(e) => { e.stopPropagation(); setTrackToPlaylist(track); setOpenMenuId(null); }}
+                            className="w-full flex items-center gap-3 px-3.5 py-2 text-xs font-medium text-left text-slate-200 hover:bg-white/[0.06] hover:text-white transition-colors"
+                          >
+                            <ListPlus size={14} className="text-emerald-400" /> Add to Playlist
+                          </button>
+                          {track.sourceType !== 'LOCAL' && (
+                            <button
+                              onClick={(e) => { e.stopPropagation(); downloadTrackFile(track); setOpenMenuId(null); }}
+                              className="w-full flex items-center gap-3 px-3.5 py-2 text-xs font-medium text-left text-slate-200 hover:bg-white/[0.06] hover:text-white transition-colors"
+                            >
+                              <Download size={14} className="text-slate-400" /> Download File
+                            </button>
+                          )}
+                          {!isOfflineMode && track.sourceType !== 'LOCAL' && (
+                            <button
+                              onClick={async (e) => {
+                                e.stopPropagation();
+                                if (!isCached(track) && !downloadingTrackIds.has(String(track.id))) {
+                                  await downloadTrack(track);
+                                }
+                              }}
+                              className="w-full flex items-center gap-3 px-3.5 py-2 text-xs font-medium text-left text-slate-200 hover:bg-white/[0.06] hover:text-white transition-colors"
+                            >
+                              {(() => {
+                                if (isCached(track)) return <CheckCircle2 size={14} className="text-green-400" />;
+                                if (downloadingTrackIds.has(String(track.id))) return <Loader2 size={14} className="animate-spin text-primary" />;
+                                return <DownloadCloud size={14} className="text-blue-400" />;
+                              })()}
+                              <span>
+                                {isCached(track) ? t('offline.downloaded', 'Downloaded (Offline)') : (downloadingTrackIds.has(String(track.id)) ? t('offline.downloading', 'Downloading...') : t('offline.downloadTrack', 'Save for Offline'))}
+                              </span>
+                            </button>
+                          )}
+                          {track.sourceType !== 'LOCAL' && (
+                            <button
+                              onClick={(e) => toggleFavorite(track, e)}
+                              className="w-full flex items-center gap-3 px-3.5 py-2 text-xs font-medium text-left text-slate-200 hover:bg-white/[0.06] hover:text-white transition-colors"
+                            >
+                              <Heart size={14} fill={favorites.some(f => f.id === track.id) ? "currentColor" : "none"} className={favorites.some(f => f.id === track.id) ? "text-primary" : "text-slate-400"} />
+                              {favorites.some(f => f.id === track.id) ? "Remove Favorite" : "Add to Favorite"}
+                            </button>
+                          )}
+                          {getAudioExtension(track.fileName) === 'flac' && (
+                            <button
+                              onClick={(e) => {
+                                e.stopPropagation();
+                                playerState.toggleFlacWasmForTrack(track);
+                                setOpenMenuId(null);
+                              }}
+                              className="w-full flex items-center gap-3 px-3.5 py-2 text-xs font-medium text-left text-slate-200 hover:bg-white/[0.06] hover:text-white transition-colors"
+                            >
+                              <Cpu size={14} className={playerState.isFlacWasmEnabled(track) ? 'text-primary' : 'text-slate-400'} />
+                              {playerState.isFlacWasmEnabled(track) ? 'Use Normal FLAC' : 'Use FLAC WASM'}
+                            </button>
+                          )}
+                          {(getAudioExtension(track.fileName) === 'm4a' || getAudioExtension(track.fileName) === 'aac') && (
+                            <button
+                              onClick={async (e) => {
+                                e.stopPropagation();
+                                playerState.toggleM4aWasmForTrack(track);
+                                setOpenMenuId(null);
+                                if (playerState.currentTrack?.id === track.id && track.sourceType !== 'LOCAL') {
+                                  await playerState.reloadCurrentTrackFromDrive();
+                                }
+                              }}
+                              className="w-full flex items-center gap-3 px-3.5 py-2 text-xs font-medium text-left text-slate-200 hover:bg-white/[0.06] hover:text-white transition-colors"
+                            >
+                              <Cpu size={14} className={playerState.isM4aWasmEnabled(track) ? 'text-primary' : 'text-slate-400'} />
+                              {playerState.isM4aWasmEnabled(track) ? 'Use Normal M4A' : 'Use M4A WASM'}
+                            </button>
+                          )}
+                          <button
+                            onClick={async (e) => {
+                              e.stopPropagation();
+                              playerState.toggleLegacyMetadataForTrack(track);
+                              setOpenMenuId(null);
+                              if (playerState.currentTrack?.id === track.id && track.sourceType !== 'LOCAL') {
+                                await playerState.reloadCurrentTrackFromDrive();
+                              }
+                            }}
+                            className="w-full flex items-center gap-3 px-3.5 py-2 text-xs font-medium text-left text-slate-200 hover:bg-white/[0.06] hover:text-white transition-colors"
+                          >
+                            <Tags size={14} className={playerState.isLegacyMetadataEnabled(track) ? 'text-primary' : 'text-slate-400'} />
+                            {playerState.isLegacyMetadataEnabled(track) ? 'Use New Metadata Parser' : 'Use Legacy Metadata Parser'}
+                          </button>
+                          <button
+                            onClick={(e) => { e.stopPropagation(); setInfoTrack(track); setOpenMenuId(null); }}
+                            className="w-full flex items-center gap-3 px-3.5 py-2 text-xs font-medium text-left text-slate-200 hover:bg-white/[0.06] hover:text-white transition-colors border-t border-white/[0.06]"
+                          >
+                            <Info size={14} className="text-slate-400" /> Info
+                          </button>
+                          {track.sourceType !== 'LOCAL' && (
+                            <button
+                              onClick={async (e) => {
+                                e.stopPropagation();
+                                const isConfirmed = await confirm({
+                                  title: 'Xóa bài hát',
+                                  description: `Bạn có chắc chắn muốn xóa bài hát "${track.title || track.fileName}" khỏi thư viện?`,
+                                  confirmText: 'Xóa',
+                                  confirmColor: 'bg-red-500/20 text-red-400 hover:bg-red-500/30 border-red-500/30'
+                                });
+                                if (isConfirmed) {
+                                  const isConfirmed2 = await confirm({
+                                    title: 'Xác nhận xóa vĩnh viễn',
+                                    description: `Hành động này sẽ xóa vĩnh viễn bài hát "${track.title || track.fileName}" từ Google Drive của bạn và không thể hoàn tác. Bạn vẫn muốn tiếp tục?`,
+                                    confirmText: 'Xóa vĩnh viễn',
+                                    confirmColor: 'bg-red-600 text-white hover:bg-red-700 border-red-600'
+                                  });
+                                  if (isConfirmed2) {
+                                    await deleteTrack(track);
+                                    setOpenMenuId(null);
+                                  }
+                                }
+                              }}
+                              className="w-full flex items-center gap-3 px-3.5 py-2 text-xs font-medium text-left text-rose-400 hover:bg-rose-500/10 hover:text-rose-300 transition-colors"
+                            >
+                              <Trash2 size={14} /> Delete
+                            </button>
+                          )}
+                        </div>
+                      )}
+                    </div>
+                  </div>
+                </div>
+              );
+            })}
+          </div>
         </div>
       )}
 

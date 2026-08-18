@@ -1,4 +1,5 @@
 import { isMobileDevice, getFullCoreCount } from './audioDevice';
+import { explicitReleaseAudioBuffer } from './audioMemory';
 
 export const getPrecalculatedBufferCacheSize = () => {
   if (isMobileDevice()) return 2;
@@ -35,7 +36,11 @@ const pruneAudioBufferCache = (cache: Map<string, AudioBuffer>, maxEntries: numb
   while (cache.size > maxEntries) {
     const oldestKey = cache.keys().next().value;
     if (oldestKey === undefined) break;
+    const buffer = cache.get(oldestKey);
     cache.delete(oldestKey);
+    if (buffer) {
+      explicitReleaseAudioBuffer(buffer);
+    }
   }
 };
 
@@ -74,6 +79,10 @@ export const cacheRenderSignatureBuffer = ({
   if (!enabled) return;
 
   const key = getRenderSignatureCacheKey(trackId, signature);
+  const existingBuffer = cache.get(key);
+  if (existingBuffer && existingBuffer !== buffer) {
+    explicitReleaseAudioBuffer(existingBuffer);
+  }
   cache.delete(key);
   cache.set(key, buffer);
   pruneAudioBufferCache(cache, MAX_RENDER_SIGNATURE_CACHE_ENTRIES);
@@ -102,9 +111,10 @@ export const prunePrecalculatedQueueBuffers = ({
   let nextPrecalculatedBuffer = nextBuffer;
 
   if (preferredAllowedIds.size > 0) {
-    for (const key of cache.keys()) {
+    for (const [key, buffer] of cache.entries()) {
       if (!preferredAllowedIds.has(String(key))) {
         cache.delete(key);
+        explicitReleaseAudioBuffer(buffer);
       }
     }
 
@@ -137,6 +147,10 @@ export const cachePrecalculatedQueueBuffer = ({
   nextBuffer,
   fullQueuePrecalculateCache,
 }: CachePrecalculatedQueueBufferOptions) => {
+  const existingBuffer = cache.get(trackId);
+  if (existingBuffer && existingBuffer !== buffer) {
+    explicitReleaseAudioBuffer(existingBuffer);
+  }
   cache.delete(trackId);
   cache.set(trackId, buffer);
 

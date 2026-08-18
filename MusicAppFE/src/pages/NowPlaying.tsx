@@ -1,10 +1,11 @@
 import { useState, useRef, useEffect, useCallback } from 'react';
 import { useGlobalAudio } from '../context/AudioContext';
 import { useAuth } from '../context/AuthContext';
-import { Disc, Play, Pause, SkipBack, SkipForward, Shuffle, Repeat, Heart, Info, ListPlus, MoreHorizontal, Repeat1, Volume2, VolumeX, BarChart2, Gauge, Music, Check, X, ArrowRight, Square, PauseCircle, ListX, Loader2, Trash2, Cpu, Tags, RefreshCw, MonitorSpeaker, Download, Keyboard, Activity } from 'lucide-react';
+import { Disc, Play, Pause, SkipBack, SkipForward, Shuffle, Repeat, Heart, Info, ListPlus, MoreHorizontal, Repeat1, Volume2, VolumeX, BarChart2, Gauge, Music, Check, X, ArrowRight, Square, PauseCircle, ListX, Loader2, Trash2, Cpu, Tags, RefreshCw, MonitorSpeaker, Download, Keyboard, Activity, Moon } from 'lucide-react';
 import { HorizontalSlider } from '../components/HorizontalSlider';
 import { SpeedPitchPanel } from '../components/SpeedPitchPanel';
 import { useLibrary } from '../context/LibraryContext';
+import { useSleepTimer } from '../context/SleepTimerContext';
 import { LyricsView } from '../components/LyricsView';
 import { AudioVisualizer } from '../components/AudioVisualizer';
 
@@ -26,6 +27,7 @@ export function NowPlaying() {
   const { isAuthenticated } = useAuth();
   const { playerState } = useGlobalAudio();
   const { deleteTrack, favorites, toggleFavorite: libraryToggleFavorite } = useLibrary();
+  const { state: sleepTimerState, openModal: openSleepTimerModal } = useSleepTimer();
   const navigate = useNavigate();
   const {
     isPlaying, isLoadingTrack, currentTrack, currentTime, duration,
@@ -337,12 +339,25 @@ export function NowPlaying() {
           <h2 className="text-xl font-bold font-display text-white tracking-tight">{t('nowPlaying.noTrack')}</h2>
           <p className="text-slate-400 text-xs mt-2 max-w-xs leading-relaxed">{t('nowPlaying.noTrackDesc')}</p>
         </div>
-        <button
-          onClick={() => navigate('/library')}
-          className="px-5 py-2.5 rounded-xl bg-primary text-slate-950 font-bold text-xs shadow-[0_0_20px_rgba(0,245,255,0.35)] hover:shadow-[0_0_30px_rgba(0,245,255,0.5)] transition-all hover:scale-105 active:scale-95"
-        >
-          Open Library
-        </button>
+        <div className="flex items-center gap-3">
+          <button
+            onClick={() => navigate('/library')}
+            className="px-5 py-2.5 rounded-xl bg-primary text-slate-950 font-bold text-xs shadow-[0_0_20px_rgba(0,245,255,0.35)] hover:shadow-[0_0_30px_rgba(0,245,255,0.5)] transition-all hover:scale-105 active:scale-95"
+          >
+            Open Library
+          </button>
+          <button
+            onClick={openSleepTimerModal}
+            className={`px-4 py-2.5 rounded-xl text-xs font-semibold border transition-all flex items-center gap-2 ${
+              sleepTimerState.isActive
+                ? 'bg-primary/20 text-primary border-primary/40 shadow-sm'
+                : 'bg-white/[0.05] hover:bg-white/[0.1] text-slate-300 hover:text-white border-white/[0.08]'
+            }`}
+          >
+            <Moon size={14} className={sleepTimerState.isActive ? 'text-primary animate-pulse' : ''} />
+            <span>{sleepTimerState.isActive ? `${t('sleepTimer.title', 'Hẹn giờ')}: ${formatTime(sleepTimerState.remainingSeconds)}` : t('sleepTimer.title', 'Hẹn Giờ Tắt')}</span>
+          </button>
+        </div>
       </div>
     );
   }
@@ -488,7 +503,6 @@ export function NowPlaying() {
               >
                 <Keyboard size={19} />
               </button>
-
               {hasLyrics && (
                 <button
                   onClick={() => setShowLyrics(!showLyrics)}
@@ -499,6 +513,27 @@ export function NowPlaying() {
                   <span>Lyrics</span>
                 </button>
               )}
+
+              {/* Sleep Timer Action Button */}
+              <button
+                onClick={openSleepTimerModal}
+                className={`transition-all p-2 rounded-xl text-xs font-semibold flex items-center gap-1.5 ${
+                  sleepTimerState.isActive
+                    ? 'text-primary bg-primary/15 border border-primary/30 shadow-[0_0_12px_rgba(0,245,255,0.25)]'
+                    : 'hover:bg-white/[0.05] text-slate-400 hover:text-white'
+                }`}
+                title={t('sleepTimer.title', 'Sleep Timer')}
+                aria-label={t('sleepTimer.title', 'Sleep Timer')}
+              >
+                <Moon size={18} className={sleepTimerState.isActive ? 'text-primary animate-pulse' : ''} />
+                {sleepTimerState.isActive && (
+                  <span className="text-[10px] font-mono font-bold text-primary">
+                    {sleepTimerState.mode === 'time'
+                      ? formatTime(sleepTimerState.remainingSeconds)
+                      : t('sleepTimer.endOfTrack', 'End of Track')}
+                  </span>
+                )}
+              </button>
 
               <button 
                 onClick={() => setShowMetadata(true)} 
@@ -579,6 +614,24 @@ export function NowPlaying() {
                       </div>
                     ) : (
                       <>
+                        {/* Sleep Timer Menu Item */}
+                        <button
+                          onClick={() => {
+                            setShowMenu(false);
+                            openSleepTimerModal();
+                          }}
+                          className="w-full flex items-center justify-between px-4 py-3 text-xs font-medium text-slate-300 hover:bg-white/[0.05] transition-colors border-b border-white/[0.04]"
+                        >
+                          <div className="flex items-center gap-3">
+                            <Moon size={16} className={sleepTimerState.isActive ? 'text-primary' : 'text-slate-400'} />
+                            <span>{t('sleepTimer.title', 'Hẹn Giờ Tắt Nhạc')}</span>
+                          </div>
+                          <span className="text-[10px] font-mono text-primary font-semibold">
+                            {sleepTimerState.isActive
+                              ? (sleepTimerState.mode === 'time' ? formatTime(sleepTimerState.remainingSeconds) : t('sleepTimer.endOfTrack', 'Hết bài'))
+                              : t('sleepTimer.sleepTimerOff', 'Tắt')}
+                          </span>
+                        </button>
                         {/* Speed & Pitch Button */}
                         <button
                           onClick={() => setShowSpeedPitch(true)}

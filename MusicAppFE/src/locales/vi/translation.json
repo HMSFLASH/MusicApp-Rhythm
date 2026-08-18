@@ -260,5 +260,30 @@
     "downloading": "Đang tải...",
     "downloaded": "Đã tải",
     "notCached": "Chưa tải về"
+  },
+  "sleepTimer": {
+    "title": "Hẹn Giờ Tắt Nhạc",
+    "subtitle": "Tự động dừng phát nhạc khi đến giờ",
+    "runningSubtitle": "Nhạc sẽ tự động dừng theo thời gian bên dưới",
+    "activeBadge": "Đang chạy",
+    "presets": "Thời gian đặt sẵn",
+    "minShort": "phút",
+    "minutes": "phút",
+    "endOfTrack": "Hết bài hát hiện tại",
+    "endOfTrackActiveTitle": "Dừng khi hết bài hát hiện tại",
+    "customDuration": "Tùy chỉnh thời gian",
+    "fadeOutTitle": "Giảm dần âm lượng",
+    "fadeOutDesc": "Hạ âm lượng từ từ trong 30 giây cuối để ngủ êm ái",
+    "startTimer": "Bắt đầu hẹn giờ",
+    "startEndOfTrack": "Hẹn giờ: Hết bài hát",
+    "cancel": "Hủy hẹn giờ tắt nhạc",
+    "add5Min": "+5 phút",
+    "add15Min": "+15 phút",
+    "add30Min": "+30 phút",
+    "stopsAt": "Dừng lúc",
+    "stoppedNotification": "Hẹn giờ tắt nhạc: Đã dừng phát nhạc",
+    "openSleepTimer": "Mở Hẹn Giờ Tắt Nhạc",
+    "sleepTimerOff": "Hẹn giờ tắt: Tắt",
+    "sleepTimerActive": "Hẹn giờ tắt: Đang chạy"
   }
 }

@@ -360,5 +360,15 @@ export const renderOfflineAudio = async ({
   connectToNext(offlineCtx.destination);
 
   offlineSource.start(0);
-  return offlineCtx.startRendering();
+  try {
+    const renderedBuffer = await offlineCtx.startRendering();
+    return renderedBuffer;
+  } finally {
+    try {
+      offlineSource.buffer = null;
+      offlineSource.disconnect();
+    } catch {
+      // Ignore cleanup error
+    }
+  }
 };

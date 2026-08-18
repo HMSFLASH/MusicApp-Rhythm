@@ -11,6 +11,9 @@ import { ActionMenu } from '../components/ActionMenu';
 import { useOffline } from '../context/OfflineContext';
 import { downloadTrackFile } from '../utils/downloadUtils';
 import { TrackInfoModal } from '../components/TrackInfoModal';
+import { useVirtualList } from '../hooks/useVirtualList';
+
+const SEARCH_TRACK_ROW_HEIGHT = 72;
 
 export function SearchPage() {
   const navigate = useNavigate();
@@ -24,6 +27,17 @@ export function SearchPage() {
   const [infoTrack, setInfoTrack] = useState<Track | null>(null);
   const [searchResults, setSearchResults] = useState<Track[]>([]);
   const [isSearching, setIsSearching] = useState(false);
+
+  const {
+    containerRef: searchTracksContainerRef,
+    handleScroll: handleSearchTracksScroll,
+    offsetY: searchTracksOffsetY,
+    totalHeight: searchTracksTotalHeight,
+    visibleIndexes: searchTracksVisibleIndexes,
+  } = useVirtualList({
+    itemCount: searchResults.length,
+    itemHeight: SEARCH_TRACK_ROW_HEIGHT,
+  });
 
   // Debounced local search
   useEffect(() => {
@@ -312,76 +326,93 @@ export function SearchPage() {
             {!isSearching && searchResults.length > 0 && (
               <div>
                 <h3 className="text-xs font-semibold text-slate-400 uppercase tracking-widest font-mono mb-3">Songs ({searchResults.length})</h3>
-                <div className="flex flex-col gap-2">
-                  {searchResults.map((track, idx) => {
-                    const isActive = playerState.currentTrack?.id === track.id;
-                    return (
-                      <div
-                        key={track.id}
-                        role="button"
-                        tabIndex={0}
-                        onClick={() => {
-                          if (isOfflineMode && !isCached(track)) return;
-                          playerState.playTrack(track, searchResults);
-                        }}
-                        onKeyDown={(e) => {
-                          if (e.key === 'Enter' || e.key === ' ') {
-                            e.preventDefault();
-                            if (isOfflineMode && !isCached(track)) return;
-                            playerState.playTrack(track, searchResults);
-                          }
-                        }}
-                        className={`flex items-center gap-3 sm:gap-3.5 p-2.5 sm:p-3 rounded-xl border transition-all duration-200 group cursor-pointer ${
-                          isOfflineMode && !isCached(track)
-                            ? 'opacity-40 grayscale pointer-events-none'
-                            : isActive
-                            ? 'bg-primary/15 border-primary/30 text-primary shadow-[inset_0_0_15px_rgba(0,245,255,0.1)]'
-                            : 'bg-white/[0.02] border-white/[0.05] hover:bg-white/[0.06] hover:border-primary/25 backdrop-blur-md'
-                        }`}
-                      >
-                        <div className="w-5 text-center shrink-0">
-                          {isActive && playerState.isPlaying ? (
-                            <div className="flex items-end justify-center gap-0.5 h-3">
-                              <span className="w-0.5 bg-primary rounded-full animate-eq-1" />
-                              <span className="w-0.5 bg-primary rounded-full animate-eq-2" />
-                              <span className="w-0.5 bg-primary rounded-full animate-eq-3" />
+                <div
+                  ref={searchTracksContainerRef}
+                  onScroll={handleSearchTracksScroll}
+                  className="relative w-full"
+                  style={{ height: searchTracksTotalHeight }}
+                >
+                  <div
+                    className="absolute inset-x-0 top-0 will-change-transform"
+                    style={{ transform: `translateY(${searchTracksOffsetY}px)` }}
+                  >
+                    {searchTracksVisibleIndexes.map((idx) => {
+                      const track = searchResults[idx];
+                      if (!track) return null;
+                      const isActive = playerState.currentTrack?.id === track.id;
+                      return (
+                        <div
+                          key={track.id}
+                          style={{ height: SEARCH_TRACK_ROW_HEIGHT }}
+                          className="relative"
+                        >
+                          <div
+                            role="button"
+                            tabIndex={0}
+                            onClick={() => {
+                              if (isOfflineMode && !isCached(track)) return;
+                              playerState.playTrack(track, searchResults);
+                            }}
+                            onKeyDown={(e) => {
+                              if (e.key === 'Enter' || e.key === ' ') {
+                                e.preventDefault();
+                                if (isOfflineMode && !isCached(track)) return;
+                                playerState.playTrack(track, searchResults);
+                              }
+                            }}
+                            className={`flex h-[64px] items-center gap-3 sm:gap-3.5 p-2.5 sm:p-3 rounded-xl border transition-all duration-200 group cursor-pointer ${
+                              isOfflineMode && !isCached(track)
+                                ? 'opacity-40 grayscale pointer-events-none'
+                                : isActive
+                                ? 'bg-primary/15 border-primary/30 text-primary shadow-[inset_0_0_15px_rgba(0,245,255,0.1)]'
+                                : 'bg-white/[0.02] border-white/[0.05] hover:bg-white/[0.06] hover:border-primary/25 backdrop-blur-md'
+                            }`}
+                          >
+                            <div className="w-5 text-center shrink-0">
+                              {isActive && playerState.isPlaying ? (
+                                <div className="flex items-end justify-center gap-0.5 h-3">
+                                  <span className="w-0.5 bg-primary rounded-full animate-eq-1" />
+                                  <span className="w-0.5 bg-primary rounded-full animate-eq-2" />
+                                  <span className="w-0.5 bg-primary rounded-full animate-eq-3" />
+                                </div>
+                              ) : (
+                                <span className="hidden sm:block text-[11px] font-mono text-slate-500">{idx + 1}</span>
+                              )}
                             </div>
-                          ) : (
-                            <span className="hidden sm:block text-[11px] font-mono text-slate-500">{idx + 1}</span>
-                          )}
-                        </div>
-                        <button onClick={(e) => { e.stopPropagation(); playerState.playTrack(track, searchResults); }}
-                          className="hidden lg:group-hover:flex w-5 items-center justify-center text-primary pointer-events-auto">
-                          <Play size={13} fill="currentColor" />
-                        </button>
-                        <div className="flex flex-col truncate flex-1 pr-2">
-                          <span className={`text-xs sm:text-sm font-semibold truncate ${isActive ? 'text-primary' : 'text-slate-100'}`}>
-                            {track.title || playerState.getTrackMetadata(track.id)?.title || (track.fileName ? (track.fileName.includes(' - ') ? track.fileName.split(' - ')[1].replace(/\.[^/.]+$/, "") : track.fileName.replace(/\.[^/.]+$/, "")) : 'Unknown Title')}
-                          </span>
-                          <span className="text-[11px] text-slate-400 font-mono mt-0.5 flex items-center gap-1.5 truncate">
-                            {track.sourceType === 'DRIVE' && (
-                              <span className="inline-flex items-center gap-0.5 text-primary text-[10px] bg-primary/10 px-1 py-0.2 rounded border border-primary/20 shrink-0">
-                                Drive
+                            <button onClick={(e) => { e.stopPropagation(); playerState.playTrack(track, searchResults); }}
+                              className="hidden lg:group-hover:flex w-5 items-center justify-center text-primary pointer-events-auto">
+                              <Play size={13} fill="currentColor" />
+                            </button>
+                            <div className="flex flex-col truncate flex-1 pr-2">
+                              <span className={`text-xs sm:text-sm font-semibold truncate ${isActive ? 'text-primary' : 'text-slate-100'}`}>
+                                {track.title || playerState.getTrackMetadata(track.id)?.title || (track.fileName ? (track.fileName.includes(' - ') ? track.fileName.split(' - ')[1].replace(/\.[^/.]+$/, "") : track.fileName.replace(/\.[^/.]+$/, "")) : 'Unknown Title')}
                               </span>
-                            )}
-                            <span className="truncate">{track.artist || playerState.getTrackMetadata(track.id)?.artist || (track.fileName?.includes(' - ') ? track.fileName.split(' - ')[0] : 'Unknown Artist')}</span>
-                          </span>
+                              <span className="text-[11px] text-slate-400 font-mono mt-0.5 flex items-center gap-1.5 truncate">
+                                {track.sourceType === 'DRIVE' && (
+                                  <span className="inline-flex items-center gap-0.5 text-primary text-[10px] bg-primary/10 px-1 py-0.2 rounded border border-primary/20 shrink-0">
+                                    Drive
+                                  </span>
+                                )}
+                                <span className="truncate">{track.artist || playerState.getTrackMetadata(track.id)?.artist || (track.fileName?.includes(' - ') ? track.fileName.split(' - ')[0] : 'Unknown Artist')}</span>
+                              </span>
+                            </div>
+                            <ActionMenu
+                              ariaLabel={`Song actions for ${track.title || track.fileName}`}
+                              buttonClassName="p-1.5 text-slate-400 hover:text-white hover:bg-white/10 rounded-lg transition-colors"
+                              actions={[
+                                { label: 'Info', icon: <Info size={14} />, onSelect: () => setInfoTrack(track) },
+                                { label: 'Add to Playlist', icon: <ListPlus size={14} />, onSelect: () => setTrackToPlaylist(track) },
+                                ...(track.sourceType !== 'LOCAL'
+                                  ? [{ label: 'Download File', icon: <Download size={14} />, onSelect: () => downloadTrackFile(track) },
+                                     { label: 'Delete', icon: <Trash2 size={14} />, tone: 'danger' as const, onSelect: () => void handleDeleteTrack(track) }]
+                                  : []),
+                              ]}
+                            />
+                          </div>
                         </div>
-                        <ActionMenu
-                          ariaLabel={`Song actions for ${track.title || track.fileName}`}
-                          buttonClassName="p-1.5 text-slate-400 hover:text-white hover:bg-white/10 rounded-lg transition-colors"
-                          actions={[
-                            { label: 'Info', icon: <Info size={14} />, onSelect: () => setInfoTrack(track) },
-                            { label: 'Add to Playlist', icon: <ListPlus size={14} />, onSelect: () => setTrackToPlaylist(track) },
-                            ...(track.sourceType !== 'LOCAL'
-                              ? [{ label: 'Download File', icon: <Download size={14} />, onSelect: () => downloadTrackFile(track) },
-                                 { label: 'Delete', icon: <Trash2 size={14} />, tone: 'danger' as const, onSelect: () => void handleDeleteTrack(track) }]
-                              : []),
-                          ]}
-                        />
-                      </div>
-                    );
-                  })}
+                      );
+                    })}
+                  </div>
                 </div>
               </div>
             )}

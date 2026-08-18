@@ -24,5 +24,8 @@ export const decodeAacToAudioBuffer = async (
     audioBuffer.copyToChannel(channel, index);
   });
 
+  // Explicit cleanup of intermediate decoded channel references
+  channelData.length = 0;
+
   return audioBuffer;
 };
