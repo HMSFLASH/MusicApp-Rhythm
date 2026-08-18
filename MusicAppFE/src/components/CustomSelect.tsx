@@ -18,7 +18,7 @@ export type CustomSelectProps<T extends string | number> = {
   placeholder?: string;
   disabled?: boolean;
   align?: 'left' | 'right';
-  direction?: 'up' | 'down';
+  direction?: 'up' | 'down' | 'auto';
   className?: string;
   buttonClassName?: string;
   menuClassName?: string;
@@ -38,7 +38,7 @@ export function CustomSelect<T extends string | number>({
   placeholder = 'Select...',
   disabled = false,
   align = 'left',
-  direction = 'down',
+  direction = 'auto',
   className = '',
   buttonClassName = '',
   menuClassName = '',
@@ -48,9 +48,26 @@ export function CustomSelect<T extends string | number>({
   size = 'sm',
 }: CustomSelectProps<T>) {
   const [isOpen, setIsOpen] = useState(false);
+  const [openUpwards, setOpenUpwards] = useState(direction === 'up');
   const containerRef = useRef<HTMLDivElement>(null);
 
   const selectedOption = options.find((opt) => opt.value === value);
+
+  useEffect(() => {
+    if (isOpen && containerRef.current) {
+      if (direction === 'up') {
+        setOpenUpwards(true);
+      } else if (direction === 'down') {
+        setOpenUpwards(false);
+      } else {
+        const rect = containerRef.current.getBoundingClientRect();
+        const estimatedHeight = Math.min(options.length * 40 + 20, 250);
+        const spaceBelow = window.innerHeight - rect.bottom;
+        const spaceAbove = rect.top;
+        setOpenUpwards(spaceBelow < estimatedHeight && spaceAbove > spaceBelow);
+      }
+    }
+  }, [isOpen, direction, options.length]);
 
   useEffect(() => {
     const handlePointerDown = (event: PointerEvent) => {
@@ -115,7 +132,7 @@ export function CustomSelect<T extends string | number>({
     : 'bg-transparent border border-transparent hover:bg-white/[0.05]';
 
   return (
-    <div ref={containerRef} className={`relative inline-block ${className}`}>
+    <div ref={containerRef} className={`relative inline-block ${isOpen ? 'z-40' : ''} ${className}`}>
       <button
         type="button"
         disabled={disabled}
@@ -154,7 +171,7 @@ export function CustomSelect<T extends string | number>({
         <div
           role="listbox"
           className={`absolute ${align === 'right' ? 'right-0' : 'left-0'} ${
-            direction === 'up' ? 'bottom-full mb-2' : 'top-full mt-2'
+            openUpwards ? 'bottom-full mb-2' : 'top-full mt-2'
           } min-w-full w-max max-w-[calc(100vw-2rem)] sm:max-w-xs bg-[#0c1626]/98 border border-white/[0.12] rounded-2xl shadow-[0_20px_50px_rgba(0,0,0,0.85)] z-50 py-1.5 backdrop-blur-2xl max-h-60 overflow-y-auto no-scrollbar animate-in zoom-in-95 fade-in duration-200 ${menuClassName}`}
           onClick={(e) => e.stopPropagation()}
         >

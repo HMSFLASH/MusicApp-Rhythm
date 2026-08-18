@@ -672,10 +672,12 @@ export function OfflineStorageManager() {
   return (
     <div className="flex flex-col gap-6 w-full">
       {/* Storage Hero Card */}
-      <div className="relative overflow-hidden rounded-3xl bg-gradient-to-br from-[#0c192c]/90 via-[#0a1220]/90 to-[#070e1a]/95 border border-primary/25 p-5 md:p-7 shadow-[0_12px_40px_rgba(0,0,0,0.5)] backdrop-blur-xl">
+      <div className="relative rounded-3xl bg-gradient-to-br from-[#0c192c]/90 via-[#0a1220]/90 to-[#070e1a]/95 border border-primary/25 p-5 md:p-7 shadow-[0_12px_40px_rgba(0,0,0,0.5)] backdrop-blur-xl">
         {/* Glow ambient background */}
-        <div className="absolute top-0 right-0 w-80 h-80 bg-primary/10 rounded-full blur-[100px] pointer-events-none" />
-        <div className="absolute -bottom-10 -left-10 w-80 h-80 bg-indigo-600/10 rounded-full blur-[100px] pointer-events-none" />
+        <div className="absolute inset-0 overflow-hidden rounded-3xl pointer-events-none">
+          <div className="absolute top-0 right-0 w-80 h-80 bg-primary/10 rounded-full blur-[100px] pointer-events-none" />
+          <div className="absolute -bottom-10 -left-10 w-80 h-80 bg-indigo-600/10 rounded-full blur-[100px] pointer-events-none" />
+        </div>
 
         {/* Card Header & Actions */}
         <div className="relative z-10 flex flex-col md:flex-row md:items-center justify-between gap-4 pb-5 border-b border-white/[0.08]">

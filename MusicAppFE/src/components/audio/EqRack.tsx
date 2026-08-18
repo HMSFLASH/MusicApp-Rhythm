@@ -312,9 +312,9 @@ export function EqRack() {
   );
 
   return (
-    <div className="bg-[#0c1626]/80 rounded-3xl border border-white/[0.08] shadow-[0_15px_40px_rgba(0,0,0,0.5)] flex flex-col overflow-hidden w-full backdrop-blur-2xl">
+    <div className="bg-[#0c1626]/80 rounded-3xl border border-white/[0.08] shadow-[0_15px_40px_rgba(0,0,0,0.5)] flex flex-col w-full backdrop-blur-2xl">
       {/* EQ Header */}
-      <div className="flex flex-col md:flex-row md:items-center justify-between gap-4 p-4 sm:p-6 border-b border-white/[0.06] bg-white/[0.02]">
+      <div className="flex flex-col md:flex-row md:items-center justify-between gap-4 p-4 sm:p-6 border-b border-white/[0.06] bg-white/[0.02] rounded-t-3xl">
         <div className="flex items-center justify-between md:justify-start w-full md:w-auto gap-4">
           <EffectPowerButton
             size="lg"
