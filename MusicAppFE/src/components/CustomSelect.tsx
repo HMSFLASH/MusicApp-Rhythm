@@ -132,7 +132,7 @@ export function CustomSelect<T extends string | number>({
     : 'bg-transparent border border-transparent hover:bg-white/[0.05]';
 
   return (
-    <div ref={containerRef} className={`relative inline-block ${isOpen ? 'z-40' : ''} ${className}`}>
+    <div ref={containerRef} className={`relative inline-block ${isOpen ? 'z-50' : ''} ${className}`}>
       <button
         type="button"
         disabled={disabled}

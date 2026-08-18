@@ -680,7 +680,7 @@ export function OfflineStorageManager() {
         </div>
 
         {/* Card Header & Actions */}
-        <div className="relative z-10 flex flex-col md:flex-row md:items-center justify-between gap-4 pb-5 border-b border-white/[0.08]">
+        <div className="relative z-30 flex flex-col md:flex-row md:items-center justify-between gap-4 pb-5 border-b border-white/[0.08]">
           <div className="flex items-center gap-3.5 min-w-0">
             <div className="w-11 h-11 sm:w-12 sm:h-12 rounded-2xl bg-gradient-to-br from-primary/25 to-cyan-500/10 border border-primary/40 flex items-center justify-center text-primary shadow-[0_0_20px_rgba(0,245,255,0.3)] shrink-0">
               <HardDrive size={22} className="sm:w-6 sm:h-6" />
@@ -822,7 +822,7 @@ export function OfflineStorageManager() {
       {/* Main Content Area: Tabs, Search, Multi-select toolbar */}
       <div className="flex flex-col gap-4">
         {/* Navigation Mode Tabs & Search Bar */}
-        <div className="flex flex-col lg:flex-row items-stretch lg:items-center justify-between gap-3.5">
+        <div className="relative z-20 flex flex-col lg:flex-row items-stretch lg:items-center justify-between gap-3.5">
           {/* Subtabs */}
           <div className="flex gap-1 overflow-x-auto rounded-2xl border border-white/[0.08] bg-[#0c1626]/80 p-1.5 backdrop-blur-xl shadow-lg no-scrollbar w-full lg:w-auto max-w-full">
             <button
