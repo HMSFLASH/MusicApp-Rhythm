@@ -8,6 +8,8 @@ import { useLibrary } from '../context/LibraryContext';
 import { useSleepTimer } from '../context/SleepTimerContext';
 import { LyricsView } from '../components/LyricsView';
 import { AudioVisualizer } from '../components/AudioVisualizer';
+import { MeshAmbientGlow } from '../components/MeshAmbientGlow';
+import { useArtworkPalette } from '../hooks/useArtworkPalette';
 
 import { useNavigate } from 'react-router-dom';
 import { useTranslation } from 'react-i18next';
@@ -42,6 +44,7 @@ export function NowPlaying() {
     hasNext, hasPrevious
   } = playerState;
   const currentArtwork = currentTrack ? (currentTrack.imageUrl || playerState.getTrackImage(currentTrack.id)) : '';
+  const { palette } = useArtworkPalette(currentArtwork);
   const pageScrollRef = useRef<HTMLDivElement>(null);
   const queueContainerRef = useRef<HTMLDivElement>(null);
   const activeQueueTrackRef = useRef<HTMLDivElement>(null);
@@ -182,7 +185,7 @@ export function NowPlaying() {
   // Metadata Modal state
   const [showMetadata, setShowMetadata] = useState(false);
   // Lyrics Modal state
-    const [showLyrics, setShowLyrics] = useState(false);
+  const [showLyrics, setShowLyrics] = useState(false);
   // Visualizer Mode state
   const [visualizerMode, setVisualizerMode] = useState<'bars' | 'wave' | 'off'>('bars');
 
@@ -364,6 +367,9 @@ export function NowPlaying() {
 
   return (
     <div ref={pageScrollRef} className="h-full overflow-y-auto w-full no-scrollbar relative" onScroll={handleScroll}>
+      {/* Apple Music / Spotify Style Mesh Ambient Glow */}
+      <MeshAmbientGlow palette={palette} isPlaying={isPlaying} />
+
       <div className="flex flex-col lg:flex-row items-start justify-center max-w-6xl 2xl:max-w-[1400px] 3xl:max-w-[1600px] 4k:max-w-[2000px] mx-auto w-full gap-8 md:gap-12 py-3 md:py-6 pb-28 md:pb-32 relative z-10">
 
         {/* Left Side: Player */}
@@ -386,8 +392,16 @@ export function NowPlaying() {
             </div>
 
             <div className={`w-full h-full relative ${showLyrics && hasLyrics ? 'hidden' : 'block'}`}>
-              {/* Dynamic Vinyl Ambient Aura */}
-              <div className={`absolute inset-0 rounded-full blur-3xl transition-opacity duration-700 pointer-events-none ${isPlaying ? 'bg-primary/20 scale-110 opacity-100' : 'opacity-0 scale-90'}`} />
+              {/* Dynamic Vinyl Ambient Aura with extracted palette */}
+              <div
+                className={`absolute inset-0 rounded-full blur-3xl transition-all duration-700 pointer-events-none ${
+                  isPlaying ? 'scale-110 opacity-100' : 'opacity-0 scale-90'
+                }`}
+                style={{
+                  background: `radial-gradient(circle, rgba(${palette.rgbPrimary}, 0.35) 0%, rgba(${palette.rgbSecondary}, 0.18) 55%, transparent 75%)`,
+                  filter: 'blur(36px)',
+                }}
+              />
 
               {currentArtwork ? (
                 <div
@@ -419,8 +433,17 @@ export function NowPlaying() {
                     <div className="absolute inset-16 rounded-full border border-white/[0.03]" />
 
                     {/* Center Label */}
-                    <div className="absolute z-10 w-1/3 h-1/3 bg-gradient-to-br from-primary/30 to-indigo-600/30 backdrop-blur-md rounded-full flex items-center justify-center border-2 border-primary/40 top-1/2 left-1/2 -translate-x-1/2 -translate-y-1/2 shadow-lg">
-                      <Disc size={28} className="text-primary drop-shadow-[0_0_8px_rgba(0,245,255,0.6)]" />
+                    <div
+                      className="absolute z-10 w-1/3 h-1/3 backdrop-blur-md rounded-full flex items-center justify-center border-2 top-1/2 left-1/2 -translate-x-1/2 -translate-y-1/2 shadow-lg"
+                      style={{
+                        background: `linear-gradient(135deg, rgba(${palette.rgbPrimary}, 0.3), rgba(${palette.rgbSecondary}, 0.3))`,
+                        borderColor: `rgba(${palette.rgbPrimary}, 0.5)`,
+                      }}
+                    >
+                      <Disc
+                        size={28}
+                        style={{ color: palette.primary, filter: `drop-shadow(0 0 8px ${palette.primary})` }}
+                      />
                     </div>
 
                     {/* Inner hole */}
@@ -446,7 +469,7 @@ export function NowPlaying() {
             </div>
           </div>
 
-          {/* Real-time Spectrum Audio Visualizer */}
+          {/* Real-time Spectrum Audio Visualizer with Adaptive Colors */}
           {visualizerMode !== 'off' && (
             <div className="w-full max-w-md px-4 my-1 animate-in fade-in duration-300">
               <div className="p-3 rounded-2xl bg-white/[0.02] border border-white/[0.05] backdrop-blur-md shadow-inner flex flex-col items-center">
@@ -455,8 +478,8 @@ export function NowPlaying() {
                   isPlaying={isPlaying}
                   mode={visualizerMode === 'wave' ? 'wave' : 'bars'}
                   className="w-full h-12"
-                  barColor="#00f5ff"
-                  glowColor="rgba(0, 245, 255, 0.5)"
+                  barColor={palette.primary}
+                  glowColor={palette.glow}
                 />
               </div>
             </div>
@@ -951,7 +974,7 @@ export function NowPlaying() {
               </button>
             </div>
 
-            {/* Seek Bar */}
+            {/* Seek Bar with Dynamic Palette */}
             <div className="flex items-center gap-3 font-mono text-xs font-semibold text-slate-400 mb-6 select-none relative">
               <span className="min-w-[36px] text-right">{formatTime(displayTime)}</span>
               <div
@@ -961,13 +984,21 @@ export function NowPlaying() {
               >
                 <div className="absolute inset-x-0 h-1.5 group-hover:h-2 bg-white/10 rounded-full overflow-hidden transition-all">
                   <div
-                    className="h-full bg-gradient-to-r from-cyan-400 to-primary shadow-[0_0_12px_rgba(0,245,255,0.5)] transition-colors"
-                    style={{ width: `${displayPercent}%` }}
+                    className="h-full transition-all duration-150"
+                    style={{
+                      width: `${displayPercent}%`,
+                      background: `linear-gradient(to right, ${palette.primary}, ${palette.secondary})`,
+                      boxShadow: `0 0 12px ${palette.glow}`,
+                    }}
                   />
                 </div>
                 <div
-                  className={`absolute h-4 w-4 bg-white rounded-full shadow-[0_0_12px_rgba(0,245,255,0.8)] border border-primary flex items-center justify-center transition-all ${isDraggingProgress ? 'opacity-100 scale-110' : 'opacity-0 group-hover:opacity-100'}`}
-                  style={{ left: `calc(${displayPercent}% - 8px)` }}
+                  className={`absolute h-4 w-4 bg-white rounded-full transition-all ${isDraggingProgress ? 'opacity-100 scale-110' : 'opacity-0 group-hover:opacity-100'}`}
+                  style={{
+                    left: `calc(${displayPercent}% - 8px)`,
+                    border: `2px solid ${palette.primary}`,
+                    boxShadow: `0 0 12px ${palette.primary}`,
+                  }}
                 />
               </div>
               <span className="min-w-[36px] text-left">{formatTime(duration)}</span>
@@ -993,7 +1024,7 @@ export function NowPlaying() {
                       step={1}
                       onChange={(val) => setVolume(val / 100)}
                       label="Volume"
-                      color="#00f5ff"
+                      color={palette.primary}
                       unit="%"
                     />
                   </div>
@@ -1016,8 +1047,12 @@ export function NowPlaying() {
                   className={`w-14 h-14 md:w-16 md:h-16 rounded-full flex items-center justify-center text-slate-950 transition-all ${
                     isLoadingTrack 
                       ? 'bg-slate-700 text-slate-400 cursor-not-allowed' 
-                      : 'bg-primary shadow-[0_0_25px_rgba(0,245,255,0.45)] hover:shadow-[0_0_35px_rgba(0,245,255,0.7)] hover:scale-105 active:scale-95'
+                      : 'hover:scale-105 active:scale-95'
                   }`}
+                  style={!isLoadingTrack ? {
+                    backgroundColor: palette.primary,
+                    boxShadow: `0 0 25px rgba(${palette.rgbPrimary}, 0.5), 0 0 45px rgba(${palette.rgbSecondary}, 0.25)`,
+                  } : undefined}
                 >
                   {isLoadingTrack ? (
                     <Loader2 size={28} className="animate-spin text-slate-400" />

@@ -107,6 +107,70 @@ textarea {
   animation: eq-dance-3 0.9s ease-in-out infinite 0.3s;
 }
 
+/* Ambient Mesh Glow Animations */
+@keyframes ambient-float-1 {
+  0% {
+    transform: translate3d(0, 0, 0) scale(1) rotate(0deg);
+  }
+  50% {
+    transform: translate3d(8%, 12%, 0) scale(1.18) rotate(45deg);
+  }
+  100% {
+    transform: translate3d(-6%, 6%, 0) scale(0.92) rotate(-30deg);
+  }
+}
+
+@keyframes ambient-float-2 {
+  0% {
+    transform: translate3d(0, 0, 0) scale(1) rotate(0deg);
+  }
+  50% {
+    transform: translate3d(-10%, -8%, 0) scale(1.22) rotate(-60deg);
+  }
+  100% {
+    transform: translate3d(6%, 10%, 0) scale(0.95) rotate(40deg);
+  }
+}
+
+@keyframes ambient-float-3 {
+  0% {
+    transform: translate3d(0, 0, 0) scale(1);
+  }
+  50% {
+    transform: translate3d(12%, -10%, 0) scale(1.15);
+  }
+  100% {
+    transform: translate3d(-8%, -5%, 0) scale(0.9);
+  }
+}
+
+@keyframes ambient-pulse-slow {
+  0%, 100% {
+    opacity: 0.75;
+    transform: scale(1);
+  }
+  50% {
+    opacity: 1;
+    transform: scale(1.08);
+  }
+}
+
+.animate-ambient-1 {
+  animation: ambient-float-1 20s cubic-bezier(0.4, 0, 0.2, 1) infinite alternate;
+}
+
+.animate-ambient-2 {
+  animation: ambient-float-2 26s cubic-bezier(0.4, 0, 0.2, 1) infinite alternate;
+}
+
+.animate-ambient-3 {
+  animation: ambient-float-3 22s cubic-bezier(0.4, 0, 0.2, 1) infinite alternate;
+}
+
+.animate-ambient-pulse {
+  animation: ambient-pulse-slow 8s ease-in-out infinite;
+}
+
 /* Vinyl Aura Effect */
 .vinyl-disc-aura {
   position: relative;
