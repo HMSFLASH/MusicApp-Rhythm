@@ -1,9 +1,10 @@
 import { getSecureRandom } from '../utils/randomUtils';
 import { useState, useRef } from 'react';
 import { useNavigate, useSearchParams } from 'react-router-dom';
-import { Heart, ListMusic, ListPlus, Play, ArrowLeft, Shuffle, MoreHorizontal, Info, X, ListEnd, ListStart, RefreshCw, Trash2, Cpu, ChevronDown, CheckSquare, Square, Download, DownloadCloud, Loader2, CheckCircle2 } from 'lucide-react';
+import { Heart, ListMusic, ListPlus, Play, ArrowLeft, Shuffle, MoreHorizontal, Info, X, ListEnd, ListStart, RefreshCw, Trash2, Cpu, ChevronDown, CheckSquare, Square, Download, DownloadCloud, Loader2, CheckCircle2, Layers } from 'lucide-react';
 import { useTranslation } from 'react-i18next';
 import { AddToPlaylistModal } from '../components/AddToPlaylistModal';
+import { AddToQueueModal } from '../components/AddToQueueModal';
 import { useGlobalAudio } from '../context/AudioContext';
 import { useAuth } from '../context/AuthContext';
 import type { Track } from '../hooks/useAudioPlayer';
@@ -38,6 +39,7 @@ export function TracksPage() {
   const [isSortMenuOpen, setIsSortMenuOpen] = useState(false);
   const [selectedTrackIds, setSelectedTrackIds] = useState<Set<string>>(new Set());
   const [tracksToPlaylist, setTracksToPlaylist] = useState<Track[] | null>(null);
+  const [tracksToMultiQueue, setTracksToMultiQueue] = useState<Track[] | null>(null);
   const longPressTimer = useRef<NodeJS.Timeout | null>(null);
   const isLongPressTriggered = useRef(false);
 
@@ -430,6 +432,7 @@ export function TracksPage() {
               ariaLabel="Batch actions"
               buttonClassName="p-1.5 rounded-lg bg-white/5 hover:bg-white/10 text-white flex items-center justify-center transition-colors"
               actions={[
+                { label: 'Thêm vào Đa Hàng Đợi...', icon: <Layers size={16} />, onSelect: () => setTracksToMultiQueue(displayTracks.filter(t => selectedTrackIds.has(String(t.id)))) },
                 { label: 'Add to Queue', icon: <ListEnd size={16} />, onSelect: handleBatchAddToQueue },
                 { label: 'Add to Playlist', icon: <ListPlus size={16} />, onSelect: () => setTracksToPlaylist(displayTracks.filter(t => selectedTrackIds.has(String(t.id)))) },
                 { label: 'Add to Favorites', icon: <Heart size={16} />, onSelect: handleBatchAddToFavorites },
@@ -569,6 +572,12 @@ export function TracksPage() {
                             <ListEnd size={14} className="text-cyan-400" /> {t('tracks.addToQueue', 'Add to Queue')}
                           </button>
                           <button
+                            onClick={(e) => { e.stopPropagation(); setTracksToMultiQueue([track]); setOpenMenuId(null); }}
+                            className="w-full flex items-center gap-3 px-3.5 py-2 text-xs font-medium text-left text-slate-200 hover:bg-white/[0.06] hover:text-white transition-colors"
+                          >
+                            <Layers size={14} className="text-cyan-400" /> Thêm vào Đa Hàng Đợi...
+                          </button>
+                          <button
                             onClick={(e) => { e.stopPropagation(); setTrackToPlaylist(track); setOpenMenuId(null); }}
                             className="w-full flex items-center gap-3 px-3.5 py-2 text-xs font-medium text-left text-slate-200 hover:bg-white/[0.06] hover:text-white transition-colors"
                           >
@@ -695,6 +704,14 @@ export function TracksPage() {
           onClose={() => setInfoTrack(null)}
         />
       )}
+
+      {/* Add To Multi-Queue Modal */}
+      <AddToQueueModal
+        isOpen={!!tracksToMultiQueue}
+        tracks={tracksToMultiQueue || []}
+        currentPlayingTrackId={playerState.currentTrack?.id ? String(playerState.currentTrack.id) : null}
+        onClose={() => setTracksToMultiQueue(null)}
+      />
     </div>
   );
 }

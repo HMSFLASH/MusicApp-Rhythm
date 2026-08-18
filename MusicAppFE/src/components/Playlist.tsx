@@ -3,10 +3,11 @@ import { useState, useEffect } from 'react';
 import { useSearchParams } from 'react-router-dom';
 import { useTranslation } from 'react-i18next';
 import type { Track } from '../hooks/useAudioPlayer';
-import { Cloud, Play, Plus, ListMusic, ChevronLeft, Trash2, ListPlus, X, Shuffle, Pencil, Check, MoreHorizontal, Heart, Info, ListStart, ListEnd, Download } from 'lucide-react';
+import { Cloud, Play, Plus, ListMusic, ChevronLeft, Trash2, ListPlus, X, Shuffle, Pencil, Check, MoreHorizontal, Heart, Info, ListStart, ListEnd, Download, Layers } from 'lucide-react';
 import { CreatePlaylistModal } from './CreatePlaylistModal';
 import { AddTracksModal } from './AddTracksModal';
 import { TrackInfoModal } from './TrackInfoModal';
+import { AddToQueueModal } from './AddToQueueModal';
 import { axiosClient } from '../api/axiosClient';
 import { useGlobalAudio } from '../context/AudioContext';
 import { db } from '../lib/db';
@@ -80,6 +81,7 @@ export function Playlist({ isAuthenticated, onPlay, currentTrackId }: PlaylistPr
   const [editListName, setEditListName] = useState('');
   const [openMenuId, setOpenMenuId] = useState<string | null>(null);
   const [infoTrack, setInfoTrack] = useState<Track | null>(null);
+  const [tracksToMultiQueue, setTracksToMultiQueue] = useState<Track[] | null>(null);
 
   const playlistTracks = selectedPlaylistDetails?.tracks || [];
   const {
@@ -623,6 +625,12 @@ export function Playlist({ isAuthenticated, onPlay, currentTrackId }: PlaylistPr
                                 >
                                   <ListEnd size={14} className="text-slate-400" /> {t('tracks.addToQueue', 'Add to Queue')}
                                 </button>
+                                <button
+                                  onClick={(e) => { e.stopPropagation(); setTracksToMultiQueue([track]); setOpenMenuId(null); }}
+                                  className="w-full flex items-center gap-3 px-3.5 py-2 text-xs font-medium text-left text-cyan-300 hover:text-white hover:bg-white/[0.08] transition-colors"
+                                >
+                                  <Layers size={14} /> Thêm vào Đa Hàng Đợi...
+                                </button>
                                 {track.sourceType !== 'LOCAL' && (
                                   <button
                                     onClick={(e) => { e.stopPropagation(); downloadTrackFile(track); setOpenMenuId(null); }}
@@ -676,6 +684,14 @@ export function Playlist({ isAuthenticated, onPlay, currentTrackId }: PlaylistPr
           onClose={() => setInfoTrack(null)}
         />
       )}
+
+      {/* Add To Multi-Queue Modal */}
+      <AddToQueueModal
+        isOpen={!!tracksToMultiQueue}
+        tracks={tracksToMultiQueue || []}
+        currentPlayingTrackId={playerState.currentTrack?.id ? String(playerState.currentTrack.id) : null}
+        onClose={() => setTracksToMultiQueue(null)}
+      />
     </div>
   );
 }
