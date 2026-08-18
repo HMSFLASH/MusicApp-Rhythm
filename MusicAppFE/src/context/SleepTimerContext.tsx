@@ -61,6 +61,16 @@ export function SleepTimerProvider({ children }: { children: ReactNode }) {
   isPlayingRef.current = isPlaying;
   const volumeRef = useRef(volume);
   volumeRef.current = volume;
+  const togglePlayRef = useRef(togglePlay);
+  togglePlayRef.current = togglePlay;
+  const setVolumeRef = useRef(setVolume);
+  setVolumeRef.current = setVolume;
+  const toastRef = useRef(toast);
+  toastRef.current = toast;
+  const tRef = useRef(t);
+  tRef.current = t;
+  const fadeOutRef = useRef(fadeOut);
+  fadeOutRef.current = fadeOut;
 
   useEffect(() => {
     currentTrackIdRef.current = currentTrack?.id ?? null;
@@ -77,10 +87,10 @@ export function SleepTimerProvider({ children }: { children: ReactNode }) {
 
   const restoreVolume = useCallback(() => {
     if (baseVolumeRef.current !== null) {
-      setVolume(baseVolumeRef.current);
+      setVolumeRef.current?.(baseVolumeRef.current);
       baseVolumeRef.current = null;
     }
-  }, [setVolume]);
+  }, []);
 
   const cancelTimer = useCallback(() => {
     restoreVolume();
@@ -127,7 +137,7 @@ export function SleepTimerProvider({ children }: { children: ReactNode }) {
       const nextTarget = targetTimestamp + addedSec * 1000;
       setTargetTimestamp(nextTarget);
       setTotalDurationSeconds(prev => prev + addedSec);
-      setRemainingSeconds(prev => prev + addedSec);
+      setRemainingSeconds(Math.max(0, Math.ceil((nextTarget - Date.now()) / 1000)));
       if (baseVolumeRef.current !== null) {
         restoreVolume();
       }
@@ -140,7 +150,7 @@ export function SleepTimerProvider({ children }: { children: ReactNode }) {
   useEffect(() => {
     if (mode !== 'time' || !targetTimestamp) return;
 
-    const interval = setInterval(() => {
+    const tick = () => {
       const now = Date.now();
       const diffMs = targetTimestamp - now;
       const leftSec = Math.max(0, Math.ceil(diffMs / 1000));
@@ -149,37 +159,40 @@ export function SleepTimerProvider({ children }: { children: ReactNode }) {
       if (leftSec <= 0) {
         // Stop playback
         if (isPlayingRef.current) {
-          togglePlay();
+          togglePlayRef.current?.();
         }
         restoreVolume();
         setMode('off');
         setTargetTimestamp(null);
         setTotalDurationSeconds(0);
         setRemainingSeconds(0);
-        toast.info(t('sleepTimer.stoppedNotification', 'Hẹn giờ tắt nhạc: Đã dừng phát nhạc'));
+        toastRef.current.info(tRef.current('sleepTimer.stoppedNotification', 'Hẹn giờ tắt nhạc: Đã dừng phát nhạc'));
         return;
       }
 
       // Smooth Fade-out logic during last FADE_OUT_DURATION_SEC seconds
-      if (fadeOut && leftSec <= FADE_OUT_DURATION_SEC) {
+      if (fadeOutRef.current && leftSec <= FADE_OUT_DURATION_SEC) {
         if (baseVolumeRef.current === null) {
           baseVolumeRef.current = volumeRef.current;
         }
         const fadeRatio = Math.max(0, leftSec / FADE_OUT_DURATION_SEC);
         const nextVol = (baseVolumeRef.current ?? volumeRef.current) * fadeRatio;
-        setVolume(Math.max(0, Math.min(1, nextVol)));
+        setVolumeRef.current?.(Math.max(0, Math.min(1, nextVol)));
       }
-    }, 500);
+    };
+
+    tick();
+    const interval = setInterval(tick, 500);
 
     return () => clearInterval(interval);
-  }, [mode, targetTimestamp, fadeOut, togglePlay, restoreVolume, setVolume, t, toast]);
+  }, [mode, targetTimestamp, restoreVolume]);
 
   // Logic for 'end_of_track' mode
   useEffect(() => {
     if (mode !== 'end_of_track') return;
 
     // Fade-out towards the end of current track
-    if (fadeOut && duration > 0) {
+    if (fadeOutRef.current && duration > 0) {
       const trackRemaining = duration - currentTime;
       if (trackRemaining <= END_OF_TRACK_FADE_SEC && trackRemaining > 0) {
         if (baseVolumeRef.current === null) {
@@ -187,22 +200,25 @@ export function SleepTimerProvider({ children }: { children: ReactNode }) {
         }
         const fadeRatio = Math.max(0, trackRemaining / END_OF_TRACK_FADE_SEC);
         const nextVol = (baseVolumeRef.current ?? volumeRef.current) * fadeRatio;
-        setVolume(Math.max(0, Math.min(1, nextVol)));
+        setVolumeRef.current?.(Math.max(0, Math.min(1, nextVol)));
       }
     }
 
     // Check if the track that was playing when timer was set has ended or changed
     const currentId = currentTrack?.id ?? null;
-    if (initialTrackIdRef.current !== null && currentId !== null && currentId !== initialTrackIdRef.current) {
+    const isTrackFinished = duration > 0 && currentTime >= Math.max(0, duration - 0.5) && !isPlaying;
+    const hasTrackChanged = initialTrackIdRef.current !== null && currentId !== null && currentId !== initialTrackIdRef.current;
+
+    if (hasTrackChanged || isTrackFinished) {
       if (isPlayingRef.current) {
-        togglePlay();
+        togglePlayRef.current?.();
       }
       restoreVolume();
       setMode('off');
       initialTrackIdRef.current = null;
-      toast.info(t('sleepTimer.stoppedNotification', 'Hẹn giờ tắt nhạc: Đã hoàn tất bài hát và dừng phát nhạc'));
+      toastRef.current.info(tRef.current('sleepTimer.stoppedNotification', 'Hẹn giờ tắt nhạc: Đã hoàn tất bài hát và dừng phát nhạc'));
     }
-  }, [mode, currentTrack?.id, currentTime, duration, fadeOut, restoreVolume, setVolume, t, toast, togglePlay]);
+  }, [mode, currentTrack?.id, currentTime, duration, isPlaying, restoreVolume]);
 
   const openModal = useCallback(() => setIsModalOpen(true), []);
   const closeModal = useCallback(() => setIsModalOpen(false), []);

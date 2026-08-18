@@ -75,8 +75,8 @@ export const AudioVisualizer = memo(function AudioVisualizer({
           const binWidth = nyquist / bufferLength;
 
           // Focused musical frequency range (35 Hz to 16,000 Hz)
-          const minFreq = 35;
-          const maxFreq = Math.min(16000, nyquist);
+          const minFreq = 20;
+          const maxFreq = Math.min(20000, nyquist);
 
           for (let i = 0; i < barCount; i++) {
             // Perceptual logarithmic octave distribution
@@ -149,7 +149,7 @@ export const AudioVisualizer = memo(function AudioVisualizer({
 
             ctx.fillRect(x, y, barWidth, barH);
           }
-        } 
+        }
         // Render Studio Spectrum Flat Equalizer Bars
         else {
           const maxBarHeight = height - 4;
@@ -173,7 +173,7 @@ export const AudioVisualizer = memo(function AudioVisualizer({
             ctx.fillRect(x, y, barWidth, barH);
           }
         }
-      } 
+      }
       // -------------------------------------------------------------
       // 3. WAVE (Fluid Liquid Neon Spline Waves - Apple Music / Siri)
       // -------------------------------------------------------------
@@ -207,10 +207,10 @@ export const AudioVisualizer = memo(function AudioVisualizer({
             const normX = i / (wavePoints - 1);
             // Harmonic envelope (soft at edges, lively in middle)
             const envelope = Math.sin(normX * Math.PI);
-            
+
             // Audio-reactive modulation
-            const audioMod = analyser && isPlaying && freqData[i * 2] 
-              ? (freqData[i * 2] / 255) * 0.6 
+            const audioMod = analyser && isPlaying && freqData[i * 2]
+              ? (freqData[i * 2] / 255) * 0.6
               : 0.15;
 
             const y = centerY + Math.sin(normX * freq * Math.PI * 2 + phase + phaseOffset) * (amplitude + audioMod * height * 0.4) * envelope;
