@@ -169,9 +169,9 @@ export function useAudioEffectsState(savedState: SavedAudioEffectsState = {}) {
       ? ('bands' in savedStylisticPreset)
         ? (savedStylisticPreset.bands as EqBand[])
         : createEqBands(
-            (savedStylisticPreset as { eqBands?: number[]; gains?: number[] }).eqBands || [],
-            (savedStylisticPreset as { eqBands?: number[]; gains?: number[] }).gains || []
-          )
+          (savedStylisticPreset as { eqBands?: number[]; gains?: number[] }).eqBands || [],
+          (savedStylisticPreset as { eqBands?: number[]; gains?: number[] }).gains || []
+        )
       : savedState.eqBands
         ? initialPresetIsParametric
           ? savedState.eqBands
@@ -315,10 +315,10 @@ export function useAudioEffectsState(savedState: SavedAudioEffectsState = {}) {
         || currentPreset?.presetMode === 'parametric'
         || (currentPreset?.isCustomOrigin && hasParametricBandSettings(currentPreset.bands))
         || hasParametricBandSettings(eqBands)
-          ? 'parametric'
-          : eqPresetName === 'CUSTOM' || currentPreset?.presetMode === 'custom'
-            ? 'custom'
-            : undefined;
+        ? 'parametric'
+        : eqPresetName === 'CUSTOM' || currentPreset?.presetMode === 'custom'
+          ? 'custom'
+          : undefined;
       const newPreset: CustomEqPreset = {
         name,
         bands: eqBands.map(band => ({ ...band })),
