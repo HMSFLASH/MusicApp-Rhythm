@@ -1,5 +1,6 @@
 import { useState, useRef, useEffect } from 'react';
 import { useNavigate } from 'react-router-dom';
+import { useTranslation } from 'react-i18next';
 import { Search, Plus, Users, Music, Disc, X, Check, Play, ListPlus, Trash2, ListMusic, Download, Info } from 'lucide-react';
 import { useGlobalAudio } from '../context/AudioContext';
 import { useAuth } from '../context/AuthContext';
@@ -16,6 +17,7 @@ import { useVirtualList } from '../hooks/useVirtualList';
 const SEARCH_TRACK_ROW_HEIGHT = 72;
 
 export function SearchPage() {
+  const { t } = useTranslation();
   const navigate = useNavigate();
   const confirm = useConfirm();
   const { isAuthenticated } = useAuth();
@@ -400,11 +402,11 @@ export function SearchPage() {
                               ariaLabel={`Song actions for ${track.title || track.fileName}`}
                               buttonClassName="p-1.5 text-slate-400 hover:text-white hover:bg-white/10 rounded-lg transition-colors"
                               actions={[
-                                { label: 'Info', icon: <Info size={14} />, onSelect: () => setInfoTrack(track) },
-                                { label: 'Add to Playlist', icon: <ListPlus size={14} />, onSelect: () => setTrackToPlaylist(track) },
+                                { label: t('tracks.info', 'Info'), icon: <Info size={14} />, onSelect: () => setInfoTrack(track) },
+                                { label: t('tracks.addToPlaylist', 'Add to Playlist'), icon: <ListPlus size={14} />, onSelect: () => setTrackToPlaylist(track) },
                                 ...(track.sourceType !== 'LOCAL'
-                                  ? [{ label: 'Download File', icon: <Download size={14} />, onSelect: () => downloadTrackFile(track) },
-                                     { label: 'Delete', icon: <Trash2 size={14} />, tone: 'danger' as const, onSelect: () => void handleDeleteTrack(track) }]
+                                  ? [{ label: t('tracks.downloadFile', 'Download File'), icon: <Download size={14} />, onSelect: () => downloadTrackFile(track) },
+                                     { label: t('tracks.delete', 'Delete'), icon: <Trash2 size={14} />, tone: 'danger' as const, onSelect: () => void handleDeleteTrack(track) }]
                                   : []),
                               ]}
                             />

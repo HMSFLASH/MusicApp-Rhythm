@@ -6,7 +6,7 @@ import { getAudioConfigStorageKey, getInitialState } from './audioStorage';
 import { getAudioExtension, getDefaultLegacyMetadataParser, shouldUseLegacyMetadataParser } from './audioMime';
 import type { Track as AudioTrack } from './audioTypes';
 import { db } from '../lib/db';
-import { LEGACY_METADATA_TRACKS_STORAGE_KEY } from '../utils/metadataCache';
+import { LEGACY_METADATA_TRACKS_STORAGE_KEY, GLOBAL_LEGACY_METADATA_STORAGE_KEY } from '../utils/metadataCache';
 export type { Track } from './audioTypes';
 export { EQ_PRESETS, STYLISTIC_PRESETS } from './audioTypes';
 
@@ -23,6 +23,7 @@ export function useAudioPlayer(
   const [flacWasmOverrides, setFlacWasmOverrides] = useState<Record<string, boolean>>({});
   const [m4aWasmOverrides, setM4aWasmOverrides] = useState<Record<string, boolean>>({});
   const [legacyMetadataOverrides, setLegacyMetadataOverrides] = useState<Record<string, boolean>>({});
+  const [useLegacyMetadata, setUseLegacyMetadata] = useState<boolean>(Boolean(savedState.useLegacyMetadata));
 
   const queueState = useAudioQueue(savedState, isAuthenticated, isAuthResolved);
   const effectsState = useAudioEffectsState(savedState);
@@ -69,9 +70,22 @@ export function useAudioPlayer(
       })
       .catch((error) => console.warn('[Audio] Failed to load legacy metadata settings', error));
 
+    void db.get<boolean>(GLOBAL_LEGACY_METADATA_STORAGE_KEY)
+      .then((saved) => {
+        if (cancelled || saved === undefined || saved === null) return;
+        setUseLegacyMetadata(Boolean(saved));
+      })
+      .catch((error) => console.warn('[Audio] Failed to load global legacy metadata setting', error));
+
     return () => {
       cancelled = true;
     };
+  }, []);
+
+  const setGlobalLegacyMetadata = useCallback((enabled: boolean) => {
+    setUseLegacyMetadata(enabled);
+    void db.set(GLOBAL_LEGACY_METADATA_STORAGE_KEY, enabled)
+      .catch((error) => console.warn('[Audio] Failed to save global legacy metadata setting', error));
   }, []);
 
   const isFlacWasmEnabled = useCallback((track?: AudioTrack | null) => {
@@ -114,8 +128,8 @@ export function useAudioPlayer(
   }, [isM4aWasmEnabled]);
 
   const isLegacyMetadataEnabled = useCallback((track?: AudioTrack | null) => (
-    shouldUseLegacyMetadataParser(track, legacyMetadataOverrides)
-  ), [legacyMetadataOverrides]);
+    shouldUseLegacyMetadataParser(track, useLegacyMetadata, legacyMetadataOverrides)
+  ), [useLegacyMetadata, legacyMetadataOverrides]);
 
   const toggleLegacyMetadataForTrack = useCallback((track: AudioTrack) => {
     const trackId = String(track.id);
@@ -137,7 +151,7 @@ export function useAudioPlayer(
   const engineState = useAudioEngine(
     isAuthenticated,
     queueState as Parameters<typeof useAudioEngine>[1],
-    { ...effectsState, flacWasmOverrides, m4aWasmOverrides, legacyMetadataOverrides } as Parameters<typeof useAudioEngine>[2],
+    { ...effectsState, flacWasmOverrides, m4aWasmOverrides, legacyMetadataOverrides, useLegacyMetadata } as Parameters<typeof useAudioEngine>[2],
     savedState,
     driveToken,
     fetchDriveToken
@@ -177,7 +191,8 @@ export function useAudioPlayer(
       stereoFftSize: effectsState.stereoFftSize,
       eqBlockSize: effectsState.eqBlockSize,
       audioLatencyHint: effectsState.audioLatencyHint,
-      fxEnabled: effectsState.fxEnabled
+      fxEnabled: effectsState.fxEnabled,
+      useLegacyMetadata
     };
     
     // Add a simple throttle to avoid too frequent writes
@@ -195,7 +210,8 @@ export function useAudioPlayer(
     effectsState.compThreshold, effectsState.compRatio, effectsState.compKnee, effectsState.compAttack, effectsState.compRelease, effectsState.compRmsSize, effectsState.compMakeupGain,
     effectsState.panValue, effectsState.stereoWidth, effectsState.reverbMix, effectsState.reverbTime,
     effectsState.loudnessNormalization, effectsState.useOversample, effectsState.precalculateOnIdle,
-    effectsState.fullQueueCacheEnabled, effectsState.masterFftSize, effectsState.stereoFftSize, effectsState.eqBlockSize, effectsState.audioLatencyHint, effectsState.fxEnabled
+    effectsState.fullQueueCacheEnabled, effectsState.masterFftSize, effectsState.stereoFftSize, effectsState.eqBlockSize, effectsState.audioLatencyHint, effectsState.fxEnabled,
+    useLegacyMetadata
   ]);
 
   return {
@@ -212,6 +228,8 @@ export function useAudioPlayer(
     toggleM4aWasmForTrack,
     isLegacyMetadataEnabled,
     toggleLegacyMetadataForTrack,
+    useLegacyMetadata,
+    setGlobalLegacyMetadata,
     loadCoverFromCache: engineState.loadCoverFromCache,
   };
 }

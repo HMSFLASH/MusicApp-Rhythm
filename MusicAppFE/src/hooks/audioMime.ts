@@ -24,11 +24,13 @@ export const getDefaultLegacyMetadataParser = (_track?: Track | null) => false;
 
 export const shouldUseLegacyMetadataParser = (
   track?: Track | null,
+  globalUseLegacy: boolean = false,
   overrides: Record<string, boolean> = {},
 ) => {
-  if (!track) return false;
-  const override = overrides[String(track.id)];
-  return override ?? getDefaultLegacyMetadataParser(track);
+  if (track && overrides[String(track.id)] !== undefined) {
+    return overrides[String(track.id)];
+  }
+  return globalUseLegacy;
 };
 
 export const getAudioMimeType = (fileName?: string, fallback?: string | null) => {

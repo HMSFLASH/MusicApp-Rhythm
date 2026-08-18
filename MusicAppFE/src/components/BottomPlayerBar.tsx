@@ -3,13 +3,14 @@ import { useNavigate, useLocation } from 'react-router-dom';
 import { useGlobalAudio } from '../context/AudioContext';
 import { useAuth } from '../context/AuthContext';
 import { useLibrary } from '../context/LibraryContext';
-import { Play, Pause, SkipForward, SkipBack, Cloud, Disc, Heart, Shuffle, Repeat, Repeat1, Square, PauseCircle, ListX, ListPlus, Maximize2, Info, ListMusic, Volume2, VolumeX, X, ArrowRight, Loader2, RefreshCw, Download, Moon } from 'lucide-react';
-import { HorizontalSlider } from './HorizontalSlider';
+import { Play, Pause, SkipForward, SkipBack, Cloud, Disc, Heart, Shuffle, Repeat, Repeat1, Square, PauseCircle, ListX, ListPlus, Maximize2, Info, ListMusic, Volume2, VolumeX, ArrowRight, Loader2, RefreshCw, Download, Moon } from 'lucide-react';
 import { useTranslation } from 'react-i18next';
+import { HorizontalSlider } from './HorizontalSlider';
 import { ActionMenu } from './ActionMenu';
 import { useVirtualList } from '../hooks/useVirtualList';
 import { downloadTrackFile } from '../utils/downloadUtils';
 import { useSleepTimer } from '../context/SleepTimerContext';
+import { TrackInfoModal } from './TrackInfoModal';
 
 const QUEUE_POPOVER_ITEM_HEIGHT = 58;
 
@@ -425,7 +426,7 @@ export function BottomPlayerBar() {
           actions={[
             { label: t('nav.nowPlaying', 'Now Playing'), icon: <Maximize2 size={14} />, onSelect: openNowPlaying },
             ...(currentTrack && currentTrack.sourceType !== 'LOCAL'
-              ? [{ label: 'Download File', icon: <Download size={14} />, onSelect: () => downloadTrackFile(currentTrack) }]
+              ? [{ label: t('tracks.downloadFile', 'Download File'), icon: <Download size={14} />, onSelect: () => downloadTrackFile(currentTrack) }]
               : []),
             ...(currentTrack && currentTrack.sourceType === 'DRIVE'
               ? [{
@@ -619,48 +620,11 @@ export function BottomPlayerBar() {
       
       {/* Metadata Modal */}
       {showMetadata && currentTrack && (
-        <div 
-          className="fixed inset-0 z-[100] flex items-center justify-center bg-black/70 backdrop-blur-md p-4"
-          onClick={() => setShowMetadata(false)}
-        >
-          <div 
-            className="bg-[#0c1626] border border-white/10 rounded-2xl w-full max-w-md max-h-[calc(100dvh-2rem)] shadow-2xl overflow-hidden flex flex-col"
-            onClick={(e) => e.stopPropagation()}
-          >
-            <div className="flex items-center justify-between p-4 border-b border-white/[0.06]">
-              <div className="flex items-center gap-2.5 text-white">
-                <Info size={20} className="text-primary" />
-                <h3 className="font-semibold text-base">{t('bottomPlayer.trackMetadata', 'Track Metadata')}</h3>
-              </div>
-              <button 
-                onClick={() => setShowMetadata(false)}
-                className="text-slate-400 hover:text-white transition-colors p-1 rounded-lg hover:bg-white/[0.05]"
-              >
-                <X size={18} />
-              </button>
-            </div>
-            
-            <div className="p-4 flex flex-col gap-3 overflow-y-auto max-h-[70vh] no-scrollbar">
-              <div className="bg-white/[0.03] border border-white/[0.05] rounded-xl p-3.5 flex flex-col gap-2.5">
-                {[
-                  { label: t('bottomPlayer.title', 'Title'), value: currentTrack.title || playerState.getTrackMetadata(currentTrack.id)?.title },
-                  { label: t('bottomPlayer.artist', 'Artist'), value: currentTrack.artist || playerState.getTrackMetadata(currentTrack.id)?.artist },
-                  { label: t('bottomPlayer.album', 'Album'), value: currentTrack.album || playerState.getTrackMetadata(currentTrack.id)?.album },
-                  { label: t('bottomPlayer.genre', 'Genre'), value: currentTrack.genre || playerState.getTrackMetadata(currentTrack.id)?.genre },
-                  { label: t('bottomPlayer.duration', 'Duration'), value: currentTrack.durationSeconds ? `${currentTrack.durationSeconds}s` : null },
-                  { label: t('bottomPlayer.fileName', 'File Name'), value: currentTrack.fileName },
-                  { label: t('bottomPlayer.source', 'Source'), value: currentTrack.sourceType },
-                  { label: t('bottomPlayer.trackId', 'Track ID'), value: String(currentTrack.id) }
-                ].map((item, idx) => (
-                  <div key={idx} className="flex flex-col gap-0.5">
-                    <span className="text-[10px] uppercase tracking-wider text-slate-400 font-mono font-semibold">{item.label}</span>
-                    <span className="text-xs text-slate-200 font-medium break-all">{item.value || t('bottomPlayer.unknown', 'unknown')}</span>
-                  </div>
-                ))}
-              </div>
-            </div>
-          </div>
-        </div>
+        <TrackInfoModal
+          track={currentTrack}
+          trackMetadata={playerState.getTrackMetadata(currentTrack.id)}
+          onClose={() => setShowMetadata(false)}
+        />
       )}
     </div>
   );

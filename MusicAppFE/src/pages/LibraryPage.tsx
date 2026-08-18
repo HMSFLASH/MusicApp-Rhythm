@@ -1,6 +1,7 @@
 import { Heart, ListMusic, Album, Mic2, Music, Disc, CloudUpload, RefreshCw, Play, TrendingUp, ListPlus, Download } from 'lucide-react';
 import { useNavigate } from 'react-router-dom';
 import { useEffect, useMemo, useState } from 'react';
+import { useTranslation } from 'react-i18next';
 import { useGlobalAudio } from '../context/AudioContext';
 import { useUploadQueue } from '../context/UploadContext';
 
@@ -11,6 +12,7 @@ import type { Track } from '../hooks/useAudioPlayer';
 import { downloadTrackFile } from '../utils/downloadUtils';
 
 export function LibraryPage() {
+  const { t } = useTranslation();
   const navigate = useNavigate();
   const { playerState } = useGlobalAudio();
   const { queueDirectFiles, uploadTasks } = useUploadQueue();
@@ -252,16 +254,16 @@ export function LibraryPage() {
                   ariaLabel={`Song actions for ${track.title || track.fileName}`}
                   buttonClassName="p-1.5 text-slate-400 hover:text-white hover:bg-white/10 rounded-lg transition-colors shrink-0"
                   actions={[
-                    { label: 'Play Next', icon: <ListMusic size={14} />, onSelect: () => playerState.addToNextQueue([track]) },
-                    { label: 'Add to Queue', icon: <ListPlus size={14} />, onSelect: () => playerState.addToCurrentQueue([track]) },
-                    { label: 'Add to Playlist', icon: <ListPlus size={14} />, onSelect: () => setTrackToPlaylist(track) },
+                    { label: t('tracks.playNext', 'Play Next'), icon: <ListMusic size={14} />, onSelect: () => playerState.addToNextQueue([track]) },
+                    { label: t('tracks.addToQueue', 'Add to Queue'), icon: <ListPlus size={14} />, onSelect: () => playerState.addToCurrentQueue([track]) },
+                    { label: t('tracks.addToPlaylist', 'Add to Playlist'), icon: <ListPlus size={14} />, onSelect: () => setTrackToPlaylist(track) },
                     ...(track.sourceType !== 'LOCAL'
                       ? [{
-                        label: 'Download File',
+                        label: t('tracks.downloadFile', 'Download File'),
                         icon: <Download size={14} />,
                         onSelect: () => downloadTrackFile(track)
                       }, {
-                        label: favorites.some(f => f.id === track.id) ? 'Remove Favorite' : 'Add to Favorite',
+                        label: favorites.some(f => f.id === track.id) ? t('tracks.removeFavorite', 'Remove Favorite') : t('tracks.addFavorite', 'Add to Favorite'),
                         icon: <Heart size={14} fill={favorites.some(f => f.id === track.id) ? "currentColor" : "none"} className={favorites.some(f => f.id === track.id) ? "text-primary" : ""} />,
                         onSelect: () => void toggleFavorite(track)
                       }]

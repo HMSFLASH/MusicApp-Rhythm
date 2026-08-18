@@ -8,16 +8,13 @@ import {
   LogOut,
   User,
   Loader2,
-  AlertCircle,
-  CheckCircle2,
-  CloudUpload,
-  CloudDownload,
   ListMusic,
   Key,
   Menu,
   Languages,
   Keyboard,
   Moon,
+  Settings,
   X as CloseIcon
 } from 'lucide-react';
 import { useState, useEffect } from 'react';
@@ -35,9 +32,7 @@ import { db } from '../lib/db';
 import { clearCachedAudio } from '../utils/mediaCache';
 import { clearCovers } from '../utils/idb';
 import { useGlobalAudio } from '../context/AudioContext';
-import { BACKEND_URL } from '../api/axiosClient';
 import { LOCAL_STORAGE_KEY, PLAYBACK_STORAGE_KEY } from '../hooks/audioStorage';
-import { useOffline } from '../context/OfflineContext';
 
 // parseJwt removed as user data is now fetched from /me
 
@@ -47,94 +42,18 @@ export function Layout() {
   const navigate = useNavigate();
   const { isAuthenticated, setIsAuthenticated, user } = useAuth();
   const { playerState } = useGlobalAudio();
-  const { isOfflineMode } = useOffline();
   const { state: sleepTimerState, openModal: openSleepTimerModal } = useSleepTimer();
-  const [syncing, setSyncing] = useState(false);
   const [isLoggingOut, setIsLoggingOut] = useState(false);
   const [isPasswordModalOpen, setIsPasswordModalOpen] = useState(false);
   const [isChangePasswordModalOpen, setIsChangePasswordModalOpen] = useState(false);
   const [isAvatarMenuOpen, setIsAvatarMenuOpen] = useState(false);
   const [isMobileMenuOpen, setIsMobileMenuOpen] = useState(false);
-  const [showRestoreConfirm, setShowRestoreConfirm] = useState(false);
-  const [showBackupConfirm, setShowBackupConfirm] = useState(false);
-  const [notification, setNotification] = useState<{ type: 'error' | 'success', message: string } | null>(null);
 
   // Close mobile menu on navigation
   useEffect(() => {
     // eslint-disable-next-line react-hooks/set-state-in-effect
     setIsMobileMenuOpen(false);
   }, [location.pathname]);
-
-  useEffect(() => {
-    if (notification) {
-      const timer = setTimeout(() => setNotification(null), 5000);
-      return () => clearTimeout(timer);
-    }
-  }, [notification]);
-
-  useEffect(() => {
-    const handleAppNotification = (e: CustomEvent) => {
-      setNotification(e.detail);
-    };
-    globalThis.addEventListener('app-notification', handleAppNotification as EventListener);
-    return () => {
-      globalThis.removeEventListener('app-notification', handleAppNotification as EventListener);
-    };
-  }, []);
-
-  const handleBackup = async () => {
-    setShowBackupConfirm(false);
-    if (!isAuthenticated) return;
-    setSyncing(true);
-    setNotification(null);
-    try {
-      const configStr = localStorage.getItem('SONIC_DEPTH_AUDIO_CONFIG');
-      const config = configStr ? JSON.parse(configStr) : {};
-      const idbData = await db.getAllData();
-
-      await axiosClient.post('/api/backup/drive', { config, idbData });
-
-      setNotification({ type: 'success', message: t('layout.backupSuccess', 'Backup to Google Drive successful!') });
-
-    } catch (e: any) {
-      console.error(e);
-      setNotification({ type: 'error', message: e.message || t('layout.backupFail', 'Failed to backup to Google Drive. Ensure you have linked your account.') });
-    } finally {
-      setSyncing(false);
-    }
-  };
-
-  const handleRestore = async () => {
-    setShowRestoreConfirm(false);
-    if (!isAuthenticated) return;
-    setSyncing(true);
-    setNotification(null);
-    try {
-
-      const response = await axiosClient.get('/api/backup/drive') as any;
-      let config = response;
-
-      if (response && response.config) {
-        config = response.config;
-        if (response.idbData) {
-          await db.importData(response.idbData);
-        }
-      }
-
-      if (config && Object.keys(config).length > 0) {
-        localStorage.setItem('SONIC_DEPTH_AUDIO_CONFIG', JSON.stringify(config));
-      }
-
-      setNotification({ type: 'success', message: t('layout.restoreSuccess', 'Restore successful! The app will now reload to apply changes.') });
-      setTimeout(() => globalThis.location.reload(), 1500);
-
-    } catch (e: any) {
-      console.error(e);
-      setNotification({ type: 'error', message: e.message || t('layout.restoreFail', 'Failed to restore from Google Drive. No backup found or account not linked.') });
-    } finally {
-      setSyncing(false);
-    }
-  };
 
   const handleLogout = async () => {
     setIsLoggingOut(true);
@@ -168,7 +87,8 @@ export function Layout() {
   ];
 
   const soundTools = [
-    { name: t('nav.audioStudio', 'Audio Studio'), path: '/studio', icon: <SlidersHorizontal size={20} /> }
+    { name: t('nav.audioStudio', 'Audio Studio'), path: '/studio', icon: <SlidersHorizontal size={20} /> },
+    { name: t('nav.settings', 'Settings'), path: '/settings', icon: <Settings size={20} /> }
   ];
 
   const showNowPlayingDisc = () => {
@@ -313,47 +233,6 @@ export function Layout() {
                 <LocalFilePicker />
               </div>
             </div>
-
-            {isAuthenticated && (
-              <div>
-                <h2 className="text-[11px] font-mono font-semibold text-slate-400 uppercase tracking-wider mb-2.5 px-3">{t('layout.cloudSync', 'Cloud Sync')}</h2>
-                <div className="flex flex-col gap-1.5">
-                  {user?.isGoogleLinked ? (
-                    <>
-                      <button
-                        onClick={() => setShowBackupConfirm(true)}
-                        disabled={syncing || isOfflineMode}
-                        className="flex items-center gap-3 px-3 py-2.5 rounded-xl text-sm text-slate-400 hover:text-slate-100 hover:bg-white/[0.04] transition-all text-left disabled:opacity-50 border border-transparent hover:border-white/[0.05]"
-                      >
-                        {syncing ? <Loader2 size={18} className="animate-spin text-primary" /> : <CloudUpload size={18} className="text-primary/80" />}
-                        <span className="truncate">{t('layout.backupToDrive', 'Backup Configuration')}</span>
-                      </button>
-                      <button
-                        onClick={() => setShowRestoreConfirm(true)}
-                        disabled={syncing || isOfflineMode}
-                        className="flex items-center gap-3 px-3 py-2.5 rounded-xl text-sm text-slate-400 hover:text-slate-100 hover:bg-white/[0.04] transition-all text-left disabled:opacity-50 border border-transparent hover:border-white/[0.05]"
-                      >
-                        {syncing ? <Loader2 size={18} className="animate-spin text-cyan-400" /> : <CloudDownload size={18} className="text-cyan-400/80" />}
-                        <span className="truncate">{t('layout.restoreFromDrive', 'Restore from Drive')}</span>
-                      </button>
-                    </>
-                  ) : (
-                    <button
-                      onClick={() => globalThis.location.href = `${BACKEND_URL}/oauth2/authorization/google`}
-                      className="flex items-center gap-3 px-3 py-2.5 rounded-xl text-sm text-slate-400 hover:text-slate-100 hover:bg-white/[0.04] transition-all text-left border border-white/[0.05]"
-                    >
-                      <svg className="w-4 h-4 shrink-0" viewBox="0 0 24 24" xmlns="http://www.w3.org/2000/svg">
-                        <path d="M22.56 12.25c0-.78-.07-1.53-.2-2.25H12v4.26h5.92c-.26 1.37-1.04 2.53-2.21 3.31v2.77h3.57c2.08-1.92 3.28-4.74 3.28-8.09z" fill="#4285F4" />
-                        <path d="M12 23c2.97 0 5.46-.98 7.28-2.66l-3.57-2.77c-.98.66-2.23 1.06-3.71 1.06-2.86 0-5.29-1.93-6.16-4.53H2.18v2.84C3.99 20.53 7.7 23 12 23z" fill="#34A853" />
-                        <path d="M5.84 14.09c-.22-.66-.35-1.36-.35-2.09s.13-1.43.35-2.09V7.07H2.18C1.43 8.55 1 10.22 1 12s.43 3.45 1.18 4.93l2.85-2.22.81-.62z" fill="#FBBC05" />
-                        <path d="M12 5.38c1.62 0 3.06.56 4.21 1.64l3.15-3.15C17.45 2.09 14.97 1 12 1 7.7 1 3.99 3.47 2.18 7.07l3.66 2.84c.87-2.6 3.3-4.53 6.16-4.53z" fill="#EA4335" />
-                      </svg>
-                      <span className="truncate">{t('layout.linkGoogleDrive', 'Link Google Drive')}</span>
-                    </button>
-                  )}
-                </div>
-              </div>
-            )}
           </div>
 
           {/* Bottom Sidebar - User Profile/Login */}
@@ -362,30 +241,18 @@ export function Layout() {
               <span className="text-[11px] font-mono text-slate-400 tracking-wider">{t('layout.language', 'Ngôn ngữ')}</span>
               <div className="flex items-center gap-1.5">
                 <button
-                  onClick={openSleepTimerModal}
-                  className={`p-1 rounded-lg transition-all border ${
-                    sleepTimerState.isActive
-                      ? 'bg-primary/20 text-primary border-primary/40 shadow-[0_0_10px_rgba(0,245,255,0.3)]'
-                      : 'bg-white/[0.05] hover:bg-white/[0.1] text-slate-300 hover:text-primary border-white/[0.06]'
-                  }`}
-                  title={t('sleepTimer.title', 'Hẹn giờ tắt nhạc (T)')}
-                  aria-label="Sleep Timer"
-                >
-                  <Moon size={13} className={sleepTimerState.isActive ? 'text-primary animate-pulse' : ''} />
-                </button>
-                <button
                   onClick={() => {
                     window.dispatchEvent(new KeyboardEvent('keydown', { key: '?' }));
                   }}
-                  className="hidden md:inline-flex p-1 rounded-lg bg-white/[0.05] hover:bg-white/[0.1] text-slate-300 hover:text-primary transition-all border border-white/[0.06]"
+                  className="hidden md:inline-flex p-1.5 rounded-lg bg-white/[0.05] hover:bg-white/[0.1] text-slate-300 hover:text-primary transition-all border border-white/[0.06]"
                   title="Phím tắt nhanh (?)"
                   aria-label="Keyboard Shortcuts"
                 >
-                  <Keyboard size={13} />
+                  <Keyboard size={14} />
                 </button>
                 <button
                   onClick={() => i18n.changeLanguage(i18n.language === 'vi' ? 'en' : 'vi')}
-                  className="flex items-center gap-1 px-2 py-0.5 rounded-lg bg-white/[0.05] hover:bg-white/[0.1] text-slate-300 hover:text-white transition-all text-xs font-mono border border-white/[0.06]"
+                  className="flex items-center gap-1 px-2.5 py-1 rounded-lg bg-white/[0.05] hover:bg-white/[0.1] text-slate-300 hover:text-white transition-all text-xs font-mono border border-white/[0.06]"
                   aria-label="Toggle language"
                 >
                   <Languages size={13} className="text-primary" />
@@ -446,6 +313,15 @@ export function Layout() {
                           <Key size={14} className="text-primary" /> {t('layout.setLocalPassword', 'Set Local Password')}
                         </button>
                       )}
+                      <button
+                        onClick={() => {
+                          setIsAvatarMenuOpen(false);
+                          navigate('/settings');
+                        }}
+                        className="w-full flex items-center gap-3 px-3.5 py-2 text-xs font-medium text-left text-slate-300 hover:bg-white/[0.08] hover:text-white transition-colors"
+                      >
+                        <Settings size={14} className="text-primary" /> {t('nav.settings', 'Settings')}
+                      </button>
                       <button
                         onClick={() => {
                           setIsAvatarMenuOpen(false);
@@ -521,15 +397,8 @@ export function Layout() {
           </div>
 
           <main className="flex-1 overflow-y-auto w-full relative">
-            {notification && (
-              <div className={`fixed top-16 md:top-4 left-1/2 -translate-x-1/2 z-[100] flex w-[calc(100vw_-_2rem)] max-w-lg items-start gap-2 px-4 py-3 rounded-lg shadow-lg border ${notification.type === 'error' ? 'bg-red-500/10 border-red-500/20 text-red-400' : 'bg-green-500/10 border-green-500/20 text-green-400'
-                }`}>
-                {notification.type === 'error' ? <AlertCircle size={20} className="shrink-0" /> : <CheckCircle2 size={20} className="shrink-0" />}
-                <span className="min-w-0 text-sm font-medium break-words">{notification.message}</span>
-              </div>
-            )}
             {playerState.isLoadingTrack && (
-              <div className={`fixed ${notification ? 'top-32 md:top-20' : 'top-16 md:top-4'} left-1/2 -translate-x-1/2 z-[100] flex max-w-[calc(100vw_-_2rem)] items-center gap-2 rounded-lg border border-primary/25 bg-primary/10 px-4 py-3 text-primary shadow-lg backdrop-blur-md`}>
+              <div className="fixed top-16 md:top-4 left-1/2 -translate-x-1/2 z-[100] flex max-w-[calc(100vw_-_2rem)] items-center gap-2 rounded-lg border border-primary/25 bg-primary/10 px-4 py-3 text-primary shadow-lg backdrop-blur-md">
                 <Loader2 size={20} className="animate-spin shrink-0" />
                 <span className="truncate text-sm font-medium">
                   {playerState.loadingTrackPhase === 'processing'
@@ -549,63 +418,6 @@ export function Layout() {
       <UploadQueuePanel />
       <BottomPlayerBar />
 
-      {/* Backup Confirmation Modal */}
-      {showBackupConfirm && (
-        <div className="fixed inset-0 z-[100] flex items-center justify-center bg-black/60 backdrop-blur-sm p-4" onClick={() => setShowBackupConfirm(false)}>
-          <div className="bg-[#121212] border border-white/10 rounded-2xl p-6 w-full max-w-md shadow-2xl" onClick={e => e.stopPropagation()}>
-            <h2 className="text-xl font-bold text-white mb-2 flex items-center gap-2">
-              <CloudUpload className="text-primary" size={24} />
-              {t('layout.backupConfigTitle', 'Backup Configuration')}
-            </h2>
-            <p className="text-white/70 mb-6 text-sm">
-              {t('layout.backupConfigDesc', 'This will overwrite your existing backup on Google Drive with your current local settings (EQ, playlists, presets). Do you want to continue?')}
-            </p>
-            <div className="flex flex-col-reverse sm:flex-row sm:justify-end gap-3">
-              <button
-                onClick={() => setShowBackupConfirm(false)}
-                className="px-4 py-2 rounded-xl text-white hover:bg-white/10 transition-colors font-medium text-sm"
-              >
-                {t('layout.cancel', 'Cancel')}
-              </button>
-              <button
-                onClick={handleBackup}
-                className="px-4 py-2 rounded-xl bg-primary/20 text-primary hover:bg-primary/30 transition-colors font-medium text-sm border border-primary/30"
-              >
-                {t('layout.yesBackup', 'Yes, Backup')}
-              </button>
-            </div>
-          </div>
-        </div>
-      )}
-
-      {/* Restore Confirmation Modal */}
-      {showRestoreConfirm && (
-        <div className="fixed inset-0 z-[100] flex items-center justify-center bg-black/60 backdrop-blur-sm p-4" onClick={() => setShowRestoreConfirm(false)}>
-          <div className="bg-[#121212] border border-white/10 rounded-2xl p-6 w-full max-w-md shadow-2xl" onClick={e => e.stopPropagation()}>
-            <h2 className="text-xl font-bold text-white mb-2 flex items-center gap-2">
-              <AlertCircle className="text-yellow-500" size={24} />
-              {t('layout.restoreConfigTitle', 'Restore Configuration')}
-            </h2>
-            <p className="text-white/70 mb-6 text-sm">
-              {t('layout.restoreConfigDesc', 'This will overwrite your current local EQ settings, presets, and playlists with the backup from Google Drive. Do you want to continue?')}
-            </p>
-            <div className="flex flex-col-reverse sm:flex-row sm:justify-end gap-3">
-              <button
-                onClick={() => setShowRestoreConfirm(false)}
-                className="px-4 py-2 rounded-xl text-white hover:bg-white/10 transition-colors font-medium text-sm"
-              >
-                {t('layout.cancel', 'Cancel')}
-              </button>
-              <button
-                onClick={handleRestore}
-                className="px-4 py-2 rounded-xl bg-yellow-500/20 text-yellow-500 hover:bg-yellow-500/30 transition-colors font-medium text-sm border border-yellow-500/30"
-              >
-                {t('layout.yesRestore', 'Yes, Restore')}
-              </button>
-            </div>
-          </div>
-        </div>
-      )}
       <SetLocalPasswordModal
         isOpen={isPasswordModalOpen}
         onClose={() => setIsPasswordModalOpen(false)}

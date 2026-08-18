@@ -8,6 +8,7 @@ type AudioEngineEffectsState = ReturnType<typeof useAudioEffectsState> & {
   flacWasmOverrides?: Record<string, boolean>;
   m4aWasmOverrides?: Record<string, boolean>;
   legacyMetadataOverrides?: Record<string, boolean>;
+  useLegacyMetadata?: boolean;
 };
 
 export function useAudioEngine(
@@ -21,6 +22,7 @@ export function useAudioEngine(
 ) {
   const metadataState = useAudioMetadata(isAuthenticated, queueState, {
     legacyMetadataOverrides: effectsState.legacyMetadataOverrides,
+    useLegacyMetadata: effectsState.useLegacyMetadata,
   });
   const currentTrack = queueState.currentTrack;
   const currentTrackMetadata = currentTrack
@@ -47,6 +49,7 @@ export function useAudioEngine(
   return {
     ...playbackState,
     extractMetadata: metadataState.extractMetadata,
+    clearTrackCachedMetadata: metadataState.clearTrackCachedMetadata,
     loadCoverFromCache: metadataState.loadCoverFromCache,
     getTrackMetadata: (id: string) => metadataState.metadataCacheRef.current.get(id),
     getTrackImage: (id: string) => metadataState.imageCacheRef.current.get(id),

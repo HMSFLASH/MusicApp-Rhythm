@@ -1,15 +1,46 @@
 const DB_NAME = 'SonicMediaCache';
 const STORE_NAME = 'audio';
-const MAX_CACHE_BYTES = 7 * 1024 * 1024 * 1024;
-const MAX_ITEM_BYTES = 100 * 1024 * 1024;
+export const DEFAULT_MAX_CACHE_BYTES = 12 * 1024 * 1024 * 1024; // 12 GB
+const MAX_ITEM_BYTES = 300 * 1024 * 1024; // 300 MB for Hi-Res audio
+const STORAGE_LIMIT_KEY = 'SONIC_MAX_CACHE_BYTES';
 
-type AudioCacheEntry = {
+export type AudioCacheEntry = {
   id: string;
   blob: Blob;
   bytes: number;
   cachedAt: number;
   lastAccessed: number;
 };
+
+export type AudioCacheEntryMeta = {
+  id: string;
+  bytes: number;
+  cachedAt: number;
+  lastAccessed: number;
+};
+
+export function getMaxCacheBytes(): number {
+  try {
+    const saved = localStorage.getItem(STORAGE_LIMIT_KEY);
+    if (saved) {
+      const parsed = Number.parseInt(saved, 10);
+      if (!Number.isNaN(parsed) && parsed > 0) {
+        return parsed;
+      }
+    }
+  } catch {
+    // Ignore localStorage errors
+  }
+  return DEFAULT_MAX_CACHE_BYTES;
+}
+
+export function setMaxCacheBytes(bytes: number): void {
+  try {
+    localStorage.setItem(STORAGE_LIMIT_KEY, String(bytes));
+  } catch {
+    // Ignore localStorage errors
+  }
+}
 
 let databasePromise: Promise<IDBDatabase> | null = null;
 
@@ -77,8 +108,6 @@ export async function getAllCachedIds(): Promise<string[]> {
       const store = transaction.objectStore(STORE_NAME);
       const request = store.getAllKeys();
       request.onsuccess = () => {
-        // filter out drive prefix if any? We store as "drive:FILE_ID", wait, we store by track ID or mediaCacheId?
-        // Let's check how cacheAudio is called in audioTrackLoader.ts.
         resolve(request.result.map(String));
       };
       request.onerror = () => resolve([]);
@@ -86,6 +115,61 @@ export async function getAllCachedIds(): Promise<string[]> {
   } catch {
     return [];
   }
+}
+
+/**
+ * Returns metadata of all cached audio entries without keeping full Blobs in memory.
+ */
+export async function getAudioCacheEntriesMetadata(): Promise<AudioCacheEntryMeta[]> {
+  try {
+    const database = await openDatabase();
+    return await new Promise((resolve, reject) => {
+      const transaction = database.transaction(STORE_NAME, 'readonly');
+      const store = transaction.objectStore(STORE_NAME);
+      const cursorRequest = store.openCursor();
+      const results: AudioCacheEntryMeta[] = [];
+
+      cursorRequest.onsuccess = (e) => {
+        const cursor = (e.target as IDBRequest<IDBCursorWithValue>).result;
+        if (cursor) {
+          const val = cursor.value;
+          results.push({
+            id: String(val.id),
+            bytes: typeof val.bytes === 'number' ? val.bytes : (val.blob?.size || 0),
+            cachedAt: typeof val.cachedAt === 'number' ? val.cachedAt : 0,
+            lastAccessed: typeof val.lastAccessed === 'number' ? val.lastAccessed : 0,
+          });
+          cursor.continue();
+        } else {
+          resolve(results);
+        }
+      };
+
+      cursorRequest.onerror = () => reject(cursorRequest.error);
+    });
+  } catch {
+    return [];
+  }
+}
+
+/**
+ * Returns summary statistics of the audio cache.
+ */
+export async function getAudioCacheSummary(): Promise<{
+  totalBytes: number;
+  count: number;
+  maxBytes: number;
+  entries: AudioCacheEntryMeta[];
+}> {
+  const entries = await getAudioCacheEntriesMetadata();
+  const totalBytes = entries.reduce((sum, item) => sum + item.bytes, 0);
+  const maxBytes = getMaxCacheBytes();
+  return {
+    totalBytes,
+    count: entries.length,
+    maxBytes,
+    entries,
+  };
 }
 
 export async function removeCachedAudio(id: string): Promise<void> {
@@ -102,9 +186,32 @@ export async function removeCachedAudio(id: string): Promise<void> {
   }
 }
 
+/**
+ * Batch delete cached audio tracks inside a single readwrite transaction.
+ */
+export async function removeCachedAudios(ids: string[]): Promise<void> {
+  if (ids.length === 0) return;
+  try {
+    const database = await openDatabase();
+    await new Promise<void>((resolve, reject) => {
+      const transaction = database.transaction(STORE_NAME, 'readwrite');
+      const store = transaction.objectStore(STORE_NAME);
+      for (const id of ids) {
+        store.delete(id);
+      }
+      transaction.oncomplete = () => resolve();
+      transaction.onerror = () => reject(transaction.error);
+      transaction.onabort = () => reject(transaction.error);
+    });
+  } catch {
+    // Ignore cache cleanup failures.
+  }
+}
+
 export async function cacheAudio(id: string, blob: Blob): Promise<void> {
   if (blob.size === 0 || blob.size > MAX_ITEM_BYTES) return;
   try {
+    const maxCacheBytes = getMaxCacheBytes();
     const database = await openDatabase();
     await new Promise<void>((resolve, reject) => {
       const transaction = database.transaction(STORE_NAME, 'readwrite');
@@ -119,7 +226,7 @@ export async function cacheAudio(id: string, blob: Blob): Promise<void> {
           .sort((left, right) => left.lastAccessed - right.lastAccessed);
 
         for (const entry of staleEntries) {
-          if (totalBytes + blob.size <= MAX_CACHE_BYTES) break;
+          if (totalBytes + blob.size <= maxCacheBytes) break;
           store.delete(entry.id);
           totalBytes -= entry.bytes;
         }

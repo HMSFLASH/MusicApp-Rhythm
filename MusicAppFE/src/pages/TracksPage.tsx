@@ -1,7 +1,7 @@
 import { getSecureRandom } from '../utils/randomUtils';
 import { useState, useRef } from 'react';
 import { useNavigate, useSearchParams } from 'react-router-dom';
-import { Heart, ListMusic, ListPlus, Play, ArrowLeft, Shuffle, MoreHorizontal, Info, X, ListEnd, ListStart, RefreshCw, Trash2, Cpu, Tags, ChevronDown, CheckSquare, Square, Download, DownloadCloud, Loader2, CheckCircle2 } from 'lucide-react';
+import { Heart, ListMusic, ListPlus, Play, ArrowLeft, Shuffle, MoreHorizontal, Info, X, ListEnd, ListStart, RefreshCw, Trash2, Cpu, ChevronDown, CheckSquare, Square, Download, DownloadCloud, Loader2, CheckCircle2 } from 'lucide-react';
 import { useTranslation } from 'react-i18next';
 import { AddToPlaylistModal } from '../components/AddToPlaylistModal';
 import { useGlobalAudio } from '../context/AudioContext';
@@ -13,6 +13,7 @@ import { getAudioExtension } from '../hooks/audioMime';
 import { ActionMenu } from '../components/ActionMenu';
 import { useOffline } from '../context/OfflineContext';
 import { downloadTrackFile } from '../utils/downloadUtils';
+import { TrackInfoModal } from '../components/TrackInfoModal';
 
 import { useVirtualList } from '../hooks/useVirtualList';
 
@@ -236,13 +237,6 @@ export function TracksPage() {
     }
   };
 
-  const infoTrackMetadata = infoTrack ? playerState.getTrackMetadata(infoTrack.id) : undefined;
-  const infoTrackFileSize = infoTrack?.fileSize ?? infoTrackMetadata?.fileSize;
-  const infoTrackBitrate = infoTrack?.bitrate ?? infoTrackMetadata?.bitrate;
-  const infoTrackChannels = infoTrack?.numberOfChannels ?? infoTrackMetadata?.numberOfChannels;
-  const infoTrackSampleRate = infoTrack?.sampleRate ?? infoTrackMetadata?.sampleRate;
-  const infoTrackBitsPerSample = infoTrack?.bitsPerSample ?? infoTrackMetadata?.bitsPerSample;
-  
   const uncachedCount = displayTracks.filter(t => !isCached(t) && t.sourceType !== 'LOCAL').length;
 
   const {
@@ -566,26 +560,27 @@ export function TracksPage() {
                             onClick={(e) => handlePlayNext(track, e)}
                             className="w-full flex items-center gap-3 px-3.5 py-2 text-xs font-medium text-left text-slate-200 hover:bg-white/[0.06] hover:text-white transition-colors"
                           >
-                            <ListStart size={14} className="text-primary" /> Play Next
+                            <ListStart size={14} className="text-primary" /> {t('tracks.playNext', 'Play Next')}
                           </button>
                           <button
                             onClick={(e) => handleAddToQueue(track, e)}
                             className="w-full flex items-center gap-3 px-3.5 py-2 text-xs font-medium text-left text-slate-200 hover:bg-white/[0.06] hover:text-white transition-colors"
                           >
-                            <ListEnd size={14} className="text-cyan-400" /> Add to Queue
+                            <ListEnd size={14} className="text-cyan-400" /> {t('tracks.addToQueue', 'Add to Queue')}
                           </button>
                           <button
                             onClick={(e) => { e.stopPropagation(); setTrackToPlaylist(track); setOpenMenuId(null); }}
                             className="w-full flex items-center gap-3 px-3.5 py-2 text-xs font-medium text-left text-slate-200 hover:bg-white/[0.06] hover:text-white transition-colors"
                           >
-                            <ListPlus size={14} className="text-emerald-400" /> Add to Playlist
+                            <ListPlus size={14} className="text-emerald-400" /> {t('tracks.addToPlaylist', 'Add to Playlist')}
                           </button>
                           {track.sourceType !== 'LOCAL' && (
                             <button
                               onClick={(e) => { e.stopPropagation(); downloadTrackFile(track); setOpenMenuId(null); }}
                               className="w-full flex items-center gap-3 px-3.5 py-2 text-xs font-medium text-left text-slate-200 hover:bg-white/[0.06] hover:text-white transition-colors"
+                              title="Tải file âm thanh về thiết bị"
                             >
-                              <Download size={14} className="text-slate-400" /> Download File
+                              <Download size={14} className="text-slate-400" /> {t('tracks.downloadFile', 'Download File')}
                             </button>
                           )}
                           {!isOfflineMode && track.sourceType !== 'LOCAL' && (
@@ -597,6 +592,7 @@ export function TracksPage() {
                                 }
                               }}
                               className="w-full flex items-center gap-3 px-3.5 py-2 text-xs font-medium text-left text-slate-200 hover:bg-white/[0.06] hover:text-white transition-colors"
+                              title="Lưu vào bộ nhớ đệm trình duyệt để nghe khi offline"
                             >
                               {(() => {
                                 if (isCached(track)) return <CheckCircle2 size={14} className="text-green-400" />;
@@ -604,7 +600,7 @@ export function TracksPage() {
                                 return <DownloadCloud size={14} className="text-blue-400" />;
                               })()}
                               <span>
-                                {isCached(track) ? t('offline.downloaded', 'Downloaded (Offline)') : (downloadingTrackIds.has(String(track.id)) ? t('offline.downloading', 'Downloading...') : t('offline.downloadTrack', 'Save for Offline'))}
+                                {isCached(track) ? t('offline.downloaded', 'Saved (Offline)') : (downloadingTrackIds.has(String(track.id)) ? t('offline.downloading', 'Saving Offline...') : t('offline.downloadTrack', 'Save for Offline'))}
                               </span>
                             </button>
                           )}
@@ -614,7 +610,7 @@ export function TracksPage() {
                               className="w-full flex items-center gap-3 px-3.5 py-2 text-xs font-medium text-left text-slate-200 hover:bg-white/[0.06] hover:text-white transition-colors"
                             >
                               <Heart size={14} fill={favorites.some(f => f.id === track.id) ? "currentColor" : "none"} className={favorites.some(f => f.id === track.id) ? "text-primary" : "text-slate-400"} />
-                              {favorites.some(f => f.id === track.id) ? "Remove Favorite" : "Add to Favorite"}
+                              {favorites.some(f => f.id === track.id) ? t('tracks.removeFavorite', 'Remove Favorite') : t('tracks.addFavorite', 'Add to Favorite')}
                             </button>
                           )}
                           {getAudioExtension(track.fileName) === 'flac' && (
@@ -647,24 +643,10 @@ export function TracksPage() {
                             </button>
                           )}
                           <button
-                            onClick={async (e) => {
-                              e.stopPropagation();
-                              playerState.toggleLegacyMetadataForTrack(track);
-                              setOpenMenuId(null);
-                              if (playerState.currentTrack?.id === track.id && track.sourceType !== 'LOCAL') {
-                                await playerState.reloadCurrentTrackFromDrive();
-                              }
-                            }}
-                            className="w-full flex items-center gap-3 px-3.5 py-2 text-xs font-medium text-left text-slate-200 hover:bg-white/[0.06] hover:text-white transition-colors"
-                          >
-                            <Tags size={14} className={playerState.isLegacyMetadataEnabled(track) ? 'text-primary' : 'text-slate-400'} />
-                            {playerState.isLegacyMetadataEnabled(track) ? 'Use New Metadata Parser' : 'Use Legacy Metadata Parser'}
-                          </button>
-                          <button
                             onClick={(e) => { e.stopPropagation(); setInfoTrack(track); setOpenMenuId(null); }}
                             className="w-full flex items-center gap-3 px-3.5 py-2 text-xs font-medium text-left text-slate-200 hover:bg-white/[0.06] hover:text-white transition-colors border-t border-white/[0.06]"
                           >
-                            <Info size={14} className="text-slate-400" /> Info
+                            <Info size={14} className="text-slate-400" /> {t('tracks.info', 'Track Info')}
                           </button>
                           {track.sourceType !== 'LOCAL' && (
                             <button
@@ -691,7 +673,7 @@ export function TracksPage() {
                               }}
                               className="w-full flex items-center gap-3 px-3.5 py-2 text-xs font-medium text-left text-rose-400 hover:bg-rose-500/10 hover:text-rose-300 transition-colors"
                             >
-                              <Trash2 size={14} /> Delete
+                              <Trash2 size={14} /> {t('tracks.delete', 'Delete Track')}
                             </button>
                           )}
                         </div>
@@ -707,57 +689,11 @@ export function TracksPage() {
 
       {/* Info Modal */}
       {infoTrack && (
-        <div
-          className="fixed inset-0 z-[100] flex items-center justify-center bg-black/70 backdrop-blur-md p-4"
-          onClick={() => setInfoTrack(null)}
-        >
-          <div
-            className="bg-[#0c1626] border border-white/10 rounded-2xl w-full max-w-md shadow-2xl overflow-hidden flex flex-col"
-            onClick={(e) => e.stopPropagation()}
-          >
-            <div className="flex items-center justify-between p-4 border-b border-white/[0.06]">
-              <div className="flex items-center gap-2.5 text-white">
-                <Info size={20} className="text-primary" />
-                <h3 className="font-semibold text-base">Track Metadata</h3>
-              </div>
-              <button
-                aria-label="Close info"
-                onClick={() => setInfoTrack(null)}
-                className="text-slate-400 hover:text-white transition-colors p-1 rounded-lg hover:bg-white/[0.05]"
-              >
-                <X size={18} />
-              </button>
-            </div>
-
-            <div className="p-4 flex flex-col gap-3 overflow-y-auto max-h-[70vh] no-scrollbar">
-              <div className="bg-white/[0.03] border border-white/[0.05] rounded-xl p-3.5 flex flex-col gap-2">
-                {[
-                  { label: 'Title', value: infoTrack.title || infoTrackMetadata?.title },
-                  { label: 'Artist', value: infoTrack.artist || infoTrackMetadata?.artist },
-                  { label: 'Album', value: infoTrack.album || infoTrackMetadata?.album },
-                  { label: 'Genre', value: infoTrack.genre || infoTrackMetadata?.genre },
-                  { label: 'Duration', value: infoTrack.durationSeconds ? `${Math.floor(infoTrack.durationSeconds / 60)}:${Math.floor(infoTrack.durationSeconds % 60).toString().padStart(2, '0')}` : null },
-                  { label: 'Play Count', value: `${infoTrack.playCount ?? 0}` },
-                  { label: 'File Name', value: infoTrack.fileName },
-                  { label: 'Source', value: infoTrack.sourceType },
-                  { label: 'Track ID', value: String(infoTrack.id) },
-                  { label: 'File Type', value: infoTrack.fileFormat || infoTrackMetadata?.fileFormat },
-                  { label: 'Codec', value: infoTrack.codec || infoTrackMetadata?.codec },
-                  { label: 'Size', value: infoTrackFileSize ? `${(infoTrackFileSize / 1024 / 1024).toFixed(2)} MB` : null },
-                  { label: 'Bit Rate', value: infoTrackBitrate ? `${Math.round(infoTrackBitrate / 1000)} kbps` : null },
-                  { label: 'Channels', value: infoTrackChannels ? `${infoTrackChannels} ${infoTrackChannels === 2 ? '(stereo)' : ''}` : null },
-                  { label: 'Audio Sample Rate', value: infoTrackSampleRate ? `${(infoTrackSampleRate / 1000).toFixed(3)} kHz` : null },
-                  { label: 'Bit Depth', value: infoTrackBitsPerSample ? `${infoTrackBitsPerSample} bit` : null }
-                ].map((item, idx) => (
-                  <div key={idx} className="flex flex-col gap-0.5">
-                    <span className="text-[10px] uppercase tracking-wider text-slate-400 font-mono font-semibold">{item.label}</span>
-                    <span className="text-xs text-slate-200 font-medium break-all">{item.value || 'unknown'}</span>
-                  </div>
-                ))}
-              </div>
-            </div>
-          </div>
-        </div>
+        <TrackInfoModal
+          track={infoTrack}
+          trackMetadata={playerState.getTrackMetadata(infoTrack.id)}
+          onClose={() => setInfoTrack(null)}
+        />
       )}
     </div>
   );

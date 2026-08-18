@@ -78,6 +78,56 @@ export async function removeCover(trackId: string): Promise<void> {
   }
 }
 
+export async function removeCovers(trackIds: string[]): Promise<void> {
+  if (trackIds.length === 0) return;
+  try {
+    const db = await getDB();
+    await new Promise<void>((resolve, reject) => {
+      const tx = db.transaction(STORE_NAME, 'readwrite');
+      const store = tx.objectStore(STORE_NAME);
+      for (const trackId of trackIds) {
+        store.delete(trackId);
+      }
+      tx.oncomplete = () => resolve();
+      tx.onerror = () => reject(tx.error);
+    });
+  } catch (e) {
+    console.error('Failed to remove covers batch from IndexedDB', e);
+  }
+}
+
+export async function getCoversStats(): Promise<{ count: number; totalBytes: number }> {
+  try {
+    const db = await getDB();
+    return await new Promise((resolve, reject) => {
+      const tx = db.transaction(STORE_NAME, 'readonly');
+      const store = tx.objectStore(STORE_NAME);
+      const cursorRequest = store.openCursor();
+      let count = 0;
+      let totalBytes = 0;
+
+      cursorRequest.onsuccess = (e) => {
+        const cursor = (e.target as IDBRequest<IDBCursorWithValue>).result;
+        if (cursor) {
+          count++;
+          const data = cursor.value?.data;
+          if (data && (data.byteLength || data.length)) {
+            totalBytes += data.byteLength || data.length || 0;
+          }
+          cursor.continue();
+        } else {
+          resolve({ count, totalBytes });
+        }
+      };
+
+      cursorRequest.onerror = () => reject(cursorRequest.error);
+    });
+  } catch (e) {
+    console.error('Failed to get covers stats from IndexedDB', e);
+    return { count: 0, totalBytes: 0 };
+  }
+}
+
 export async function clearCovers(): Promise<void> {
   try {
     const db = await getDB();

@@ -1,5 +1,6 @@
 import { createContext, useContext, useEffect, useState, useCallback, useMemo, type ReactNode } from 'react';
-import { getAllCachedIds } from '../utils/mediaCache';
+import { getAllCachedIds, removeCachedAudio, removeCachedAudios, clearCachedAudio } from '../utils/mediaCache';
+import { clearCovers } from '../utils/idb';
 import { loadTrackAudioUrl } from '../hooks/audioTrackLoader';
 import type { Track } from '../hooks/useAudioPlayer';
 import { useAuth } from './AuthContext';
@@ -12,6 +13,9 @@ interface OfflineContextType {
   downloadTrack: (track: Track) => Promise<void>;
   downloadingTrackIds: Set<string>;
   refreshCachedMediaIds: () => Promise<void>;
+  removeCachedAudioTrack: (id: string) => Promise<void>;
+  removeCachedAudioTracks: (ids: string[]) => Promise<void>;
+  clearAllCache: () => Promise<void>;
 }
 
 const OfflineContext = createContext<OfflineContextType | undefined>(undefined);
@@ -94,6 +98,24 @@ export function OfflineProvider({ children }: OfflineProviderProps) {
     }
   }, [driveToken, fetchDriveToken, isCached, playerState, refreshCachedMediaIds]);
 
+  const removeCachedAudioTrack = useCallback(async (id: string) => {
+    await removeCachedAudio(id);
+    await refreshCachedMediaIds();
+  }, [refreshCachedMediaIds]);
+
+  const removeCachedAudioTracks = useCallback(async (ids: string[]) => {
+    await removeCachedAudios(ids);
+    await refreshCachedMediaIds();
+  }, [refreshCachedMediaIds]);
+
+  const clearAllCache = useCallback(async () => {
+    await Promise.allSettled([
+      clearCachedAudio(),
+      clearCovers(),
+    ]);
+    await refreshCachedMediaIds();
+  }, [refreshCachedMediaIds]);
+
   const value = useMemo(() => ({
     isOfflineMode,
     cachedMediaIds,
@@ -101,7 +123,10 @@ export function OfflineProvider({ children }: OfflineProviderProps) {
     downloadTrack,
     downloadingTrackIds,
     refreshCachedMediaIds,
-  }), [isOfflineMode, cachedMediaIds, isCached, downloadTrack, downloadingTrackIds, refreshCachedMediaIds]);
+    removeCachedAudioTrack,
+    removeCachedAudioTracks,
+    clearAllCache,
+  }), [isOfflineMode, cachedMediaIds, isCached, downloadTrack, downloadingTrackIds, refreshCachedMediaIds, removeCachedAudioTrack, removeCachedAudioTracks, clearAllCache]);
 
   return (
     <OfflineContext.Provider value={value}>

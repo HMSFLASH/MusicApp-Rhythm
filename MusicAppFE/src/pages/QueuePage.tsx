@@ -1,4 +1,5 @@
 import { useState, useEffect, useMemo, useRef } from 'react';
+import { useTranslation } from 'react-i18next';
 import { useGlobalAudio } from '../context/AudioContext';
 import { useLibrary } from '../context/LibraryContext';
 import { Play, Trash2, GripVertical, MoreHorizontal, ArrowUp, ArrowDown, ListPlus, Heart, Info, X, ChevronsUp, ChevronsDown, CheckSquare, Square, Download } from 'lucide-react';
@@ -8,6 +9,7 @@ import { AddToPlaylistModal } from '../components/AddToPlaylistModal';
 import { ActionMenu } from '../components/ActionMenu';
 import { useAuth } from '../context/AuthContext';
 import { downloadTrackFile } from '../utils/downloadUtils';
+import { TrackInfoModal } from '../components/TrackInfoModal';
 
 const QUEUE_ITEM_HEIGHT = 84;
 
@@ -28,6 +30,7 @@ const getDisplayArtist = (track: Track, metadata?: Partial<Track>) => {
 };
 
 export function QueuePage() {
+  const { t } = useTranslation();
   const { playerState } = useGlobalAudio();
   const { queue, setQueue, currentTrack, isPlaying, playTrack, togglePlay, upcomingQueues, removeUpcomingQueue } = playerState;
   const { favorites, toggleFavorite } = useLibrary();
@@ -411,8 +414,9 @@ export function QueuePage() {
                             <button
                               onClick={(e) => { e.stopPropagation(); downloadTrackFile(track); setOpenMenuIndex(null); }}
                               className="w-full flex items-center gap-3 px-3.5 py-2.5 text-xs font-medium text-left text-slate-200 hover:bg-white/[0.08] hover:text-white transition-colors border-t border-white/[0.04] mt-0.5 pt-2"
+                              title="Tải file âm thanh về thiết bị"
                             >
-                              <Download size={14} className="text-slate-400" /> Download File
+                              <Download size={14} className="text-slate-400" /> {t('tracks.downloadFile', 'Download File')}
                             </button>
                           )}
                           {track.sourceType !== 'LOCAL' && (
@@ -421,14 +425,14 @@ export function QueuePage() {
                               className="w-full flex items-center gap-3 px-3.5 py-2.5 text-xs font-medium text-left text-slate-200 hover:bg-white/[0.08] hover:text-white transition-colors"
                             >
                               <Heart size={14} fill={isFavorite ? "currentColor" : "none"} className={isFavorite ? "text-primary" : "text-slate-400"} /> 
-                              {isFavorite ? "Remove from Favorites" : "Add to Favorites"}
+                              {isFavorite ? t('tracks.removeFavorite', 'Remove from Favorites') : t('tracks.addFavorite', 'Add to Favorites')}
                             </button>
                           )}
                           <button
                             onClick={(e) => { e.stopPropagation(); setInfoTrack(track); setOpenMenuIndex(null); }}
                             className="w-full flex items-center gap-3 px-3.5 py-2.5 text-xs font-medium text-left text-slate-200 hover:bg-white/[0.08] hover:text-white transition-colors"
                           >
-                            <Info size={14} className="text-slate-400" /> Info
+                            <Info size={14} className="text-slate-400" /> {t('tracks.info', 'Info')}
                           </button>
                           <div className="h-px bg-white/[0.06] my-1"></div>
                           <button
@@ -505,60 +509,11 @@ export function QueuePage() {
 
       {/* Info Modal */}
       {infoTrack && (
-        <div
-          className="fixed inset-0 z-[100] flex items-center justify-center bg-black/70 backdrop-blur-md p-4"
-          onClick={() => setInfoTrack(null)}
-        >
-          <div
-            className="bg-[#0c1626] border border-white/10 rounded-2xl w-full max-w-md max-h-[calc(100dvh-2rem)] shadow-2xl overflow-hidden flex flex-col"
-            onClick={(e) => e.stopPropagation()}
-          >
-            <div className="flex items-center justify-between p-4 border-b border-white/[0.06]">
-              <div className="flex items-center gap-2.5 text-white">
-                <Info size={20} className="text-primary" />
-                <h2 className="font-semibold text-base">Track Metadata</h2>
-              </div>
-              <button
-                aria-label="Close info"
-                onClick={() => setInfoTrack(null)}
-                className="text-slate-400 hover:text-white transition-colors p-1 rounded-lg hover:bg-white/[0.05]"
-              >
-                <X size={18} />
-              </button>
-            </div>
-
-            <div className="p-4 flex flex-col gap-3 overflow-y-auto max-h-[70vh] no-scrollbar">
-              <div className="bg-white/[0.03] border border-white/[0.05] rounded-xl p-3.5 flex flex-col gap-2">
-                {[
-                  { label: 'Title', value: infoTrack.title || playerState.getTrackMetadata(infoTrack.id)?.title },
-                  { label: 'Artist', value: infoTrack.artist || playerState.getTrackMetadata(infoTrack.id)?.artist },
-                  { label: 'Album', value: infoTrack.album || playerState.getTrackMetadata(infoTrack.id)?.album },
-                  { label: 'Genre', value: infoTrack.genre || playerState.getTrackMetadata(infoTrack.id)?.genre },
-                  { label: 'Duration', value: infoTrack.durationSeconds ? `${Math.floor(infoTrack.durationSeconds / 60)}:${Math.floor(infoTrack.durationSeconds % 60).toString().padStart(2, '0')}` : null },
-                  { label: 'File Name', value: infoTrack.fileName },
-                  { label: 'Source', value: infoTrack.sourceType },
-                  { label: 'Track ID', value: String(infoTrack.id) },
-                  { label: 'File Type', value: infoTrack.fileFormat || playerState.getTrackMetadata(infoTrack.id)?.fileFormat },
-                  { label: 'Codec', value: infoTrack.codec || playerState.getTrackMetadata(infoTrack.id)?.codec },
-                  // eslint-disable-next-line @typescript-eslint/no-non-null-asserted-optional-chain
-                  { label: 'Size', value: (infoTrack.fileSize || playerState.getTrackMetadata(infoTrack.id)?.fileSize) ? `${((infoTrack.fileSize || playerState.getTrackMetadata(infoTrack.id)?.fileSize!) / 1024 / 1024).toFixed(2)} MB` : null },
-                  // eslint-disable-next-line @typescript-eslint/no-non-null-asserted-optional-chain
-                  { label: 'Bit Rate', value: (infoTrack.bitrate || playerState.getTrackMetadata(infoTrack.id)?.bitrate) ? `${Math.round((infoTrack.bitrate || playerState.getTrackMetadata(infoTrack.id)?.bitrate!) / 1000)} kbps` : null },
-                  // eslint-disable-next-line @typescript-eslint/no-non-null-asserted-optional-chain
-                  { label: 'Channels', value: (infoTrack.numberOfChannels || playerState.getTrackMetadata(infoTrack.id)?.numberOfChannels) ? `${infoTrack.numberOfChannels || playerState.getTrackMetadata(infoTrack.id)?.numberOfChannels} ${[2].includes(infoTrack.numberOfChannels || playerState.getTrackMetadata(infoTrack.id)?.numberOfChannels!) ? '(stereo)' : ''}` : null },
-                  // eslint-disable-next-line @typescript-eslint/no-non-null-asserted-optional-chain
-                  { label: 'Audio Sample Rate', value: (infoTrack.sampleRate || playerState.getTrackMetadata(infoTrack.id)?.sampleRate) ? `${((infoTrack.sampleRate || playerState.getTrackMetadata(infoTrack.id)?.sampleRate!) / 1000).toFixed(3)} kHz` : null },
-                  { label: 'Bit Depth', value: (infoTrack.bitsPerSample || playerState.getTrackMetadata(infoTrack.id)?.bitsPerSample) ? `${infoTrack.bitsPerSample || playerState.getTrackMetadata(infoTrack.id)?.bitsPerSample} bit` : null }
-                ].map((item, idx) => (
-                  <div key={idx} className="flex flex-col gap-0.5">
-                    <span className="text-[10px] uppercase tracking-wider text-slate-400 font-mono font-semibold">{item.label}</span>
-                    <span className="text-xs text-slate-200 font-medium break-all">{item.value || 'unknown'}</span>
-                  </div>
-                ))}
-              </div>
-            </div>
-          </div>
-        </div>
+        <TrackInfoModal
+          track={infoTrack}
+          trackMetadata={playerState.getTrackMetadata(infoTrack.id)}
+          onClose={() => setInfoTrack(null)}
+        />
       )}
     </div>
   );

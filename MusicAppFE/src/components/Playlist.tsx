@@ -6,6 +6,7 @@ import type { Track } from '../hooks/useAudioPlayer';
 import { Cloud, Play, Plus, ListMusic, ChevronLeft, Trash2, ListPlus, X, Shuffle, Pencil, Check, MoreHorizontal, Heart, Info, ListStart, ListEnd, Download } from 'lucide-react';
 import { CreatePlaylistModal } from './CreatePlaylistModal';
 import { AddTracksModal } from './AddTracksModal';
+import { TrackInfoModal } from './TrackInfoModal';
 import { axiosClient } from '../api/axiosClient';
 import { useGlobalAudio } from '../context/AudioContext';
 import { db } from '../lib/db';
@@ -300,13 +301,6 @@ export function Playlist({ isAuthenticated, onPlay, currentTrackId }: PlaylistPr
       console.error(e);
     }
   };
-
-  const infoTrackMetadata = infoTrack ? playerState.getTrackMetadata(infoTrack.id) : undefined;
-  const infoTrackFileSize = infoTrack?.fileSize ?? infoTrackMetadata?.fileSize;
-  const infoTrackBitrate = infoTrack?.bitrate ?? infoTrackMetadata?.bitrate;
-  const infoTrackChannels = infoTrack?.numberOfChannels ?? infoTrackMetadata?.numberOfChannels;
-  const infoTrackSampleRate = infoTrack?.sampleRate ?? infoTrackMetadata?.sampleRate;
-  const infoTrackBitsPerSample = infoTrack?.bitsPerSample ?? infoTrackMetadata?.bitsPerSample;
 
   return (
     <div className="bg-surface rounded-xl p-3 sm:p-4 md:p-6 shadow-2xl border border-white/5 flex flex-col h-full">
@@ -621,20 +615,21 @@ export function Playlist({ isAuthenticated, onPlay, currentTrackId }: PlaylistPr
                                   onClick={(e) => handlePlayNext(track, e)}
                                   className="w-full flex items-center gap-3 px-3.5 py-2 text-xs font-medium text-left text-slate-200 hover:text-white hover:bg-white/[0.08] transition-colors"
                                 >
-                                  <ListStart size={14} className="text-slate-400" /> Play Next
+                                  <ListStart size={14} className="text-slate-400" /> {t('tracks.playNext', 'Play Next')}
                                 </button>
                                 <button
                                   onClick={(e) => handleAddToQueue(track, e)}
                                   className="w-full flex items-center gap-3 px-3.5 py-2 text-xs font-medium text-left text-slate-200 hover:text-white hover:bg-white/[0.08] transition-colors"
                                 >
-                                  <ListEnd size={14} className="text-slate-400" /> Add to Queue
+                                  <ListEnd size={14} className="text-slate-400" /> {t('tracks.addToQueue', 'Add to Queue')}
                                 </button>
                                 {track.sourceType !== 'LOCAL' && (
                                   <button
                                     onClick={(e) => { e.stopPropagation(); downloadTrackFile(track); setOpenMenuId(null); }}
                                     className="w-full flex items-center gap-3 px-3.5 py-2 text-xs font-medium text-left text-slate-200 hover:text-white hover:bg-white/[0.08] transition-colors"
+                                    title="Tải file âm thanh về thiết bị"
                                   >
-                                    <Download size={14} className="text-slate-400" /> Download File
+                                    <Download size={14} className="text-slate-400" /> {t('tracks.downloadFile', 'Download File')}
                                   </button>
                                 )}
                                 {track.sourceType !== 'LOCAL' && (
@@ -643,21 +638,21 @@ export function Playlist({ isAuthenticated, onPlay, currentTrackId }: PlaylistPr
                                     className="w-full flex items-center gap-3 px-3.5 py-2 text-xs font-medium text-left text-slate-200 hover:text-white hover:bg-white/[0.08] transition-colors"
                                   >
                                     <Heart size={14} fill={favorites.some(f => f.id === track.id) ? "currentColor" : "none"} className={favorites.some(f => f.id === track.id) ? "text-primary" : "text-slate-400"} /> 
-                                    {favorites.some(f => f.id === track.id) ? "Remove from Favorites" : "Add to Favorites"}
+                                    {favorites.some(f => f.id === track.id) ? t('tracks.removeFavorite', 'Remove from Favorites') : t('tracks.addFavorite', 'Add to Favorites')}
                                   </button>
                                 )}
                                 <button
                                   onClick={(e) => { e.stopPropagation(); setInfoTrack(track); setOpenMenuId(null); }}
                                   className="w-full flex items-center gap-3 px-3.5 py-2 text-xs font-medium text-left text-slate-200 hover:text-white hover:bg-white/[0.08] transition-colors border-t border-white/[0.06] mt-1 pt-1.5"
                                 >
-                                  <Info size={14} className="text-slate-400" /> Info
+                                  <Info size={14} className="text-slate-400" /> {t('tracks.info', 'Info')}
                                 </button>
                                 <div className="h-px bg-white/[0.06] my-1"></div>
                                 <button
                                   onClick={(e) => { setOpenMenuId(null); removeTrackFromPlaylist(track.id, e); }}
                                   className="w-full flex items-center gap-3 px-3.5 py-2 text-xs font-medium text-left text-rose-400 hover:text-rose-300 hover:bg-rose-500/10 transition-colors"
                                 >
-                                  <Trash2 size={14} /> Remove
+                                  <Trash2 size={14} /> {t('playlist.removeFromPlaylist', 'Remove')}
                                 </button>
                               </div>
                             )}
@@ -675,55 +670,11 @@ export function Playlist({ isAuthenticated, onPlay, currentTrackId }: PlaylistPr
 
       {/* Info Modal */}
       {infoTrack && (
-        <div
-          className="fixed inset-0 z-[100] flex items-center justify-center bg-black/60 backdrop-blur-sm p-4"
-          onClick={() => setInfoTrack(null)}
-        >
-          <div
-            className="bg-[#1a1a1a] border border-white/10 rounded-2xl w-full max-w-md max-h-[calc(100dvh-2rem)] shadow-2xl overflow-hidden flex flex-col"
-            onClick={(e) => e.stopPropagation()}
-          >
-            <div className="flex items-center justify-between p-5 border-b border-white/5">
-              <div className="flex items-center gap-3 text-white">
-                <Info size={24} className="text-primary" />
-                <h3 className="font-semibold text-lg">Track Metadata</h3>
-              </div>
-              <button
-                onClick={() => setInfoTrack(null)}
-                className="text-white/40 hover:text-white transition-colors p-1"
-              >
-                <X size={20} />
-              </button>
-            </div>
-
-            <div className="p-5 flex flex-col gap-4 overflow-y-auto max-h-[70vh]">
-              <div className="bg-white/5 rounded-xl p-4 flex flex-col gap-3">
-                {[
-                  { label: 'Title', value: infoTrack.title || infoTrackMetadata?.title },
-                  { label: 'Artist', value: infoTrack.artist || infoTrackMetadata?.artist },
-                  { label: 'Album', value: infoTrack.album || infoTrackMetadata?.album },
-                  { label: 'Genre', value: infoTrack.genre || infoTrackMetadata?.genre },
-                  { label: 'Duration', value: infoTrack.durationSeconds ? `${Math.floor(infoTrack.durationSeconds / 60)}:${Math.floor(infoTrack.durationSeconds % 60).toString().padStart(2, '0')}` : null },
-                  { label: 'File Name', value: infoTrack.fileName },
-                  { label: 'Source', value: infoTrack.sourceType },
-                  { label: 'Track ID', value: String(infoTrack.id) },
-                  { label: 'File Type', value: infoTrack.fileFormat || infoTrackMetadata?.fileFormat },
-                  { label: 'Codec', value: infoTrack.codec || infoTrackMetadata?.codec },
-                  { label: 'Size', value: infoTrackFileSize ? `${(infoTrackFileSize / 1024 / 1024).toFixed(2)} MB` : null },
-                  { label: 'Bit Rate', value: infoTrackBitrate ? `${Math.round(infoTrackBitrate / 1000)} kbps` : null },
-                  { label: 'Channels', value: infoTrackChannels ? `${infoTrackChannels} ${infoTrackChannels === 2 ? '(stereo)' : ''}` : null },
-                  { label: 'Audio Sample Rate', value: infoTrackSampleRate ? `${(infoTrackSampleRate / 1000).toFixed(3)} kHz` : null },
-                  { label: 'Bit Depth', value: infoTrackBitsPerSample ? `${infoTrackBitsPerSample} bit` : null }
-                ].map((item, idx) => (
-                  <div key={idx} className="flex flex-col gap-1">
-                    <span className="text-[10px] uppercase tracking-wider text-white/40 font-semibold">{item.label}</span>
-                    <span className="text-sm text-white/90 font-medium break-all">{item.value || 'unknown'}</span>
-                  </div>
-                ))}
-              </div>
-            </div>
-          </div>
-        </div>
+        <TrackInfoModal
+          track={infoTrack}
+          trackMetadata={playerState.getTrackMetadata(infoTrack.id)}
+          onClose={() => setInfoTrack(null)}
+        />
       )}
     </div>
   );

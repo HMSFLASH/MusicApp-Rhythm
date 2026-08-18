@@ -9,6 +9,7 @@ import { SearchPage } from './pages/SearchPage';
 import { RegisterPage } from './pages/RegisterPage';
 import { LibraryPage } from './pages/LibraryPage';
 import { TracksPage } from './pages/TracksPage';
+import { SettingsPage } from './pages/SettingsPage';
 import { NotFoundPage } from './pages/NotFoundPage';
 
 import { LoginPage } from './pages/LoginPage';
@@ -73,6 +74,7 @@ function App() {
           <Route path="genres" element={<GenresPage />} />
           <Route path="queue" element={<QueuePage />} />
           <Route path="search" element={<SearchPage />} />
+          <Route path="settings" element={<SettingsPage />} />
           <Route path="*" element={<NotFoundPage />} />
         </Route>
       </Routes>

@@ -1,11 +1,12 @@
 import { useState, useRef, useEffect, useCallback } from 'react';
 import { useGlobalAudio } from '../context/AudioContext';
 import { useAuth } from '../context/AuthContext';
-import { Disc, Play, Pause, SkipBack, SkipForward, Shuffle, Repeat, Heart, Info, ListPlus, MoreHorizontal, Repeat1, Volume2, VolumeX, BarChart2, Gauge, Music, Check, X, ArrowRight, Square, PauseCircle, ListX, Loader2, Trash2, Cpu, Tags, RefreshCw, MonitorSpeaker, Download, Keyboard, Activity, Moon } from 'lucide-react';
+import { Disc, Play, Pause, SkipBack, SkipForward, Shuffle, Repeat, Heart, Info, ListPlus, MoreHorizontal, Repeat1, Volume2, VolumeX, BarChart2, Gauge, Music, Check, ArrowRight, Square, PauseCircle, ListX, Loader2, Trash2, Cpu, RefreshCw, MonitorSpeaker, Download, Activity, Moon, DownloadCloud, CheckCircle2 } from 'lucide-react';
 import { HorizontalSlider } from '../components/HorizontalSlider';
 import { SpeedPitchPanel } from '../components/SpeedPitchPanel';
 import { useLibrary } from '../context/LibraryContext';
 import { useSleepTimer } from '../context/SleepTimerContext';
+import { useOffline } from '../context/OfflineContext';
 import { LyricsView } from '../components/LyricsView';
 import { AudioVisualizer } from '../components/AudioVisualizer';
 import { MeshAmbientGlow } from '../components/MeshAmbientGlow';
@@ -16,6 +17,7 @@ import { useTranslation } from 'react-i18next';
 import { useConfirm } from '../context/ConfirmContext';
 import { getAudioExtension } from '../hooks/audioMime';
 import { downloadTrackFile } from '../utils/downloadUtils';
+import { TrackInfoModal } from '../components/TrackInfoModal';
 
 const formatTime = (time: number) => {
   const m = Math.floor(time / 60);
@@ -30,6 +32,7 @@ export function NowPlaying() {
   const { playerState } = useGlobalAudio();
   const { deleteTrack, favorites, toggleFavorite: libraryToggleFavorite } = useLibrary();
   const { state: sleepTimerState, openModal: openSleepTimerModal } = useSleepTimer();
+  const { isOfflineMode, isCached, downloadTrack, downloadingTrackIds } = useOffline();
   const navigate = useNavigate();
   const {
     isPlaying, isLoadingTrack, currentTrack, currentTime, duration,
@@ -186,8 +189,18 @@ export function NowPlaying() {
   const [showMetadata, setShowMetadata] = useState(false);
   // Lyrics Modal state
   const [showLyrics, setShowLyrics] = useState(false);
-  // Visualizer Mode state
-  const [visualizerMode, setVisualizerMode] = useState<'bars' | 'wave' | 'off'>('bars');
+  // Visualizer Mode state (default to 'off')
+  const [visualizerMode, setVisualizerMode] = useState<'mirror' | 'bars' | 'wave' | 'off'>(() => {
+    const saved = localStorage.getItem('RHYTHM_VISUALIZER_MODE');
+    if (saved && ['mirror', 'bars', 'wave', 'off'].includes(saved)) {
+      return saved as 'mirror' | 'bars' | 'wave' | 'off';
+    }
+    return 'off';
+  });
+
+  useEffect(() => {
+    localStorage.setItem('RHYTHM_VISUALIZER_MODE', visualizerMode);
+  }, [visualizerMode]);
 
   // Audio Device state
   const [showDeviceMenu, setShowDeviceMenu] = useState(false);
@@ -454,406 +467,234 @@ export function NowPlaying() {
             </div>
           </div>
 
-          <div className="text-center px-4 w-full">
-            <h2 className="text-xl sm:text-2xl font-bold font-display text-white mb-1.5 tracking-tight truncate">
-              {currentTrack.title || playerState.getTrackMetadata(currentTrack.id)?.title || (currentTrack.fileName ? (currentTrack.fileName.includes(' - ') ? currentTrack.fileName.split(' - ')[1].replace(/\.[^/.]+$/, "") : currentTrack.fileName.replace(/\.[^/.]+$/, "")) : 'Unknown Title')}
-            </h2>
-            <div className="flex items-center justify-center gap-2 text-sm text-slate-400 font-medium truncate w-full">
-              <span className="truncate">{currentTrack.artist || playerState.getTrackMetadata(currentTrack.id)?.artist || (currentTrack.fileName?.includes(' - ') ? currentTrack.fileName.split(' - ')[0] : t('bottomPlayer.unknown'))}</span>
-              {currentTrack.album && (
-                <>
-                  <span className="text-slate-600">•</span>
-                  <span className="text-slate-400 truncate text-xs">{currentTrack.album}</span>
-                </>
-              )}
+          <div className="flex items-center justify-between w-full px-3 gap-3">
+            <div className="flex-1 min-w-0 text-left sm:text-center">
+              <h2 className="text-xl sm:text-2xl font-bold font-display text-white mb-1 tracking-tight truncate">
+                {currentTrack.title || playerState.getTrackMetadata(currentTrack.id)?.title || (currentTrack.fileName ? (currentTrack.fileName.includes(' - ') ? currentTrack.fileName.split(' - ')[1].replace(/\.[^/.]+$/, "") : currentTrack.fileName.replace(/\.[^/.]+$/, "")) : 'Unknown Title')}
+              </h2>
+              <div className="flex items-center sm:justify-center gap-2 text-sm text-slate-400 font-medium truncate">
+                <span className="truncate">{currentTrack.artist || playerState.getTrackMetadata(currentTrack.id)?.artist || (currentTrack.fileName?.includes(' - ') ? currentTrack.fileName.split(' - ')[0] : t('bottomPlayer.unknown'))}</span>
+                {currentTrack.album && (
+                  <>
+                    <span className="text-slate-600">•</span>
+                    <span className="text-slate-400 truncate text-xs">{currentTrack.album}</span>
+                  </>
+                )}
+              </div>
             </div>
+
+            {currentTrack.sourceType !== 'LOCAL' && (
+              <button
+                onClick={toggleFavorite}
+                className={`p-2.5 rounded-2xl transition-all duration-300 shrink-0 ${
+                  isFavorite
+                    ? 'text-primary bg-primary/10 border border-primary/30 shadow-[0_0_15px_rgba(0,245,255,0.3)] scale-105'
+                    : 'text-slate-400 hover:text-white hover:bg-white/[0.06] border border-transparent'
+                }`}
+                aria-label={isFavorite ? "Remove from Favorites" : "Add to Favorites"}
+                title={isFavorite ? "Remove from Favorites" : "Add to Favorites"}
+              >
+                <Heart size={22} fill={isFavorite ? "currentColor" : "none"} className="transition-transform active:scale-90" />
+              </button>
+            )}
           </div>
 
           {/* Real-time Spectrum Audio Visualizer with Adaptive Colors */}
           {visualizerMode !== 'off' && (
-            <div className="w-full max-w-md px-4 my-1 animate-in fade-in duration-300">
-              <div className="p-3 rounded-2xl bg-white/[0.02] border border-white/[0.05] backdrop-blur-md shadow-inner flex flex-col items-center">
+            <div className="w-full max-w-md px-2 my-1 animate-in fade-in duration-300">
+              <div
+                className="group relative p-2.5 rounded-2xl bg-white/[0.025] hover:bg-white/[0.045] border border-white/[0.06] hover:border-white/[0.1] backdrop-blur-md shadow-inner flex flex-col items-center cursor-pointer transition-all duration-300"
+                onClick={() => setVisualizerMode(m => m === 'mirror' ? 'bars' : m === 'bars' ? 'wave' : m === 'wave' ? 'off' : 'mirror')}
+                title={`Visualizer: ${visualizerMode.toUpperCase()} (Click to switch)`}
+              >
                 <AudioVisualizer
                   analyserRef={playerState.masterAnalyserRef}
                   isPlaying={isPlaying}
-                  mode={visualizerMode === 'wave' ? 'wave' : 'bars'}
-                  className="w-full h-12"
+                  mode={visualizerMode}
+                  className="w-full h-14"
                   barColor={palette.primary}
+                  secondaryColor={palette.secondary}
                   glowColor={palette.glow}
                 />
+                <span className="absolute top-1.5 right-2.5 opacity-0 group-hover:opacity-100 transition-opacity bg-black/60 backdrop-blur-sm px-1.5 py-0.5 rounded-full border border-white/10 text-[9px] font-mono uppercase tracking-wider text-slate-300 pointer-events-none select-none">
+                  {visualizerMode}
+                </span>
               </div>
             </div>
           )}
 
-          {/* Playback Controls (Play/Pause, Skip, Progress) */}
-          <div className="w-full max-w-md mt-1">
+          {/* Playback Controls (Progress, Main Transport, Secondary Dock) */}
+          <div className="w-full max-w-md mt-2 flex flex-col gap-4">
 
-            {/* Top Action Bar */}
-            <div className="flex items-center justify-between px-2 mb-6 text-slate-400">
-              {currentTrack.sourceType !== 'LOCAL' ? (
-                <button
-                  onClick={toggleFavorite}
-                  className={`
-                    ${isFavorite ? 'text-primary drop-shadow-[0_0_12px_rgba(0,245,255,0.8)] scale-110' : 'text-slate-400 hover:text-white'} 
-                    transition-all duration-300 p-2 rounded-xl hover:bg-white/[0.05]
-                    active:scale-95
-                  `}
-                  aria-label={isFavorite ? "Remove from Favorites" : "Add to Favorites"}
-                >
-                  <Heart size={20} fill={isFavorite ? "currentColor" : "none"} className="transition-all duration-300" />
-                </button>
-              ) : (
-                <div className="w-9 h-9" />
-              )}
-
-              {/* Visualizer Mode Toggle */}
-              <button
-                onClick={() => setVisualizerMode(m => m === 'bars' ? 'wave' : m === 'wave' ? 'off' : 'bars')}
-                className={`transition-all p-2 rounded-xl text-xs font-semibold flex items-center gap-1.5 ${visualizerMode !== 'off' ? 'text-primary bg-primary/10 border border-primary/25 shadow-sm' : 'hover:bg-white/[0.05] text-slate-400 hover:text-white'}`}
-                title={`Visualizer: ${visualizerMode.toUpperCase()}`}
+            {/* Seek Bar with Dynamic Palette */}
+            <div className="flex items-center gap-3 font-mono text-xs font-semibold text-slate-400 select-none relative px-2">
+              <span className="min-w-[36px] text-right">{formatTime(displayTime)}</span>
+              <div
+                ref={progressBarRef}
+                className="flex-1 relative flex items-center group h-5 cursor-pointer touch-none"
+                onPointerDown={handleProgressPointerDown}
               >
-                <Activity size={18} />
-                <span className="hidden sm:inline uppercase text-[10px] font-mono">{visualizerMode}</span>
-              </button>
-
-              {/* Keyboard Shortcuts Trigger (Desktop only) */}
-              <button
-                onClick={() => {
-                  window.dispatchEvent(new KeyboardEvent('keydown', { key: '?' }));
-                }}
-                className="hidden md:flex hover:text-white transition-colors p-2 rounded-xl hover:bg-white/[0.05]"
-                title="Keyboard Shortcuts (?)"
-              >
-                <Keyboard size={19} />
-              </button>
-              {hasLyrics && (
-                <button
-                  onClick={() => setShowLyrics(!showLyrics)}
-                  className={`transition-all p-2 rounded-xl text-xs font-semibold flex items-center gap-1.5 ${showLyrics ? 'text-primary bg-primary/15 border border-primary/30 shadow-[0_0_12px_rgba(0,245,255,0.2)]' : 'hover:bg-white/[0.05] text-slate-400 hover:text-white'}`}
-                  title={showLyrics ? 'Show Disc' : t('nowPlaying.viewLyrics')}
-                >
-                  <Music size={18} />
-                  <span>Lyrics</span>
-                </button>
-              )}
-
-              {/* Sleep Timer Action Button */}
-              <button
-                onClick={openSleepTimerModal}
-                className={`transition-all p-2 rounded-xl text-xs font-semibold flex items-center gap-1.5 ${
-                  sleepTimerState.isActive
-                    ? 'text-primary bg-primary/15 border border-primary/30 shadow-[0_0_12px_rgba(0,245,255,0.25)]'
-                    : 'hover:bg-white/[0.05] text-slate-400 hover:text-white'
-                }`}
-                title={t('sleepTimer.title', 'Sleep Timer')}
-                aria-label={t('sleepTimer.title', 'Sleep Timer')}
-              >
-                <Moon size={18} className={sleepTimerState.isActive ? 'text-primary animate-pulse' : ''} />
-                {sleepTimerState.isActive && (
-                  <span className="text-[10px] font-mono font-bold text-primary">
-                    {sleepTimerState.mode === 'time'
-                      ? formatTime(sleepTimerState.remainingSeconds)
-                      : t('sleepTimer.endOfTrack', 'End of Track')}
-                  </span>
-                )}
-              </button>
-
-              <button 
-                onClick={() => setShowMetadata(true)} 
-                className="hover:text-white transition-colors p-2 rounded-xl hover:bg-white/[0.05]"
-                title="Track Info"
-              >
-                <Info size={20} />
-              </button>
-
-              {/* More Options (...) Button */}
-              <div className="relative" ref={menuRef}>
-                <button
-                  onClick={() => setShowMenu(v => !v)}
-                  className={`hover:text-white transition-colors p-2 rounded-xl hover:bg-white/[0.05] ${showMenu ? 'text-primary bg-primary/10' : ''}`}
-                >
-                  <MoreHorizontal size={20} />
-                </button>
-                {showMenu && (
-                  <div className="absolute bottom-full left-1/2 -translate-x-1/2 mb-3 w-72 max-w-[calc(100vw_-_2rem)] bg-[#0c1626] border border-white/10 rounded-2xl shadow-2xl overflow-hidden z-50 backdrop-blur-2xl">
-                    {showSpeedPitch ? (
-                      <SpeedPitchPanel
-                        playbackRate={playbackRate}
-                        updatePlaybackRate={updatePlaybackRate}
-                        preservesPitch={preservesPitch}
-                        togglePreservesPitch={togglePreservesPitch}
-                        pitchRate={pitchRate}
-                        updatePitchRate={updatePitchRate}
-                        speedPitchMode={speedPitchMode}
-                        setSpeedPitchMode={setSpeedPitchMode}
-                        speedPitchScope={speedPitchScope}
-                        setSpeedPitchScope={setSpeedPitchScope}
-                        precalculateOnIdle={playerState.precalculateOnIdle}
-                        currentTrackId={currentTrack?.id ? String(currentTrack.id) : undefined}
-                        t={t}
-                        onBack={() => setShowSpeedPitch(false)}
-                      />
-                    ) : showDeviceMenu ? (
-                      <div className="flex flex-col max-h-[65vh] overflow-y-auto">
-                        <div className="flex items-center gap-3 px-4 py-3 border-b border-white/5 sticky top-0 bg-[#0c1626] z-10">
-                          <button onClick={() => setShowDeviceMenu(false)} className="hover:bg-white/10 p-1.5 -ml-1.5 rounded-lg transition-colors">
-                            <ArrowRight size={16} className="rotate-180 text-white/80" />
-                          </button>
-                          <span className="text-sm font-bold text-white/90">{t('nowPlaying.outputDevice') || 'Output Device'}</span>
-                        </div>
-                        
-                        {!hasDeviceLabels && (
-                          <div className="p-4 border-b border-white/5">
-                            <p className="text-xs text-slate-400 mb-3 leading-tight">
-                              {t('nowPlaying.devicePermissionReason') || 'Trình duyệt ẩn tên thiết bị cho đến khi bạn cấp quyền Audio.'}
-                            </p>
-                            <button
-                              onClick={requestAudioPermission}
-                              className="w-full text-xs font-semibold bg-primary/20 text-primary py-2 rounded-lg hover:bg-primary/30 transition-colors"
-                            >
-                              {t('nowPlaying.grantPermission') || 'Hiện tên thiết bị'}
-                            </button>
-                          </div>
-                        )}
-
-                        {audioDevices.length > 0 ? audioDevices.map(device => (
-                          <button
-                            key={device.deviceId || 'default'}
-                            onClick={() => {
-                              const id = device.deviceId || '';
-                              setSelectedDeviceId(id);
-                              if (playerState.setAudioOutputDevice) {
-                                playerState.setAudioOutputDevice(id);
-                              }
-                            }}
-                            className={`w-full text-left px-4 py-3 text-xs font-medium transition-colors flex items-center justify-between border-b border-white/[0.04] ${selectedDeviceId === (device.deviceId || '') ? 'bg-primary/10 text-primary font-semibold' : 'text-slate-300 hover:bg-white/[0.05]'}`}
-                          >
-                            <span className="truncate pr-2">{device.label || `Device (${device.deviceId ? device.deviceId.slice(0, 5) : 'default'}...)`}</span>
-                            {selectedDeviceId === (device.deviceId || '') && <Check size={14} className="flex-shrink-0 text-primary" />}
-                          </button>
-                        )) : (
-                          <p className="text-xs text-slate-500 px-4 py-4 text-center">No devices found</p>
-                        )}
-                      </div>
-                    ) : (
-                      <>
-                        {/* Sleep Timer Menu Item */}
-                        <button
-                          onClick={() => {
-                            setShowMenu(false);
-                            openSleepTimerModal();
-                          }}
-                          className="w-full flex items-center justify-between px-4 py-3 text-xs font-medium text-slate-300 hover:bg-white/[0.05] transition-colors border-b border-white/[0.04]"
-                        >
-                          <div className="flex items-center gap-3">
-                            <Moon size={16} className={sleepTimerState.isActive ? 'text-primary' : 'text-slate-400'} />
-                            <span>{t('sleepTimer.title', 'Hẹn Giờ Tắt Nhạc')}</span>
-                          </div>
-                          <span className="text-[10px] font-mono text-primary font-semibold">
-                            {sleepTimerState.isActive
-                              ? (sleepTimerState.mode === 'time' ? formatTime(sleepTimerState.remainingSeconds) : t('sleepTimer.endOfTrack', 'Hết bài'))
-                              : t('sleepTimer.sleepTimerOff', 'Tắt')}
-                          </span>
-                        </button>
-                        {/* Speed & Pitch Button */}
-                        <button
-                          onClick={() => setShowSpeedPitch(true)}
-                          className="w-full flex items-center justify-between px-4 py-3 text-xs font-medium text-slate-300 hover:bg-white/[0.05] transition-colors border-b border-white/[0.04]"
-                        >
-                          <div className="flex items-center gap-3">
-                            <Gauge size={16} className={playbackRate !== 1 || (speedPitchMode === 'advanced' && pitchRate !== 1) ? 'text-primary' : 'text-slate-400'} />
-                            <span>{t('nowPlaying.speedAndPitch')}</span>
-                          </div>
-                          <span className="text-[10px] font-mono text-primary">
-                            {speedPitchMode === 'advanced' && pitchRate !== 1
-                              ? `${playbackRate}x / ${pitchRate}x`
-                              : `${playbackRate}x`
-                            }
-                          </span>
-                        </button>
-                        {/* Output Device Button */}
-                        <button
-                          onClick={() => setShowDeviceMenu(true)}
-                          className="w-full flex items-center justify-between px-4 py-3 text-xs font-medium text-slate-300 hover:bg-white/[0.05] transition-colors border-b border-white/[0.04]"
-                        >
-                          <div className="flex items-center gap-3">
-                            <MonitorSpeaker size={16} className="text-slate-400" />
-                            <span>{t('nowPlaying.outputDevice') || 'Output Device'}</span>
-                          </div>
-                          <span className="text-[10px] font-mono text-slate-400 truncate max-w-[80px]">
-                            {audioDevices.find(d => d.deviceId === selectedDeviceId)?.label || 'Default'}
-                          </span>
-                        </button>
-                        {currentTrack && currentTrack.sourceType !== 'LOCAL' && (
-                          <button
-                            onClick={() => {
-                              downloadTrackFile(currentTrack);
-                              setShowMenu(false);
-                            }}
-                            className="w-full flex items-center gap-3 px-4 py-3 text-xs font-medium text-slate-300 hover:bg-white/[0.05] transition-colors border-b border-white/[0.04]"
-                          >
-                            <Download size={16} className="text-slate-400" />
-                            <span>Download File</span>
-                          </button>
-                        )}
-                        {getAudioExtension(currentTrack.fileName) === 'flac' && (
-                          <button
-                            onClick={() => {
-                              playerState.toggleFlacWasmForTrack(currentTrack);
-                              setShowMenu(false);
-                            }}
-                            className="w-full flex items-center gap-3 px-4 py-3 text-xs font-medium text-slate-300 hover:bg-white/[0.05] transition-colors border-b border-white/[0.04]"
-                          >
-                            <Cpu size={16} className={playerState.isFlacWasmEnabled(currentTrack) ? 'text-primary' : 'text-slate-400'} />
-                            <span>{playerState.isFlacWasmEnabled(currentTrack) ? 'Use Normal FLAC' : 'Use FLAC WASM'}</span>
-                          </button>
-                        )}
-                        {(getAudioExtension(currentTrack.fileName) === 'm4a' || getAudioExtension(currentTrack.fileName) === 'aac') && (
-                          <button
-                            onClick={async () => {
-                              playerState.toggleM4aWasmForTrack(currentTrack);
-                              setShowMenu(false);
-                              if (currentTrack.sourceType !== 'LOCAL') {
-                                await playerState.reloadCurrentTrackFromDrive();
-                              }
-                            }}
-                            className="w-full flex items-center gap-3 px-4 py-3 text-xs font-medium text-slate-300 hover:bg-white/[0.05] transition-colors border-b border-white/[0.04]"
-                          >
-                            <Cpu size={16} className={playerState.isM4aWasmEnabled(currentTrack) ? 'text-primary' : 'text-slate-400'} />
-                            <span>{playerState.isM4aWasmEnabled(currentTrack) ? 'Use Normal M4A' : 'Use M4A WASM'}</span>
-                          </button>
-                        )}
-                        {currentTrack && (
-                          <button
-                            onClick={async () => {
-                              playerState.toggleLegacyMetadataForTrack(currentTrack);
-                              setShowMenu(false);
-                              if (currentTrack.sourceType !== 'LOCAL') {
-                                await playerState.reloadCurrentTrackFromDrive();
-                              }
-                            }}
-                            className="w-full flex items-center gap-3 px-4 py-3 text-xs font-medium text-slate-300 hover:bg-white/[0.05] transition-colors border-b border-white/[0.04]"
-                          >
-                            <Tags size={16} className={playerState.isLegacyMetadataEnabled(currentTrack) ? 'text-primary' : 'text-slate-400'} />
-                            <span>{playerState.isLegacyMetadataEnabled(currentTrack) ? 'Use New Metadata' : 'Use Legacy Metadata'}</span>
-                          </button>
-                        )}
-                        {currentTrack.sourceType !== 'LOCAL' && (
-                          <button
-                            onClick={async () => {
-                              setShowMenu(false);
-                              await playerState.reloadCurrentTrackFromDrive();
-                            }}
-                            className="w-full flex items-center gap-3 px-4 py-3 text-xs font-medium text-slate-300 hover:bg-white/[0.05] transition-colors border-b border-white/[0.04]"
-                          >
-                            <RefreshCw size={16} className="text-slate-400" />
-                            <span>{t('nowPlaying.reloadFromDrive')}</span>
-                          </button>
-                        )}
-
-                        {currentTrack.sourceType !== 'LOCAL' && (
-                          <button
-                            onClick={async () => {
-                              const isConfirmed = await confirm({
-                                title: 'Xóa bài hát',
-                                description: `Bạn có chắc chắn muốn xóa bài hát "${currentTrack.title || currentTrack.fileName}" khỏi thư viện?`,
-                                confirmText: 'Xóa',
-                                confirmColor: 'bg-red-500/20 text-red-400 hover:bg-red-500/30 border-red-500/30'
-                              });
-                              if (isConfirmed) {
-                                const isConfirmed2 = await confirm({
-                                  title: 'Xác nhận xóa vĩnh viễn',
-                                  description: `Hành động này sẽ xóa vĩnh viễn bài hát "${currentTrack.title || currentTrack.fileName}" từ Google Drive của bạn và không thể hoàn tác. Bạn vẫn muốn tiếp tục?`,
-                                  confirmText: 'Xóa vĩnh viễn',
-                                  confirmColor: 'bg-red-600 text-white hover:bg-red-700 border-red-600'
-                                });
-                                if (isConfirmed2) {
-                                  setShowMenu(false);
-                                  await deleteTrack(currentTrack);
-                                }
-                              }
-                            }}
-                            className="w-full flex items-center gap-3 px-4 py-3 text-xs font-medium text-red-400 hover:bg-red-500/10 transition-colors border-t border-white/[0.04]"
-                          >
-                            <Trash2 size={16} />
-                            <span>Delete from Library</span>
-                          </button>
-                        )}
-                      </>
-                    )}
-                  </div>
-                )}
+                <div className="absolute inset-x-0 h-1.5 group-hover:h-2 bg-white/10 rounded-full overflow-hidden transition-all">
+                  <div
+                    className="h-full transition-all duration-150"
+                    style={{
+                      width: `${displayPercent}%`,
+                      background: `linear-gradient(to right, ${palette.primary}, ${palette.secondary})`,
+                      boxShadow: `0 0 12px ${palette.glow}`,
+                    }}
+                  />
+                </div>
+                <div
+                  className={`absolute h-4 w-4 bg-white rounded-full transition-all ${isDraggingProgress ? 'opacity-100 scale-110' : 'opacity-0 group-hover:opacity-100'}`}
+                  style={{
+                    left: `calc(${displayPercent}% - 8px)`,
+                    border: `2px solid ${palette.primary}`,
+                    boxShadow: `0 0 12px ${palette.primary}`,
+                  }}
+                />
               </div>
+              <span className="min-w-[36px] text-left">{formatTime(duration)}</span>
+            </div>
 
-              <div className="relative flex items-center gap-2" ref={repeatRef}>
+            {/* Primary Transport Controls (Shuffle - Prev - Play/Pause - Next - Repeat) */}
+            <div className="flex items-center justify-between px-2">
+              {/* Shuffle */}
+              <button
+                onClick={() => setIsShuffle(prev => !prev)}
+                className={`p-2.5 rounded-2xl transition-all duration-200 ${
+                  isShuffle
+                    ? 'text-primary bg-primary/10 border border-primary/25 shadow-[0_0_15px_rgba(0,245,255,0.25)]'
+                    : 'text-slate-400 hover:text-white hover:bg-white/[0.05] border border-transparent'
+                }`}
+                title={isShuffle ? "Shuffle On" : "Shuffle Off"}
+              >
+                <Shuffle size={20} />
+              </button>
+
+              {/* Skip Back */}
+              <button
+                aria-label="Previous track"
+                onClick={playPrevious}
+                disabled={!hasPrevious}
+                className={`transition-all p-3 rounded-2xl hover:bg-white/[0.06] ${
+                  hasPrevious ? 'text-slate-200 hover:text-white active:scale-95' : 'text-white/20 cursor-not-allowed'
+                }`}
+              >
+                <SkipBack size={26} fill="currentColor" />
+              </button>
+
+              {/* Hero Play/Pause Button */}
+              <button
+                aria-label="Play or pause"
+                onClick={togglePlay}
+                disabled={isLoadingTrack}
+                className={`w-16 h-16 rounded-full flex items-center justify-center text-slate-950 transition-all ${
+                  isLoadingTrack 
+                    ? 'bg-slate-700 text-slate-400 cursor-not-allowed' 
+                    : 'hover:scale-105 active:scale-95 shadow-xl'
+                }`}
+                style={!isLoadingTrack ? {
+                  backgroundColor: palette.primary,
+                  boxShadow: `0 0 25px rgba(${palette.rgbPrimary}, 0.55), 0 0 50px rgba(${palette.rgbSecondary}, 0.3)`,
+                } : undefined}
+              >
+                {isLoadingTrack ? (
+                  <Loader2 size={28} className="animate-spin text-slate-400" />
+                ) : isPlaying ? (
+                  <Pause size={28} fill="currentColor" />
+                ) : (
+                  <Play size={28} fill="currentColor" className="ml-1" />
+                )}
+              </button>
+
+              {/* Skip Forward */}
+              <button
+                aria-label="Next track"
+                onClick={playNext}
+                disabled={!hasNext}
+                className={`transition-all p-3 rounded-2xl hover:bg-white/[0.06] ${
+                  hasNext ? 'text-slate-200 hover:text-white active:scale-95' : 'text-white/20 cursor-not-allowed'
+                }`}
+              >
+                <SkipForward size={26} fill="currentColor" />
+              </button>
+
+              {/* Repeat Button & Context Dropdown */}
+              <div className="relative flex items-center" ref={repeatRef}>
                 {repeatMode === 'simple' ? (
-                  <div className="flex items-center">
+                  <button
+                    onClick={() => {
+                      if (songEndMode === 'next' && queueEndMode === 'stop') {
+                        setQueueEndMode('repeat');
+                      } else if (songEndMode === 'next' && queueEndMode === 'repeat') {
+                        setSongEndMode('repeat_one');
+                      } else {
+                        setSongEndMode('next');
+                        setQueueEndMode('stop');
+                      }
+                    }}
+                    onContextMenu={(e) => { e.preventDefault(); openRepeatMenu(); }}
+                    className={`p-2.5 rounded-2xl transition-all duration-200 ${
+                      (queueEndMode === 'repeat' || songEndMode === 'repeat_one')
+                        ? 'text-primary bg-primary/10 border border-primary/25 shadow-[0_0_15px_rgba(0,245,255,0.25)]'
+                        : 'text-slate-400 hover:text-white hover:bg-white/[0.05] border border-transparent'
+                    }`}
+                    title={songEndMode === 'repeat_one' ? t('bottomPlayer.repeatSong') : (queueEndMode === 'repeat' ? t('bottomPlayer.repeatQueue') : t('bottomPlayer.repeatOff'))}
+                  >
+                    {songEndMode === 'repeat_one' ? <Repeat1 size={20} /> : <Repeat size={20} />}
+                  </button>
+                ) : (
+                  <div className="flex items-center gap-1">
                     <button
                       onClick={() => {
-                        if (songEndMode === 'next' && queueEndMode === 'stop') {
-                          setQueueEndMode('repeat');
-                        } else if (songEndMode === 'next' && queueEndMode === 'repeat') {
-                          setSongEndMode('repeat_one');
-                        } else {
-                          setSongEndMode('next');
-                          setQueueEndMode('stop');
-                        }
+                        if (songEndMode === 'next') setSongEndMode('repeat_one');
+                        else if (songEndMode === 'repeat_one') setSongEndMode('preload');
+                        else if (songEndMode === 'preload') setSongEndMode('stop');
+                        else setSongEndMode('next');
                       }}
                       onContextMenu={(e) => { e.preventDefault(); openRepeatMenu(); }}
-                      className={`hover:scale-105 transition-transform p-1.5 rounded-lg hover:bg-white/[0.05] ${(queueEndMode === 'repeat' || songEndMode === 'repeat_one') ? 'text-primary drop-shadow-[0_0_8px_rgba(0,245,255,0.6)]' : 'text-slate-400 hover:text-white'}`}
-                      title={songEndMode === 'repeat_one' ? t('bottomPlayer.repeatSong') : (queueEndMode === 'repeat' ? t('bottomPlayer.repeatQueue') : t('bottomPlayer.repeatOff'))}
+                      className={`p-2 rounded-xl transition-all ${
+                        songEndMode !== 'next'
+                          ? 'text-primary bg-primary/10 border border-primary/25 shadow-[0_0_15px_rgba(0,245,255,0.25)]'
+                          : 'text-slate-400 hover:text-white hover:bg-white/[0.05] border border-transparent'
+                      }`}
+                      title={
+                        songEndMode === 'next' ? t('bottomPlayer.songNext') :
+                        songEndMode === 'repeat_one' ? t('bottomPlayer.songRepeat') :
+                        songEndMode === 'preload' ? t('bottomPlayer.songPreload') : t('bottomPlayer.songStop')
+                      }
                     >
-                      {songEndMode === 'repeat_one' ? <Repeat1 size={20} /> : <Repeat size={20} />}
+                      {(() => {
+                        if (songEndMode === 'repeat_one') return <Repeat1 size={18} />;
+                        if (songEndMode === 'stop') return <Square size={15} />;
+                        if (songEndMode === 'preload') return <PauseCircle size={18} />;
+                        return <ArrowRight size={18} />;
+                      })()}
+                    </button>
+                    <button
+                      onClick={() => {
+                        if (queueEndMode === 'repeat') setQueueEndMode('next');
+                        else if (queueEndMode === 'next') setQueueEndMode('stop');
+                        else setQueueEndMode('repeat');
+                      }}
+                      onContextMenu={(e) => { e.preventDefault(); openRepeatMenu(); }}
+                      className={`p-2 rounded-xl transition-all ${
+                        queueEndMode !== 'stop'
+                          ? 'text-primary bg-primary/10 border border-primary/25 shadow-[0_0_15px_rgba(0,245,255,0.25)]'
+                          : 'text-slate-400 hover:text-white hover:bg-white/[0.05] border border-transparent'
+                      }`}
+                      title={
+                        queueEndMode === 'repeat' ? t('bottomPlayer.queueRepeat') :
+                        queueEndMode === 'next' ? t('bottomPlayer.queueNext') : queueEndMode === 'stop' ? t('bottomPlayer.queueStop') : ''
+                      }
+                    >
+                      {(() => {
+                        if (queueEndMode === 'repeat') return <Repeat size={18} />;
+                        if (queueEndMode === 'next') return <ListPlus size={18} />;
+                        return <ListX size={18} />;
+                      })()}
                     </button>
                   </div>
-                ) : (
-                  <>
-                    <div className="flex items-center">
-                      <button
-                        onClick={() => {
-                          if (songEndMode === 'next') setSongEndMode('repeat_one');
-                          else if (songEndMode === 'repeat_one') setSongEndMode('preload');
-                          else if (songEndMode === 'preload') setSongEndMode('stop');
-                          else setSongEndMode('next');
-                        }}
-                        onContextMenu={(e) => { e.preventDefault(); openRepeatMenu(); }}
-                        className={`hover:scale-105 transition-transform p-1.5 rounded-lg hover:bg-white/[0.05] ${songEndMode !== 'next' ? 'text-primary drop-shadow-[0_0_8px_rgba(0,245,255,0.6)]' : 'text-slate-400 hover:text-white'}`}
-                        title={
-                          songEndMode === 'next' ? t('bottomPlayer.songNext') :
-                          songEndMode === 'repeat_one' ? t('bottomPlayer.songRepeat') :
-                          songEndMode === 'preload' ? t('bottomPlayer.songPreload') : t('bottomPlayer.songStop')
-                        }
-                      >
-                        {(() => {
-                          if (songEndMode === 'repeat_one') return <Repeat1 size={20} />;
-                          if (songEndMode === 'stop') return <Square size={16} />;
-                          if (songEndMode === 'preload') return <PauseCircle size={20} />;
-                          return <ArrowRight size={20} />;
-                        })()}
-                      </button>
-                    </div>
-                    <div className="flex items-center">
-                      <button
-                        onClick={() => {
-                          if (queueEndMode === 'repeat') setQueueEndMode('next');
-                          else if (queueEndMode === 'next') setQueueEndMode('stop');
-                          else setQueueEndMode('repeat');
-                        }}
-                        onContextMenu={(e) => { e.preventDefault(); openRepeatMenu(); }}
-                        className={`hover:scale-105 transition-transform p-1.5 rounded-lg hover:bg-white/[0.05] ${queueEndMode !== 'stop' ? 'text-primary drop-shadow-[0_0_8px_rgba(0,245,255,0.6)]' : 'text-slate-400 hover:text-white'}`}
-                        title={
-                          queueEndMode === 'repeat' ? t('bottomPlayer.queueRepeat') :
-                          queueEndMode === 'next' ? t('bottomPlayer.queueNext') : queueEndMode === 'stop' ? t('bottomPlayer.queueStop') : ''
-                        }
-                      >
-                        {(() => {
-                          if (queueEndMode === 'repeat') return <Repeat size={20} />;
-                          if (queueEndMode === 'next') return <ListPlus size={20} />;
-                          return <ListX size={20} />;
-                        })()}
-                      </button>
-                    </div>
-                  </>
                 )}
 
                 {showRepeatMenu && (
@@ -965,54 +806,23 @@ export function NowPlaying() {
                   </div>
                 )}
               </div>
-              <button
-                onClick={() => setIsShuffle(prev => !prev)}
-                className={`p-1.5 rounded-lg hover:bg-white/[0.05] ${isShuffle ? 'text-primary drop-shadow-[0_0_8px_rgba(0,245,255,0.6)]' : 'text-slate-400 hover:text-white'} transition-colors`}
-                title={isShuffle ? "Shuffle On" : "Shuffle Off"}
-              >
-                <Shuffle size={20} />
-              </button>
             </div>
 
-            {/* Seek Bar with Dynamic Palette */}
-            <div className="flex items-center gap-3 font-mono text-xs font-semibold text-slate-400 mb-6 select-none relative">
-              <span className="min-w-[36px] text-right">{formatTime(displayTime)}</span>
-              <div
-                ref={progressBarRef}
-                className="flex-1 relative flex items-center group h-5 cursor-pointer touch-none"
-                onPointerDown={handleProgressPointerDown}
-              >
-                <div className="absolute inset-x-0 h-1.5 group-hover:h-2 bg-white/10 rounded-full overflow-hidden transition-all">
-                  <div
-                    className="h-full transition-all duration-150"
-                    style={{
-                      width: `${displayPercent}%`,
-                      background: `linear-gradient(to right, ${palette.primary}, ${palette.secondary})`,
-                      boxShadow: `0 0 12px ${palette.glow}`,
-                    }}
-                  />
-                </div>
-                <div
-                  className={`absolute h-4 w-4 bg-white rounded-full transition-all ${isDraggingProgress ? 'opacity-100 scale-110' : 'opacity-0 group-hover:opacity-100'}`}
-                  style={{
-                    left: `calc(${displayPercent}% - 8px)`,
-                    border: `2px solid ${palette.primary}`,
-                    boxShadow: `0 0 12px ${palette.primary}`,
-                  }}
-                />
-              </div>
-              <span className="min-w-[36px] text-left">{formatTime(duration)}</span>
-            </div>
-
-            {/* Bottom Playback Main Controls */}
-            <div className="flex items-center justify-between px-2 mb-2">
+            {/* Secondary Feature Dock */}
+            <div className="flex items-center justify-between p-2 rounded-2xl bg-white/[0.03] border border-white/[0.06] backdrop-blur-xl shadow-lg">
+              {/* Volume */}
               <div className="relative" ref={volumeRef}>
                 <button
                   aria-label="Volume"
                   onClick={() => setShowVolume(v => !v)}
-                  className={`transition-colors p-2.5 rounded-xl ${showVolume ? 'text-primary bg-primary/10' : 'text-slate-400 hover:text-white hover:bg-white/[0.05]'}`}
+                  className={`transition-all p-2.5 rounded-xl ${
+                    showVolume
+                      ? 'text-primary bg-primary/15 border border-primary/25 shadow-[0_0_12px_rgba(0,245,255,0.2)]'
+                      : 'text-slate-400 hover:text-white hover:bg-white/[0.05]'
+                  }`}
+                  title="Volume"
                 >
-                  {volume === 0 ? <VolumeX size={20} className="text-red-400" /> : <Volume2 size={20} />}
+                  {volume === 0 ? <VolumeX size={18} className="text-red-400" /> : <Volume2 size={18} />}
                 </button>
 
                 {showVolume && (
@@ -1031,56 +841,301 @@ export function NowPlaying() {
                 )}
               </div>
 
-              <div className="flex items-center gap-4 sm:gap-6 md:gap-8">
+              {/* Lyrics Button */}
+              {hasLyrics && (
                 <button
-                  aria-label="Previous track"
-                  onClick={playPrevious}
-                  disabled={!hasPrevious}
-                  className={`transition-all p-2 rounded-xl hover:bg-white/[0.05] ${hasPrevious ? 'text-slate-200 hover:text-white' : 'text-white/20 cursor-not-allowed'}`}
-                >
-                  <SkipBack size={26} fill="currentColor" />
-                </button>
-                <button
-                  aria-label="Play or pause"
-                  onClick={togglePlay}
-                  disabled={isLoadingTrack}
-                  className={`w-14 h-14 md:w-16 md:h-16 rounded-full flex items-center justify-center text-slate-950 transition-all ${
-                    isLoadingTrack 
-                      ? 'bg-slate-700 text-slate-400 cursor-not-allowed' 
-                      : 'hover:scale-105 active:scale-95'
+                  onClick={() => setShowLyrics(!showLyrics)}
+                  className={`transition-all p-2.5 rounded-xl flex items-center gap-1.5 ${
+                    showLyrics
+                      ? 'text-primary bg-primary/15 border border-primary/25 shadow-[0_0_12px_rgba(0,245,255,0.2)]'
+                      : 'text-slate-400 hover:text-white hover:bg-white/[0.05]'
                   }`}
-                  style={!isLoadingTrack ? {
-                    backgroundColor: palette.primary,
-                    boxShadow: `0 0 25px rgba(${palette.rgbPrimary}, 0.5), 0 0 45px rgba(${palette.rgbSecondary}, 0.25)`,
-                  } : undefined}
+                  title={showLyrics ? 'Show Disc' : t('nowPlaying.viewLyrics')}
                 >
-                  {isLoadingTrack ? (
-                    <Loader2 size={28} className="animate-spin text-slate-400" />
-                  ) : isPlaying ? (
-                    <Pause size={28} fill="currentColor" />
-                  ) : (
-                    <Play size={28} fill="currentColor" className="ml-1" />
-                  )}
+                  <Music size={18} />
+                  <span className="text-xs font-semibold hidden sm:inline">Lyrics</span>
                 </button>
-                <button
-                  aria-label="Next track"
-                  onClick={playNext}
-                  disabled={!hasNext}
-                  className={`transition-all p-2 rounded-xl hover:bg-white/[0.05] ${hasNext ? 'text-slate-200 hover:text-white' : 'text-white/20 cursor-not-allowed'}`}
-                >
-                  <SkipForward size={26} fill="currentColor" />
-                </button>
-              </div>
+              )}
 
+              {/* Visualizer Mode Toggle */}
+              <button
+                onClick={() => setVisualizerMode(m => m === 'off' ? 'mirror' : m === 'mirror' ? 'bars' : m === 'bars' ? 'wave' : 'off')}
+                className={`transition-all p-2.5 rounded-xl flex items-center gap-1.5 cursor-pointer ${
+                  visualizerMode !== 'off'
+                    ? 'text-primary bg-primary/15 border border-primary/25 shadow-[0_0_12px_rgba(0,245,255,0.2)]'
+                    : 'text-slate-400 hover:text-white hover:bg-white/[0.05]'
+                }`}
+                title={`Visualizer: ${visualizerMode === 'off' ? 'Off (Bấm để bật)' : visualizerMode.toUpperCase()}`}
+                aria-label={`Visualizer: ${visualizerMode.toUpperCase()}`}
+              >
+                <Activity size={18} />
+                <span className="hidden sm:inline uppercase text-[10px] font-mono">{visualizerMode}</span>
+              </button>
+
+              {/* Studio & EQ DSP */}
               <button
                 aria-label="EQ and tone settings"
                 onClick={() => navigate('/studio')}
-                className="text-slate-400 hover:text-primary transition-colors p-2.5 rounded-xl hover:bg-white/[0.05]"
-                title="EQ & Studio"
+                className="text-slate-400 hover:text-primary transition-all p-2.5 rounded-xl hover:bg-white/[0.05]"
+                title="EQ & Studio DSP"
               >
-                <BarChart2 size={20} />
+                <BarChart2 size={18} />
               </button>
+
+              {/* Sleep Timer */}
+              <button
+                onClick={openSleepTimerModal}
+                className={`transition-all p-2.5 rounded-xl flex items-center gap-1.5 ${
+                  sleepTimerState.isActive
+                    ? 'text-primary bg-primary/15 border border-primary/25 shadow-[0_0_12px_rgba(0,245,255,0.25)]'
+                    : 'text-slate-400 hover:text-white hover:bg-white/[0.05]'
+                }`}
+                title={t('sleepTimer.title', 'Sleep Timer')}
+                aria-label={t('sleepTimer.title', 'Sleep Timer')}
+              >
+                <Moon size={18} className={sleepTimerState.isActive ? 'text-primary animate-pulse' : ''} />
+                {sleepTimerState.isActive && (
+                  <span className="text-[10px] font-mono font-bold text-primary">
+                    {sleepTimerState.mode === 'time'
+                      ? formatTime(sleepTimerState.remainingSeconds)
+                      : 'Track'}
+                  </span>
+                )}
+              </button>
+
+              {/* More Options (...) Button */}
+              <div className="relative" ref={menuRef}>
+                <button
+                  onClick={() => setShowMenu(v => !v)}
+                  className={`transition-all p-2.5 rounded-xl ${
+                    showMenu
+                      ? 'text-primary bg-primary/15 border border-primary/25 shadow-[0_0_12px_rgba(0,245,255,0.2)]'
+                      : 'text-slate-400 hover:text-white hover:bg-white/[0.05]'
+                  }`}
+                  title="More Options"
+                >
+                  <MoreHorizontal size={18} />
+                </button>
+                {showMenu && (
+                  <div className="absolute bottom-full right-0 mb-3 w-72 max-w-[calc(100vw_-_2rem)] bg-[#0c1626] border border-white/10 rounded-2xl shadow-2xl overflow-hidden z-50 backdrop-blur-2xl">
+                    {showSpeedPitch ? (
+                      <SpeedPitchPanel
+                        playbackRate={playbackRate}
+                        updatePlaybackRate={updatePlaybackRate}
+                        preservesPitch={preservesPitch}
+                        togglePreservesPitch={togglePreservesPitch}
+                        pitchRate={pitchRate}
+                        updatePitchRate={updatePitchRate}
+                        speedPitchMode={speedPitchMode}
+                        setSpeedPitchMode={setSpeedPitchMode}
+                        speedPitchScope={speedPitchScope}
+                        setSpeedPitchScope={setSpeedPitchScope}
+                        precalculateOnIdle={playerState.precalculateOnIdle}
+                        currentTrackId={currentTrack?.id ? String(currentTrack.id) : undefined}
+                        t={t}
+                        onBack={() => setShowSpeedPitch(false)}
+                      />
+                    ) : showDeviceMenu ? (
+                      <div className="flex flex-col max-h-[65vh] overflow-y-auto">
+                        <div className="flex items-center gap-3 px-4 py-3 border-b border-white/5 sticky top-0 bg-[#0c1626] z-10">
+                          <button onClick={() => setShowDeviceMenu(false)} className="hover:bg-white/10 p-1.5 -ml-1.5 rounded-lg transition-colors">
+                            <ArrowRight size={16} className="rotate-180 text-white/80" />
+                          </button>
+                          <span className="text-sm font-bold text-white/90">{t('nowPlaying.outputDevice') || 'Output Device'}</span>
+                        </div>
+                        
+                        {!hasDeviceLabels && (
+                          <div className="p-4 border-b border-white/5">
+                            <p className="text-xs text-slate-400 mb-3 leading-tight">
+                              {t('nowPlaying.devicePermissionReason') || 'Trình duyệt ẩn tên thiết bị cho đến khi bạn cấp quyền Audio.'}
+                            </p>
+                            <button
+                              onClick={requestAudioPermission}
+                              className="w-full text-xs font-semibold bg-primary/20 text-primary py-2 rounded-lg hover:bg-primary/30 transition-colors"
+                            >
+                              {t('nowPlaying.grantPermission') || 'Hiện tên thiết bị'}
+                            </button>
+                          </div>
+                        )}
+
+                        {audioDevices.length > 0 ? audioDevices.map(device => (
+                          <button
+                            key={device.deviceId || 'default'}
+                            onClick={() => {
+                              const id = device.deviceId || '';
+                              setSelectedDeviceId(id);
+                              if (playerState.setAudioOutputDevice) {
+                                playerState.setAudioOutputDevice(id);
+                              }
+                            }}
+                            className={`w-full text-left px-4 py-3 text-xs font-medium transition-colors flex items-center justify-between border-b border-white/[0.04] ${selectedDeviceId === (device.deviceId || '') ? 'bg-primary/10 text-primary font-semibold' : 'text-slate-300 hover:bg-white/[0.05]'}`}
+                          >
+                            <span className="truncate pr-2">{device.label || `Device (${device.deviceId ? device.deviceId.slice(0, 5) : 'default'}...)`}</span>
+                            {selectedDeviceId === (device.deviceId || '') && <Check size={14} className="flex-shrink-0 text-primary" />}
+                          </button>
+                        )) : (
+                          <p className="text-xs text-slate-500 px-4 py-4 text-center">No devices found</p>
+                        )}
+                      </div>
+                    ) : (
+                      <>
+                        {/* Track Info */}
+                        <button
+                          onClick={() => {
+                            setShowMetadata(true);
+                            setShowMenu(false);
+                          }}
+                          className="w-full flex items-center gap-3 px-4 py-3 text-xs font-medium text-slate-300 hover:bg-white/[0.05] transition-colors border-b border-white/[0.04]"
+                        >
+                          <Info size={16} className="text-primary" />
+                          <span>{t('bottomPlayer.trackMetadata', 'Thông tin bài hát')}</span>
+                        </button>
+
+                        {/* Speed & Pitch Button */}
+                        <button
+                          onClick={() => setShowSpeedPitch(true)}
+                          className="w-full flex items-center justify-between px-4 py-3 text-xs font-medium text-slate-300 hover:bg-white/[0.05] transition-colors border-b border-white/[0.04]"
+                        >
+                          <div className="flex items-center gap-3">
+                            <Gauge size={16} className={playbackRate !== 1 || (speedPitchMode === 'advanced' && pitchRate !== 1) ? 'text-primary' : 'text-slate-400'} />
+                            <span>{t('nowPlaying.speedAndPitch')}</span>
+                          </div>
+                          <span className="text-[10px] font-mono text-primary">
+                            {speedPitchMode === 'advanced' && pitchRate !== 1
+                              ? `${playbackRate}x / ${pitchRate}x`
+                              : `${playbackRate}x`
+                            }
+                          </span>
+                        </button>
+
+                        {/* Output Device Button */}
+                        <button
+                          onClick={() => setShowDeviceMenu(true)}
+                          className="w-full flex items-center justify-between px-4 py-3 text-xs font-medium text-slate-300 hover:bg-white/[0.05] transition-colors border-b border-white/[0.04]"
+                        >
+                          <div className="flex items-center gap-3">
+                            <MonitorSpeaker size={16} className="text-slate-400" />
+                            <span>{t('nowPlaying.outputDevice') || 'Output Device'}</span>
+                          </div>
+                          <span className="text-[10px] font-mono text-slate-400 truncate max-w-[80px]">
+                            {audioDevices.find(d => d.deviceId === selectedDeviceId)?.label || 'Default'}
+                          </span>
+                        </button>
+
+                        {currentTrack && currentTrack.sourceType !== 'LOCAL' && (
+                          <button
+                            onClick={() => {
+                              downloadTrackFile(currentTrack);
+                              setShowMenu(false);
+                            }}
+                            className="w-full flex items-center gap-3 px-4 py-3 text-xs font-medium text-slate-300 hover:bg-white/[0.05] transition-colors border-b border-white/[0.04]"
+                            title="Tải file âm thanh về thiết bị"
+                          >
+                            <Download size={16} className="text-slate-400" />
+                            <span>{t('tracks.downloadFile', 'Download File')}</span>
+                          </button>
+                        )}
+
+                        {!isOfflineMode && currentTrack && currentTrack.sourceType !== 'LOCAL' && (
+                          <button
+                            onClick={async () => {
+                              if (!isCached(currentTrack) && !downloadingTrackIds.has(String(currentTrack.id))) {
+                                await downloadTrack(currentTrack);
+                              }
+                            }}
+                            className="w-full flex items-center gap-3 px-4 py-3 text-xs font-medium text-slate-300 hover:bg-white/[0.05] transition-colors border-b border-white/[0.04]"
+                            title="Lưu vào bộ nhớ đệm trình duyệt để nghe khi offline"
+                          >
+                            {(() => {
+                              if (isCached(currentTrack)) return <CheckCircle2 size={16} className="text-green-400" />;
+                              if (downloadingTrackIds.has(String(currentTrack.id))) return <Loader2 size={16} className="animate-spin text-primary" />;
+                              return <DownloadCloud size={16} className="text-blue-400" />;
+                            })()}
+                            <span>
+                              {isCached(currentTrack) ? t('offline.downloaded', 'Saved (Offline)') : (downloadingTrackIds.has(String(currentTrack.id)) ? t('offline.downloading', 'Saving Offline...') : t('offline.downloadTrack', 'Save for Offline'))}
+                            </span>
+                          </button>
+                        )}
+
+                        {getAudioExtension(currentTrack.fileName) === 'flac' && (
+                          <button
+                            onClick={() => {
+                              playerState.toggleFlacWasmForTrack(currentTrack);
+                              setShowMenu(false);
+                            }}
+                            className="w-full flex items-center gap-3 px-4 py-3 text-xs font-medium text-slate-300 hover:bg-white/[0.05] transition-colors border-b border-white/[0.04]"
+                          >
+                            <Cpu size={16} className={playerState.isFlacWasmEnabled(currentTrack) ? 'text-primary' : 'text-slate-400'} />
+                            <span>{playerState.isFlacWasmEnabled(currentTrack) ? 'Use Normal FLAC' : 'Use FLAC WASM'}</span>
+                          </button>
+                        )}
+
+                        {(getAudioExtension(currentTrack.fileName) === 'm4a' || getAudioExtension(currentTrack.fileName) === 'aac') && (
+                          <button
+                            onClick={async () => {
+                              playerState.toggleM4aWasmForTrack(currentTrack);
+                              setShowMenu(false);
+                              if (currentTrack.sourceType !== 'LOCAL') {
+                                await playerState.reloadCurrentTrackFromDrive();
+                              }
+                            }}
+                            className="w-full flex items-center gap-3 px-4 py-3 text-xs font-medium text-slate-300 hover:bg-white/[0.05] transition-colors border-b border-white/[0.04]"
+                          >
+                            <Cpu size={16} className={playerState.isM4aWasmEnabled(currentTrack) ? 'text-primary' : 'text-slate-400'} />
+                            <span>{playerState.isM4aWasmEnabled(currentTrack) ? 'Use Normal M4A' : 'Use M4A WASM'}</span>
+                          </button>
+                        )}
+
+
+
+                        {currentTrack.sourceType !== 'LOCAL' && (
+                          <button
+                            onClick={async () => {
+                              setShowMenu(false);
+                              await playerState.reloadCurrentTrackFromDrive();
+                            }}
+                            className="w-full flex items-center gap-3 px-4 py-3 text-xs font-medium text-slate-300 hover:bg-white/[0.05] transition-colors border-b border-white/[0.04]"
+                          >
+                            <RefreshCw size={16} className="text-slate-400" />
+                            <span>{t('nowPlaying.reloadFromDrive')}</span>
+                          </button>
+                        )}
+
+                        {currentTrack.sourceType !== 'LOCAL' && (
+                          <button
+                            onClick={async () => {
+                              const isConfirmed = await confirm({
+                                title: 'Xóa bài hát',
+                                description: `Bạn có chắc chắn muốn xóa bài hát "${currentTrack.title || currentTrack.fileName}" khỏi thư viện?`,
+                                confirmText: 'Xóa',
+                                confirmColor: 'bg-red-500/20 text-red-400 hover:bg-red-500/30 border-red-500/30'
+                              });
+                              if (isConfirmed) {
+                                const isConfirmed2 = await confirm({
+                                  title: 'Xác nhận xóa vĩnh viễn',
+                                  description: `Hành động này sẽ xóa vĩnh viễn bài hát "${currentTrack.title || currentTrack.fileName}" từ Google Drive của bạn và không thể hoàn tác. Bạn vẫn muốn tiếp tục?`,
+                                  confirmText: 'Xóa vĩnh viễn',
+                                  confirmColor: 'bg-red-600 text-white hover:bg-red-700 border-red-600'
+                                });
+                                if (isConfirmed2) {
+                                  setShowMenu(false);
+                                  await deleteTrack(currentTrack);
+                                }
+                              }
+                            }}
+                            className="w-full flex items-center gap-3 px-4 py-3 text-xs font-medium text-red-400 hover:bg-red-500/10 transition-colors border-t border-white/[0.04]"
+                          >
+                            <Trash2 size={16} />
+                            <span>Delete from Library</span>
+                          </button>
+                        )}
+                      </>
+                    )}
+                  </div>
+                )}
+              </div>
             </div>
+
           </div>
 
         </div>
@@ -1148,55 +1203,11 @@ export function NowPlaying() {
 
       {/* Metadata Modal */}
       {showMetadata && currentTrack && (
-        <div
-          className="fixed inset-0 z-[100] flex items-center justify-center bg-black/70 backdrop-blur-md p-4"
-          onClick={() => setShowMetadata(false)}
-        >
-          <div
-            className="bg-[#0c1626] border border-white/10 rounded-2xl w-full max-w-md max-h-[calc(100dvh-2rem)] shadow-2xl overflow-hidden flex flex-col"
-            onClick={(e) => e.stopPropagation()}
-          >
-            <div className="flex items-center justify-between p-4 border-b border-white/[0.06]">
-              <div className="flex items-center gap-2.5 text-white">
-                <Info size={20} className="text-primary" />
-                <h3 className="font-semibold text-base">{t('bottomPlayer.trackMetadata')}</h3>
-              </div>
-              <button
-                onClick={() => setShowMetadata(false)}
-                className="text-slate-400 hover:text-white transition-colors p-1 rounded-lg hover:bg-white/[0.05]"
-              >
-                <X size={18} />
-              </button>
-            </div>
-
-            <div className="p-4 flex flex-col gap-3 overflow-y-auto max-h-[70vh] no-scrollbar">
-              <div className="bg-white/[0.03] border border-white/[0.05] rounded-xl p-3.5 flex flex-col gap-2">
-                {[
-                  { label: t('bottomPlayer.title'), value: currentTrack.title || playerState.getTrackMetadata(currentTrack.id)?.title },
-                  { label: t('bottomPlayer.artist'), value: currentTrack.artist || playerState.getTrackMetadata(currentTrack.id)?.artist },
-                  { label: t('bottomPlayer.album'), value: currentTrack.album || playerState.getTrackMetadata(currentTrack.id)?.album },
-                  { label: t('bottomPlayer.genre'), value: currentTrack.genre || playerState.getTrackMetadata(currentTrack.id)?.genre },
-                  { label: t('bottomPlayer.duration'), value: currentTrack.durationSeconds ? formatTime(currentTrack.durationSeconds) : (duration ? formatTime(duration) : null) },
-                  { label: t('bottomPlayer.fileName'), value: currentTrack.fileName },
-                  { label: t('bottomPlayer.source'), value: currentTrack.sourceType },
-                  { label: t('bottomPlayer.trackId'), value: String(currentTrack.id) },
-                  { label: 'File Type', value: currentTrack.fileFormat },
-                  { label: 'Codec', value: currentTrack.codec },
-                  { label: 'Size', value: currentTrack.fileSize ? `${(currentTrack.fileSize / 1024 / 1024).toFixed(2)} MB` : null },
-                  { label: 'Bit Rate', value: currentTrack.bitrate ? `${Math.round(currentTrack.bitrate / 1000)} kbps` : null },
-                  { label: 'Channels', value: currentTrack.numberOfChannels ? `${currentTrack.numberOfChannels} ${currentTrack.numberOfChannels === 2 ? '(stereo)' : ''}` : null },
-                  { label: 'Audio Sample Rate', value: currentTrack.sampleRate ? `${(currentTrack.sampleRate / 1000).toFixed(3)} kHz` : null },
-                  { label: 'Bit Depth', value: currentTrack.bitsPerSample ? `${currentTrack.bitsPerSample} bit` : null }
-                ].map((item, idx) => (
-                  <div key={idx} className="flex flex-col gap-0.5">
-                    <span className="text-[10px] uppercase tracking-wider text-slate-400 font-mono font-semibold">{item.label}</span>
-                    <span className="text-xs text-slate-200 font-medium break-all">{item.value || 'unknown'}</span>
-                  </div>
-                ))}
-              </div>
-            </div>
-          </div>
-        </div>
+        <TrackInfoModal
+          track={currentTrack}
+          trackMetadata={playerState.getTrackMetadata(currentTrack.id)}
+          onClose={() => setShowMetadata(false)}
+        />
       )}
     </div>
   );

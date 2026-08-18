@@ -36,6 +36,7 @@ type ParsedAudioMetadata = {
 
 type AudioMetadataSettings = {
     legacyMetadataOverrides?: Record<string, boolean>;
+    useLegacyMetadata?: boolean;
 };
 
 type MetadataFileInfo = {
@@ -126,6 +127,7 @@ export function useAudioMetadata(isAuthenticated: boolean, queueState: any, sett
     const setQueue = queueState?.setQueue;
     const currentTrack = queueState?.currentTrack as Track | undefined;
     const legacyMetadataOverrides = settings.legacyMetadataOverrides || {};
+    const useLegacyMetadata = Boolean(settings.useLegacyMetadata);
 
 
     const [metadataVersion, setMetadataVersion] = useState(0);
@@ -167,7 +169,7 @@ export function useAudioMetadata(isAuthenticated: boolean, queueState: any, sett
         const existing = metadataCacheRef.current.get(trackId);
         if (existing?.pending) return;
         if (track.sourceType !== 'LOCAL' && !isAuthenticated) return;
-        const useLegacyMetadataParser = options.useLegacyMetadataParser ?? shouldUseLegacyMetadataParser(track, legacyMetadataOverrides);
+        const useLegacyMetadataParser = options.useLegacyMetadataParser ?? shouldUseLegacyMetadataParser(track, useLegacyMetadata, legacyMetadataOverrides);
 
         // --- CACHE READ LAYER ---
         const lsKey = getMetadataCacheKey(trackId);
@@ -571,7 +573,7 @@ export function useAudioMetadata(isAuthenticated: boolean, queueState: any, sett
     useEffect(() => {
         if (currentTrack) {
             const trackId = String(currentTrack.id);
-            const useLegacyMetadataParser = shouldUseLegacyMetadataParser(currentTrack, legacyMetadataOverrides);
+            const useLegacyMetadataParser = shouldUseLegacyMetadataParser(currentTrack, useLegacyMetadata, legacyMetadataOverrides);
             const previousParserMode = metadataParserModeRef.current.get(trackId);
             metadataParserModeRef.current.set(trackId, useLegacyMetadataParser);
 
@@ -580,6 +582,7 @@ export function useAudioMetadata(isAuthenticated: boolean, queueState: any, sett
                 const imageUrl = imageCacheRef.current.get(trackId);
                 if (imageUrl?.startsWith('blob:')) URL.revokeObjectURL(imageUrl);
                 imageCacheRef.current.delete(trackId);
+                void extractMetadata(currentTrack, { ignoreCache: true });
             }
         }
 
@@ -592,7 +595,7 @@ export function useAudioMetadata(isAuthenticated: boolean, queueState: any, sett
                 void extractMetadata(currentTrack);
             }
         }
-    }, [currentTrack, legacyMetadataOverrides]);
+    }, [currentTrack, legacyMetadataOverrides, useLegacyMetadata]);
 
     return {
         extractMetadata,

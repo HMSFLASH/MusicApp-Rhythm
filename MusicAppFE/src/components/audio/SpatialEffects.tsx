@@ -4,44 +4,6 @@ import { useTranslation } from 'react-i18next';
 import { AudioEffectPanel, EffectControlsGate, EffectPowerButton } from './AudioEffectPanel';
 import { AudioSelectRow } from './AudioSelectRow';
 import { STEREO_WIDTH_MAX_PERCENT } from '../../hooks/audioMath';
-import { reverbWetGain } from '../../hooks/audioGraph';
-
-function SpatialSignalRouting({
-  reverbMix,
-  stereoWidth,
-  reverbEnabled,
-  stereoEnabled
-}: {
-  reverbMix: number;
-  stereoWidth: number;
-  reverbEnabled: boolean;
-  stereoEnabled: boolean;
-}) {
-  const { t } = useTranslation();
-
-  const reverbWet = reverbEnabled ? reverbWetGain(reverbMix) : 0;
-  const stereoWet = stereoEnabled ? (stereoWidth / 100) : 1.0;
-  
-  // Total combined spatial field values
-  const totalDry = 1.0;
-  const totalWet = reverbWet + stereoWet;
-
-  const isActive = reverbEnabled || stereoEnabled;
-
-  return (
-    <div className={`flex items-center justify-between p-4 sm:p-5 rounded-2xl border transition-all ${isActive ? 'bg-[#0c1626]/80 border-purple-500/30 shadow-[0_0_20px_rgba(168,85,247,0.15)]' : 'bg-white/[0.02] border-white/[0.06] opacity-60 grayscale'}`}>
-      <div className="flex flex-col">
-        <span className="text-slate-100 font-semibold text-sm">{t('studio.spatial.routingTitle', 'Spatial Output Balance')}</span>
-        <span className="text-slate-400 text-xs font-mono mt-0.5">{t('studio.spatial.routingDesc', 'Total calculated spatial field')}</span>
-      </div>
-      <div className="flex items-center gap-3 font-mono text-xs sm:text-sm bg-white/[0.04] px-4 py-2 rounded-xl border border-white/[0.08]">
-        <span className="text-slate-400">Dry: <span className="text-primary font-bold">{totalDry.toFixed(2)}</span></span>
-        <span className="text-white/20">|</span>
-        <span className="text-slate-400">Wet: <span className="text-purple-400 font-bold">{totalWet.toFixed(2)}</span></span>
-      </div>
-    </div>
-  );
-}
 
 export function SpatialEffects() {
   const { playerState } = useGlobalAudio();
@@ -59,13 +21,6 @@ export function SpatialEffects() {
 
   return (
     <div className="flex flex-col gap-6 md:gap-8 w-full">
-      
-      <SpatialSignalRouting
-        reverbMix={playerState.reverbMix}
-        stereoWidth={playerState.stereoWidth}
-        reverbEnabled={playerState.fxEnabled.reverb}
-        stereoEnabled={playerState.fxEnabled.stereo}
-      />
 
       <AudioEffectPanel
         title={t('studio.spatial.reverbTitle', 'Reverb FX')}
