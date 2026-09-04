@@ -1,5 +1,4 @@
 import type { AudioRenderParams, FxEnabledFlags } from './audioRenderSignature';
-import { generateGraphicEqImpulseResponse } from './firFilterGenerator';
 import {
   clamp,
   compressorAttackSeconds,
@@ -68,10 +67,12 @@ export const renderOfflineAudio = async ({
     reverbMix,
     reverbTime,
     stereoWidth,
+    stereoCrossoverLow,
+    stereoCrossoverHigh,
+    stereoCrossoverMode,
     panValue,
     loudnessNormalization,
     useOversample,
-    eqBlockSize,
   } = params;
 
   let autoPreamp = 0;
@@ -96,6 +97,9 @@ export const renderOfflineAudio = async ({
     trebleGain,
     reverbMix,
     stereoWidth,
+    stereoCrossoverLow,
+    stereoCrossoverHigh,
+    stereoCrossoverMode,
     panValue,
   }, enabledWithAutoPreamp);
 
@@ -111,6 +115,9 @@ export const renderOfflineAudio = async ({
       trebleGain,
       reverbMix,
       stereoWidth,
+      stereoCrossoverLow,
+      stereoCrossoverHigh,
+      stereoCrossoverMode,
     }, enabledWithAutoPreamp)
     : 0;
 
@@ -130,6 +137,9 @@ export const renderOfflineAudio = async ({
       trebleGain,
       reverbMix,
       stereoWidth,
+      stereoCrossoverLow,
+      stereoCrossoverHigh,
+      stereoCrossoverMode,
     }, enabledWithAutoPreamp);
     trackGain.gain.value =
       calculateNormalizedTrackGain(audioBuffer, downstreamGainDb) *
@@ -160,70 +170,57 @@ export const renderOfflineAudio = async ({
   }
 
   if (activity.eq) {
-    if (!isParametricPreset && eqBands && eqBands.length > 0) {
-      const convolver = offlineCtx.createConvolver();
-      convolver.normalize = false;
-      const ir = generateGraphicEqImpulseResponse(eqBands, offlineCtx.sampleRate, eqBlockSize);
-      const buffer = offlineCtx.createBuffer(2, ir.length, offlineCtx.sampleRate);
-      buffer.copyToChannel(ir as any, 0);
-      buffer.copyToChannel(ir as any, 1);
-      convolver.buffer = buffer;
-      
-      currentNode.connect(convolver);
-      currentNode = convolver;
-    } else {
-      const expandedEqBands = expandResonantEqBands(processedEqBands || []);
-      const activeEqBands = expandedEqBands.filter(isActiveEqBand);
-      if (activeEqBands.length > 0) {
-        const filters = activeEqBands.map((band) => {
-          const filter = offlineCtx.createBiquadFilter();
-          filter.type = band.type || 'peaking';
-          filter.frequency.value = Number.isFinite(band.frequency) ? band.frequency : 1000;
-          filter.Q.value = Number.isFinite(band.q) ? band.q : 1;
-          filter.gain.value = Number.isFinite(band.gain) ? band.gain : 0;
-          return filter;
-        });
+    const expandedEqBands = expandResonantEqBands(processedEqBands || []);
+    const activeEqBands = expandedEqBands.filter(isActiveEqBand);
+    if (activeEqBands.length > 0) {
+      const filters = activeEqBands.map((band) => {
+        const filter = offlineCtx.createBiquadFilter();
+        filter.type = band.type || 'peaking';
+        filter.frequency.value = Number.isFinite(band.frequency) ? band.frequency : 1000;
+        filter.Q.value = Number.isFinite(band.q) ? band.q : 1;
+        filter.gain.value = Number.isFinite(band.gain) ? band.gain : 0;
+        return filter;
+      });
 
-        const splitter = offlineCtx.createChannelSplitter(2);
-        const merger = offlineCtx.createChannelMerger(2);
+      const splitter = offlineCtx.createChannelSplitter(2);
+      const merger = offlineCtx.createChannelMerger(2);
 
-        const stereoFilters = filters.filter((_, i) => activeEqBands[i].channel === 'L+R');
-        const leftFilters = filters.filter((_, i) => activeEqBands[i].channel === 'L');
-        const rightFilters = filters.filter((_, i) => activeEqBands[i].channel === 'R');
+      const stereoFilters = filters.filter((_, i) => activeEqBands[i].channel === 'L+R');
+      const leftFilters = filters.filter((_, i) => activeEqBands[i].channel === 'L');
+      const rightFilters = filters.filter((_, i) => activeEqBands[i].channel === 'R');
 
-        let prevNode: BiquadFilterNode | null = null;
-        for (const filter of stereoFilters) {
-          if (prevNode) prevNode.connect(filter);
-          else currentNode.connect(filter);
-          prevNode = filter;
-        }
-        if (prevNode) prevNode.connect(splitter);
-        else currentNode.connect(splitter);
-
-        let leftNode: AudioNode = splitter;
-        let prevLeft: BiquadFilterNode | null = null;
-        for (const filter of leftFilters) {
-          if (prevLeft) prevLeft.connect(filter);
-          else leftNode.connect(filter, 0, 0);
-          leftNode = filter;
-          prevLeft = filter;
-        }
-        if (prevLeft) prevLeft.connect(merger, 0, 0);
-        else splitter.connect(merger, 0, 0);
-
-        let rightNode: AudioNode = splitter;
-        let prevRight: BiquadFilterNode | null = null;
-        for (const filter of rightFilters) {
-          if (prevRight) prevRight.connect(filter);
-          else rightNode.connect(filter, 1, 0);
-          rightNode = filter;
-          prevRight = filter;
-        }
-        if (prevRight) rightNode.connect(merger, 0, 1);
-        else splitter.connect(merger, 1, 1);
-
-        currentNode = merger;
+      let prevNode: BiquadFilterNode | null = null;
+      for (const filter of stereoFilters) {
+        if (prevNode) prevNode.connect(filter);
+        else currentNode.connect(filter);
+        prevNode = filter;
       }
+      if (prevNode) prevNode.connect(splitter);
+      else currentNode.connect(splitter);
+
+      let leftNode: AudioNode = splitter;
+      let prevLeft: BiquadFilterNode | null = null;
+      for (const filter of leftFilters) {
+        if (prevLeft) prevLeft.connect(filter);
+        else leftNode.connect(filter, 0, 0);
+        leftNode = filter;
+        prevLeft = filter;
+      }
+      if (prevLeft) prevLeft.connect(merger, 0, 0);
+      else splitter.connect(merger, 0, 0);
+
+      let rightNode: AudioNode = splitter;
+      let prevRight: BiquadFilterNode | null = null;
+      for (const filter of rightFilters) {
+        if (prevRight) prevRight.connect(filter);
+        else rightNode.connect(filter, 1, 0);
+        rightNode = filter;
+        prevRight = filter;
+      }
+      if (prevRight) rightNode.connect(merger, 0, 1);
+      else splitter.connect(merger, 1, 1);
+
+      currentNode = merger;
     }
   }
 
@@ -333,7 +330,7 @@ export const renderOfflineAudio = async ({
     const stereoInput = offlineCtx.createGain();
     connectToNext(stereoInput);
     const shouldUsePseudoStereo = isAudioBufferNearMono(audioBuffer);
-    currentNode = connectStereoWidthMatrix(offlineCtx, stereoInput, stereoWidth, shouldUsePseudoStereo);
+    currentNode = connectStereoWidthMatrix(offlineCtx, stereoInput, stereoWidth, stereoCrossoverLow, stereoCrossoverHigh, stereoCrossoverMode, shouldUsePseudoStereo);
   }
 
   if (activity.master) {

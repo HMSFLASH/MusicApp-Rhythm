@@ -22,6 +22,9 @@ type SavedAudioEffectsState = Partial<{
   compMakeupGain: number;
   panValue: number;
   stereoWidth: number;
+  stereoCrossoverLow: number;
+  stereoCrossoverHigh: number;
+  stereoCrossoverMode: 'inside' | 'outside';
   reverbMix: number;
   reverbTime: number;
   loudnessNormalization: boolean;
@@ -30,7 +33,6 @@ type SavedAudioEffectsState = Partial<{
   fullQueueCacheEnabled: boolean;
   masterFftSize: number;
   stereoFftSize: number;
-  eqBlockSize: number;
   audioLatencyHint: AudioContextLatencyCategory;
   fxEnabled: Partial<FxEnabledState>;
 }>;
@@ -199,6 +201,15 @@ export function useAudioEffectsState(savedState: SavedAudioEffectsState = {}) {
   const [stereoWidth, setStereoWidthState] = useState<number>(
     clamp(savedState.stereoWidth ?? 100, 0, STEREO_WIDTH_MAX_PERCENT)
   );
+  const [stereoCrossoverLow, setStereoCrossoverLowState] = useState<number>(
+    clamp(savedState.stereoCrossoverLow ?? 150, 20, 20000)
+  );
+  const [stereoCrossoverHigh, setStereoCrossoverHighState] = useState<number>(
+    clamp(savedState.stereoCrossoverHigh ?? 20000, 20, 20000)
+  );
+  const [stereoCrossoverMode, setStereoCrossoverModeState] = useState<'inside' | 'outside'>(
+    savedState.stereoCrossoverMode ?? 'inside'
+  );
   const [reverbMix, setReverbMix] = useState<number>(savedState.reverbMix ?? 0);
   const [reverbTime, setReverbTime] = useState<number>(savedState.reverbTime ?? 2);
 
@@ -208,7 +219,6 @@ export function useAudioEffectsState(savedState: SavedAudioEffectsState = {}) {
   const [fullQueueCacheEnabled, setFullQueueCacheEnabled] = useState<boolean>(savedState.fullQueueCacheEnabled ?? false);
   const [masterFftSize, setMasterFftSize] = useState<number>(savedState.masterFftSize ?? 2048);
   const [stereoFftSize, setStereoFftSize] = useState<number>(savedState.stereoFftSize ?? 1024);
-  const [eqBlockSize, setEqBlockSize] = useState<number>(savedState.eqBlockSize ?? 4096);
   const [audioLatencyHint, setAudioLatencyHint] = useState<AudioContextLatencyCategory>(savedState.audioLatencyHint ?? 'playback');
 
   const initialFxEnabled: FxEnabledState = {
@@ -395,6 +405,9 @@ export function useAudioEffectsState(savedState: SavedAudioEffectsState = {}) {
     applyDefaultCompressor, resetCompressor,
     panValue, setPanValue, updatePanValue: setPanValue,
     stereoWidth, setStereoWidth, updateStereoWidth: setStereoWidth,
+    stereoCrossoverLow, setStereoCrossoverLow: setStereoCrossoverLowState, updateStereoCrossoverLow: setStereoCrossoverLowState,
+    stereoCrossoverHigh, setStereoCrossoverHigh: setStereoCrossoverHighState, updateStereoCrossoverHigh: setStereoCrossoverHighState,
+    stereoCrossoverMode, setStereoCrossoverMode: setStereoCrossoverModeState, updateStereoCrossoverMode: setStereoCrossoverModeState,
     reverbMix, setReverbMix, updateReverbMix: setReverbMix,
     reverbTime, setReverbTime, updateReverbTime: setReverbTime,
     loudnessNormalization, setLoudnessNormalization, toggleLoudnessNormalization,
@@ -403,7 +416,7 @@ export function useAudioEffectsState(savedState: SavedAudioEffectsState = {}) {
     fullQueueCacheEnabled, setFullQueueCacheEnabled,
     masterFftSize, setMasterFftSize, updateMasterFftSize: setMasterFftSize,
     stereoFftSize, setStereoFftSize, updateStereoFftSize: setStereoFftSize,
-    eqBlockSize, setEqBlockSize, updateEqBlockSize: setEqBlockSize,
+    
     audioLatencyHint, setAudioLatencyHint, updateAudioLatencyHint: setAudioLatencyHint,
     fxEnabled, setFxEnabled, toggleFx, fxEnabledRef,
     applyPreset, applyStylisticPreset, setCustomPreset, setParametricPreset,

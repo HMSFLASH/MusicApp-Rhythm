@@ -1,14 +1,13 @@
 import { useState, useRef, useEffect, useCallback } from 'react';
 import { useGlobalAudio } from '../context/AudioContext';
 import { useAuth } from '../context/AuthContext';
-import { Disc, Play, Pause, SkipBack, SkipForward, Shuffle, Repeat, Heart, Info, ListPlus, MoreHorizontal, Repeat1, Volume2, VolumeX, BarChart2, Gauge, Music, Check, ArrowRight, Square, PauseCircle, ListX, Loader2, Trash2, RefreshCw, MonitorSpeaker, Download, Activity, Moon, DownloadCloud, CheckCircle2 } from 'lucide-react';
+import { Disc, Play, Pause, SkipBack, SkipForward, Shuffle, Repeat, Heart, Info, ListPlus, MoreHorizontal, Repeat1, Volume2, VolumeX, BarChart2, Gauge, Music, Check, ArrowRight, Square, PauseCircle, ListX, Loader2, Trash2, RefreshCw, MonitorSpeaker, Download, Moon, DownloadCloud, CheckCircle2 } from 'lucide-react';
 import { HorizontalSlider } from '../components/HorizontalSlider';
 import { SpeedPitchPanel } from '../components/SpeedPitchPanel';
 import { useLibrary } from '../context/LibraryContext';
 import { useSleepTimer } from '../context/SleepTimerContext';
 import { useOffline } from '../context/OfflineContext';
 import { LyricsView } from '../components/LyricsView';
-import { AudioVisualizer, type VisualizerMode } from '../components/AudioVisualizer';
 import { MeshAmbientGlow } from '../components/MeshAmbientGlow';
 import { useArtworkPalette } from '../hooks/useArtworkPalette';
 
@@ -192,26 +191,6 @@ export function NowPlaying() {
   const [showMetadata, setShowMetadata] = useState(false);
   // Lyrics Modal state
   const [showLyrics, setShowLyrics] = useState(false);
-  const VISUALIZER_CYCLE: VisualizerMode[] = ['mirror', 'bars', 'wave', 'radial', 'oscilloscope', 'off'];
-  // Visualizer Mode state (default to 'mirror')
-  const [visualizerMode, setVisualizerMode] = useState<VisualizerMode>(() => {
-    const saved = localStorage.getItem('RHYTHM_VISUALIZER_MODE') as VisualizerMode;
-    if (saved && VISUALIZER_CYCLE.includes(saved)) {
-      return saved;
-    }
-    return 'mirror';
-  });
-
-  const cycleVisualizerMode = useCallback(() => {
-    setVisualizerMode(prev => {
-      const idx = VISUALIZER_CYCLE.indexOf(prev);
-      return VISUALIZER_CYCLE[(idx + 1) % VISUALIZER_CYCLE.length];
-    });
-  }, []);
-
-  useEffect(() => {
-    localStorage.setItem('RHYTHM_VISUALIZER_MODE', visualizerMode);
-  }, [visualizerMode]);
 
   // Audio Device state
   const [showDeviceMenu, setShowDeviceMenu] = useState(false);
@@ -509,30 +488,6 @@ export function NowPlaying() {
               </button>
             )}
           </div>
-
-          {/* Real-time Spectrum Audio Visualizer with Adaptive Colors */}
-          {visualizerMode !== 'off' && (
-            <div className="w-full max-w-md px-2 my-1 animate-in fade-in duration-300">
-              <div
-                className="group relative p-2.5 rounded-2xl bg-white/[0.025] hover:bg-white/[0.045] border border-white/[0.06] hover:border-white/[0.1] backdrop-blur-md shadow-inner flex flex-col items-center cursor-pointer transition-all duration-300"
-                onClick={cycleVisualizerMode}
-                title={`Visualizer: ${visualizerMode.toUpperCase()} (Click to switch)`}
-              >
-                <AudioVisualizer
-                  analyserRef={playerState.masterAnalyserRef}
-                  isPlaying={isPlaying}
-                  mode={visualizerMode}
-                  className="w-full h-14"
-                  barColor={palette.primary}
-                  secondaryColor={palette.secondary}
-                  glowColor={palette.glow}
-                />
-                <span className="absolute top-1.5 right-2.5 opacity-0 group-hover:opacity-100 transition-opacity bg-black/60 backdrop-blur-sm px-1.5 py-0.5 rounded-full border border-white/10 text-[9px] font-mono uppercase tracking-wider text-slate-300 pointer-events-none select-none">
-                  {visualizerMode}
-                </span>
-              </div>
-            </div>
-          )}
 
           {/* Playback Controls (Progress, Main Transport, Secondary Dock) */}
           <div className="w-full max-w-md mt-2 flex flex-col gap-4">
@@ -868,20 +823,6 @@ export function NowPlaying() {
                 </button>
               )}
 
-              {/* Visualizer Mode Toggle */}
-              <button
-                onClick={cycleVisualizerMode}
-                className={`transition-all p-2.5 rounded-xl flex items-center gap-1.5 cursor-pointer ${
-                  visualizerMode !== 'off'
-                    ? 'text-primary bg-primary/15 border border-primary/25 shadow-[0_0_12px_rgba(0,245,255,0.2)]'
-                    : 'text-slate-400 hover:text-white hover:bg-white/[0.05]'
-                }`}
-                title={`Visualizer: ${visualizerMode === 'off' ? 'Off (Bấm để bật)' : visualizerMode.toUpperCase()}`}
-                aria-label={`Visualizer: ${visualizerMode.toUpperCase()}`}
-              >
-                <Activity size={18} />
-                <span className="hidden sm:inline uppercase text-[10px] font-mono">{visualizerMode}</span>
-              </button>
 
               {/* Studio & EQ DSP */}
               <button

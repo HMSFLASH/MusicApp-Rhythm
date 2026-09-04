@@ -15,10 +15,12 @@ export type AudioRenderParams = {
   reverbMix: number;
   reverbTime: number;
   stereoWidth: number;
+  stereoCrossoverLow: number;
+  stereoCrossoverHigh: number;
+  stereoCrossoverMode: 'inside' | 'outside';
   panValue: number;
   loudnessNormalization: boolean;
   useOversample: boolean;
-  eqBlockSize: number;
 };
 
 export type FxEnabledFlags = Partial<Record<
@@ -41,7 +43,7 @@ export const createRenderSignature = (
     limiter: Boolean(enabled.limiter),
     interpolate: Boolean(enabled.interpolate),
   },
-  eqBlockSize: params.eqBlockSize,
+  
   useOversample: Boolean(params.useOversample),
   preampGain: params.preampGain,
   eqBands: Array.isArray(params.eqBands)
@@ -65,6 +67,9 @@ export const createRenderSignature = (
   reverbMix: params.reverbMix,
   reverbTime: params.reverbTime,
   stereoWidth: params.stereoWidth,
+  stereoCrossoverLow: params.stereoCrossoverLow,
+  stereoCrossoverHigh: params.stereoCrossoverHigh,
+  stereoCrossoverMode: params.stereoCrossoverMode,
   panValue: params.panValue,
   loudnessNormalization: Boolean(params.loudnessNormalization),
 });

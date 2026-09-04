@@ -182,7 +182,26 @@ export const createEqResponseChartData = (
   enabledFlags?: { eq?: boolean; tone?: boolean; preamp?: boolean },
   isGraphicMode = false
 ): EqResponseChartData => {
-  const frequencies = createLogFrequencies();
+  const baseFrequencies = createLogFrequencies();
+  const bandFreqs: number[] = [];
+  
+  if (eqBands && eqBands.length > 0) {
+    eqBands.forEach(b => {
+      if (b.frequency > 0) {
+        bandFreqs.push(b.frequency);
+        // Thêm 2 điểm liền kề rất nhỏ để chóp chuông khi Q lớn vẫn vẽ mượt mà không bị "kim"
+        bandFreqs.push(b.frequency * 0.995);
+        bandFreqs.push(b.frequency * 1.005);
+      }
+    });
+  }
+  if (Math.abs(bassGain) > 0.001) bandFreqs.push(150);
+  if (Math.abs(trebleGain) > 0.001) bandFreqs.push(4000);
+  
+  const frequencies = Array.from(new Set([...baseFrequencies, ...bandFreqs]))
+    .filter(f => f >= MIN_FREQUENCY && f <= MAX_FREQUENCY)
+    .sort((a, b) => a - b);
+
   const eqEnabled = enabledFlags?.eq ?? enabled;
   const toneEnabled = enabledFlags?.tone ?? enabled;
   const preampEnabled = enabledFlags?.preamp ?? enabled;

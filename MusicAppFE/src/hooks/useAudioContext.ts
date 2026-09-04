@@ -1,6 +1,5 @@
 import { useRef, useEffect, useCallback, useState } from 'react';
 import { expandResonantEqBands, type EqBand } from './audioTypes';
-import { generateGraphicEqImpulseResponse } from './firFilterGenerator';
 import {
   applyCustomDynamicsCompressorSettings,
   applyMasterLimiterState,
@@ -46,8 +45,17 @@ const disconnectNode = (node: AudioNode | null) => {
   }
 };
 
-export function useAudioContext(effectsState: any) {
-  const { eqBands: rawEqBands, isParametricPreset, preampGain, bassGain, trebleGain, compThreshold, compRatio, compKnee, compAttack, compRelease, compRmsSize, compMakeupGain, panValue, stereoWidth, reverbMix, reverbTime, loudnessNormalization, useOversample, masterFftSize = 2048, stereoFftSize = 1024, eqBlockSize = 4096, audioLatencyHint = 'playback', fxEnabled, audioIsStereo = true, isAuthenticated } = effectsState;
+export function useAudioContext(inputEffectsState: any) {
+  const [effectsState, setEffectsState] = useState(inputEffectsState);
+
+  useEffect(() => {
+    const handler = setTimeout(() => {
+      setEffectsState(inputEffectsState);
+    }, 1000);
+    return () => clearTimeout(handler);
+  }, [inputEffectsState]);
+
+  const { eqBands: rawEqBands, isParametricPreset, preampGain, bassGain, trebleGain, compThreshold, compRatio, compKnee, compAttack, compRelease, compRmsSize, compMakeupGain, panValue, stereoWidth, stereoCrossoverLow = 150, stereoCrossoverHigh = 20000, stereoCrossoverMode = 'inside', reverbMix, reverbTime, loudnessNormalization, useOversample, masterFftSize = 2048, stereoFftSize = 1024, audioLatencyHint = 'playback', fxEnabled, audioIsStereo = true, isAuthenticated } = effectsState;
   const [audioSampleRate, setAudioSampleRate] = useState(44100);
 
   // Audio Context and Core Nodes
@@ -63,6 +71,10 @@ export function useAudioContext(effectsState: any) {
   const stereoOutRef = useRef<GainNode | null>(null);
   const pseudoMonoRef = useRef<GainNode | null>(null);
   const pseudoDelayRef = useRef<DelayNode | null>(null);
+  const crossoverLp1Ref = useRef<BiquadFilterNode | null>(null);
+  const crossoverHp1Ref = useRef<BiquadFilterNode | null>(null);
+  const crossoverLp2Ref = useRef<BiquadFilterNode | null>(null);
+  const crossoverHp2Ref = useRef<BiquadFilterNode | null>(null);
   const pseudoHighpassRef = useRef<BiquadFilterNode | null>(null);
   const pseudoLeftGainRef = useRef<GainNode | null>(null);
   const pseudoRightGainRef = useRef<GainNode | null>(null);
@@ -92,7 +104,6 @@ export function useAudioContext(effectsState: any) {
 
   // FX Nodes
   const eqNodesRef = useRef<BiquadFilterNode[]>([]);
-  const eqConvolverRef = useRef<ConvolverNode | null>(null);
   const eqSplitterRef = useRef<ChannelSplitterNode | null>(null);
   const eqMergerRef = useRef<ChannelMergerNode | null>(null);
   const limiterNodeRef = useRef<DynamicsCompressorNode | null>(null);
@@ -245,6 +256,9 @@ export function useAudioContext(effectsState: any) {
     trebleGain,
     reverbMix,
     stereoWidth,
+    stereoCrossoverLow,
+    stereoCrossoverHigh,
+    stereoCrossoverMode,
     panValue,
   }, effectiveFxEnabled);
 
@@ -260,6 +274,7 @@ export function useAudioContext(effectsState: any) {
     comp: currentGraphActivity.comp,
     reverb: currentGraphActivity.reverb,
     stereo: currentGraphActivity.stereo,
+    stereoCrossoverMode: currentGraphActivity.stereo ? stereoCrossoverMode : null,
     audioIsStereo: currentGraphActivity.stereo ? Boolean(audioIsStereo) : null,
     master: currentGraphActivity.master,
     limiter: currentGraphActivity.limiter,
@@ -409,7 +424,7 @@ export function useAudioContext(effectsState: any) {
     eqNodesRef.current.forEach(disconnectNode);
     disconnectNode(eqSplitterRef.current);
     disconnectNode(eqMergerRef.current);
-    disconnectNode(eqConvolverRef.current);
+
     toneNodesRef.current.forEach(disconnectNode);
     disconnectNode(compressorNodeRef.current);
     disconnectNode(customCompressorNodeRef.current);
@@ -431,6 +446,10 @@ export function useAudioContext(effectsState: any) {
     disconnectNode(stereoOutRef.current);
     disconnectNode(pseudoMonoRef.current);
     disconnectNode(pseudoDelayRef.current);
+    disconnectNode(crossoverLp1Ref.current);
+    disconnectNode(crossoverHp1Ref.current);
+    disconnectNode(crossoverLp2Ref.current);
+    disconnectNode(crossoverHp2Ref.current);
     disconnectNode(pseudoHighpassRef.current);
     disconnectNode(pseudoLeftGainRef.current);
     disconnectNode(pseudoRightGainRef.current);
@@ -455,6 +474,9 @@ export function useAudioContext(effectsState: any) {
       trebleGain,
       reverbMix,
       stereoWidth,
+      stereoCrossoverLow,
+      stereoCrossoverHigh,
+      stereoCrossoverMode,
       panValue,
     }, enabledWithAutoPreamp);
 
@@ -488,24 +510,9 @@ export function useAudioContext(effectsState: any) {
     }
 
     // 2. EQ
-    if (activity.eq && rawEqBands && rawEqBands.length > 0) {
-      if (!isParametricPreset) {
-        eqNodesRef.current.forEach(disconnectNode);
-        eqNodesRef.current = [];
-        // Graphic EQ -> FIR Convolver
-        if (!eqConvolverRef.current) eqConvolverRef.current = ctx.createConvolver();
-        eqConvolverRef.current.normalize = false; // Important: Do not normalize EQ impulse response!
-
-        const ir = generateGraphicEqImpulseResponse(rawEqBands, ctx.sampleRate, eqBlockSize);
-        const buffer = ctx.createBuffer(2, ir.length, ctx.sampleRate);
-        buffer.copyToChannel(ir as any, 0);
-        buffer.copyToChannel(ir as any, 1);
-        eqConvolverRef.current.buffer = buffer;
-
-        connectStage(eqConvolverRef.current);
-      } else {
-        eqConvolverRef.current = null;
-        // Parametric EQ -> Biquads
+    if (activity.eq && eqBands && eqBands.length > 0) {
+      {
+        // Unified EQ -> Biquads
         const expandedEqBands = expandResonantEqBands(eqBands || []);
         if (eqNodesRef.current.length !== expandedEqBands.length) {
           eqNodesRef.current.forEach(node => node.disconnect());
@@ -696,7 +703,36 @@ export function useAudioContext(effectsState: any) {
       stereoInputRef.current.channelCount = 2;
       stereoInputRef.current.channelCountMode = 'explicit';
       stereoInputRef.current.channelInterpretation = 'speakers';
-      currentNode.connect(stereoInputRef.current);
+
+      if (!crossoverLp1Ref.current) crossoverLp1Ref.current = ctx.createBiquadFilter();
+      if (!crossoverHp1Ref.current) crossoverHp1Ref.current = ctx.createBiquadFilter();
+      if (!crossoverLp2Ref.current) crossoverLp2Ref.current = ctx.createBiquadFilter();
+      if (!crossoverHp2Ref.current) crossoverHp2Ref.current = ctx.createBiquadFilter();
+
+      crossoverLp1Ref.current.type = 'lowpass';
+      crossoverLp1Ref.current.frequency.value = stereoCrossoverLow;
+      crossoverHp1Ref.current.type = 'highpass';
+      crossoverHp1Ref.current.frequency.value = stereoCrossoverLow;
+      crossoverLp2Ref.current.type = 'lowpass';
+      crossoverLp2Ref.current.frequency.value = stereoCrossoverHigh;
+      crossoverHp2Ref.current.type = 'highpass';
+      crossoverHp2Ref.current.frequency.value = stereoCrossoverHigh;
+
+      currentNode.connect(crossoverLp1Ref.current);
+      currentNode.connect(crossoverHp1Ref.current);
+      crossoverHp1Ref.current.connect(crossoverLp2Ref.current);
+      crossoverHp1Ref.current.connect(crossoverHp2Ref.current);
+
+      if (stereoCrossoverMode === 'inside') {
+        crossoverLp2Ref.current.connect(stereoInputRef.current);
+        crossoverLp1Ref.current.connect(stereoOutRef.current);
+        crossoverHp2Ref.current.connect(stereoOutRef.current);
+      } else {
+        crossoverLp1Ref.current.connect(stereoInputRef.current);
+        crossoverHp2Ref.current.connect(stereoInputRef.current);
+        crossoverLp2Ref.current.connect(stereoOutRef.current);
+      }
+
       stereoInputRef.current.connect(stereoSplitterRef.current);
       stereoSplitterRef.current.connect(lToLRef.current, 0);
       stereoSplitterRef.current.connect(lToRRef.current, 0);
@@ -730,7 +766,12 @@ export function useAudioContext(effectsState: any) {
       pseudoRightGainRef.current.gain.value = 1;
       haasWetGainRef.current.gain.value = pseudoStereoWetGain(pseudoAmount);
 
-      currentNode.connect(pseudoMonoRef.current);
+      if (stereoCrossoverMode === 'inside') {
+        crossoverLp2Ref.current.connect(pseudoMonoRef.current);
+      } else {
+        crossoverLp1Ref.current.connect(pseudoMonoRef.current);
+        crossoverHp2Ref.current.connect(pseudoMonoRef.current);
+      }
       pseudoMonoRef.current.connect(pseudoLeftGainRef.current);
       pseudoMonoRef.current.connect(pseudoDelayRef.current);
       pseudoDelayRef.current.connect(pseudoHighpassRef.current);
@@ -866,8 +907,11 @@ export function useAudioContext(effectsState: any) {
       trebleGain,
       reverbMix,
       stereoWidth,
+      stereoCrossoverLow,
+      stereoCrossoverHigh,
+      stereoCrossoverMode,
     }, effectiveFxEnabled) || BASE_POST_FX_TRIM_DB);
-  }, [bassGain, effectiveFxEnabled, effectivePreampGain, eqBands, reverbMix, stereoWidth, trebleGain]);
+  }, [bassGain, effectiveFxEnabled, effectivePreampGain, eqBands, reverbMix, stereoWidth, stereoCrossoverLow, stereoCrossoverHigh, stereoCrossoverMode, trebleGain]);
 
   useEffect(() => {
     if (preampNodeRef.current) {
@@ -904,60 +948,28 @@ export function useAudioContext(effectsState: any) {
   }, [bassGain, trebleGain, fxEnabled.tone]);
 
   useEffect(() => {
-    let timeoutId: number | null = null;
+    if (eqNodesRef.current && eqBands) {
+      eqBands.forEach((band: EqBand, i: number) => {
+        if (eqNodesRef.current[i]) {
+          const freq = Number.isFinite(band.frequency) ? band.frequency : 1000;
+          const qVal = Number.isFinite(band.q) ? band.q : 1;
+          const gainVal = Number.isFinite(band.gain) ? (fxEnabled.eq ? band.gain : 0) : 0;
+          const now = audioContextRef.current?.currentTime || 0;
 
-    if (isParametricPreset) {
-      if (eqNodesRef.current && eqBands) {
-        eqBands.forEach((band: EqBand, i: number) => {
-          if (eqNodesRef.current[i]) {
-            const freq = Number.isFinite(band.frequency) ? band.frequency : 1000;
-            const qVal = Number.isFinite(band.q) ? band.q : 1;
-            const gainVal = Number.isFinite(band.gain) ? (fxEnabled.eq ? band.gain : 0) : 0;
-            const now = audioContextRef.current?.currentTime || 0;
+          eqNodesRef.current[i].type = band.type || 'peaking';
 
-            eqNodesRef.current[i].type = band.type || 'peaking';
+          eqNodesRef.current[i].frequency.cancelScheduledValues(now);
+          eqNodesRef.current[i].frequency.setTargetAtTime(freq, now, 0.015);
 
-            eqNodesRef.current[i].frequency.cancelScheduledValues(now);
-            eqNodesRef.current[i].frequency.setTargetAtTime(freq, now, 0.015);
+          eqNodesRef.current[i].Q.cancelScheduledValues(now);
+          eqNodesRef.current[i].Q.setTargetAtTime(qVal, now, 0.015);
 
-            eqNodesRef.current[i].Q.cancelScheduledValues(now);
-            eqNodesRef.current[i].Q.setTargetAtTime(qVal, now, 0.015);
-
-            eqNodesRef.current[i].gain.cancelScheduledValues(now);
-            eqNodesRef.current[i].gain.setTargetAtTime(gainVal, now, 0.015);
-          }
-        });
-      }
-    } else if (eqConvolverRef.current && rawEqBands && audioContextRef.current) {
-      if (fxEnabled.eq) {
-        const audioCtx = audioContextRef.current;
-        timeoutId = window.setTimeout(() => {
-          if (!eqConvolverRef.current || !audioCtx) return;
-          const ir = generateGraphicEqImpulseResponse(rawEqBands, audioCtx.sampleRate, eqBlockSize);
-          const buffer = audioCtx.createBuffer(2, ir.length, audioCtx.sampleRate);
-          // eslint-disable-next-line @typescript-eslint/no-explicit-any
-          buffer.copyToChannel(ir as any, 0);
-          // eslint-disable-next-line @typescript-eslint/no-explicit-any
-          buffer.copyToChannel(ir as any, 1);
-          eqConvolverRef.current.buffer = buffer;
-        }, 50);
-      } else {
-        // Bypassed: Impulse response is just a single pulse at N/2
-        const ir = new Float32Array(eqBlockSize);
-        ir[Math.floor(eqBlockSize / 2)] = 1.0;
-        const buffer = audioContextRef.current.createBuffer(2, ir.length, audioContextRef.current.sampleRate);
-        buffer.copyToChannel(ir, 0);
-        buffer.copyToChannel(ir, 1);
-        eqConvolverRef.current.buffer = buffer;
-      }
+          eqNodesRef.current[i].gain.cancelScheduledValues(now);
+          eqNodesRef.current[i].gain.setTargetAtTime(gainVal, now, 0.015);
+        }
+      });
     }
-
-    return () => {
-      if (timeoutId !== null) {
-        globalThis.clearTimeout(timeoutId);
-      }
-    };
-  }, [eqBands, rawEqBands, fxEnabled.eq, isParametricPreset]);
+  }, [eqBands, fxEnabled.eq]);
 
   useEffect(() => {
     if (compressorNodeRef.current && compMakeupNodeRef.current) {
@@ -1006,6 +1018,26 @@ export function useAudioContext(effectsState: any) {
       }
     }
   }, [stereoWidth, fxEnabled.stereo, audioIsStereo]);
+
+  useEffect(() => {
+    const now = audioContextRef.current?.currentTime || 0;
+    if (crossoverLp1Ref.current) {
+      crossoverLp1Ref.current.frequency.cancelScheduledValues(now);
+      crossoverLp1Ref.current.frequency.setTargetAtTime(stereoCrossoverLow, now, 0.015);
+    }
+    if (crossoverHp1Ref.current) {
+      crossoverHp1Ref.current.frequency.cancelScheduledValues(now);
+      crossoverHp1Ref.current.frequency.setTargetAtTime(stereoCrossoverLow, now, 0.015);
+    }
+    if (crossoverLp2Ref.current) {
+      crossoverLp2Ref.current.frequency.cancelScheduledValues(now);
+      crossoverLp2Ref.current.frequency.setTargetAtTime(stereoCrossoverHigh, now, 0.015);
+    }
+    if (crossoverHp2Ref.current) {
+      crossoverHp2Ref.current.frequency.cancelScheduledValues(now);
+      crossoverHp2Ref.current.frequency.setTargetAtTime(stereoCrossoverHigh, now, 0.015);
+    }
+  }, [stereoCrossoverLow, stereoCrossoverHigh]);
 
   useEffect(() => {
     if (panNodeRef.current) {

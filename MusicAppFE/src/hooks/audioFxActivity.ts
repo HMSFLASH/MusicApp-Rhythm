@@ -24,7 +24,7 @@ export type AudioFxActivity = {
 export const getAudioFxActivity = (
   params: Pick<
     AudioRenderParams,
-    'preampGain' | 'eqBands' | 'bassGain' | 'trebleGain' | 'reverbMix' | 'stereoWidth' | 'panValue'
+    'preampGain' | 'eqBands' | 'bassGain' | 'trebleGain' | 'reverbMix' | 'stereoWidth' | 'stereoCrossoverLow' | 'stereoCrossoverHigh' | 'stereoCrossoverMode' | 'panValue'
   >,
   enabled: FxEnabledFlags = {}
 ): AudioFxActivity => {

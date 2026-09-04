@@ -314,6 +314,9 @@ export const connectStereoWidthMatrix = (
   ctx: BaseAudioContext,
   input: AudioNode,
   widthPercent: number,
+  stereoCrossoverLow: number,
+  stereoCrossoverHigh: number,
+  stereoCrossoverMode: 'inside' | 'outside',
   usePseudoStereo = true
 ) => {
   const width = percentToStereoBaseWidth(widthPercent);
@@ -337,7 +340,34 @@ export const connectStereoWidthMatrix = (
   lToR.gain.value = (1 - width) / 2;
   rToR.gain.value = (1 + width) / 2;
 
-  input.connect(stereoInput);
+  const crossoverLp1 = ctx.createBiquadFilter();
+  const crossoverHp1 = ctx.createBiquadFilter();
+  const crossoverLp2 = ctx.createBiquadFilter();
+  const crossoverHp2 = ctx.createBiquadFilter();
+
+  crossoverLp1.type = 'lowpass';
+  crossoverLp1.frequency.value = stereoCrossoverLow;
+  crossoverHp1.type = 'highpass';
+  crossoverHp1.frequency.value = stereoCrossoverLow;
+  crossoverLp2.type = 'lowpass';
+  crossoverLp2.frequency.value = stereoCrossoverHigh;
+  crossoverHp2.type = 'highpass';
+  crossoverHp2.frequency.value = stereoCrossoverHigh;
+
+  input.connect(crossoverLp1);
+  input.connect(crossoverHp1);
+  crossoverHp1.connect(crossoverLp2);
+  crossoverHp1.connect(crossoverHp2);
+
+  if (stereoCrossoverMode === 'inside') {
+    crossoverLp2.connect(stereoInput);
+    crossoverLp1.connect(out);
+    crossoverHp2.connect(out);
+  } else {
+    crossoverLp1.connect(stereoInput);
+    crossoverHp2.connect(stereoInput);
+    crossoverLp2.connect(out);
+  }
   stereoInput.connect(splitter);
   splitter.connect(lToL, 0);
   splitter.connect(lToR, 0);
@@ -367,7 +397,12 @@ export const connectStereoWidthMatrix = (
     pseudoHighpass.frequency.value = 180;
     pseudoWet.gain.value = pseudoStereoWetGain(pseudoAmount);
 
-    input.connect(pseudoMono);
+    if (stereoCrossoverMode === 'inside') {
+      crossoverLp2.connect(pseudoMono);
+    } else {
+      crossoverLp1.connect(pseudoMono);
+      crossoverHp2.connect(pseudoMono);
+    }
     pseudoMono.connect(pseudoLeft);
     pseudoMono.connect(pseudoDelay);
     pseudoDelay.connect(pseudoHighpass);

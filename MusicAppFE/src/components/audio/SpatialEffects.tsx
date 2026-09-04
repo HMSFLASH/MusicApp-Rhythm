@@ -1,4 +1,5 @@
 import { HorizontalSlider } from '../HorizontalSlider';
+import { RangeSlider } from '../RangeSlider';
 import { useGlobalAudio } from '../../context/AudioContext';
 import { useTranslation } from 'react-i18next';
 import { AudioEffectPanel, EffectControlsGate, EffectPowerButton } from './AudioEffectPanel';
@@ -87,6 +88,43 @@ export function SpatialEffects() {
             color="#818cf8"
             unit="%"
           />
+          <div className="flex flex-col gap-2">
+            <div className="flex items-center justify-between mb-1">
+              <span className="text-xs font-mono font-bold text-slate-300 uppercase tracking-wider">
+                Crossover Range
+              </span>
+              <button
+                onClick={() => playerState.updateStereoCrossoverMode(playerState.stereoCrossoverMode === 'inside' ? 'outside' : 'inside')}
+                className={`px-3 py-1 text-xs font-mono font-bold rounded-md border transition-all ${
+                  playerState.stereoCrossoverMode === 'inside' 
+                  ? 'bg-indigo-500/20 text-indigo-400 border-indigo-500/40 shadow-[0_0_10px_rgba(99,102,241,0.2)]' 
+                  : 'bg-rose-500/20 text-rose-400 border-rose-500/40 shadow-[0_0_10px_rgba(244,63,94,0.2)]'
+                }`}
+              >
+                {playerState.stereoCrossoverMode === 'inside' ? 'INSIDE' : 'OUTSIDE'}
+              </button>
+            </div>
+            <RangeSlider
+              value={[playerState.stereoCrossoverLow, playerState.stereoCrossoverHigh]}
+              min={20}
+              max={20000}
+              onChange={(val) => {
+                playerState.updateStereoCrossoverLow(val[0]);
+                playerState.updateStereoCrossoverHigh(val[1]);
+              }}
+              label=""
+              color={playerState.stereoCrossoverMode === 'inside' ? '#818cf8' : '#fb7185'}
+              unit="Hz"
+              mode={playerState.stereoCrossoverMode}
+              isLogarithmic={true}
+            />
+            <p className="text-[11px] text-slate-400 leading-tight">
+              {playerState.stereoCrossoverMode === 'inside' 
+                ? 'Stereo Imager will ONLY affect frequencies INSIDE this range. Frequencies outside will remain unchanged.'
+                : 'Stereo Imager will ONLY affect frequencies OUTSIDE this range (e.g. keeping bass and highs wide but mids narrow).'
+              }
+            </p>
+          </div>
           <AudioSelectRow<number>
             title={t('studio.spatial.stereoFftTitle', 'Độ phân giải phân tích Stereo (FFT Size)')}
             description={t('studio.spatial.stereoFftDesc', 'Tần số lấy mẫu phân tích tương quan kênh L/R. Mặc định 1024 cho độ mượt cao, có thể chỉnh lên 16384 hoặc giảm xuống 256.')}

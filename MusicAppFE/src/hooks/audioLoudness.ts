@@ -198,6 +198,9 @@ export const calculateAutoPostFxTrimDb = (
     trebleGain?: number;
     reverbMix?: number;
     stereoWidth?: number;
+    stereoCrossoverLow?: number;
+    stereoCrossoverHigh?: number;
+    stereoCrossoverMode?: 'inside' | 'outside';
   },
   enabled: Partial<Record<'preamp' | 'eq' | 'tone' | 'reverb' | 'stereo', boolean>> = {}
 ) => {
@@ -233,6 +236,9 @@ export const calculateRealtimeTrackLoudnessGain = (
     trebleGain?: number;
     reverbMix?: number;
     stereoWidth?: number;
+    stereoCrossoverLow?: number;
+    stereoCrossoverHigh?: number;
+    stereoCrossoverMode?: 'inside' | 'outside';
     panValue?: number;
   },
   fxEnabled: Partial<Record<'preamp' | 'eq' | 'tone' | 'reverb' | 'stereo' | 'master' | 'limiter', boolean>> = {}
@@ -244,6 +250,9 @@ export const calculateRealtimeTrackLoudnessGain = (
     trebleGain: params.trebleGain ?? 0,
     reverbMix: params.reverbMix ?? 0,
     stereoWidth: params.stereoWidth ?? 100,
+    stereoCrossoverLow: params.stereoCrossoverLow ?? 150,
+    stereoCrossoverHigh: params.stereoCrossoverHigh ?? 20000,
+    stereoCrossoverMode: params.stereoCrossoverMode ?? 'inside',
     panValue: params.panValue ?? 0,
   };
   const fxActivity = getAudioFxActivity(fxParams, fxEnabled);

@@ -181,6 +181,9 @@ export function useAudioPlayer(
       compMakeupGain: effectsState.compMakeupGain,
       panValue: effectsState.panValue,
       stereoWidth: effectsState.stereoWidth,
+      stereoCrossoverLow: effectsState.stereoCrossoverLow,
+      stereoCrossoverHigh: effectsState.stereoCrossoverHigh,
+      stereoCrossoverMode: effectsState.stereoCrossoverMode,
       reverbMix: effectsState.reverbMix,
       reverbTime: effectsState.reverbTime,
       loudnessNormalization: effectsState.loudnessNormalization,
@@ -189,7 +192,7 @@ export function useAudioPlayer(
       fullQueueCacheEnabled: effectsState.fullQueueCacheEnabled,
       masterFftSize: effectsState.masterFftSize,
       stereoFftSize: effectsState.stereoFftSize,
-      eqBlockSize: effectsState.eqBlockSize,
+      
       audioLatencyHint: effectsState.audioLatencyHint,
       fxEnabled: effectsState.fxEnabled,
       useLegacyMetadata
@@ -208,9 +211,9 @@ export function useAudioPlayer(
     effectsState.eqPresetName, effectsState.eqBands, effectsState.customEqPresets,
     effectsState.preampGain, effectsState.bassGain, effectsState.trebleGain,
     effectsState.compThreshold, effectsState.compRatio, effectsState.compKnee, effectsState.compAttack, effectsState.compRelease, effectsState.compRmsSize, effectsState.compMakeupGain,
-    effectsState.panValue, effectsState.stereoWidth, effectsState.reverbMix, effectsState.reverbTime,
+    effectsState.panValue, effectsState.stereoWidth, effectsState.stereoCrossoverLow, effectsState.stereoCrossoverHigh, effectsState.stereoCrossoverMode, effectsState.reverbMix, effectsState.reverbTime,
     effectsState.loudnessNormalization, effectsState.useOversample, effectsState.precalculateOnIdle,
-    effectsState.fullQueueCacheEnabled, effectsState.masterFftSize, effectsState.stereoFftSize, effectsState.eqBlockSize, effectsState.audioLatencyHint, effectsState.fxEnabled,
+    effectsState.fullQueueCacheEnabled, effectsState.masterFftSize, effectsState.stereoFftSize, effectsState.audioLatencyHint, effectsState.fxEnabled,
     useLegacyMetadata
   ]);
 

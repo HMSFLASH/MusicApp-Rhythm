@@ -112,10 +112,13 @@ export function useAudioPlayback(
     reverbMix,
     reverbTime,
     stereoWidth,
+    stereoCrossoverLow,
+    stereoCrossoverHigh,
+    stereoCrossoverMode,
     panValue,
     loudnessNormalization,
     useOversample,
-    eqBlockSize,
+    
     fullQueueCacheEnabled,
     flacWasmOverrides,
     m4aWasmOverrides,
@@ -570,10 +573,13 @@ export function useAudioPlayback(
     reverbMix,
     reverbTime,
     stereoWidth,
+    stereoCrossoverLow,
+    stereoCrossoverHigh,
+    stereoCrossoverMode,
     panValue,
     loudnessNormalization,
     useOversample,
-    eqBlockSize,
+    
   });
   const fxEnabledRef = useRef<FxEnabledFlags>(fxEnabled || {});
 
@@ -597,10 +603,13 @@ export function useAudioPlayback(
       reverbMix,
       reverbTime,
       stereoWidth,
+      stereoCrossoverLow,
+      stereoCrossoverHigh,
+      stereoCrossoverMode,
       panValue,
       loudnessNormalization,
       useOversample,
-      eqBlockSize,
+      
     };
   }, [
     bassGain,
@@ -617,10 +626,13 @@ export function useAudioPlayback(
     reverbMix,
     reverbTime,
     stereoWidth,
+    stereoCrossoverLow,
+    stereoCrossoverHigh,
+    stereoCrossoverMode,
     trebleGain,
     loudnessNormalization,
     useOversample,
-    eqBlockSize,
+    
   ]);
 
   useEffect(() => {
@@ -668,6 +680,9 @@ export function useAudioPlayback(
     setTrackLoudnessGain,
     stopQueuePrecalculateStatusSoon,
     stereoWidth,
+    stereoCrossoverLow,
+    stereoCrossoverHigh,
+    stereoCrossoverMode,
     trebleGain,
     useOversample,
   ]);
