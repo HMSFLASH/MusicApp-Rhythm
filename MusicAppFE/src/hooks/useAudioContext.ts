@@ -46,14 +46,75 @@ const disconnectNode = (node: AudioNode | null) => {
 };
 
 export function useAudioContext(inputEffectsState: any) {
-  const [effectsState, setEffectsState] = useState(inputEffectsState);
+  const [debouncedContinuous, setDebouncedContinuous] = useState({
+    preampGain: inputEffectsState.preampGain,
+    bassGain: inputEffectsState.bassGain,
+    trebleGain: inputEffectsState.trebleGain,
+    eqBands: inputEffectsState.eqBands,
+    stereoWidth: inputEffectsState.stereoWidth,
+    stereoCrossoverLow: inputEffectsState.stereoCrossoverLow,
+    stereoCrossoverHigh: inputEffectsState.stereoCrossoverHigh,
+    reverbMix: inputEffectsState.reverbMix,
+    reverbTime: inputEffectsState.reverbTime,
+    panValue: inputEffectsState.panValue,
+    compThreshold: inputEffectsState.compThreshold,
+    compRatio: inputEffectsState.compRatio,
+    compKnee: inputEffectsState.compKnee,
+    compAttack: inputEffectsState.compAttack,
+    compRelease: inputEffectsState.compRelease,
+    compRmsSize: inputEffectsState.compRmsSize,
+    compMakeupGain: inputEffectsState.compMakeupGain,
+  });
 
   useEffect(() => {
+    // Debounce continuous slider values to avoid audio stuttering during real-time dragging.
+    // Instant toggles (fxEnabled, crossoverMode) will not be delayed.
     const handler = setTimeout(() => {
-      setEffectsState(inputEffectsState);
-    }, 1000);
+      setDebouncedContinuous({
+        preampGain: inputEffectsState.preampGain,
+        bassGain: inputEffectsState.bassGain,
+        trebleGain: inputEffectsState.trebleGain,
+        eqBands: inputEffectsState.eqBands,
+        stereoWidth: inputEffectsState.stereoWidth,
+        stereoCrossoverLow: inputEffectsState.stereoCrossoverLow,
+        stereoCrossoverHigh: inputEffectsState.stereoCrossoverHigh,
+        reverbMix: inputEffectsState.reverbMix,
+        reverbTime: inputEffectsState.reverbTime,
+        panValue: inputEffectsState.panValue,
+        compThreshold: inputEffectsState.compThreshold,
+        compRatio: inputEffectsState.compRatio,
+        compKnee: inputEffectsState.compKnee,
+        compAttack: inputEffectsState.compAttack,
+        compRelease: inputEffectsState.compRelease,
+        compRmsSize: inputEffectsState.compRmsSize,
+        compMakeupGain: inputEffectsState.compMakeupGain,
+      });
+    }, 1000); // 1-second debounce
     return () => clearTimeout(handler);
-  }, [inputEffectsState]);
+  }, [
+    inputEffectsState.preampGain,
+    inputEffectsState.bassGain,
+    inputEffectsState.trebleGain,
+    inputEffectsState.eqBands,
+    inputEffectsState.stereoWidth,
+    inputEffectsState.stereoCrossoverLow,
+    inputEffectsState.stereoCrossoverHigh,
+    inputEffectsState.reverbMix,
+    inputEffectsState.reverbTime,
+    inputEffectsState.panValue,
+    inputEffectsState.compThreshold,
+    inputEffectsState.compRatio,
+    inputEffectsState.compKnee,
+    inputEffectsState.compAttack,
+    inputEffectsState.compRelease,
+    inputEffectsState.compRmsSize,
+    inputEffectsState.compMakeupGain,
+  ]);
+
+  const effectsState = {
+    ...inputEffectsState,
+    ...debouncedContinuous,
+  };
 
   const { eqBands: rawEqBands, isParametricPreset, preampGain, bassGain, trebleGain, compThreshold, compRatio, compKnee, compAttack, compRelease, compRmsSize, compMakeupGain, panValue, stereoWidth, stereoCrossoverLow = 150, stereoCrossoverHigh = 20000, stereoCrossoverMode = 'inside', reverbMix, reverbTime, loudnessNormalization, useOversample, masterFftSize = 2048, stereoFftSize = 1024, audioLatencyHint = 'playback', fxEnabled, audioIsStereo = true, isAuthenticated } = effectsState;
   const [audioSampleRate, setAudioSampleRate] = useState(44100);
@@ -878,6 +939,9 @@ export function useAudioContext(inputEffectsState: any) {
     reverbMix,
     reverbTime,
     stereoWidth,
+    stereoCrossoverLow,
+    stereoCrossoverHigh,
+    stereoCrossoverMode,
     trebleGain,
     useOversample,
   ]);
