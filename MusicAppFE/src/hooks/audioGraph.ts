@@ -278,7 +278,9 @@ export const generateImpulseResponse = (ctx: BaseAudioContext, duration: number,
 
   for (let channel = 0; channel < 2; channel++) {
     const data = impulse.getChannelData(channel);
-    let last = 0;
+    let lp1 = 0;
+    let lp2 = 0;
+    let hp = 0;
 
     for (let i = 0; i < length; i++) {
       const t = i / sampleRate;
@@ -287,22 +289,35 @@ export const generateImpulseResponse = (ctx: BaseAudioContext, duration: number,
       // T60 exponential decay
       const envelope = Math.exp((-6.9078 * t) / duration);
 
-      // High frequency damping: cutoff smoothly decreases from 12kHz to 4kHz
-      const cutoff = 12000 - progress * 8000;
-      const alpha = 1 - Math.exp((-2 * Math.PI * cutoff) / sampleRate);
+      // Warmer high frequency damping: smoothly decreases from 7kHz to 500Hz
+      const cutoff = 7000 * Math.pow(0.07, progress);
+      const alphaLp = 1 - Math.exp((-2 * Math.PI * cutoff) / sampleRate);
+      
+      // High pass to remove low-end mud (fixed at 150Hz)
+      const alphaHp = 1 - Math.exp((-2 * Math.PI * 150) / sampleRate);
 
-      const noise = Math.random() * 2 - 1; // NOSONAR: Math.random is sufficient for audio white noise and much faster than Web Crypto.
-      last = last + alpha * (noise - last);
+      const noise = Math.random() * 2 - 1; // NOSONAR
+      
+      lp1 = lp1 + alphaLp * (noise - lp1);
+      lp2 = lp2 + alphaLp * (lp1 - lp2); // 2nd order lowpass
+      hp = hp + alphaHp * (lp2 - hp);
+      
+      const bandpassed = lp2 - hp;
 
-      // Apply T60 envelope and base decay modifier
-      data[i] = last * envelope * decay;
+      // Apply T60 envelope and base decay modifier. Add slight channel variation.
+      const channelVar = channel === 0 ? 1.0 : 0.95;
+      data[i] = bandpassed * envelope * decay * channelVar * 2.0; // Boost gain slightly to compensate for 2-pole LP
     }
 
-    // Add early reflections
+    // Add softened early reflections
     for (const reflection of earlyReflections) {
       const index = Math.floor(reflection.time * sampleRate);
-      if (index < length) {
-        data[index] += reflection.gain;
+      if (index < length - 2) {
+        // Smear the impulse over a few samples to avoid harsh clicks
+        const smearGain = reflection.gain * 0.3;
+        data[index] += smearGain;
+        data[index + 1] += smearGain;
+        data[index + 2] += smearGain;
       }
     }
   }
