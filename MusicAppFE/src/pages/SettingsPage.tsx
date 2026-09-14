@@ -400,6 +400,7 @@ export function SettingsPage() {
                     value={playerState.eqBandCount}
                     onChange={(val) => playerState.changeEqBandCount(val)}
                     options={[
+                      { value: 0, label: 'Tùy chỉnh (Studio)' },
                       { value: 3, label: '3 Bands' },
                       { value: 5, label: '5 Bands' },
                       { value: 10, label: '10 Bands' },

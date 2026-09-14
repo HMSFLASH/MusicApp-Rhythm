@@ -2,7 +2,7 @@ import { useMemo, useState } from 'react';
 import { createPortal } from 'react-dom';
 import { Plus, ChevronDown, X, Edit2, Trash2, Info, CircleDot, Sliders } from 'lucide-react';
 import { VerticalFader } from '../VerticalFader';
-import { EQ_PRESETS, STYLISTIC_PRESETS, PRECOMPUTED_STYLISTIC_PRESETS } from '../../hooks/audioTypes';
+import { STYLISTIC_PRESETS, PRECOMPUTED_STYLISTIC_PRESETS } from '../../hooks/audioTypes';
 import type { CustomEqPreset, EqBand } from '../../hooks/audioTypes';
 import { useGlobalAudio } from '../../context/AudioContext';
 import { useTranslation } from 'react-i18next';
@@ -297,11 +297,13 @@ export function EqRack() {
   const isParametricPreset = playerState.eqPresetName === 'PARAMETRIC'
     || isSavedParametricPreset(currentSavedPreset)
     || Boolean(currentStylisticPreset && 'isParametric' in currentStylisticPreset && (currentStylisticPreset as any).isParametric);
-  const isEditablePreset = playerState.eqPresetName === 'CUSTOM'
+  const isEditablePreset = playerState.eqBandMode === 'custom' && (
+    playerState.eqPresetName === 'CUSTOM'
     || playerState.eqPresetName === 'PARAMETRIC'
     || currentSavedPreset?.isCustomOrigin
     || currentSavedPreset?.presetMode === 'custom'
-    || currentSavedPreset?.presetMode === 'parametric';
+    || currentSavedPreset?.presetMode === 'parametric'
+  );
   const bandColumnWidth = isEditablePreset ? 72 : 48;
   const bandGap = 16;
   const eqRackMinWidth = Math.max(
@@ -336,19 +338,20 @@ export function EqRack() {
               <>
                 <div className="fixed inset-0 z-40" onClick={() => setShowPresetMenu(false)} />
                 <div className="absolute top-full left-0 mt-2 w-72 max-w-[calc(100vw-32px)] bg-[#0c1626] border border-white/10 rounded-2xl shadow-2xl z-50 overflow-hidden py-2 max-h-96 overflow-y-auto backdrop-blur-2xl">
-                  {Object.keys(EQ_PRESETS).map((key) => (
-                    <button aria-label="Select preset"
-                      key={key}
-                      onClick={() => {
-                        playerState.applyPreset(key as keyof typeof EQ_PRESETS);
-                        setShowPresetMenu(false);
-                      }}
-                      className="w-full flex items-center gap-2.5 px-4 py-2 hover:bg-white/[0.06] text-slate-200 hover:text-white text-xs font-medium transition-colors"
-                    >
-                      <Sliders size={13} className="text-slate-400 shrink-0" />
-                      <span>{key.replace('_', ' ')}</span>
-                    </button>
-                  ))}
+                  <button aria-label="Set Flat EQ"
+                    onClick={() => {
+                      playerState.setEqPresetName('FLAT');
+                      playerState.setEqBands(playerState.eqBands.map(b => ({ ...b, gain: 0 })));
+                      playerState.setBassGain(0);
+                      playerState.setTrebleGain(0);
+                      playerState.setPreampGain(0);
+                      setShowPresetMenu(false);
+                    }}
+                    className="w-full flex items-center gap-2.5 px-4 py-2 hover:bg-white/[0.06] text-slate-200 hover:text-white text-xs font-medium transition-colors"
+                  >
+                    <Sliders size={13} className="text-slate-400 shrink-0" />
+                    <span>FLAT</span>
+                  </button>
 
                   <div className="h-px bg-white/[0.06] my-1.5"></div>
                   <div className="px-4 py-1 text-[10px] text-slate-400 uppercase font-bold tracking-widest">Sound Signatures</div>

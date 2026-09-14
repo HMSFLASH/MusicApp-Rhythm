@@ -456,8 +456,10 @@ export function useAudioEffectsState(savedState: SavedAudioEffectsState = {}) {
     setEqBands(prev => prev.map(b => b.id === id ? { ...b, type: val } : b));
   }, [checkAndSwitchToCustom]);
 
+  const eqBandMode = eqBandCount === 0 ? 'custom' : 'fixed';
+
   return {
-    eqPresetName, eqBandCount, changeEqBandCount, eqBands, customEqPresets,
+    eqPresetName, setEqPresetName, eqBandCount, eqBandMode, changeEqBandCount, eqBands, setEqBands, customEqPresets,
     preampGain, setPreampGain, updatePreampGain: setPreampGain,
     bassGain, setBassGain, updateBassGain: setBassGain,
     trebleGain, setTrebleGain, updateTrebleGain: setTrebleGain,
