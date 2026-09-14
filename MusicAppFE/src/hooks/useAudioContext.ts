@@ -721,6 +721,10 @@ export function useAudioContext(inputEffectsState: any) {
       reverbLowpassRef.current.frequency.value = REVERB_WET_LOWPASS_HZ;
       reverbLowpassRef.current.Q.value = 0.7;
 
+      if (!irBufferRef.current) {
+        irBufferRef.current = generateImpulseResponse(ctx, clamp(reverbTime || 2, 0.1, 10), 2);
+      }
+
       if (irBufferRef.current && convolverNodeRef.current.buffer !== irBufferRef.current) {
         convolverNodeRef.current.buffer = irBufferRef.current;
       }
