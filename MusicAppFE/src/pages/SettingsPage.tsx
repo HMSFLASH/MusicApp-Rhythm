@@ -18,6 +18,7 @@ import {
   Sparkles,
   RefreshCw,
 } from 'lucide-react';
+import { CustomSelect } from '../components/CustomSelect';
 import { OfflineStorageManager } from '../components/settings/OfflineStorageManager';
 import { useAuth } from '../context/AuthContext';
 import { useOffline } from '../context/OfflineContext';
@@ -184,11 +185,10 @@ export function SettingsPage() {
         <div className="flex w-full sm:w-auto gap-1.5 overflow-x-auto rounded-2xl border border-white/[0.08] bg-[#0c1626]/80 p-1.5 backdrop-blur-xl shadow-lg no-scrollbar max-w-full touch-pan-x">
           <button
             onClick={() => handleTabChange('storage')}
-            className={`flex items-center justify-center gap-2 shrink-0 grow sm:grow-0 px-4 py-2.5 rounded-xl text-xs font-bold transition-all whitespace-nowrap cursor-pointer ${
-              activeTab === 'storage'
+            className={`flex items-center justify-center gap-2 shrink-0 grow sm:grow-0 px-4 py-2.5 rounded-xl text-xs font-bold transition-all whitespace-nowrap cursor-pointer ${activeTab === 'storage'
                 ? 'bg-primary/20 text-primary border border-primary/30 shadow-[0_0_15px_rgba(0,245,255,0.25)]'
                 : 'text-slate-400 hover:text-white hover:bg-white/[0.05]'
-            }`}
+              }`}
           >
             <HardDrive size={15} className="shrink-0" />
             <span>{t('settings.tabStorage', 'Bộ Nhớ Offline')}</span>
@@ -196,11 +196,10 @@ export function SettingsPage() {
 
           <button
             onClick={() => handleTabChange('cloud')}
-            className={`flex items-center justify-center gap-2 shrink-0 grow sm:grow-0 px-4 py-2.5 rounded-xl text-xs font-bold transition-all whitespace-nowrap cursor-pointer ${
-              activeTab === 'cloud'
+            className={`flex items-center justify-center gap-2 shrink-0 grow sm:grow-0 px-4 py-2.5 rounded-xl text-xs font-bold transition-all whitespace-nowrap cursor-pointer ${activeTab === 'cloud'
                 ? 'bg-cyan-500/20 text-cyan-400 border border-cyan-500/30 shadow-[0_0_15px_rgba(6,182,212,0.25)]'
                 : 'text-slate-400 hover:text-white hover:bg-white/[0.05]'
-            }`}
+              }`}
           >
             <Cloud size={15} className="shrink-0" />
             <span>{t('settings.tabCloud', 'Đồng Bộ Drive')}</span>
@@ -208,11 +207,10 @@ export function SettingsPage() {
 
           <button
             onClick={() => handleTabChange('general')}
-            className={`flex items-center justify-center gap-2 shrink-0 grow sm:grow-0 px-4 py-2.5 rounded-xl text-xs font-bold transition-all whitespace-nowrap cursor-pointer ${
-              activeTab === 'general'
+            className={`flex items-center justify-center gap-2 shrink-0 grow sm:grow-0 px-4 py-2.5 rounded-xl text-xs font-bold transition-all whitespace-nowrap cursor-pointer ${activeTab === 'general'
                 ? 'bg-purple-500/20 text-purple-400 border border-purple-500/30 shadow-[0_0_15px_rgba(168,85,247,0.25)]'
                 : 'text-slate-400 hover:text-white hover:bg-white/[0.05]'
-            }`}
+              }`}
           >
             <Sliders size={15} className="shrink-0" />
             <span>{t('settings.tabGeneral', 'Cài Đặt Chung')}</span>
@@ -360,24 +358,56 @@ export function SettingsPage() {
                 <div className="flex items-center gap-1.5 p-1 rounded-xl bg-white/[0.04] border border-white/10 shrink-0 self-start sm:self-auto">
                   <button
                     onClick={() => i18n.changeLanguage('vi')}
-                    className={`px-3 py-1.5 rounded-lg text-xs font-bold transition-all cursor-pointer ${
-                      i18n.language === 'vi'
+                    className={`px-3 py-1.5 rounded-lg text-xs font-bold transition-all cursor-pointer ${i18n.language === 'vi'
                         ? 'bg-primary text-slate-950 shadow-md'
                         : 'text-slate-400 hover:text-white'
-                    }`}
+                      }`}
                   >
                     Tiếng Việt
                   </button>
                   <button
                     onClick={() => i18n.changeLanguage('en')}
-                    className={`px-3 py-1.5 rounded-lg text-xs font-bold transition-all cursor-pointer ${
-                      i18n.language === 'en'
+                    className={`px-3 py-1.5 rounded-lg text-xs font-bold transition-all cursor-pointer ${i18n.language === 'en'
                         ? 'bg-primary text-slate-950 shadow-md'
                         : 'text-slate-400 hover:text-white'
-                    }`}
+                      }`}
                   >
                     English
                   </button>
+                </div>
+              </div>
+            </div>
+
+            {/* Graphic EQ Bands Selection */}
+            <div className="rounded-3xl bg-white/[0.02] border border-white/[0.08] p-5 sm:p-6 backdrop-blur-xl relative z-20">
+              <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-4">
+                <div className="flex items-center gap-3">
+                  <div className="w-10 h-10 rounded-xl bg-orange-500/15 border border-orange-500/25 flex items-center justify-center text-orange-400 shrink-0">
+                    <Sliders size={20} />
+                  </div>
+                  <div>
+                    <h4 className="text-sm font-bold text-white">
+                      {t('settings.eqBandsTitle', 'Graphic EQ Bands')}
+                    </h4>
+                    <p className="text-xs text-slate-400 font-mono mt-0.5">
+                      {t('settings.eqBandsDesc', 'Số lượng dải tần mặc định cho bộ chỉnh âm Graphic EQ')}
+                    </p>
+                  </div>
+                </div>
+
+                <div className="shrink-0 self-start sm:self-auto w-full sm:w-48">
+                  <CustomSelect<number>
+                    value={playerState.eqBandCount}
+                    onChange={(val) => playerState.changeEqBandCount(val)}
+                    options={[
+                      { value: 3, label: '3 Bands' },
+                      { value: 5, label: '5 Bands' },
+                      { value: 10, label: '10 Bands' },
+                      { value: 15, label: '15 Bands' },
+                      { value: 24, label: '24 Bands' },
+                      { value: 31, label: '31 Bands' },
+                    ]}
+                  />
                 </div>
               </div>
             </div>
@@ -409,17 +439,15 @@ export function SettingsPage() {
                 <button
                   type="button"
                   onClick={() => setGlobalLegacyMetadata(false)}
-                  className={`flex flex-col text-left p-4 rounded-2xl border transition-all cursor-pointer relative overflow-hidden group ${
-                    !useLegacyMetadata
+                  className={`flex flex-col text-left p-4 rounded-2xl border transition-all cursor-pointer relative overflow-hidden group ${!useLegacyMetadata
                       ? 'bg-primary/10 border-primary/40 shadow-[0_0_20px_rgba(0,245,255,0.15)] ring-1 ring-primary/40'
                       : 'bg-white/[0.02] border-white/[0.06] hover:bg-white/[0.05] hover:border-white/15'
-                  }`}
+                    }`}
                 >
                   <div className="flex items-center justify-between w-full mb-2">
                     <div className="flex items-center gap-2">
-                      <div className={`w-3.5 h-3.5 rounded-full border flex items-center justify-center transition-all ${
-                        !useLegacyMetadata ? 'border-primary bg-primary' : 'border-slate-500'
-                      }`}>
+                      <div className={`w-3.5 h-3.5 rounded-full border flex items-center justify-center transition-all ${!useLegacyMetadata ? 'border-primary bg-primary' : 'border-slate-500'
+                        }`}>
                         {!useLegacyMetadata && <div className="w-1.5 h-1.5 rounded-full bg-slate-950" />}
                       </div>
                       <span className="text-sm font-bold text-white group-hover:text-primary transition-colors">
@@ -442,17 +470,15 @@ export function SettingsPage() {
                 <button
                   type="button"
                   onClick={() => setGlobalLegacyMetadata(true)}
-                  className={`flex flex-col text-left p-4 rounded-2xl border transition-all cursor-pointer relative overflow-hidden group ${
-                    useLegacyMetadata
+                  className={`flex flex-col text-left p-4 rounded-2xl border transition-all cursor-pointer relative overflow-hidden group ${useLegacyMetadata
                       ? 'bg-primary/10 border-primary/40 shadow-[0_0_20px_rgba(0,245,255,0.15)] ring-1 ring-primary/40'
                       : 'bg-white/[0.02] border-white/[0.06] hover:bg-white/[0.05] hover:border-white/15'
-                  }`}
+                    }`}
                 >
                   <div className="flex items-center justify-between w-full mb-2">
                     <div className="flex items-center gap-2">
-                      <div className={`w-3.5 h-3.5 rounded-full border flex items-center justify-center transition-all ${
-                        useLegacyMetadata ? 'border-primary bg-primary' : 'border-slate-500'
-                      }`}>
+                      <div className={`w-3.5 h-3.5 rounded-full border flex items-center justify-center transition-all ${useLegacyMetadata ? 'border-primary bg-primary' : 'border-slate-500'
+                        }`}>
                         {useLegacyMetadata && <div className="w-1.5 h-1.5 rounded-full bg-slate-950" />}
                       </div>
                       <span className="text-sm font-bold text-white group-hover:text-primary transition-colors">

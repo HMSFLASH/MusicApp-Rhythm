@@ -91,7 +91,7 @@ export function SpatialEffects() {
           <div className="flex flex-col gap-2">
             <div className="flex items-center justify-between mb-1">
               <span className="text-xs font-mono font-bold text-slate-300 uppercase tracking-wider">
-                Crossover Range
+                {t('studio.spatial.crossoverRange', 'Crossover Range')}
               </span>
               <button
                 onClick={() => playerState.updateStereoCrossoverMode(playerState.stereoCrossoverMode === 'inside' ? 'outside' : 'inside')}
@@ -101,7 +101,7 @@ export function SpatialEffects() {
                   : 'bg-rose-500/20 text-rose-400 border-rose-500/40 shadow-[0_0_10px_rgba(244,63,94,0.2)]'
                 }`}
               >
-                {playerState.stereoCrossoverMode === 'inside' ? 'INSIDE' : 'OUTSIDE'}
+                {playerState.stereoCrossoverMode === 'inside' ? t('studio.spatial.crossoverInside', 'INSIDE') : t('studio.spatial.crossoverOutside', 'OUTSIDE')}
               </button>
             </div>
             <RangeSlider
@@ -120,8 +120,8 @@ export function SpatialEffects() {
             />
             <p className="text-[11px] text-slate-400 leading-tight">
               {playerState.stereoCrossoverMode === 'inside' 
-                ? 'Stereo Imager will ONLY affect frequencies INSIDE this range. Frequencies outside will remain unchanged.'
-                : 'Stereo Imager will ONLY affect frequencies OUTSIDE this range (e.g. keeping bass and highs wide but mids narrow).'
+                ? t('studio.spatial.stereoInsideDesc', 'Stereo Imager will ONLY affect frequencies INSIDE this range. Frequencies outside will remain unchanged.')
+                : t('studio.spatial.stereoOutsideDesc', 'Stereo Imager will ONLY affect frequencies OUTSIDE this range (e.g. keeping bass and highs wide but mids narrow).')
               }
             </p>
           </div>

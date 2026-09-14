@@ -89,7 +89,7 @@ export function useAudioContext(inputEffectsState: any) {
         compRmsSize: inputEffectsState.compRmsSize,
         compMakeupGain: inputEffectsState.compMakeupGain,
       });
-    }, 1000); // 1-second debounce
+    }, 700);
     return () => clearTimeout(handler);
   }, [
     inputEffectsState.preampGain,

@@ -1,5 +1,5 @@
 import { useState, useCallback, useRef } from 'react';
-import { COMPRESSOR_DEFAULTS, COMPRESSOR_RESET_SETTINGS, EQ_PRESETS, STYLISTIC_PRESETS } from './audioTypes';
+import { COMPRESSOR_DEFAULTS, COMPRESSOR_RESET_SETTINGS, EQ_PRESETS, STYLISTIC_PRESETS, PRECOMPUTED_STYLISTIC_PRESETS } from './audioTypes';
 import type { EqBand, CustomEqPreset } from './audioTypes';
 import { clamp, STEREO_WIDTH_MAX_PERCENT } from './audioMath';
 
@@ -8,6 +8,7 @@ type FxEnabledState = Record<FxKey, boolean>;
 
 type SavedAudioEffectsState = Partial<{
   eqPresetName: string;
+  eqBandCount: number;
   eqBands: EqBand[];
   customEqPresets: CustomEqPreset[];
   preampGain: number;
@@ -165,21 +166,31 @@ export function useAudioEffectsState(savedState: SavedAudioEffectsState = {}) {
   const initialPresetIsParametric = savedState.eqPresetName === 'PARAMETRIC'
     || savedCustomPreset?.presetMode === 'parametric'
     || Boolean(savedCustomPreset?.isCustomOrigin && hasParametricBandSettings(savedCustomPreset.bands));
-  const [eqPresetName, setEqPresetName] = useState<string>(savedState.eqPresetName || '10_BANDS');
+  const [eqBandCount, setEqBandCountState] = useState<number>(savedState.eqBandCount ?? 10);
+  const [eqPresetName, setEqPresetName] = useState<string>(savedState.eqPresetName || 'CUSTOM');
   const [eqBands, setEqBands] = useState<EqBand[]>(() => {
-    const initialBands = savedStylisticPreset
-      ? ('bands' in savedStylisticPreset)
-        ? (savedStylisticPreset.bands as EqBand[])
-        : createEqBands(
-          (savedStylisticPreset as { eqBands?: number[]; gains?: number[] }).eqBands || [],
-          (savedStylisticPreset as { eqBands?: number[]; gains?: number[] }).gains || []
-        )
-      : savedState.eqBands
-        ? initialPresetIsParametric
-          ? savedState.eqBands
-          : applyGraphicEqQ(savedState.eqBands)
-        : createEqBands(EQ_PRESETS['10_BANDS']);
-    return [...initialBands].sort((a, b) => a.frequency - b.frequency);
+    const presetName = savedState.eqPresetName || 'CUSTOM';
+    const precomputedPreset = PRECOMPUTED_STYLISTIC_PRESETS[presetName];
+    const isParam = presetName === 'PARAMETRIC' 
+      || savedCustomPreset?.presetMode === 'parametric' 
+      || Boolean(savedCustomPreset?.isCustomOrigin && hasParametricBandSettings(savedCustomPreset.bands))
+      || Boolean(precomputedPreset && precomputedPreset.isParametric);
+
+    if (savedState.eqBands && savedState.eqBands.length > 0) {
+       return isParam ? savedState.eqBands : applyGraphicEqQ(savedState.eqBands);
+    }
+    
+    const bandKey = `${savedState.eqBandCount ?? 10}_BANDS` as keyof typeof EQ_PRESETS;
+    
+    if (precomputedPreset) {
+      if (precomputedPreset.isParametric) return precomputedPreset.bands as EqBand[];
+      const freqs = EQ_PRESETS[bandKey] || EQ_PRESETS['10_BANDS'];
+      const gains = precomputedPreset.precomputedGains[bandKey] || precomputedPreset.precomputedGains['10_BANDS'];
+      return createEqBands(freqs, gains);
+    }
+    
+    const freqs = EQ_PRESETS[bandKey] || EQ_PRESETS['10_BANDS'];
+    return createEqBands(freqs);
   });
   const [customEqPresets, setCustomEqPresets] = useState<CustomEqPreset[]>(savedState.customEqPresets || []);
 
@@ -286,29 +297,42 @@ export function useAudioEffectsState(savedState: SavedAudioEffectsState = {}) {
   }, [setPreampGain]);
 
   const applyStylisticPreset = useCallback((presetName: string) => {
-    const preset = STYLISTIC_PRESETS[presetName as keyof typeof STYLISTIC_PRESETS];
+    const preset = PRECOMPUTED_STYLISTIC_PRESETS[presetName];
     if (preset) {
       setEqPresetName(presetName);
-      if ('bands' in preset) {
+      if (preset.isParametric) {
         setEqBands(preset.bands as EqBand[]);
       } else {
-        const legacy = preset as { eqBands?: number[]; gains?: number[] };
-        setEqBands(createEqBands(legacy.eqBands || [], legacy.gains || []));
+        const bandKey = `${eqBandCount}_BANDS` as keyof typeof EQ_PRESETS;
+        const freqs = EQ_PRESETS[bandKey] || EQ_PRESETS['10_BANDS'];
+        const gains = preset.precomputedGains[bandKey] || preset.precomputedGains['10_BANDS'];
+        setEqBands(createEqBands(freqs, gains));
       }
       setBassGain(preset.bassGain);
       setTrebleGain(preset.trebleGain);
       setPreampGain(preset.preampGain);
     }
-  }, [setPreampGain]);
+  }, [setPreampGain, eqBandCount]);
 
   const isCurrentParametricEq = useCallback(() => {
     const currentPreset = customEqPresets.find(p => p.name === eqPresetName);
-    const currentStylisticPreset = STYLISTIC_PRESETS[eqPresetName as keyof typeof STYLISTIC_PRESETS];
+    const precomputedPreset = PRECOMPUTED_STYLISTIC_PRESETS[eqPresetName];
     return eqPresetName === 'PARAMETRIC'
       || currentPreset?.presetMode === 'parametric'
       || Boolean(currentPreset?.isCustomOrigin && hasParametricBandSettings(currentPreset.bands))
-      || Boolean(currentStylisticPreset && 'bands' in currentStylisticPreset);
+      || Boolean(precomputedPreset?.isParametric);
   }, [customEqPresets, eqPresetName]);
+
+  const checkAndSwitchToCustom = useCallback(() => {
+    setEqPresetName(prev => {
+      if (prev === 'CUSTOM' || prev === 'PARAMETRIC') return prev;
+      const isCustom = customEqPresets.some(p => p.name === prev);
+      if (isCustom) return prev;
+      
+      const precomputedPreset = PRECOMPUTED_STYLISTIC_PRESETS[prev];
+      return precomputedPreset?.isParametric ? 'PARAMETRIC' : 'CUSTOM';
+    });
+  }, [customEqPresets]);
 
   const setCustomPreset = useCallback(() => {
     setEqPresetName('CUSTOM');
@@ -354,7 +378,11 @@ export function useAudioEffectsState(savedState: SavedAudioEffectsState = {}) {
       if (preset) {
         const isParametricPreset = preset.presetMode === 'parametric'
           || Boolean(preset.isCustomOrigin && hasParametricBandSettings(preset.bands));
-        if (isParametricPreset) disableInterpolation();
+        if (isParametricPreset) {
+            disableInterpolation();
+        } else {
+            setEqBandCountState(preset.bands.length);
+        }
         setEqBands(isParametricPreset
           ? preset.bands.map(band => ({ ...band }))
           : applyGraphicEqQ(preset.bands));
@@ -365,6 +393,27 @@ export function useAudioEffectsState(savedState: SavedAudioEffectsState = {}) {
       return prev;
     });
   }, [disableInterpolation, setPreampGain]);
+
+  const changeEqBandCount = useCallback((newCount: number) => {
+    setEqBandCountState(newCount);
+    const bandKey = `${newCount}_BANDS` as keyof typeof EQ_PRESETS;
+    
+    if (PRECOMPUTED_STYLISTIC_PRESETS[eqPresetName] && !PRECOMPUTED_STYLISTIC_PRESETS[eqPresetName].isParametric) {
+      const preset = PRECOMPUTED_STYLISTIC_PRESETS[eqPresetName];
+      const freqs = EQ_PRESETS[bandKey] || EQ_PRESETS['10_BANDS'];
+      const gains = preset.precomputedGains[bandKey] || preset.precomputedGains['10_BANDS'];
+      setEqBands(createEqBands(freqs, gains));
+      return;
+    }
+    
+    if (!isCurrentParametricEq()) {
+      setEqBands(() => {
+        const freqs = EQ_PRESETS[bandKey] || EQ_PRESETS['10_BANDS'];
+        return applyGraphicEqQ(createEqBands(freqs));
+      });
+      setEqPresetName('CUSTOM');
+    }
+  }, [eqPresetName, isCurrentParametricEq]);
   const renameCustomPreset = useCallback((oldName: string, newName: string) => {
     setCustomEqPresets(prev => {
       if (prev.some(p => p.name === newName)) return prev;
@@ -374,24 +423,41 @@ export function useAudioEffectsState(savedState: SavedAudioEffectsState = {}) {
   const deleteCustomPreset = useCallback((name: string) => setCustomEqPresets(prev => prev.filter(p => p.name !== name)), []);
 
   const addCustomEqBand = useCallback((freq?: number) => setEqBands(prev => {
+    checkAndSwitchToCustom();
     const nextBands = [...prev, { id: `band_${Date.now()}`, frequency: freq || 1000, gain: 0, q: DEFAULT_PARAMETRIC_Q, channel: 'L+R' as const, type: 'peaking' as BiquadFilterType }];
     return isCurrentParametricEq() ? nextBands : applyGraphicEqQ(nextBands);
-  }), [isCurrentParametricEq]);
+  }), [isCurrentParametricEq, checkAndSwitchToCustom]);
   const removeCustomEqBand = useCallback((id: string) => setEqBands(prev => {
+    checkAndSwitchToCustom();
     const nextBands = prev.filter(b => b.id !== id);
     return isCurrentParametricEq() ? nextBands : applyGraphicEqQ(nextBands);
-  }), [isCurrentParametricEq]);
-  const updateEqGain = useCallback((id: string, val: number) => setEqBands(prev => prev.map(b => b.id === id ? { ...b, gain: val } : b)), []);
-  const updateEqBandFreq = useCallback((id: string, val: number) => setEqBands(prev => {
-    const nextBands = prev.map(b => b.id === id ? { ...b, frequency: val } : b);
-    return isCurrentParametricEq() ? nextBands : applyGraphicEqQ(nextBands);
-  }), [isCurrentParametricEq]);
-  const updateEqBandQ = useCallback((id: string, val: number) => setEqBands(prev => prev.map(b => b.id === id ? { ...b, q: clamp(val, MIN_EQ_Q, MAX_EQ_Q) } : b)), []);
-  const updateEqBandChannel = useCallback((id: string, val: EqBand['channel']) => setEqBands(prev => prev.map(b => b.id === id ? { ...b, channel: val } : b)), []);
-  const updateEqBandType = useCallback((id: string, val: BiquadFilterType) => setEqBands(prev => prev.map(b => b.id === id ? { ...b, type: val } : b)), []);
+  }), [isCurrentParametricEq, checkAndSwitchToCustom]);
+  const updateEqGain = useCallback((id: string, val: number) => {
+    checkAndSwitchToCustom();
+    setEqBands(prev => prev.map(b => b.id === id ? { ...b, gain: val } : b));
+  }, [checkAndSwitchToCustom]);
+  const updateEqBandFreq = useCallback((id: string, val: number) => {
+    checkAndSwitchToCustom();
+    setEqBands(prev => {
+      const nextBands = prev.map(b => b.id === id ? { ...b, frequency: val } : b);
+      return isCurrentParametricEq() ? nextBands : applyGraphicEqQ(nextBands);
+    });
+  }, [isCurrentParametricEq, checkAndSwitchToCustom]);
+  const updateEqBandQ = useCallback((id: string, val: number) => {
+    checkAndSwitchToCustom();
+    setEqBands(prev => prev.map(b => b.id === id ? { ...b, q: clamp(val, MIN_EQ_Q, MAX_EQ_Q) } : b));
+  }, [checkAndSwitchToCustom]);
+  const updateEqBandChannel = useCallback((id: string, val: EqBand['channel']) => {
+    checkAndSwitchToCustom();
+    setEqBands(prev => prev.map(b => b.id === id ? { ...b, channel: val } : b));
+  }, [checkAndSwitchToCustom]);
+  const updateEqBandType = useCallback((id: string, val: BiquadFilterType) => {
+    checkAndSwitchToCustom();
+    setEqBands(prev => prev.map(b => b.id === id ? { ...b, type: val } : b));
+  }, [checkAndSwitchToCustom]);
 
   return {
-    eqPresetName, eqBands, customEqPresets,
+    eqPresetName, eqBandCount, changeEqBandCount, eqBands, customEqPresets,
     preampGain, setPreampGain, updatePreampGain: setPreampGain,
     bassGain, setBassGain, updateBassGain: setBassGain,
     trebleGain, setTrebleGain, updateTrebleGain: setTrebleGain,

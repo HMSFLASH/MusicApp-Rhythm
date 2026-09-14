@@ -2,7 +2,7 @@ import { useMemo, useState } from 'react';
 import { createPortal } from 'react-dom';
 import { Plus, ChevronDown, X, Edit2, Trash2, Info, CircleDot, Sliders } from 'lucide-react';
 import { VerticalFader } from '../VerticalFader';
-import { EQ_PRESETS, STYLISTIC_PRESETS } from '../../hooks/useAudioPlayer';
+import { EQ_PRESETS, STYLISTIC_PRESETS, PRECOMPUTED_STYLISTIC_PRESETS } from '../../hooks/audioTypes';
 import type { CustomEqPreset, EqBand } from '../../hooks/audioTypes';
 import { useGlobalAudio } from '../../context/AudioContext';
 import { useTranslation } from 'react-i18next';
@@ -352,14 +352,14 @@ export function EqRack() {
 
                   <div className="h-px bg-white/[0.06] my-1.5"></div>
                   <div className="px-4 py-1 text-[10px] text-slate-400 uppercase font-bold tracking-widest">Sound Signatures</div>
-                  {Object.keys(STYLISTIC_PRESETS).map((key) => {
-                    const preset = STYLISTIC_PRESETS[key as keyof typeof STYLISTIC_PRESETS];
-                    const isParam = 'isParametric' in preset && (preset as any).isParametric;
+                  {Object.keys(PRECOMPUTED_STYLISTIC_PRESETS).map((key) => {
+                    const preset = PRECOMPUTED_STYLISTIC_PRESETS[key];
+                    const isParam = preset.isParametric;
                     return (
                       <button aria-label="Select sound signature"
                         key={key}
                         onClick={() => {
-                          playerState.applyStylisticPreset(key as keyof typeof STYLISTIC_PRESETS);
+                          playerState.applyStylisticPreset(key);
                           setShowPresetMenu(false);
                         }}
                         className="w-full flex items-center gap-2.5 px-4 py-2 hover:bg-purple-500/15 text-purple-400 font-semibold text-xs transition-colors"

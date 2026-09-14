@@ -409,3 +409,64 @@ export interface Track {
 
 export type SongEndMode = 'stop' | 'preload' | 'next' | 'repeat_one';
 export type QueueEndMode = 'stop' | 'next' | 'repeat';
+
+export function interpolateGains(sourceFreqs: number[], sourceGains: number[], targetFreqs: number[]): number[] {
+  return targetFreqs.map(targetFreq => {
+    const exactIndex = sourceFreqs.indexOf(targetFreq);
+    if (exactIndex !== -1) return sourceGains[exactIndex];
+
+    let lowerIdx = 0;
+    while (lowerIdx < sourceFreqs.length - 1 && sourceFreqs[lowerIdx + 1] < targetFreq) {
+      lowerIdx++;
+    }
+    const upperIdx = Math.min(lowerIdx + 1, sourceFreqs.length - 1);
+    
+    if (lowerIdx === upperIdx) return sourceGains[lowerIdx];
+
+    const f1 = sourceFreqs[lowerIdx];
+    const f2 = sourceFreqs[upperIdx];
+    const g1 = sourceGains[lowerIdx];
+    const g2 = sourceGains[upperIdx];
+
+    const logF1 = Math.log10(f1);
+    const logF2 = Math.log10(f2);
+    const logTarget = Math.log10(targetFreq);
+    const t = (logTarget - logF1) / (logF2 - logF1);
+    
+    return Math.round((g1 + t * (g2 - g1)) * 10) / 10;
+  });
+}
+
+export type PrecomputedGraphicPreset = {
+  name: string;
+  bassGain: number;
+  trebleGain: number;
+  preampGain: number;
+  precomputedGains: Record<keyof typeof EQ_PRESETS, number[]>;
+};
+
+export const PRECOMPUTED_STYLISTIC_PRESETS = Object.keys(STYLISTIC_PRESETS).reduce((acc, key) => {
+  const preset = STYLISTIC_PRESETS[key as keyof typeof STYLISTIC_PRESETS];
+  if ('isParametric' in preset) {
+    acc[key] = preset; 
+  } else {
+    const legacy = preset as any;
+    const sourceFreqs = legacy.eqBands || EQ_PRESETS['31_BANDS'];
+    const sourceGains = legacy.gains || new Array(31).fill(0);
+    
+    const precomputedGains = Object.keys(EQ_PRESETS).reduce((bandAcc, bandKey) => {
+      const targetFreqs = EQ_PRESETS[bandKey as keyof typeof EQ_PRESETS];
+      bandAcc[bandKey as keyof typeof EQ_PRESETS] = interpolateGains(sourceFreqs, sourceGains, targetFreqs);
+      return bandAcc;
+    }, {} as Record<keyof typeof EQ_PRESETS, number[]>);
+
+    acc[key] = {
+      name: preset.name,
+      bassGain: legacy.bassGain,
+      trebleGain: legacy.trebleGain,
+      preampGain: legacy.preampGain,
+      precomputedGains
+    };
+  }
+  return acc;
+}, {} as Record<string, any>);
