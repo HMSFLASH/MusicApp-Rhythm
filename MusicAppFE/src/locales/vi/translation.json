@@ -481,7 +481,11 @@
       "fft2048": "2048 (Trung bình)",
       "fft4096": "4096 (Cao)",
       "fft8192": "8192 (Rất cao / Nặng CPU)",
-      "fft16384": "16384 (Tối đa / Cực nặng)"
+      "fft16384": "16384 (Tối đa / Cực nặng)",
+      "reverbEngineTitle": "Lõi xử lý Vang (Reverb Engine)",
+      "reverbEngineDesc": "Chọn \"Tính toán trực tiếp\" để tải web cực nhanh (dùng tài nguyên CPU của máy để tính toán) hoặc \"File lưu sẵn\" để tiếng vang chân thực nhất (giảm tải CPU nhưng tốn thêm RAM và mạng để tải file).",
+      "engineProcedural": "Tính toán trực tiếp (Tiết kiệm RAM)",
+      "engineFile": "File lưu sẵn (Chân thực & Nặng mạng)"
     }
   },
   "player": {
@@ -690,7 +694,20 @@
     "noTrackPlaying": "Chưa có bài hát nào đang phát.",
     "shortcutsTitle": "Phím Tắt Nhanh (Keyboard Shortcuts)",
     "shortcutsDesc": "Điều khiển trình phát nhạc cực nhanh bằng bàn phím",
-    "openShortcutsModal": "Mở bảng phím tắt (?)"
+    "openShortcutsModal": "Mở bảng phím tắt (?)",
+    "analysisPerfTitle": "Hiệu suất Phân tích Đồ thị & Âm thanh (FFT Size)",
+    "analysisPerfDesc": "Tùy chỉnh độ phân giải của các khối phân tích âm thanh. Các mức càng cao (như 8192, 16384) sẽ cho độ chính xác cực tốt nhưng sẽ rất ngốn CPU và RAM. Nếu bị giật lag, hãy giảm xuống.",
+    "masterFftTitle": "Độ phân giải Master Analyser (Tần số biểu đồ)",
+    "masterFftDesc": "Quyết định độ nét của biểu đồ tần số trực quan. Tăng lên để biểu đồ mịn mượt hơn, giảm xuống (256-1024) cho máy yếu để tiết kiệm tối đa CPU.",
+    "stereoFftTitle": "Độ phân giải phân tích Stereo (Imager)",
+    "stereoFftDesc": "Tần số lấy mẫu phân tích tương quan kênh L/R của hiệu ứng Stereo Imager. Mặc định 1024. Nếu tăng lên sẽ mở rộng không gian cực chuẩn nhưng rất tốn tài nguyên.",
+    "fft256": "256 (Siêu nhẹ / Đồ thị thô / Dành cho máy rất yếu)",
+    "fft512": "512 (Nhẹ CPU / Đồ thị kém chi tiết)",
+    "fft1024": "1024 (Trung bình / Phù hợp máy yếu)",
+    "fft2048": "2048 (Tối ưu / Khuyên dùng cho đa số thiết bị)",
+    "fft4096": "4096 (Cao / Đồ thị sắc nét / Tốn thêm CPU)",
+    "fft8192": "8192 (Rất cao / Đồ thị rất mượt / Nặng CPU)",
+    "fft16384": "16384 (Tối đa / Đồ thị cực nét / Rất nặng CPU)"
   },
   "storage": {
     "heroTitle": "Bộ Nhớ Đệm Offline (Media Cache)",

@@ -35,6 +35,7 @@ type SavedAudioEffectsState = Partial<{
   masterFftSize: number;
   stereoFftSize: number;
   audioLatencyHint: AudioContextLatencyCategory;
+  reverbEngine: 'procedural' | 'file';
   fxEnabled: Partial<FxEnabledState>;
 }>;
 
@@ -223,6 +224,7 @@ export function useAudioEffectsState(savedState: SavedAudioEffectsState = {}) {
   );
   const [reverbMix, setReverbMix] = useState<number>(savedState.reverbMix ?? 0);
   const [reverbTime, setReverbTime] = useState<number>(savedState.reverbTime ?? 2);
+  const [reverbEngine, setReverbEngine] = useState<'procedural' | 'file'>(savedState.reverbEngine ?? 'procedural');
 
   const [loudnessNormalization, setLoudnessNormalization] = useState<boolean>(savedState.loudnessNormalization ?? true);
   const [useOversample, setUseOversample] = useState<boolean>(savedState.useOversample ?? false);
@@ -478,6 +480,7 @@ export function useAudioEffectsState(savedState: SavedAudioEffectsState = {}) {
     stereoCrossoverMode, setStereoCrossoverMode: setStereoCrossoverModeState, updateStereoCrossoverMode: setStereoCrossoverModeState,
     reverbMix, setReverbMix, updateReverbMix: setReverbMix,
     reverbTime, setReverbTime, updateReverbTime: setReverbTime,
+    reverbEngine, setReverbEngine, updateReverbEngine: setReverbEngine,
     loudnessNormalization, setLoudnessNormalization, toggleLoudnessNormalization,
     useOversample, setUseOversample, toggleUseOversample,
     precalculateOnIdle, setPrecalculateOnIdle,

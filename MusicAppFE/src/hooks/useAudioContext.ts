@@ -116,7 +116,7 @@ export function useAudioContext(inputEffectsState: any) {
     ...debouncedContinuous,
   };
 
-  const { eqBands: rawEqBands, isParametricPreset, preampGain, bassGain, trebleGain, compThreshold, compRatio, compKnee, compAttack, compRelease, compRmsSize, compMakeupGain, panValue, stereoWidth, stereoCrossoverLow = 150, stereoCrossoverHigh = 20000, stereoCrossoverMode = 'inside', reverbMix, reverbTime, loudnessNormalization, useOversample, masterFftSize = 2048, stereoFftSize = 1024, audioLatencyHint = 'playback', fxEnabled, audioIsStereo = true, isAuthenticated } = effectsState;
+  const { eqBands: rawEqBands, isParametricPreset, preampGain, bassGain, trebleGain, compThreshold, compRatio, compKnee, compAttack, compRelease, compRmsSize, compMakeupGain, panValue, stereoWidth, stereoCrossoverLow = 150, stereoCrossoverHigh = 20000, stereoCrossoverMode = 'inside', reverbMix, reverbTime, reverbEngine = 'procedural', loudnessNormalization, useOversample, masterFftSize = 2048, stereoFftSize = 1024, audioLatencyHint = 'playback', fxEnabled, audioIsStereo = true, isAuthenticated } = effectsState;
   const [audioSampleRate, setAudioSampleRate] = useState(44100);
 
   // Audio Context and Core Nodes
@@ -350,101 +350,109 @@ export function useAudioContext(inputEffectsState: any) {
   useEffect(() => {
     if (!audioContextRef.current) return;
 
-    try {
-      const newIrBuffer = generateImpulseResponse(
-        audioContextRef.current,
-        clamp(reverbTime || 2, 0.1, 10),
-        2
-      );
-      irBufferRef.current = newIrBuffer;
+    let isCancelled = false;
 
-      if (convolverNodeRef.current && reverbHighpassRef.current && reverbPreDelayRef.current && wetGainRef.current) {
-        const ctx = audioContextRef.current;
-        const now = ctx.currentTime;
+    const updateConvolver = async () => {
+      try {
+        let newIrBuffer: AudioBuffer | null = null;
 
-        // Save old nodes
-        const oldConvolver = convolverNodeRef.current;
-        const oldWetGain = ctx.createGain();
-
-        // Re-route old convolver through temporary fade-out gain
-        oldConvolver.disconnect();
-        oldConvolver.connect(oldWetGain);
-        oldWetGain.connect(reverbHighpassRef.current);
-        oldWetGain.gain.setValueAtTime(1, now);
-        oldWetGain.gain.setTargetAtTime(0, now, 0.015);
-
-        // Setup new convolver
-        const newConvolver = ctx.createConvolver();
-        newConvolver.buffer = newIrBuffer;
-
-        const newConvolverGain = ctx.createGain();
-        newConvolverGain.gain.setValueAtTime(0, now);
-        newConvolverGain.gain.setTargetAtTime(1, now, 0.015);
-
-        reverbPreDelayRef.current.connect(newConvolver);
-        newConvolver.connect(newConvolverGain);
-        newConvolverGain.connect(reverbHighpassRef.current);
-
-        // Update ref
-        convolverNodeRef.current = newConvolver;
-
-        // Cleanup old nodes
-        setTimeout(() => {
+        if (reverbEngine === 'file') {
           try {
-            oldConvolver.disconnect();
-            oldWetGain.disconnect();
-            newConvolverGain.disconnect();
-            // Connect new convolver directly to highpass once fade is done
-            if (convolverNodeRef.current === newConvolver && reverbHighpassRef.current) {
-              newConvolver.disconnect();
-              newConvolver.connect(reverbHighpassRef.current);
+            const timeStr = clamp(reverbTime || 2, 0.1, 10).toFixed(1);
+            const response = await fetch(`/reverbs/reverb_${timeStr}.opus`);
+            if (response.ok) {
+              const arrayBuffer = await response.arrayBuffer();
+              newIrBuffer = await audioContextRef.current!.decodeAudioData(arrayBuffer);
             }
-          } catch (err) {
-            console.error('Failed to cleanup reverb crossfade', err);
+          } catch (e) {
+            console.warn('Failed to load file-based IR, falling back to procedural', e);
           }
-        }, 100);
-      } else if (convolverNodeRef.current) {
-        convolverNodeRef.current.buffer = newIrBuffer;
+        }
+
+        if (!newIrBuffer) {
+          newIrBuffer = generateImpulseResponse(
+            audioContextRef.current!,
+            clamp(reverbTime || 2, 0.1, 10),
+            2
+          );
+        }
+
+        if (isCancelled) return;
+        irBufferRef.current = newIrBuffer;
+
+        if (convolverNodeRef.current && reverbHighpassRef.current && reverbPreDelayRef.current && wetGainRef.current) {
+          const ctx = audioContextRef.current!;
+          const now = ctx.currentTime;
+
+          // Save old nodes
+          const oldConvolver = convolverNodeRef.current;
+          const oldWetGain = ctx.createGain();
+
+          // Re-route old convolver through temporary fade-out gain
+          oldConvolver.disconnect();
+          oldConvolver.connect(oldWetGain);
+          oldWetGain.connect(reverbHighpassRef.current);
+          oldWetGain.gain.setValueAtTime(1, now);
+          oldWetGain.gain.setTargetAtTime(0, now, 0.015);
+
+          // Setup new convolver
+          const newConvolver = ctx.createConvolver();
+          newConvolver.buffer = newIrBuffer;
+
+          const newConvolverGain = ctx.createGain();
+          newConvolverGain.gain.setValueAtTime(0, now);
+          newConvolverGain.gain.setTargetAtTime(1, now, 0.015);
+
+          reverbPreDelayRef.current.connect(newConvolver);
+          newConvolver.connect(newConvolverGain);
+          newConvolverGain.connect(reverbHighpassRef.current);
+
+          // Update ref
+          convolverNodeRef.current = newConvolver;
+
+          // Cleanup old nodes
+          setTimeout(() => {
+            try {
+              oldConvolver.disconnect();
+              oldWetGain.disconnect();
+              newConvolverGain.disconnect();
+              // Connect new convolver directly to highpass once fade is done
+              if (convolverNodeRef.current === newConvolver && reverbHighpassRef.current) {
+                newConvolver.disconnect();
+                newConvolver.connect(reverbHighpassRef.current);
+              }
+            } catch (err) {
+              console.error('Failed to cleanup reverb crossfade', err);
+            }
+          }, 100);
+        } else if (convolverNodeRef.current) {
+          convolverNodeRef.current.buffer = newIrBuffer;
+        }
+      } catch (e) {
+        console.error('Failed to generate IR', e);
       }
-    } catch (e) {
-      console.error('Failed to generate IR', e);
-    }
-  }, [reverbTime]);
+    };
 
+    updateConvolver().catch(e => console.error('Failed to update IR', e));
 
-
+    return () => {
+      isCancelled = true;
+    };
+  }, [reverbTime, reverbEngine]);
 
   const initializeAudioContext = useCallback(() => {
     if (!audioContextRef.current) {
 
       const AudioContextCtor = globalThis.AudioContext || (window as any).webkitAudioContext;
       try {
-        audioContextRef.current = new AudioContextCtor({ latencyHint: audioLatencyHint, sampleRate: 2000000 });
+        // Attempt a reasonable high-res sample rate if hardware supports it, but avoid ultra-high values
+        // like 384kHz or 2MHz which cause massive AudioBuffers and crash the ConvolverNode.
+        audioContextRef.current = new AudioContextCtor({ latencyHint: audioLatencyHint, sampleRate: 96000 });
       } catch {
         try {
-          audioContextRef.current = new AudioContextCtor({ latencyHint: audioLatencyHint, sampleRate: 1000000 });
+          audioContextRef.current = new AudioContextCtor({ latencyHint: audioLatencyHint });
         } catch {
-          try {
-            audioContextRef.current = new AudioContextCtor({ latencyHint: audioLatencyHint, sampleRate: 500000 });
-          } catch {
-            try {
-              audioContextRef.current = new AudioContextCtor({ latencyHint: audioLatencyHint, sampleRate: 384000 });
-            } catch {
-              try {
-                audioContextRef.current = new AudioContextCtor({ latencyHint: audioLatencyHint, sampleRate: 192000 });
-              } catch {
-                try {
-                  audioContextRef.current = new AudioContextCtor({ latencyHint: audioLatencyHint, sampleRate: 96000 });
-                } catch {
-                  try {
-                    audioContextRef.current = new AudioContextCtor({ latencyHint: audioLatencyHint });
-                  } catch {
-                    audioContextRef.current = new AudioContextCtor();
-                  }
-                }
-              }
-            }
-          }
+          audioContextRef.current = new AudioContextCtor();
         }
       }
       try {
@@ -464,7 +472,7 @@ export function useAudioContext(inputEffectsState: any) {
     if (audioSampleRate !== ctx.sampleRate) {
       setAudioSampleRate(ctx.sampleRate);
     }
-    if (!irBufferRef.current) {
+    if (!irBufferRef.current && reverbEngine === 'procedural') {
       irBufferRef.current = generateImpulseResponse(ctx, clamp(reverbTime || 2, 0.1, 10), 2);
     }
 
@@ -721,7 +729,7 @@ export function useAudioContext(inputEffectsState: any) {
       reverbLowpassRef.current.frequency.value = REVERB_WET_LOWPASS_HZ;
       reverbLowpassRef.current.Q.value = 0.7;
 
-      if (!irBufferRef.current) {
+      if (!irBufferRef.current && reverbEngine === 'procedural') {
         irBufferRef.current = generateImpulseResponse(ctx, clamp(reverbTime || 2, 0.1, 10), 2);
       }
 

@@ -11,6 +11,7 @@ type AudioSelectRowProps<T extends string | number> = {
   direction?: 'up' | 'down' | 'auto';
   titleClassName?: string;
   descriptionClassName?: string;
+  zIndex?: number;
 };
 
 export function AudioSelectRow<T extends string | number>({
@@ -23,6 +24,7 @@ export function AudioSelectRow<T extends string | number>({
   direction = 'auto',
   titleClassName,
   descriptionClassName,
+  zIndex,
 }: AudioSelectRowProps<T>) {
   const [isOpen, setIsOpen] = useState(false);
   const [openUpwards, setOpenUpwards] = useState(direction === 'up');
@@ -72,7 +74,10 @@ export function AudioSelectRow<T extends string | number>({
     : 'bg-white/[0.02] border-white/[0.06] hover:border-white/[0.12]';
 
   return (
-    <div className={`flex flex-col gap-3 mt-2 p-4 sm:p-5 rounded-2xl border transition-all ${containerStyle} w-full ${isOpen ? 'relative z-30' : ''}`}>
+    <div 
+      className={`flex flex-col gap-3 mt-2 p-4 sm:p-5 rounded-2xl border transition-all ${containerStyle} w-full relative`}
+      style={{ zIndex: isOpen ? 50 : (zIndex ?? 1) }}
+    >
       <div className="flex flex-col w-full">
         <span className={`text-sm font-semibold block leading-snug break-words ${titleClassName || 'text-slate-100'}`}>{title}</span>
         <span className={`text-xs font-mono mt-1 block leading-normal break-words ${descriptionClassName || 'text-slate-400'}`}>

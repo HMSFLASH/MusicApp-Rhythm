@@ -16,9 +16,9 @@ import {
   Info,
   Tags,
   Sparkles,
-  RefreshCw,
 } from 'lucide-react';
 import { CustomSelect } from '../components/CustomSelect';
+import { AudioSelectRow } from '../components/audio/AudioSelectRow';
 import { OfflineStorageManager } from '../components/settings/OfflineStorageManager';
 import { useAuth } from '../context/AuthContext';
 import { useOffline } from '../context/OfflineContext';
@@ -41,10 +41,6 @@ export function SettingsPage() {
   const {
     useLegacyMetadata,
     setGlobalLegacyMetadata,
-    currentTrack,
-    extractMetadata,
-    clearTrackCachedMetadata,
-    reloadCurrentTrackFromDrive,
   } = playerState;
   const [searchParams, setSearchParams] = useSearchParams();
 
@@ -54,31 +50,6 @@ export function SettingsPage() {
   );
 
   const [syncing, setSyncing] = useState(false);
-  const [refreshingMeta, setRefreshingMeta] = useState(false);
-
-  const handleRefreshCurrentTrackMeta = async () => {
-    if (!currentTrack) {
-      toast.error(t('settings.noTrackPlaying', 'Chưa có bài hát nào đang phát.'));
-      return;
-    }
-    setRefreshingMeta(true);
-    try {
-      if (clearTrackCachedMetadata) {
-        await clearTrackCachedMetadata(currentTrack);
-      }
-      if (currentTrack.sourceType !== 'LOCAL' && reloadCurrentTrackFromDrive) {
-        await reloadCurrentTrackFromDrive();
-      } else if (extractMetadata) {
-        await extractMetadata(currentTrack, { ignoreCache: true });
-      }
-      toast.success(t('settings.refreshMetaSuccess', 'Đã làm mới thông tin và ảnh bìa bài hát!'));
-    } catch (e: any) {
-      console.error('Refresh metadata error:', e);
-      toast.error(e?.message || 'Không thể làm mới metadata.');
-    } finally {
-      setRefreshingMeta(false);
-    }
-  };
 
   useEffect(() => {
     const currentTab = searchParams.get('tab') as SettingsTab;
@@ -515,24 +486,73 @@ export function SettingsPage() {
                 </div>
               </div>
 
-              {/* Quick action: Re-parse current track */}
-              {currentTrack && (
-                <div className="flex flex-col sm:flex-row items-start sm:items-center justify-between gap-3 pt-2 border-t border-white/[0.04]">
-                  <div className="text-xs text-slate-400 font-mono min-w-0 flex-1">
-                    <span className="text-slate-200 font-medium">{t('nav.nowPlaying', 'Đang phát')}:</span>{' '}
-                    <span className="text-primary font-semibold break-all sm:break-normal">{currentTrack.title || currentTrack.fileName}</span>
-                  </div>
-                  <button
-                    type="button"
-                    disabled={refreshingMeta}
-                    onClick={handleRefreshCurrentTrackMeta}
-                    className="w-full sm:w-auto justify-center px-3.5 py-2 rounded-xl bg-white/[0.04] hover:bg-white/[0.08] text-slate-200 hover:text-white border border-white/10 text-xs font-semibold flex items-center gap-2 transition-all disabled:opacity-50 cursor-pointer shrink-0"
-                  >
-                    <RefreshCw size={13} className={refreshingMeta ? 'animate-spin text-primary shrink-0' : 'text-slate-400 shrink-0'} />
-                    <span>{t('settings.refreshCurrentMeta', 'Làm mới metadata bài đang phát')}</span>
-                  </button>
+            </div>
+
+            {/* Reverb Engine Selection */}
+            <div className="rounded-3xl bg-white/[0.02] border border-white/[0.08] p-5 sm:p-6 backdrop-blur-xl">
+              <AudioSelectRow<string>
+                title={t('studio.spatial.reverbEngineTitle', 'Lõi xử lý Vang (Reverb Engine)')}
+                description={t('studio.spatial.reverbEngineDesc', 'Chọn "Tính toán trực tiếp" để tải web cực nhanh (dùng tài nguyên CPU của máy để tính toán) hoặc "File lưu sẵn" để tiếng vang chân thực nhất (giảm tải CPU nhưng tốn thêm RAM và mạng để tải file).')}
+                value={playerState.reverbEngine || 'procedural'}
+                options={[
+                  { label: t('studio.spatial.engineProcedural', 'Tính toán trực tiếp (Tiết kiệm RAM)'), value: 'procedural' },
+                  { label: t('studio.spatial.engineFile', 'Dùng File lưu sẵn (Tiết kiệm CPU)'), value: 'file' },
+                ]}
+                onChange={(val) => playerState.updateReverbEngine(val as 'procedural' | 'file')}
+              />
+            </div>
+
+            {/* FFT / Analysis Quality Selection */}
+            <div className="rounded-3xl bg-white/[0.02] border border-white/[0.08] p-5 sm:p-6 backdrop-blur-xl">
+              <div className="flex items-center gap-3.5 pb-4 border-b border-white/[0.06] mb-5">
+                <div className="w-10 h-10 rounded-xl bg-blue-500/15 border border-blue-500/25 flex items-center justify-center text-blue-400 shrink-0">
+                  <Sliders size={20} />
                 </div>
-              )}
+                <div>
+                  <h3 className="text-sm font-bold text-white">
+                    {t('settings.analysisPerfTitle', 'Hiệu suất Phân tích Đồ thị & Âm thanh (FFT Size)')}
+                  </h3>
+                  <p className="text-xs text-slate-400 font-mono mt-0.5">
+                    {t('settings.analysisPerfDesc', 'Tùy chỉnh độ phân giải của các khối phân tích âm thanh. Các mức càng cao (như 8192, 16384) sẽ cho độ chính xác cực tốt nhưng sẽ rất ngốn CPU và RAM. Nếu bị giật lag, hãy giảm xuống.')}
+                  </p>
+                </div>
+              </div>
+
+              <div className="flex flex-col gap-6">
+                <AudioSelectRow<number>
+                  title={t('settings.masterFftTitle', 'Độ phân giải Master Analyser (Tần số biểu đồ)')}
+                  description={t('settings.masterFftDesc', 'Quyết định độ nét của biểu đồ tần số trực quan. Tăng lên để biểu đồ mịn mượt hơn, giảm xuống (256-1024) cho máy yếu để tiết kiệm tối đa CPU.')}
+                  value={playerState.masterFftSize || 2048}
+                  options={[
+                    { label: t('settings.fft256', '256 (Siêu nhẹ / Đồ thị thô / Dành cho máy rất yếu)'), value: 256 },
+                    { label: t('settings.fft512', '512 (Nhẹ CPU / Đồ thị kém chi tiết)'), value: 512 },
+                    { label: t('settings.fft1024', '1024 (Trung bình / Phù hợp máy yếu)'), value: 1024 },
+                    { label: t('settings.fft2048', '2048 (Tối ưu / Khuyên dùng cho đa số thiết bị)'), value: 2048 },
+                    { label: t('settings.fft4096', '4096 (Cao / Đồ thị sắc nét / Tốn thêm CPU)'), value: 4096 },
+                    { label: t('settings.fft8192', '8192 (Rất cao / Đồ thị rất mượt / Nặng CPU)'), value: 8192 },
+                    { label: t('settings.fft16384', '16384 (Tối đa / Đồ thị cực nét / Rất nặng CPU)'), value: 16384 },
+                  ]}
+                  onChange={(val) => playerState.updateMasterFftSize(val)}
+                  zIndex={20}
+                />
+
+                <AudioSelectRow<number>
+                  title={t('settings.stereoFftTitle', 'Độ phân giải phân tích Stereo (Imager)')}
+                  description={t('settings.stereoFftDesc', 'Tần số lấy mẫu phân tích tương quan kênh L/R của hiệu ứng Stereo Imager. Mặc định 1024. Nếu tăng lên sẽ mở rộng không gian cực chuẩn nhưng rất tốn tài nguyên.')}
+                  value={playerState.stereoFftSize || 1024}
+                  options={[
+                    { label: t('settings.fft256', '256 (Siêu nhẹ / Đồ thị thô / Dành cho máy rất yếu)'), value: 256 },
+                    { label: t('settings.fft512', '512 (Nhẹ CPU / Đồ thị kém chi tiết)'), value: 512 },
+                    { label: t('settings.fft1024', '1024 (Trung bình / Phù hợp máy yếu)'), value: 1024 },
+                    { label: t('settings.fft2048', '2048 (Tối ưu / Khuyên dùng cho đa số thiết bị)'), value: 2048 },
+                    { label: t('settings.fft4096', '4096 (Cao / Đồ thị sắc nét / Tốn thêm CPU)'), value: 4096 },
+                    { label: t('settings.fft8192', '8192 (Rất cao / Đồ thị rất mượt / Nặng CPU)'), value: 8192 },
+                    { label: t('settings.fft16384', '16384 (Tối đa / Đồ thị cực nét / Rất nặng CPU)'), value: 16384 },
+                  ]}
+                  onChange={(val) => playerState.updateStereoFftSize(val)}
+                  zIndex={10}
+                />
+              </div>
             </div>
 
             {/* Keyboard Shortcuts Reference */}

@@ -2,29 +2,12 @@ import { HorizontalSlider } from '../HorizontalSlider';
 import { useGlobalAudio } from '../../context/AudioContext';
 import { useTranslation } from 'react-i18next';
 import { AudioToggleRow } from './AudioToggleRow';
-import { AudioSelectRow } from './AudioSelectRow';
 import { QueuePrecalculatePanel } from './QueuePrecalculatePanel';
 import { AudioEffectPanel, EffectControlsGate, EffectPowerButton } from './AudioEffectPanel';
 
 export function MasterOutput() {
   const { playerState } = useGlobalAudio();
   const { t } = useTranslation();
-
-  const fftSizeOptions: { label: string; value: number }[] = [
-    { label: t('studio.masterOutput.fft256', '256 (Siêu nhẹ / Đồ thị thô / Dành cho máy rất yếu)'), value: 256 },
-    { label: t('studio.masterOutput.fft512', '512 (Nhẹ CPU / Đồ thị kém chi tiết)'), value: 512 },
-    { label: t('studio.masterOutput.fft1024', '1024 (Trung bình / Phù hợp máy yếu)'), value: 1024 },
-    { label: t('studio.masterOutput.fft2048', '2048 (Tối ưu / Khuyên dùng cho đa số thiết bị)'), value: 2048 },
-    { label: t('studio.masterOutput.fft4096', '4096 (Cao / Đồ thị sắc nét / Tốn thêm CPU)'), value: 4096 },
-    { label: t('studio.masterOutput.fft8192', '8192 (Rất cao / Đồ thị rất mượt / Nặng CPU)'), value: 8192 },
-    { label: t('studio.masterOutput.fft16384', '16384 (Tối đa / Đồ thị cực nét / Rất nặng CPU)'), value: 16384 },
-  ];
-
-  const latencyOptions: { label: string; value: AudioContextLatencyCategory }[] = [
-    { label: t('studio.masterOutput.latencyInteractive', 'Interactive (Độ trễ thấp nhất / Dễ bị giật tiếng trên máy yếu)'), value: 'interactive' },
-    { label: t('studio.masterOutput.latencyBalanced', 'Balanced (Cân bằng giữa độ trễ và hiệu năng)'), value: 'balanced' },
-    { label: t('studio.masterOutput.latencyPlayback', 'Playback (Độ trễ cao / An toàn nhất / Không lo giật tiếng)'), value: 'playback' },
-  ];
 
   return (
     <AudioEffectPanel
@@ -50,22 +33,6 @@ export function MasterOutput() {
           unit="%"
         />
       </EffectControlsGate>
-
-      <AudioSelectRow<number>
-        title={t('studio.masterOutput.analyserFftTitle', 'Độ phân giải Master Analyser (FFT Size)')}
-        description={t('studio.masterOutput.analyserFftDesc', 'Quyết định độ nét của biểu đồ tần số. Tăng lên để biểu đồ mịn và chi tiết hơn, hoặc giảm xuống (256 - 1024) nếu máy yếu để tiết kiệm CPU và tránh giật lag.')}
-        value={playerState.masterFftSize || 2048}
-        options={fftSizeOptions}
-        onChange={(val) => playerState.updateMasterFftSize(val)}
-      />
-
-      <AudioSelectRow<AudioContextLatencyCategory>
-        title={t('studio.masterOutput.latencyTitle', 'Audio Buffer Size (Latency Mode)')}
-        description={t('studio.masterOutput.latencyDesc', 'Tương tự Block Size trong DAW. Quyết định kích thước bộ đệm âm thanh. Nên chọn Playback để máy có nhiều thời gian xử lý EQ, tránh bị nổ tiếng/ngắt quãng. (Lưu ý: Thay đổi chỉ áp dụng khi tải lại trang (F5)).')}
-        value={playerState.audioLatencyHint || 'playback'}
-        options={latencyOptions}
-        onChange={(val) => playerState.updateAudioLatencyHint(val)}
-      />
 
       <AudioToggleRow
         title={t('studio.dynamics.limiterTitle', 'Anti-Clipping Master Limiter')}

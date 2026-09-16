@@ -266,59 +266,90 @@ export const configureLoudnessNormalization = (
 export const generateImpulseResponse = (ctx: BaseAudioContext, duration: number, decay: number) => {
   const sampleRate = ctx.sampleRate;
   const length = Math.max(1, Math.floor(sampleRate * duration));
-  const impulse = ctx.createBuffer(2, length, sampleRate);
+  // OPTIMIZATION: If duration >= 5s, use Mono (1 channel) to save 50% CPU load on ConvolverNode.
+  const numChannels = duration >= 5 ? 1 : 2;
+  const impulse = ctx.createBuffer(numChannels, length, sampleRate);
+
+  // Filter coefficients (1-pole RC approximation of the Butterworth filters)
+  const alpha500 = 1 - Math.exp((-2 * Math.PI * 500) / sampleRate);
+  const alpha3000 = 1 - Math.exp((-2 * Math.PI * 3000) / sampleRate);
+  const alpha8000 = 1 - Math.exp((-2 * Math.PI * 8000) / sampleRate);
+  const alpha250 = 1 - Math.exp((-2 * Math.PI * 250) / sampleRate);
+
+  // Frequency-dependent decay multipliers (T60)
+  const decayMultLow = Math.exp(-6.9078 / (duration * 1.0 * sampleRate));
+  const decayMultMid = Math.exp(-6.9078 / (duration * 0.85 * sampleRate));
+  const decayMultHigh = Math.exp(-6.9078 / (duration * 0.5 * sampleRate));
+
+  const predelaySamples = Math.floor(sampleRate * 0.035);
 
   const earlyReflections = [
-    { time: 0.007, gain: 0.35 },
-    { time: 0.013, gain: -0.28 },
-    { time: 0.021, gain: 0.22 },
-    { time: 0.034, gain: -0.18 },
-    { time: 0.055, gain: 0.12 },
+    { time: 0.013, gain: 0.316 }, // -10dB
+    { time: 0.021, gain: 0.223 }, // -13dB
+    { time: 0.031, gain: 0.158 }, // -16dB
+    { time: 0.043, gain: 0.125 }, // -18dB
   ];
 
-  for (let channel = 0; channel < 2; channel++) {
+  for (let channel = 0; channel < numChannels; channel++) {
     const data = impulse.getChannelData(channel);
-    let lp1 = 0;
-    let lp2 = 0;
-    let hp = 0;
+    
+    let envLow = 1.0;
+    let envMid = 1.0;
+    let envHigh = 1.0;
 
-    for (let i = 0; i < length; i++) {
-      const t = i / sampleRate;
-      const progress = i / length;
+    let lp500 = 0, lp3000 = 0, erLp = 0, hp250 = 0;
+    let sumSq = 0;
 
-      // T60 exponential decay
-      const envelope = Math.exp((-6.9078 * t) / duration);
+    // Decorrelation: shift early reflections slightly per channel for stereo width
+    const channelErDelay = channel === 0 ? 0 : 0.0015;
 
-      // Warmer high frequency damping: smoothly decreases from 7kHz to 500Hz
-      const cutoff = 7000 * Math.pow(0.07, progress);
-      const alphaLp = 1 - Math.exp((-2 * Math.PI * cutoff) / sampleRate);
-      
-      // High pass to remove low-end mud (fixed at 150Hz)
-      const alphaHp = 1 - Math.exp((-2 * Math.PI * 150) / sampleRate);
-
-      const noise = Math.random() * 2 - 1; // NOSONAR
-      
-      lp1 = lp1 + alphaLp * (noise - lp1);
-      lp2 = lp2 + alphaLp * (lp1 - lp2); // 2nd order lowpass
-      hp = hp + alphaHp * (lp2 - hp);
-      
-      const bandpassed = lp2 - hp;
-
-      // Apply T60 envelope and base decay modifier. Add slight channel variation.
-      const channelVar = channel === 0 ? 1.0 : 0.95;
-      data[i] = bandpassed * envelope * decay * channelVar * 2.0; // Boost gain slightly to compensate for 2-pole LP
+    const erArray = new Float32Array(length);
+    for (const er of earlyReflections) {
+       const idx = Math.floor((er.time + channelErDelay) * sampleRate);
+       if (idx < length) {
+           erArray[idx] = er.gain;
+       }
     }
 
-    // Add softened early reflections
-    for (const reflection of earlyReflections) {
-      const index = Math.floor(reflection.time * sampleRate);
-      if (index < length - 2) {
-        // Smear the impulse over a few samples to avoid harsh clicks
-        const smearGain = reflection.gain * 0.3;
-        data[index] += smearGain;
-        data[index + 1] += smearGain;
-        data[index + 2] += smearGain;
+    for (let i = 0; i < length; i++) {
+      // 1. Generate multi-band tail
+      const noise = Math.random() * 2 - 1;
+      
+      lp500 += alpha500 * (noise - lp500);
+      const hp500 = noise - lp500;
+      
+      lp3000 += alpha3000 * (hp500 - lp3000);
+      const hp3000 = hp500 - lp3000;
+
+      let tail = (lp500 * envLow) + (lp3000 * envMid) + (hp3000 * envHigh);
+      if (i < predelaySamples) {
+        tail = 0;
       }
+
+      // 2. Add Early Reflections (lowpassed at 8kHz)
+      erLp += alpha8000 * (erArray[i] - erLp);
+      const mixed = tail + erLp;
+
+      // 3. Highpass whole signal at 250Hz to remove mud
+      hp250 += alpha250 * (mixed - hp250);
+      const finalCut = mixed - hp250;
+
+      data[i] = finalCut;
+      sumSq += finalCut * finalCut;
+
+      // Advance envelopes
+      envLow *= decayMultLow;
+      envMid *= decayMultMid;
+      envHigh *= decayMultHigh;
+    }
+
+    // 4. L2 Normalization to balance Convolution Volume
+    // Multiply by a factor (decay * 0.5) to maintain reasonable gain levels.
+    const energy = Math.sqrt(sumSq) + 1e-12;
+    const normFactor = (decay * 0.5) / energy;
+    
+    for (let i = 0; i < length; i++) {
+        data[i] *= normFactor;
     }
   }
 

@@ -481,7 +481,11 @@
       "fft2048": "2048 (Medium)",
       "fft4096": "4096 (High)",
       "fft8192": "8192 (Very High / Heavy CPU)",
-      "fft16384": "16384 (Maximum / Very Heavy)"
+      "fft16384": "16384 (Maximum / Very Heavy)",
+      "reverbEngineTitle": "Reverb Processing Engine",
+      "reverbEngineDesc": "Choose \"Procedural\" for extreme web loading speed (uses local CPU power) or \"File-based\" for the most realistic reverb (reduces CPU load but uses more RAM and network).",
+      "engineProcedural": "Procedural (Saves RAM)",
+      "engineFile": "File-based (Realistic & Heavy)"
     }
   },
   "player": {
@@ -690,7 +694,20 @@
     "noTrackPlaying": "No track is currently playing.",
     "shortcutsTitle": "Keyboard Shortcuts",
     "shortcutsDesc": "Control your music playback instantly with hotkeys",
-    "openShortcutsModal": "Open shortcuts panel (?)"
+    "openShortcutsModal": "Open shortcuts panel (?)",
+    "analysisPerfTitle": "Analysis & Visuals Performance (FFT Size)",
+    "analysisPerfDesc": "Customize the resolution of audio analysis blocks. Higher values (like 8192, 16384) provide extreme accuracy but consume significant CPU and RAM. Decrease if you experience lag.",
+    "masterFftTitle": "Master Analyser Resolution (Visualizer)",
+    "masterFftDesc": "Determines the sharpness of the visual frequency spectrum. Increase for smoother visuals, decrease (256-1024) on weaker devices to save CPU.",
+    "stereoFftTitle": "Stereo Analysis Resolution (Imager)",
+    "stereoFftDesc": "L/R correlation analysis sample rate for Stereo Imager effect. Default is 1024. Increasing it expands the stereo field accurately but uses much more resources.",
+    "fft256": "256 (Ultra light / Rough / For very weak devices)",
+    "fft512": "512 (Light CPU / Less detailed)",
+    "fft1024": "1024 (Medium / Suitable for weak devices)",
+    "fft2048": "2048 (Optimal / Recommended for most devices)",
+    "fft4096": "4096 (High / Sharp visuals / Uses more CPU)",
+    "fft8192": "8192 (Very high / Very smooth / Heavy on CPU)",
+    "fft16384": "16384 (Max / Ultra sharp / Very heavy on CPU)"
   },
   "storage": {
     "heroTitle": "Offline Storage Manager (Media Cache)",
