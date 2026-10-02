@@ -263,118 +263,501 @@ export const configureLoudnessNormalization = (
   makeup.gain.value = 1;
 };
 
-export const generateImpulseResponse = (ctx: BaseAudioContext, duration: number, decay: number) => {
-  const sampleRate = ctx.sampleRate;
-  const length = Math.max(1, Math.floor(sampleRate * duration));
-  // OPTIMIZATION: If duration >= 5s, use Mono (1 channel) to save 50% CPU load on ConvolverNode.
-  const numChannels = duration >= 5 ? 1 : 2;
-  const impulse = ctx.createBuffer(numChannels, length, sampleRate);
+// Seeded pseudo-random generator (Mulberry32) for deterministic, artifact-free impulse response generation
+const createSeededPrng = (seed: number) => {
+  let s = Math.floor(seed) >>> 0;
+  return () => {
+    s = (s + 0x6D2B79F5) >>> 0;
+    let t = Math.imul(s ^ (s >>> 15), 1 | s);
+    t = (t + Math.imul(t ^ (t >>> 7), 61 | t)) ^ t;
+    return ((t ^ (t >>> 14)) >>> 0) / 4294967296;
+  };
+};
 
-  // Filter coefficients (1-pole RC approximation of the Butterworth filters)
-  const alpha500 = 1 - Math.exp((-2 * Math.PI * 500) / sampleRate);
-  const alpha3000 = 1 - Math.exp((-2 * Math.PI * 3000) / sampleRate);
-  const alpha8000 = 1 - Math.exp((-2 * Math.PI * 8000) / sampleRate);
-  const alpha250 = 1 - Math.exp((-2 * Math.PI * 250) / sampleRate);
+// Gaussian distribution noise generator (Box-Muller transform)
+const gaussianNoise = (prng: () => number) => {
+  let u = 0;
+  let v = 0;
+  while (u === 0) u = prng();
+  while (v === 0) v = prng();
+  return Math.sqrt(-2.0 * Math.log(u)) * Math.cos(2.0 * Math.PI * v);
+};
 
-  // Frequency-dependent decay multipliers (T60)
-  const decayMultLow = Math.exp(-6.9078 / (duration * 1.0 * sampleRate));
-  const decayMultMid = Math.exp(-6.9078 / (duration * 0.85 * sampleRate));
-  const decayMultHigh = Math.exp(-6.9078 / (duration * 0.5 * sampleRate));
+// 10-Direction 3D Spatial Early Reflections configurations (from generate_reverb_ir.py)
+const SPATIAL_ER_CONFIGS = [
+  { ms: 11.0, db: -9.5,   azimuth: 0 },    // ER1: Ceiling (Trần nhà - cân bằng 2 tai)
+  { ms: 15.0, db: -10.5,  azimuth: -40 },  // ER2: Front-Left Wall (Tường trước Trái)
+  { ms: 18.0, db: -11.0,  azimuth: 45 },   // ER3: Front-Right Wall (Tường trước Phải)
+  { ms: 23.0, db: -12.5,  azimuth: -75 },  // ER4: Left Lateral Wall (Tường bên Trái - ASW)
+  { ms: 27.0, db: -13.0,  azimuth: 80 },   // ER5: Right Lateral Wall (Tường bên Phải - ASW)
+  { ms: 31.0, db: -14.0,  azimuth: -60 },  // ER6: Ceiling-Left Wall corner (Góc trần - tường Trái)
+  { ms: 35.0, db: -14.5,  azimuth: 65 },   // ER7: Ceiling-Right Wall corner (Góc trần - tường Phải)
+  { ms: 40.0, db: -15.5,  azimuth: -130 }, // ER8: Rear-Left Surround (Vòm sau lưng Trái)
+  { ms: 45.0, db: -16.0,  azimuth: 135 },  // ER9: Rear-Right Surround (Vòm sau lưng Phải)
+  { ms: 52.0, db: -17.5,  azimuth: 180 },  // ER10: Back Wall (Tường sau chính diện)
+];
 
-  const predelaySamples = Math.floor(sampleRate * 0.035);
+// 2nd-order Butterworth filter helper for offline array processing
+const applyBiquadFilterToArray = (
+  input: Float32Array,
+  fs: number,
+  freq: number,
+  type: 'lowpass' | 'highpass',
+  q = 0.7071
+) => {
+  const output = new Float32Array(input.length);
+  const safeFreq = clamp(freq, 20, fs * 0.49);
+  const w0 = (2 * Math.PI * safeFreq) / fs;
+  const cosW0 = Math.cos(w0);
+  const sinW0 = Math.sin(w0);
+  const alpha = sinW0 / (2 * q);
 
-  const earlyReflections = [
-    { time: 0.013, gain: 0.316 }, // -10dB
-    { time: 0.021, gain: 0.223 }, // -13dB
-    { time: 0.031, gain: 0.158 }, // -16dB
-    { time: 0.043, gain: 0.125 }, // -18dB
-  ];
+  let b0 = 0, b1 = 0, b2 = 0, a0 = 1, a1 = 0, a2 = 0;
+  if (type === 'lowpass') {
+    b0 = (1 - cosW0) / 2;
+    b1 = 1 - cosW0;
+    b2 = (1 - cosW0) / 2;
+    a0 = 1 + alpha;
+    a1 = -2 * cosW0;
+    a2 = 1 - alpha;
+  } else {
+    b0 = (1 + cosW0) / 2;
+    b1 = -(1 + cosW0);
+    b2 = (1 + cosW0) / 2;
+    a0 = 1 + alpha;
+    a1 = -2 * cosW0;
+    a2 = 1 - alpha;
+  }
 
-  for (let channel = 0; channel < numChannels; channel++) {
-    const data = impulse.getChannelData(channel);
-    
-    let envLow = 1.0;
-    let envMid = 1.0;
-    let envHigh = 1.0;
+  const invA0 = 1 / a0;
+  const nb0 = b0 * invA0;
+  const nb1 = b1 * invA0;
+  const nb2 = b2 * invA0;
+  const na1 = a1 * invA0;
+  const na2 = a2 * invA0;
 
-    let lp500 = 0, lp3000 = 0, erLp = 0, hp250 = 0;
-    let sumSq = 0;
+  let x1 = 0, x2 = 0, y1 = 0, y2 = 0;
+  for (let i = 0; i < input.length; i++) {
+    const x0 = input[i];
+    const y0 = nb0 * x0 + nb1 * x1 + nb2 * x2 - na1 * y1 - na2 * y2;
+    x2 = x1;
+    x1 = x0;
+    y2 = y1;
+    y1 = y0;
+    output[i] = y0;
+  }
+  return output;
+};
 
-    // Decorrelation: shift early reflections slightly per channel for stereo width
-    const channelErDelay = channel === 0 ? 0 : 0.0015;
+const generateSpatialEarlyReflections = (
+  totalSamples: number,
+  fs: number,
+  seedVal: number
+) => {
+  const prng = createSeededPrng(seedVal);
+  const erLeft = new Float32Array(totalSamples);
+  const erRight = new Float32Array(totalSamples);
 
-    const erArray = new Float32Array(length);
-    for (const er of earlyReflections) {
-       const idx = Math.floor((er.time + channelErDelay) * sampleRate);
-       if (idx < length) {
-           erArray[idx] = er.gain;
-       }
+  const pulseLen = Math.max(1, Math.floor(fs * 0.0003)); // ~0.3ms pulse
+  const pulse = new Float32Array(pulseLen);
+  for (let i = 0; i < pulseLen; i++) {
+    pulse[i] = 1.0 - i / pulseLen;
+  }
+
+  // Head-Shadowing 1st-order lowpass (6000Hz) cho tai bị khuất
+  const pulseShadow = new Float32Array(pulseLen);
+  const shadowAlpha = 1 - Math.exp((-2 * Math.PI * 6000) / fs);
+  let shadowLp = 0;
+  for (let i = 0; i < pulseLen; i++) {
+    shadowLp += shadowAlpha * (pulse[i] - shadowLp);
+    pulseShadow[i] = shadowLp;
+  }
+
+  const itdMaxSec = 0.00060; // Max ITD ~0.60ms (~29 samples tại 48kHz)
+
+  for (const cfg of SPATIAL_ER_CONFIGS) {
+    const msJitter = cfg.ms + (prng() * 2.4 - 1.2);
+    const dbJitter = cfg.db + (prng() * 1.6 - 0.8);
+    const baseGain = Math.pow(10, dbJitter / 20.0);
+
+    const azRad = (cfg.azimuth * Math.PI) / 180.0;
+    const sinAz = Math.sin(azRad);
+    const absSin = Math.abs(sinAz);
+
+    const itdSec = itdMaxSec * absSin;
+    const itdSamples = Math.floor(fs * itdSec);
+
+    // Suy giảm biên độ cho tai ở phía bị khuất
+    const shadowGainMult = Math.pow(10, (-3.5 * absSin) / 20.0);
+    const baseSample = Math.floor(fs * (msJitter / 1000.0));
+
+    let idxL = baseSample;
+    let idxR = baseSample;
+    let gainL = baseGain;
+    let gainR = baseGain;
+    let pL = pulse;
+    let pR = pulse;
+
+    if (cfg.azimuth < 0) {
+      // Nguồn bên Trái
+      idxL = baseSample;
+      idxR = baseSample + itdSamples;
+      gainL = baseGain;
+      gainR = baseGain * shadowGainMult;
+      pL = pulse;
+      pR = pulseShadow;
+    } else if (cfg.azimuth > 0 && cfg.azimuth !== 180) {
+      // Nguồn bên Phải
+      idxR = baseSample;
+      idxL = baseSample + itdSamples;
+      gainR = baseGain;
+      gainL = baseGain * shadowGainMult;
+      pR = pulse;
+      pL = pulseShadow;
     }
 
-    for (let i = 0; i < length; i++) {
-      // 1. Generate multi-band tail
-      const noise = Math.random() * 2 - 1;
-      
-      lp500 += alpha500 * (noise - lp500);
-      const hp500 = noise - lp500;
-      
-      lp3000 += alpha3000 * (hp500 - lp3000);
-      const hp3000 = hp500 - lp3000;
-
-      let tail = (lp500 * envLow) + (lp3000 * envMid) + (hp3000 * envHigh);
-      if (i < predelaySamples) {
-        tail = 0;
+    if (idxL >= 0 && idxL < totalSamples) {
+      const copyLenL = Math.min(pulseLen, totalSamples - idxL);
+      for (let i = 0; i < copyLenL; i++) {
+        erLeft[idxL + i] += gainL * pL[i];
       }
-
-      // 2. Add Early Reflections (lowpassed at 8kHz)
-      erLp += alpha8000 * (erArray[i] - erLp);
-      const mixed = tail + erLp;
-
-      // 3. Highpass whole signal at 250Hz to remove mud
-      hp250 += alpha250 * (mixed - hp250);
-      const finalCut = mixed - hp250;
-
-      data[i] = finalCut;
-      sumSq += finalCut * finalCut;
-
-      // Advance envelopes
-      envLow *= decayMultLow;
-      envMid *= decayMultMid;
-      envHigh *= decayMultHigh;
     }
 
-    // 4. L2 Normalization to balance Convolution Volume
-    // Multiply by a factor (decay * 0.5) to maintain reasonable gain levels.
-    const energy = Math.sqrt(sumSq) + 1e-12;
-    const normFactor = (decay * 0.5) / energy;
-    
-    for (let i = 0; i < length; i++) {
-        data[i] *= normFactor;
+    if (idxR >= 0 && idxR < totalSamples) {
+      const copyLenR = Math.min(pulseLen, totalSamples - idxR);
+      for (let i = 0; i < copyLenR; i++) {
+        erRight[idxR + i] += gainR * pR[i];
+      }
     }
   }
+
+  // Lọc thông thấp 8000Hz cho Early Reflections
+  return {
+    erLeft: applyBiquadFilterToArray(erLeft, fs, 8000, 'lowpass'),
+    erRight: applyBiquadFilterToArray(erRight, fs, 8000, 'lowpass'),
+  };
+};
+
+const generateDiffuseTailStream = (
+  duration: number,
+  fs: number,
+  seedVal: number
+) => {
+  const prng = createSeededPrng(seedVal);
+  const totalSamples = Math.max(1, Math.floor(fs * duration));
+  const rawNoise = new Float32Array(totalSamples);
+  for (let i = 0; i < totalSamples; i++) {
+    rawNoise[i] = gaussianNoise(prng);
+  }
+
+  const alpha500 = 1 - Math.exp((-2 * Math.PI * 500) / fs);
+  const alpha3000 = 1 - Math.exp((-2 * Math.PI * 3000) / fs);
+
+  const decayConstant = 6.907755; // ln(1000) for -60dB (T60)
+  const decayRateLow = decayConstant / (duration * 1.0 * fs);
+  const decayRateMid = decayConstant / (duration * 0.85 * fs);
+  const decayRateHigh = decayConstant / (duration * 0.50 * fs);
+
+  const predelayStart = Math.floor(fs * 0.020);
+  const predelayEnd = Math.floor(fs * 0.035);
+  const fadeLen = Math.max(1, predelayEnd - predelayStart);
+
+  let envLow = 1.0;
+  let envMid = 1.0;
+  let envHigh = 1.0;
+  const multLow = Math.exp(-decayRateLow);
+  const multMid = Math.exp(-decayRateMid);
+  const multHigh = Math.exp(-decayRateHigh);
+
+  let lp500 = 0;
+  let lp3000 = 0;
+  const tail = new Float32Array(totalSamples);
+
+  for (let i = 0; i < totalSamples; i++) {
+    const x = rawNoise[i];
+    lp500 += alpha500 * (x - lp500);
+    const hp500 = x - lp500;
+    lp3000 += alpha3000 * (hp500 - lp3000);
+    const hp3000 = hp500 - lp3000;
+
+    let sample = (lp500 * envLow) + (lp3000 * envMid) + (hp3000 * envHigh);
+
+    if (i < predelayStart) {
+      sample = 0;
+    } else if (i < predelayEnd) {
+      sample *= (i - predelayStart) / fadeLen;
+    }
+
+    tail[i] = sample;
+
+    envLow *= multLow;
+    envMid *= multMid;
+    envHigh *= multHigh;
+  }
+
+  return tail;
+};
+
+export const generateImpulseResponse = (ctx: BaseAudioContext, duration: number, decay: number) => {
+  const fs = ctx.sampleRate;
+  const safeDuration = clamp(duration, 0.1, 10);
+  const totalSamples = Math.max(1, Math.floor(fs * safeDuration));
+  const impulse = ctx.createBuffer(2, totalSamples, fs);
+
+  const seedBase = Math.floor(safeDuration * 1000);
+
+  // 1. Phản xạ sớm 10 hướng không gian (3D Spatial Early Reflections với ITD + Head Shadowing)
+  const { erLeft, erRight } = generateSpatialEarlyReflections(totalSamples, fs, seedBase);
+
+  // 2. Đuôi vang khuếch tán đa hướng 360 độ (3 luồng độc lập)
+  const tailShared = generateDiffuseTailStream(safeDuration, fs, seedBase + 10);
+  const tailLIndep = generateDiffuseTailStream(safeDuration, fs, seedBase + 20);
+  const tailRIndep = generateDiffuseTailStream(safeDuration, fs, seedBase + 30);
+
+  // Mix đuôi vang: 35% Shared (giữ tâm vững chắc) + 65% Decorrelated (mở rộng 360 độ)
+  const irLeftRaw = new Float32Array(totalSamples);
+  const irRightRaw = new Float32Array(totalSamples);
+
+  for (let i = 0; i < totalSamples; i++) {
+    const tailL = 0.35 * tailShared[i] + 0.65 * tailLIndep[i];
+    const tailR = 0.35 * tailShared[i] + 0.65 * tailRIndep[i];
+    irLeftRaw[i] = tailL + erLeft[i];
+    irRightRaw[i] = tailR + erRight[i];
+  }
+
+  // 3. Highpass 250Hz Butterworth để loại bỏ tiếng đục / rumble ở dải trầm
+  const irLeftCut = applyBiquadFilterToArray(irLeftRaw, fs, 250, 'highpass');
+  const irRightCut = applyBiquadFilterToArray(irRightRaw, fs, 250, 'highpass');
+
+  // 4. L2-norm Energy Normalization toàn phần cho Wet của từng kênh
+  let sumSqL = 0;
+  let sumSqR = 0;
+  for (let i = 0; i < totalSamples; i++) {
+    sumSqL += irLeftCut[i] * irLeftCut[i];
+    sumSqR += irRightCut[i] * irRightCut[i];
+  }
+
+  const energyL = Math.sqrt(sumSqL) + 1e-12;
+  const energyR = Math.sqrt(sumSqR) + 1e-12;
+
+  const targetGain = 0.5 * (decay || 2);
+  const normFactorL = targetGain / energyL;
+  const normFactorR = targetGain / energyR;
+
+  for (let i = 0; i < totalSamples; i++) {
+    irLeftCut[i] *= normFactorL;
+    irRightCut[i] *= normFactorR;
+  }
+
+  impulse.copyToChannel(irLeftCut, 0);
+  impulse.copyToChannel(irRightCut, 1);
 
   return impulse;
 };
 
+// Allpass Diffuser Stage (Schroeder All-pass Filter)
+const createSchroederAllpass = (ctx: BaseAudioContext, delaySec: number, g: number) => {
+  const inputNode = ctx.createGain();
+  const outputNode = ctx.createGain();
+  const sumW = ctx.createGain();
+  const delay = ctx.createDelay(0.05);
+  delay.delayTime.value = delaySec;
+
+  const feedback = ctx.createGain();
+  feedback.gain.value = -g;
+
+  const feedforward = ctx.createGain();
+  feedforward.gain.value = g;
+
+  inputNode.connect(sumW);
+  sumW.connect(delay);
+  delay.connect(feedback);
+  feedback.connect(sumW);
+
+  delay.connect(outputNode);
+  sumW.connect(feedforward);
+  feedforward.connect(outputNode);
+
+  return { input: inputNode, output: outputNode };
+};
+
+export type SpeakerMode = 'stereo' | 'phase-safe-mono' | 'mono-sum';
+
+export interface StereoWidthMatrixOptions {
+  widthPercent: number;
+  stereoCrossoverLow: number;
+  stereoCrossoverHigh: number;
+  stereoCrossoverMode: 'inside' | 'outside';
+  usePseudoStereo?: boolean;
+  surroundWet?: number;
+  surroundDelay?: number;
+  speakerMode?: SpeakerMode;
+  chorusEnabled?: boolean;
+}
+
 export const connectStereoWidthMatrix = (
   ctx: BaseAudioContext,
   input: AudioNode,
-  widthPercent: number,
-  stereoCrossoverLow: number,
-  stereoCrossoverHigh: number,
-  stereoCrossoverMode: 'inside' | 'outside',
-  usePseudoStereo = true
+  widthPercentOrOptions: number | StereoWidthMatrixOptions,
+  legacyLow = 150,
+  legacyHigh = 20000,
+  legacyMode: 'inside' | 'outside' = 'inside',
+  legacyPseudo = true,
+  legacySurroundWet?: number,
+  legacySurroundDelay?: number,
+  legacySpeakerMode: SpeakerMode = 'stereo',
+  legacyChorusEnabled = false
 ) => {
-  const width = percentToStereoBaseWidth(widthPercent);
-  const pseudoAmount = usePseudoStereo ? percentToPseudoStereoAmount(widthPercent) : 0;
+  const opts: StereoWidthMatrixOptions = typeof widthPercentOrOptions === 'object'
+    ? widthPercentOrOptions
+    : {
+      widthPercent: widthPercentOrOptions,
+      stereoCrossoverLow: legacyLow,
+      stereoCrossoverHigh: legacyHigh,
+      stereoCrossoverMode: legacyMode,
+      usePseudoStereo: legacyPseudo,
+      surroundWet: legacySurroundWet,
+      surroundDelay: legacySurroundDelay,
+      speakerMode: legacySpeakerMode,
+      chorusEnabled: legacyChorusEnabled,
+    };
+
+  const width = percentToStereoBaseWidth(opts.widthPercent);
   const out = ctx.createGain();
-  const stereoInput = ctx.createGain();
+
+  // 1. Phân tách dải tần Crossover Transient-Perfect (hp = in - lp)
+  // Tổng lp + hp = in tuyệt đối, triệt tiêu hoàn toàn hiện tượng lệch pha/khuyết tần số tại crossover
+  const lowHz = Math.min(opts.stereoCrossoverLow, opts.stereoCrossoverHigh);
+  const highHz = Math.max(opts.stereoCrossoverLow, opts.stereoCrossoverHigh);
+
+  const lpLow = ctx.createBiquadFilter();
+  lpLow.type = 'lowpass';
+  lpLow.frequency.value = lowHz;
+  lpLow.Q.value = 0.7071;
+
+  const hpLowBus = ctx.createGain();
+  const lpLowInv = ctx.createGain();
+  lpLowInv.gain.value = -1;
+
+  input.connect(lpLow);
+  input.connect(hpLowBus);
+  lpLow.connect(lpLowInv);
+  lpLowInv.connect(hpLowBus); // hpLowBus = input - lpLow
+
+  const lpHigh = ctx.createBiquadFilter();
+  lpHigh.type = 'lowpass';
+  lpHigh.frequency.value = highHz;
+  lpHigh.Q.value = 0.7071;
+
+  const hpHighBus = ctx.createGain();
+  const lpHighInv = ctx.createGain();
+  lpHighInv.gain.value = -1;
+
+  hpLowBus.connect(lpHigh);
+  hpLowBus.connect(hpHighBus);
+  lpHigh.connect(lpHighInv);
+  lpHighInv.connect(hpHighBus); // hpHighBus = hpLowBus - lpHigh
+
+  const processedBand = ctx.createGain();
+  const bypassBand = ctx.createGain();
+
+  if (opts.stereoCrossoverMode === 'inside') {
+    // Inside: Xử lý dải trung (từ lowHz đến highHz)
+    lpHigh.connect(processedBand);
+    lpLow.connect(bypassBand);
+    hpHighBus.connect(bypassBand);
+  } else {
+    // Outside: Xử lý dải trầm và dải cao
+    lpLow.connect(processedBand);
+    hpHighBus.connect(processedBand);
+    lpHigh.connect(bypassBand);
+  }
+
+  bypassBand.connect(out);
+
+  // 2. Chế độ 1 Loa (Speaker Mode)
+  if (opts.speakerMode === 'mono-sum') {
+    // Chế độ 1 loa tiêu chuẩn: Downmix (L + R) * 0.5
+    const monoSum = ctx.createGain();
+    monoSum.gain.value = 0.5;
+    const monoMerger = ctx.createChannelMerger(2);
+    processedBand.connect(monoSum);
+    monoSum.connect(monoMerger, 0, 0);
+    monoSum.connect(monoMerger, 0, 1);
+    monoMerger.connect(out);
+    return out;
+  }
+
+  if (opts.speakerMode === 'phase-safe-mono') {
+    // Chế độ 1 loa thông minh: Bộ dịch pha trực giao 90 độ (Olli Niemitalo Hilbert Network)
+    // Giúp bảo toàn 100% âm lượng dải Side trên loa mono mà KHÔNG bị triệt tiêu pha
+    const splitter = ctx.createChannelSplitter(2);
+    processedBand.connect(splitter);
+
+    const midNode = ctx.createGain();
+    midNode.gain.value = 0.5;
+    const sideNode = ctx.createGain();
+    sideNode.gain.value = 0.5;
+    const sideInv = ctx.createGain();
+    sideInv.gain.value = -0.5;
+
+    splitter.connect(midNode, 0);
+    splitter.connect(midNode, 1); // M = (L+R)*0.5
+
+    splitter.connect(sideNode, 0);
+    splitter.connect(sideInv, 1);
+    sideInv.connect(sideNode); // S = (L-R)*0.5
+
+    // Lọc cắt trầm Side (120Hz) chống ù/đục âm khi gập vào mono
+    const sideHp = ctx.createBiquadFilter();
+    sideHp.type = 'highpass';
+    sideHp.frequency.value = 120;
+    sideHp.Q.value = 0.7071;
+    sideNode.connect(sideHp);
+
+    // Nhánh 1 (Mid): Trễ 1 mẫu + 4 bộ lọc Allpass IIR
+    const samplePeriod = 1 / ctx.sampleRate;
+    const delay1 = ctx.createDelay(0.001);
+    delay1.delayTime.value = samplePeriod;
+    midNode.connect(delay1);
+
+    const apCoeffs = [0.4794008653, 0.8762184931, 0.9765975883, 0.9974992552];
+    let prevP1: AudioNode = delay1;
+    for (const c of apCoeffs) {
+      const ap = ctx.createIIRFilter([c, 0, -1], [1, 0, -c]);
+      prevP1.connect(ap);
+      prevP1 = ap;
+    }
+
+    // Nhánh 2 (Side): 4 bộ lọc Allpass IIR (lệch pha 90 độ so với Mid)
+    const bpCoeffs = [0.1617585000, 0.7330289300, 0.9453497000, 0.9905991600];
+    let prevP2: AudioNode = sideHp;
+    for (const c of bpCoeffs) {
+      const bp = ctx.createIIRFilter([c, 0, -1], [1, 0, -c]);
+      prevP2.connect(bp);
+      prevP2 = bp;
+    }
+
+    // Gộp Mid và Side trực giao: M_phase + 0.7071 * k * S_phase
+    const effK = 0.7071 * clamp(opts.widthPercent / 100, 0, 2);
+    const monoSumOut = ctx.createGain();
+    prevP1.connect(monoSumOut);
+
+    const sideScaled = ctx.createGain();
+    sideScaled.gain.value = effK;
+    prevP2.connect(sideScaled);
+    sideScaled.connect(monoSumOut);
+
+    const monoMerger = ctx.createChannelMerger(2);
+    monoSumOut.connect(monoMerger, 0, 0);
+    monoSumOut.connect(monoMerger, 0, 1);
+    monoMerger.connect(out);
+    return out;
+  }
+
+  // 3. Chế độ Stereo: Mid/Side Width Matrix
   const splitter = ctx.createChannelSplitter(2);
   const merger = ctx.createChannelMerger(2);
-
-  stereoInput.channelCount = 2;
-  stereoInput.channelCountMode = 'explicit';
-  stereoInput.channelInterpretation = 'speakers';
 
   const lToL = ctx.createGain();
   const rToL = ctx.createGain();
@@ -386,35 +769,7 @@ export const connectStereoWidthMatrix = (
   lToR.gain.value = (1 - width) / 2;
   rToR.gain.value = (1 + width) / 2;
 
-  const crossoverLp1 = ctx.createBiquadFilter();
-  const crossoverHp1 = ctx.createBiquadFilter();
-  const crossoverLp2 = ctx.createBiquadFilter();
-  const crossoverHp2 = ctx.createBiquadFilter();
-
-  crossoverLp1.type = 'lowpass';
-  crossoverLp1.frequency.value = stereoCrossoverLow;
-  crossoverHp1.type = 'highpass';
-  crossoverHp1.frequency.value = stereoCrossoverLow;
-  crossoverLp2.type = 'lowpass';
-  crossoverLp2.frequency.value = stereoCrossoverHigh;
-  crossoverHp2.type = 'highpass';
-  crossoverHp2.frequency.value = stereoCrossoverHigh;
-
-  input.connect(crossoverLp1);
-  input.connect(crossoverHp1);
-  crossoverHp1.connect(crossoverLp2);
-  crossoverHp1.connect(crossoverHp2);
-
-  if (stereoCrossoverMode === 'inside') {
-    crossoverLp2.connect(stereoInput);
-    crossoverLp1.connect(out);
-    crossoverHp2.connect(out);
-  } else {
-    crossoverLp1.connect(stereoInput);
-    crossoverHp2.connect(stereoInput);
-    crossoverLp2.connect(out);
-  }
-  stereoInput.connect(splitter);
+  processedBand.connect(splitter);
   splitter.connect(lToL, 0);
   splitter.connect(lToR, 0);
   splitter.connect(rToL, 1);
@@ -424,43 +779,161 @@ export const connectStereoWidthMatrix = (
   rToL.connect(merger, 0, 0);
   lToR.connect(merger, 0, 1);
   rToR.connect(merger, 0, 1);
-  merger.connect(out);
 
-  if (pseudoAmount > 0) {
-    const pseudoMono = ctx.createGain();
-    const pseudoDelay = ctx.createDelay(0.05);
-    const pseudoHighpass = ctx.createBiquadFilter();
-    const pseudoLeft = ctx.createGain();
-    const pseudoRight = ctx.createGain();
-    const pseudoMerger = ctx.createChannelMerger(2);
-    const pseudoWet = ctx.createGain();
-
-    pseudoMono.channelCount = 1;
-    pseudoMono.channelCountMode = 'explicit';
-    pseudoMono.channelInterpretation = 'speakers';
-    pseudoDelay.delayTime.value = 0.006 + 0.007 * pseudoAmount;
-    pseudoHighpass.type = 'highpass';
-    pseudoHighpass.frequency.value = 180;
-    pseudoWet.gain.value = pseudoStereoWetGain(pseudoAmount);
-
-    if (stereoCrossoverMode === 'inside') {
-      crossoverLp2.connect(pseudoMono);
-    } else {
-      crossoverLp1.connect(pseudoMono);
-      crossoverHp2.connect(pseudoMono);
+  // 4. Mạng trễ Khuyếch tán Đa hướng Âm vòm 3D (3D Differential Surround Multi-tap Network)
+  let effectiveWet = 0;
+  if (typeof opts.surroundWet === 'number' && opts.surroundWet > 0) {
+    effectiveWet = opts.surroundWet / 100;
+  } else if (opts.widthPercent > 100) {
+    const pseudoAmount = percentToPseudoStereoAmount(opts.widthPercent);
+    effectiveWet = pseudoAmount * 0.18;
+    if (opts.usePseudoStereo) {
+      effectiveWet = Math.max(0.10, effectiveWet);
     }
-    pseudoMono.connect(pseudoLeft);
-    pseudoMono.connect(pseudoDelay);
-    pseudoDelay.connect(pseudoHighpass);
-    pseudoHighpass.connect(pseudoRight);
-    pseudoLeft.connect(pseudoMerger, 0, 0);
-    pseudoRight.connect(pseudoMerger, 0, 1);
-    pseudoMerger.connect(pseudoWet);
-    pseudoWet.connect(out);
+  } else if (opts.usePseudoStereo) {
+    effectiveWet = 0.10;
   }
 
+  if (effectiveWet > 0.001) {
+    // Bước A: Lấy tín hiệu Mid và lọc Sub-rumble (80Hz) chống ù kick/bass
+    const midFeed = ctx.createGain();
+    midFeed.gain.value = 0.5;
+    splitter.connect(midFeed, 0);
+    splitter.connect(midFeed, 1);
+
+    const subHp = ctx.createBiquadFilter();
+    subHp.type = 'highpass';
+    subHp.frequency.value = 80;
+    subHp.Q.value = 0.7071;
+    midFeed.connect(subHp);
+
+    // Bước B: Mạng Khuếch tán All-Pass 2 tầng (Phase Dispersion / Transient Smearing)
+    // Tầng 1: D1 ~ 2.1ms (g = 0.60); Tầng 2: D2 ~ 3.7ms (g = 0.50)
+    const ap1 = createSchroederAllpass(ctx, 0.0021, 0.60);
+    const ap2 = createSchroederAllpass(ctx, 0.0037, 0.50);
+    subHp.connect(ap1.input);
+    ap1.output.connect(ap2.input);
+
+    // Bước C & D: Đọc 4 luồng phản xạ phi điều hòa (Golden ratio & irrational spacing) với Progressive Air Absorption
+    const baseDelaySec = clamp((opts.surroundDelay ?? 12) / 1000, 0.005, 0.030);
+    const diffBus = ctx.createGain();
+
+    // Tap 1: 0.618x, gain +0.75, dải cao trong sáng
+    const tap1Delay = ctx.createDelay(0.1);
+    tap1Delay.delayTime.value = baseDelaySec * 0.618;
+    const tap1Gain = ctx.createGain();
+    tap1Gain.gain.value = 0.75;
+    ap2.output.connect(tap1Delay);
+    tap1Delay.connect(tap1Gain);
+    tap1Gain.connect(diffBus);
+
+    // Tap 2: 1.000x, gain -0.65, damping nhẹ 10kHz
+    const tap2Delay = ctx.createDelay(0.1);
+    tap2Delay.delayTime.value = baseDelaySec * 1.000;
+    const tap2Lp = ctx.createBiquadFilter();
+    tap2Lp.type = 'lowpass';
+    tap2Lp.frequency.value = 10000;
+    const tap2Gain = ctx.createGain();
+    tap2Gain.gain.value = -0.65;
+    ap2.output.connect(tap2Delay);
+    tap2Delay.connect(tap2Lp);
+    tap2Lp.connect(tap2Gain);
+    tap2Gain.connect(diffBus);
+
+    // Tap 3: 1.414x, gain +0.50, damping 7.5kHz cho phản xạ sau trái
+    const tap3Delay = ctx.createDelay(0.1);
+    tap3Delay.delayTime.value = baseDelaySec * 1.414;
+    const tap3Lp = ctx.createBiquadFilter();
+    tap3Lp.type = 'lowpass';
+    tap3Lp.frequency.value = 7500;
+    const tap3Gain = ctx.createGain();
+    tap3Gain.gain.value = 0.50;
+    ap2.output.connect(tap3Delay);
+    tap3Delay.connect(tap3Lp);
+    tap3Lp.connect(tap3Gain);
+    tap3Gain.connect(diffBus);
+
+    // Tap 4: 1.932x, gain -0.40, damping 5.5kHz cho ambient sau phải
+    const tap4Delay = ctx.createDelay(0.1);
+    tap4Delay.delayTime.value = baseDelaySec * 1.932;
+    const tap4Lp = ctx.createBiquadFilter();
+    tap4Lp.type = 'lowpass';
+    tap4Lp.frequency.value = 5500;
+    const tap4Gain = ctx.createGain();
+    tap4Gain.gain.value = -0.40;
+    ap2.output.connect(tap4Delay);
+    tap4Delay.connect(tap4Lp);
+    tap4Lp.connect(tap4Gain);
+    tap4Gain.connect(diffBus);
+
+    // Bước E: Ma trận phân bổ không gian vi sai (3D Differential Surround Matrix)
+    // Kênh L nhận (+), kênh R nhận (-) => Triệt tiêu 100% đối xứng khi gập Mono (Phase-Safe Mono-Compatible)
+    const surroundLeft = ctx.createGain();
+    surroundLeft.gain.value = effectiveWet;
+    const surroundRight = ctx.createGain();
+    surroundRight.gain.value = -effectiveWet;
+
+    diffBus.connect(surroundLeft);
+    diffBus.connect(surroundRight);
+    surroundLeft.connect(merger, 0, 0);
+    surroundRight.connect(merger, 0, 1);
+  }
+
+  // 5. Chorus Micro-Delay Ensemble (Tạo độ dày và lộng lẫy âm thanh)
+  if (opts.chorusEnabled) {
+    try {
+      const chorusLfo = ctx.createOscillator();
+      chorusLfo.frequency.value = 0.45;
+
+      const chorusModL = ctx.createGain();
+      chorusModL.gain.value = 0.0012;
+      const chorusModR = ctx.createGain();
+      chorusModR.gain.value = -0.0012;
+
+      chorusLfo.connect(chorusModL);
+      chorusLfo.connect(chorusModR);
+
+      const chorusDelayL = ctx.createDelay(0.02);
+      chorusDelayL.delayTime.value = 0.0045;
+      const chorusDelayR = ctx.createDelay(0.02);
+      chorusDelayR.delayTime.value = 0.0045;
+
+      chorusModL.connect(chorusDelayL.delayTime);
+      chorusModR.connect(chorusDelayR.delayTime);
+
+      splitter.connect(chorusDelayL, 0);
+      splitter.connect(chorusDelayR, 1);
+
+      const chorusSide = ctx.createGain();
+      chorusSide.gain.value = 0.5;
+      const chorusSideInv = ctx.createGain();
+      chorusSideInv.gain.value = -0.5;
+
+      chorusDelayL.connect(chorusSide);
+      chorusDelayR.connect(chorusSideInv);
+      chorusSideInv.connect(chorusSide);
+
+      const chorusWet = 0.22;
+      const chorusLeftGain = ctx.createGain();
+      chorusLeftGain.gain.value = chorusWet;
+      const chorusRightGain = ctx.createGain();
+      chorusRightGain.gain.value = -chorusWet;
+
+      chorusSide.connect(chorusLeftGain);
+      chorusSide.connect(chorusRightGain);
+      chorusLeftGain.connect(merger, 0, 0);
+      chorusRightGain.connect(merger, 0, 1);
+
+      chorusLfo.start(0);
+    } catch {
+      // Ignored if oscillator start fails in inactive context
+    }
+  }
+
+  merger.connect(out);
   return out;
 };
+
 
 export const createSilentWavUrl = () => {
   const sampleRate = 8000;

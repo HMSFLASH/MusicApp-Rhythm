@@ -18,6 +18,10 @@ export type AudioRenderParams = {
   stereoCrossoverLow: number;
   stereoCrossoverHigh: number;
   stereoCrossoverMode: 'inside' | 'outside';
+  surroundWet?: number;
+  surroundDelay?: number;
+  speakerMode?: 'stereo' | 'phase-safe-mono' | 'mono-sum';
+  chorusEnabled?: boolean;
   panValue: number;
   loudnessNormalization: boolean;
   useOversample: boolean;
@@ -70,6 +74,10 @@ export const createRenderSignature = (
   stereoCrossoverLow: params.stereoCrossoverLow,
   stereoCrossoverHigh: params.stereoCrossoverHigh,
   stereoCrossoverMode: params.stereoCrossoverMode,
+  surroundWet: params.surroundWet ?? 0,
+  surroundDelay: params.surroundDelay ?? 12,
+  speakerMode: params.speakerMode || 'stereo',
+  chorusEnabled: Boolean(params.chorusEnabled),
   panValue: params.panValue,
   loudnessNormalization: Boolean(params.loudnessNormalization),
 });

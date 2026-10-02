@@ -1,7 +1,15 @@
 import { useState, useCallback, useRef } from 'react';
 import { COMPRESSOR_DEFAULTS, COMPRESSOR_RESET_SETTINGS, EQ_PRESETS, STYLISTIC_PRESETS, PRECOMPUTED_STYLISTIC_PRESETS } from './audioTypes';
 import type { EqBand, CustomEqPreset } from './audioTypes';
-import { clamp, STEREO_WIDTH_MAX_PERCENT } from './audioMath';
+import {
+  clamp,
+  STEREO_WIDTH_MAX_PERCENT,
+  SURROUND_WET_MAX_PERCENT,
+  SURROUND_DELAY_DEFAULT_MS,
+  SURROUND_DELAY_MIN_MS,
+  SURROUND_DELAY_MAX_MS,
+} from './audioMath';
+import type { SpeakerMode } from './audioGraph';
 
 type FxKey = 'eq' | 'tone' | 'comp' | 'reverb' | 'master' | 'preamp' | 'limiter' | 'stereo' | 'interpolate';
 type FxEnabledState = Record<FxKey, boolean>;
@@ -26,6 +34,10 @@ type SavedAudioEffectsState = Partial<{
   stereoCrossoverLow: number;
   stereoCrossoverHigh: number;
   stereoCrossoverMode: 'inside' | 'outside';
+  surroundWet: number;
+  surroundDelay: number;
+  speakerMode: SpeakerMode;
+  chorusEnabled: boolean;
   reverbMix: number;
   reverbTime: number;
   loudnessNormalization: boolean;
@@ -222,6 +234,18 @@ export function useAudioEffectsState(savedState: SavedAudioEffectsState = {}) {
   const [stereoCrossoverMode, setStereoCrossoverModeState] = useState<'inside' | 'outside'>(
     savedState.stereoCrossoverMode ?? 'inside'
   );
+  const [surroundWet, setSurroundWetState] = useState<number>(
+    clamp(savedState.surroundWet ?? 14, 0, SURROUND_WET_MAX_PERCENT)
+  );
+  const [surroundDelay, setSurroundDelayState] = useState<number>(
+    clamp(savedState.surroundDelay ?? SURROUND_DELAY_DEFAULT_MS, SURROUND_DELAY_MIN_MS, SURROUND_DELAY_MAX_MS)
+  );
+  const [speakerMode, setSpeakerModeState] = useState<SpeakerMode>(
+    savedState.speakerMode ?? 'stereo'
+  );
+  const [chorusEnabled, setChorusEnabledState] = useState<boolean>(
+    savedState.chorusEnabled ?? false
+  );
   const [reverbMix, setReverbMix] = useState<number>(savedState.reverbMix ?? 0);
   const [reverbTime, setReverbTime] = useState<number>(savedState.reverbTime ?? 2);
   const [reverbEngine, setReverbEngine] = useState<'procedural' | 'file'>(savedState.reverbEngine ?? 'procedural');
@@ -259,6 +283,21 @@ export function useAudioEffectsState(savedState: SavedAudioEffectsState = {}) {
   }, []);
   const setStereoWidth = useCallback((value: number) => {
     setStereoWidthState(clamp(value, 0, STEREO_WIDTH_MAX_PERCENT));
+  }, []);
+  const setSurroundWet = useCallback((value: number) => {
+    setSurroundWetState(clamp(value, 0, SURROUND_WET_MAX_PERCENT));
+  }, []);
+  const setSurroundDelay = useCallback((value: number) => {
+    setSurroundDelayState(clamp(value, SURROUND_DELAY_MIN_MS, SURROUND_DELAY_MAX_MS));
+  }, []);
+  const setSpeakerMode = useCallback((mode: SpeakerMode) => {
+    setSpeakerModeState(mode);
+  }, []);
+  const setChorusEnabled = useCallback((value: boolean) => {
+    setChorusEnabledState(value);
+  }, []);
+  const toggleChorus = useCallback(() => {
+    setChorusEnabledState((prev) => !prev);
   }, []);
   const toggleLoudnessNormalization = useCallback(() => setLoudnessNormalization(prev => !prev), []);
   const toggleUseOversample = useCallback(() => setUseOversample(prev => !prev), []);
@@ -478,6 +517,10 @@ export function useAudioEffectsState(savedState: SavedAudioEffectsState = {}) {
     stereoCrossoverLow, setStereoCrossoverLow: setStereoCrossoverLowState, updateStereoCrossoverLow: setStereoCrossoverLowState,
     stereoCrossoverHigh, setStereoCrossoverHigh: setStereoCrossoverHighState, updateStereoCrossoverHigh: setStereoCrossoverHighState,
     stereoCrossoverMode, setStereoCrossoverMode: setStereoCrossoverModeState, updateStereoCrossoverMode: setStereoCrossoverModeState,
+    surroundWet, setSurroundWet, updateSurroundWet: setSurroundWet,
+    surroundDelay, setSurroundDelay, updateSurroundDelay: setSurroundDelay,
+    speakerMode, setSpeakerMode, updateSpeakerMode: setSpeakerMode,
+    chorusEnabled, setChorusEnabled, updateChorusEnabled: setChorusEnabled, toggleChorus,
     reverbMix, setReverbMix, updateReverbMix: setReverbMix,
     reverbTime, setReverbTime, updateReverbTime: setReverbTime,
     reverbEngine, setReverbEngine, updateReverbEngine: setReverbEngine,

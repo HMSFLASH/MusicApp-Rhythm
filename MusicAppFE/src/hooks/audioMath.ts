@@ -10,6 +10,11 @@ export const compressorAttackSeconds = (attackMs: number, rmsSizeMs: number) =>
 export const percentToPan = (value: number) => clamp(value / 100, -1, 1);
 
 export const STEREO_WIDTH_MAX_PERCENT = 200;
+export const SURROUND_WET_MAX_PERCENT = 50;
+export const SURROUND_DELAY_DEFAULT_MS = 12;
+export const SURROUND_DELAY_MIN_MS = 5;
+export const SURROUND_DELAY_MAX_MS = 30;
+
 
 export const percentToStereoWidth = (value: number) => {
   const effectiveValue = value <= 100 ? value : 100 + (value - 100) * 3;

@@ -3,6 +3,7 @@ import { expandResonantEqBands, type EqBand } from './audioTypes';
 import {
   applyCustomDynamicsCompressorSettings,
   applyMasterLimiterState,
+  connectStereoWidthMatrix,
   createCustomDynamicsCompressorNode,
   generateImpulseResponse,
   getStereoSimilarity,
@@ -57,6 +58,8 @@ export function useAudioContext(inputEffectsState: any) {
     reverbMix: inputEffectsState.reverbMix,
     reverbTime: inputEffectsState.reverbTime,
     panValue: inputEffectsState.panValue,
+    surroundWet: inputEffectsState.surroundWet,
+    surroundDelay: inputEffectsState.surroundDelay,
     compThreshold: inputEffectsState.compThreshold,
     compRatio: inputEffectsState.compRatio,
     compKnee: inputEffectsState.compKnee,
@@ -68,7 +71,7 @@ export function useAudioContext(inputEffectsState: any) {
 
   useEffect(() => {
     // Debounce continuous slider values to avoid audio stuttering during real-time dragging.
-    // Instant toggles (fxEnabled, crossoverMode) will not be delayed.
+    // Instant toggles (fxEnabled, crossoverMode, speakerMode, chorus) will not be delayed.
     const handler = setTimeout(() => {
       setDebouncedContinuous({
         preampGain: inputEffectsState.preampGain,
@@ -81,6 +84,8 @@ export function useAudioContext(inputEffectsState: any) {
         reverbMix: inputEffectsState.reverbMix,
         reverbTime: inputEffectsState.reverbTime,
         panValue: inputEffectsState.panValue,
+        surroundWet: inputEffectsState.surroundWet,
+        surroundDelay: inputEffectsState.surroundDelay,
         compThreshold: inputEffectsState.compThreshold,
         compRatio: inputEffectsState.compRatio,
         compKnee: inputEffectsState.compKnee,
@@ -102,6 +107,8 @@ export function useAudioContext(inputEffectsState: any) {
     inputEffectsState.reverbMix,
     inputEffectsState.reverbTime,
     inputEffectsState.panValue,
+    inputEffectsState.surroundWet,
+    inputEffectsState.surroundDelay,
     inputEffectsState.compThreshold,
     inputEffectsState.compRatio,
     inputEffectsState.compKnee,
@@ -116,7 +123,7 @@ export function useAudioContext(inputEffectsState: any) {
     ...debouncedContinuous,
   };
 
-  const { eqBands: rawEqBands, isParametricPreset, preampGain, bassGain, trebleGain, compThreshold, compRatio, compKnee, compAttack, compRelease, compRmsSize, compMakeupGain, panValue, stereoWidth, stereoCrossoverLow = 150, stereoCrossoverHigh = 20000, stereoCrossoverMode = 'inside', reverbMix, reverbTime, reverbEngine = 'procedural', loudnessNormalization, useOversample, masterFftSize = 2048, stereoFftSize = 1024, audioLatencyHint = 'playback', fxEnabled, audioIsStereo = true, isAuthenticated } = effectsState;
+  const { eqBands: rawEqBands, isParametricPreset, preampGain, bassGain, trebleGain, compThreshold, compRatio, compKnee, compAttack, compRelease, compRmsSize, compMakeupGain, panValue, stereoWidth, stereoCrossoverLow = 150, stereoCrossoverHigh = 20000, stereoCrossoverMode = 'inside', surroundWet = 14, surroundDelay = 12, speakerMode = 'stereo', chorusEnabled = false, reverbMix, reverbTime, reverbEngine = 'procedural', loudnessNormalization, useOversample, masterFftSize = 2048, stereoFftSize = 1024, audioLatencyHint = 'playback', fxEnabled, audioIsStereo = true, isAuthenticated } = effectsState;
   const [audioSampleRate, setAudioSampleRate] = useState(44100);
 
   // Audio Context and Core Nodes
@@ -320,6 +327,10 @@ export function useAudioContext(inputEffectsState: any) {
     stereoCrossoverLow,
     stereoCrossoverHigh,
     stereoCrossoverMode,
+    surroundWet,
+    surroundDelay,
+    speakerMode,
+    chorusEnabled,
     panValue,
   }, effectiveFxEnabled);
 
@@ -337,6 +348,8 @@ export function useAudioContext(inputEffectsState: any) {
     stereo: currentGraphActivity.stereo,
     stereoCrossoverMode: currentGraphActivity.stereo ? stereoCrossoverMode : null,
     audioIsStereo: currentGraphActivity.stereo ? Boolean(audioIsStereo) : null,
+    speakerMode: currentGraphActivity.stereo ? speakerMode : null,
+    chorusEnabled: currentGraphActivity.stereo ? Boolean(chorusEnabled) : null,
     master: currentGraphActivity.master,
     limiter: currentGraphActivity.limiter,
 
@@ -546,6 +559,10 @@ export function useAudioContext(inputEffectsState: any) {
       stereoCrossoverLow,
       stereoCrossoverHigh,
       stereoCrossoverMode,
+      surroundWet,
+      surroundDelay,
+      speakerMode,
+      chorusEnabled,
       panValue,
     }, enabledWithAutoPreamp);
 
@@ -707,8 +724,6 @@ export function useAudioContext(inputEffectsState: any) {
       currentNode = compMakeupNodeRef.current;
     }
 
-    const stereoDetectionNode = currentNode;
-
     // 5. Reverb
     if (activity.reverb) {
       if (!convolverNodeRef.current) convolverNodeRef.current = ctx.createConvolver();
@@ -752,113 +767,24 @@ export function useAudioContext(inputEffectsState: any) {
       currentNode = reverbOutRef.current;
     }
 
-    // 5.5 Stereo Width Matrix
+    // 5.5 Stereo Width Matrix & 3D Spatial Surround
     if (activity.stereo) {
-      if (!stereoInputRef.current) stereoInputRef.current = ctx.createGain();
-      if (!stereoSplitterRef.current) stereoSplitterRef.current = ctx.createChannelSplitter(2);
-      if (!stereoMergerRef.current) stereoMergerRef.current = ctx.createChannelMerger(2);
-
-      if (!lToLRef.current) lToLRef.current = ctx.createGain();
-      if (!rToLRef.current) rToLRef.current = ctx.createGain();
-      if (!lToRRef.current) lToRRef.current = ctx.createGain();
-      if (!rToRRef.current) rToRRef.current = ctx.createGain();
-      if (!stereoOutRef.current) stereoOutRef.current = ctx.createGain();
-
-      const width = percentToStereoBaseWidth(stereoWidth);
-      const basePseudoAmount = percentToPseudoStereoAmount(stereoWidth);
-      stereoPseudoBaseAmountRef.current = basePseudoAmount;
-      const pseudoAmount = !audioIsStereo ? basePseudoAmount : 0;
-      lToLRef.current.gain.value = (1 + width) / 2;
-      rToLRef.current.gain.value = (1 - width) / 2;
-      lToRRef.current.gain.value = (1 - width) / 2;
-      rToRRef.current.gain.value = (1 + width) / 2;
-
-      stereoInputRef.current.channelCount = 2;
-      stereoInputRef.current.channelCountMode = 'explicit';
-      stereoInputRef.current.channelInterpretation = 'speakers';
-
-      if (!crossoverLp1Ref.current) crossoverLp1Ref.current = ctx.createBiquadFilter();
-      if (!crossoverHp1Ref.current) crossoverHp1Ref.current = ctx.createBiquadFilter();
-      if (!crossoverLp2Ref.current) crossoverLp2Ref.current = ctx.createBiquadFilter();
-      if (!crossoverHp2Ref.current) crossoverHp2Ref.current = ctx.createBiquadFilter();
-
-      crossoverLp1Ref.current.type = 'lowpass';
-      crossoverLp1Ref.current.frequency.value = stereoCrossoverLow;
-      crossoverHp1Ref.current.type = 'highpass';
-      crossoverHp1Ref.current.frequency.value = stereoCrossoverLow;
-      crossoverLp2Ref.current.type = 'lowpass';
-      crossoverLp2Ref.current.frequency.value = stereoCrossoverHigh;
-      crossoverHp2Ref.current.type = 'highpass';
-      crossoverHp2Ref.current.frequency.value = stereoCrossoverHigh;
-
-      currentNode.connect(crossoverLp1Ref.current);
-      currentNode.connect(crossoverHp1Ref.current);
-      crossoverHp1Ref.current.connect(crossoverLp2Ref.current);
-      crossoverHp1Ref.current.connect(crossoverHp2Ref.current);
-
-      if (stereoCrossoverMode === 'inside') {
-        crossoverLp2Ref.current.connect(stereoInputRef.current);
-        crossoverLp1Ref.current.connect(stereoOutRef.current);
-        crossoverHp2Ref.current.connect(stereoOutRef.current);
-      } else {
-        crossoverLp1Ref.current.connect(stereoInputRef.current);
-        crossoverHp2Ref.current.connect(stereoInputRef.current);
-        crossoverLp2Ref.current.connect(stereoOutRef.current);
-      }
-
-      stereoInputRef.current.connect(stereoSplitterRef.current);
-      stereoSplitterRef.current.connect(lToLRef.current, 0);
-      stereoSplitterRef.current.connect(lToRRef.current, 0);
-      stereoSplitterRef.current.connect(rToLRef.current, 1);
-      stereoSplitterRef.current.connect(rToRRef.current, 1);
-
-      lToLRef.current.connect(stereoMergerRef.current, 0, 0);
-      rToLRef.current.connect(stereoMergerRef.current, 0, 0);
-      lToRRef.current.connect(stereoMergerRef.current, 0, 1);
-      rToRRef.current.connect(stereoMergerRef.current, 0, 1);
-
-      stereoMergerRef.current.connect(stereoOutRef.current);
-
-      if (!pseudoMonoRef.current) pseudoMonoRef.current = ctx.createGain();
-      if (!pseudoDelayRef.current) pseudoDelayRef.current = ctx.createDelay(0.05);
-      if (!pseudoHighpassRef.current) {
-        pseudoHighpassRef.current = ctx.createBiquadFilter();
-        pseudoHighpassRef.current.type = 'highpass';
-        pseudoHighpassRef.current.frequency.value = 180;
-      }
-      if (!pseudoLeftGainRef.current) pseudoLeftGainRef.current = ctx.createGain();
-      if (!pseudoRightGainRef.current) pseudoRightGainRef.current = ctx.createGain();
-      if (!pseudoMergerRef.current) pseudoMergerRef.current = ctx.createChannelMerger(2);
-      if (!haasWetGainRef.current) haasWetGainRef.current = ctx.createGain();
-
-      pseudoMonoRef.current.channelCount = 1;
-      pseudoMonoRef.current.channelCountMode = 'explicit';
-      pseudoMonoRef.current.channelInterpretation = 'speakers';
-      pseudoDelayRef.current.delayTime.value = 0.006 + 0.007 * pseudoAmount;
-      pseudoLeftGainRef.current.gain.value = 1;
-      pseudoRightGainRef.current.gain.value = 1;
-      haasWetGainRef.current.gain.value = pseudoStereoWetGain(pseudoAmount);
-
-      if (stereoCrossoverMode === 'inside') {
-        crossoverLp2Ref.current.connect(pseudoMonoRef.current);
-      } else {
-        crossoverLp1Ref.current.connect(pseudoMonoRef.current);
-        crossoverHp2Ref.current.connect(pseudoMonoRef.current);
-      }
-      pseudoMonoRef.current.connect(pseudoLeftGainRef.current);
-      pseudoMonoRef.current.connect(pseudoDelayRef.current);
-      pseudoDelayRef.current.connect(pseudoHighpassRef.current);
-      pseudoHighpassRef.current.connect(pseudoRightGainRef.current);
-      pseudoLeftGainRef.current.connect(pseudoMergerRef.current, 0, 0);
-      pseudoRightGainRef.current.connect(pseudoMergerRef.current, 0, 1);
-      pseudoMergerRef.current.connect(haasWetGainRef.current);
-      haasWetGainRef.current.connect(stereoOutRef.current);
-
-      if (audioIsStereo) {
-        startStereoNearMonoAnalysis(stereoDetectionNode, basePseudoAmount);
-      }
-
-      currentNode = stereoOutRef.current;
+      const stereoStageInput = ctx.createGain();
+      currentNode.connect(stereoStageInput);
+      const stereoStageOut = connectStereoWidthMatrix(
+        ctx,
+        stereoStageInput,
+        stereoWidth,
+        stereoCrossoverLow,
+        stereoCrossoverHigh,
+        stereoCrossoverMode,
+        !audioIsStereo,
+        surroundWet,
+        surroundDelay,
+        speakerMode,
+        chorusEnabled
+      );
+      currentNode = stereoStageOut;
     }
 
 
@@ -954,6 +880,10 @@ export function useAudioContext(inputEffectsState: any) {
     stereoCrossoverLow,
     stereoCrossoverHigh,
     stereoCrossoverMode,
+    surroundWet,
+    surroundDelay,
+    speakerMode,
+    chorusEnabled,
     trebleGain,
     useOversample,
   ]);

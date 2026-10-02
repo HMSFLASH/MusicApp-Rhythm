@@ -70,6 +70,10 @@ export const renderOfflineAudio = async ({
     stereoCrossoverLow,
     stereoCrossoverHigh,
     stereoCrossoverMode,
+    surroundWet,
+    surroundDelay,
+    speakerMode,
+    chorusEnabled,
     panValue,
     loudnessNormalization,
     useOversample,
@@ -330,7 +334,19 @@ export const renderOfflineAudio = async ({
     const stereoInput = offlineCtx.createGain();
     connectToNext(stereoInput);
     const shouldUsePseudoStereo = isAudioBufferNearMono(audioBuffer);
-    currentNode = connectStereoWidthMatrix(offlineCtx, stereoInput, stereoWidth, stereoCrossoverLow, stereoCrossoverHigh, stereoCrossoverMode, shouldUsePseudoStereo);
+    currentNode = connectStereoWidthMatrix(
+      offlineCtx,
+      stereoInput,
+      stereoWidth,
+      stereoCrossoverLow,
+      stereoCrossoverHigh,
+      stereoCrossoverMode,
+      shouldUsePseudoStereo,
+      surroundWet,
+      surroundDelay,
+      speakerMode,
+      chorusEnabled
+    );
   }
 
   if (activity.master) {
