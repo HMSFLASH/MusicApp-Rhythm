@@ -27,7 +27,7 @@ export function MobileMiniPlayer({ onOpenSidebar }: MobileMiniPlayerProps) {
   };
 
   return (
-    <div className="fixed bottom-14 inset-x-2 z-30 md:hidden bg-[#0a1424]/95 backdrop-blur-2xl border border-white/10 rounded-2xl shadow-[0_4px_24px_rgba(0,0,0,0.7)] overflow-hidden select-none">
+    <div className="fixed bottom-14 inset-x-2 sm:inset-x-4 max-w-lg mx-auto z-30 md:hidden bg-[#0a1424]/95 backdrop-blur-2xl border border-white/10 rounded-2xl shadow-[0_8px_32px_rgba(0,0,0,0.75)] overflow-hidden select-none">
       {/* Top Progress Line */}
       <div className="h-0.5 bg-white/10 w-full overflow-hidden">
         <div

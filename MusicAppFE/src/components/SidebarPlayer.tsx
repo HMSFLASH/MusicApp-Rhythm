@@ -263,7 +263,7 @@ export function SidebarPlayer({
       {/* Main Sidebar Container */}
       <aside
         className={`bg-[#08111e]/95 backdrop-blur-2xl border-r border-white/[0.06] flex flex-col flex-shrink-0 transition-all duration-300 z-50 fixed inset-y-0 left-0 md:relative md:translate-x-0 ${
-          isMobileOpen ? 'translate-x-0 w-[min(20rem,85vw)]' : '-translate-x-full md:translate-x-0'
+          isMobileOpen ? 'translate-x-0 w-[min(22rem,88vw)] max-w-sm shadow-[10px_0_40px_rgba(0,0,0,0.85)]' : '-translate-x-full md:translate-x-0'
         } ${isCollapsed ? 'md:w-16' : 'md:w-72 lg:w-80'}`}
       >
         {/* Collapsed State on Desktop */}
@@ -412,11 +412,11 @@ export function SidebarPlayer({
             </div>
 
             {/* Scrollable Center Content */}
-            <div className="flex-1 overflow-y-auto no-scrollbar p-3.5 sm:p-4 space-y-4">
+            <div className="flex-1 overflow-y-auto no-scrollbar p-3.5 sm:p-4 space-y-3.5 pb-8 md:pb-4">
               {currentTrack ? (
                 <>
                   {/* Artwork & Turntable Record */}
-                  <div className="relative group mx-auto w-full max-w-[240px] aspect-square rounded-2xl overflow-hidden bg-slate-900 border border-white/10 shadow-2xl flex items-center justify-center">
+                  <div className="relative group mx-auto w-full max-w-[190px] sm:max-w-[210px] lg:max-w-[240px] aspect-square rounded-2xl overflow-hidden bg-slate-900 border border-white/10 shadow-2xl flex items-center justify-center">
                     {currentArtwork ? (
                       <img
                         src={currentArtwork}

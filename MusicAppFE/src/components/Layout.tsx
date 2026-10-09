@@ -4,6 +4,7 @@ import {
   User,
   Loader2,
   Disc,
+  Languages,
 } from 'lucide-react';
 import { useState, useEffect } from 'react';
 import { useTranslation } from 'react-i18next';
@@ -24,7 +25,7 @@ import { useGlobalAudio } from '../context/AudioContext';
 import { LOCAL_STORAGE_KEY, PLAYBACK_STORAGE_KEY } from '../hooks/audioStorage';
 
 export function Layout() {
-  const { t } = useTranslation();
+  const { t, i18n } = useTranslation();
   const location = useLocation();
   const navigate = useNavigate();
   const { isAuthenticated, setIsAuthenticated, user } = useAuth();
@@ -131,6 +132,17 @@ export function Layout() {
                 <Moon size={15} className={sleepTimerState.isActive ? 'text-primary animate-pulse' : ''} />
               </button>
 
+              <button
+                type="button"
+                onClick={() => i18n.changeLanguage(i18n.language === 'vi' ? 'en' : 'vi')}
+                className="flex items-center gap-1 px-2 py-1 rounded-lg bg-white/[0.05] hover:bg-white/[0.1] text-slate-300 hover:text-white transition-all text-xs font-mono border border-white/[0.06]"
+                title={t('layout.language', 'Language')}
+                aria-label="Toggle language"
+              >
+                <Languages size={13} className="text-primary" />
+                <span className="font-bold">{i18n.language === 'vi' ? 'VI' : 'EN'}</span>
+              </button>
+
               {isAuthenticated ? (
                 <div className="w-7 h-7 rounded-full bg-primary/20 border border-primary/30 flex items-center justify-center overflow-hidden">
                   {user?.avatarUrl ? (
@@ -162,7 +174,7 @@ export function Layout() {
                 </span>
               </div>
             )}
-            <div className="px-3 py-4 sm:px-4 md:px-6 lg:px-8 max-w-7xl 2xl:max-w-[1500px] 3xl:max-w-[1800px] 4k:max-w-[2800px] mx-auto min-h-full w-full pb-20 md:pb-24">
+            <div className="px-3 py-4 sm:px-4 md:px-6 lg:px-8 max-w-7xl 2xl:max-w-[1500px] 3xl:max-w-[1800px] 4k:max-w-[2800px] mx-auto min-h-full w-full pb-36 sm:pb-32 md:pb-24">
               <Outlet />
             </div>
           </main>

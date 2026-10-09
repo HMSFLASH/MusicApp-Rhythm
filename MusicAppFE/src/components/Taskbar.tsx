@@ -73,9 +73,9 @@ export function Taskbar({
   };
 
   return (
-    <footer className="fixed bottom-0 inset-x-0 h-14 md:h-16 bg-[#070e1b]/95 backdrop-blur-2xl border-t border-white/[0.08] z-40 select-none shadow-[0_-10px_35px_rgba(0,0,0,0.65)] px-2 sm:px-4 md:px-6 flex items-center justify-between gap-2">
+    <footer className="fixed bottom-0 inset-x-0 h-14 md:h-16 bg-[#070e1b]/95 backdrop-blur-2xl border-t border-white/[0.08] z-40 select-none shadow-[0_-10px_35px_rgba(0,0,0,0.65)] px-2 sm:px-4 md:px-6 flex items-center justify-between gap-1 sm:gap-2">
       {/* Left: Brand Logo & Player Sidebar Toggle */}
-      <div className="flex items-center gap-2 sm:gap-3 shrink-0">
+      <div className="flex items-center gap-1.5 sm:gap-3 shrink-0">
         <button
           type="button"
           onClick={onToggleSidebarPlayer}
@@ -93,7 +93,7 @@ export function Taskbar({
         <Link
           to="/"
           onClick={showNowPlayingDisc}
-          className="group flex items-center gap-2.5 transition-transform duration-200 hover:scale-[1.02]"
+          className="hidden sm:flex group items-center gap-2.5 transition-transform duration-200 hover:scale-[1.02]"
         >
           <div className="w-8 h-8 rounded-lg bg-gradient-to-br from-primary/20 via-primary/10 to-indigo-500/10 border border-primary/30 flex items-center justify-center shadow-[0_0_12px_rgba(0,245,255,0.25)] group-hover:shadow-[0_0_18px_rgba(0,245,255,0.45)] transition-all">
             <svg width="18" height="18" viewBox="0 0 24 24" fill="none" xmlns="http://www.w3.org/2000/svg" className="text-primary">
@@ -112,7 +112,7 @@ export function Taskbar({
       </div>
 
       {/* Center: Navigation Taskbar Items */}
-      <nav className="flex items-center gap-1 sm:gap-1.5 md:gap-2 overflow-x-auto no-scrollbar py-1 px-1">
+      <nav className="flex-1 md:flex-initial flex items-center justify-around md:justify-start gap-1 sm:gap-1.5 md:gap-2 px-1">
         {navItems.map((item) => {
           let isLibraryChild = false;
           if (item.path === '/library') {
@@ -129,7 +129,7 @@ export function Taskbar({
               }}
               className={({ isActive }) => {
                 const active = (isActive && item.path !== '/library') || isLibraryChild;
-                return `group relative flex items-center gap-2 px-2.5 sm:px-3 md:px-3.5 py-1.5 md:py-2 rounded-xl text-xs md:text-sm font-medium transition-all duration-200 shrink-0 ${
+                return `group relative flex items-center justify-center gap-2 px-2.5 sm:px-3 md:px-3.5 py-1.5 md:py-2 rounded-xl text-xs md:text-sm font-medium transition-all duration-200 shrink-0 ${
                   active
                     ? 'bg-primary/15 text-primary shadow-[inset_0_0_12px_rgba(0,245,255,0.12)] border border-primary/30 font-semibold'
                     : 'text-slate-400 hover:text-slate-100 hover:bg-white/[0.04] border border-transparent'
@@ -139,14 +139,14 @@ export function Taskbar({
               <span className="transition-transform group-hover:scale-110 duration-200 shrink-0">
                 {item.icon}
               </span>
-              <span className="hidden sm:inline-block whitespace-nowrap">{item.name}</span>
+              <span className="hidden md:inline-block whitespace-nowrap">{item.name}</span>
             </NavLink>
           );
         })}
       </nav>
 
-      {/* Right: System Tray & User Area */}
-      <div className="flex items-center gap-1.5 sm:gap-2 shrink-0">
+      {/* Right: System Tray & User Area (Hidden on mobile < md as it is present in mobile header) */}
+      <div className="hidden md:flex items-center gap-1.5 sm:gap-2 shrink-0">
         {/* Sleep Timer */}
         <button
           type="button"
