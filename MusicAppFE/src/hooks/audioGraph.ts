@@ -4,6 +4,7 @@ import {
   percentToStereoBaseWidth,
 } from './audioMath';
 import { TRUE_PEAK_CEILING_DB } from './audioLoudness';
+import { SPATIAL_ER_CONFIGS_3D, getKemarHrirPair } from '../utils/kemarHrirData';
 
 export const REVERB_WET_GAIN = 0.70;
 export const REVERB_PRE_DELAY_MIN_SECONDS = 0.008;
@@ -242,7 +243,7 @@ export const applyMasterLimiterState = (
   smooth = false
 ) => {
   applyMasterLimiterCompressorState(ctx, limiter, enabled, smooth);
-  softClip.curve = (enabled ? createSoftClipCurve() : createIdentityCurve()) as any;
+  softClip.curve = (enabled ? createSoftClipCurve() : createIdentityCurve()) as Float32Array<ArrayBuffer>;
   softClip.oversample = useOversample ? '4x' : 'none';
 };
 
@@ -283,19 +284,27 @@ const gaussianNoise = (prng: () => number) => {
   return Math.sqrt(-2.0 * Math.log(u)) * Math.cos(2.0 * Math.PI * v);
 };
 
-// 10-Direction 3D Spatial Early Reflections configurations (from generate_reverb_ir.py)
-const SPATIAL_ER_CONFIGS = [
-  { ms: 11.0, db: -9.5,   azimuth: 0 },    // ER1: Ceiling (Trần nhà - cân bằng 2 tai)
-  { ms: 15.0, db: -10.5,  azimuth: -40 },  // ER2: Front-Left Wall (Tường trước Trái)
-  { ms: 18.0, db: -11.0,  azimuth: 45 },   // ER3: Front-Right Wall (Tường trước Phải)
-  { ms: 23.0, db: -12.5,  azimuth: -75 },  // ER4: Left Lateral Wall (Tường bên Trái - ASW)
-  { ms: 27.0, db: -13.0,  azimuth: 80 },   // ER5: Right Lateral Wall (Tường bên Phải - ASW)
-  { ms: 31.0, db: -14.0,  azimuth: -60 },  // ER6: Ceiling-Left Wall corner (Góc trần - tường Trái)
-  { ms: 35.0, db: -14.5,  azimuth: 65 },   // ER7: Ceiling-Right Wall corner (Góc trần - tường Phải)
-  { ms: 40.0, db: -15.5,  azimuth: -130 }, // ER8: Rear-Left Surround (Vòm sau lưng Trái)
-  { ms: 45.0, db: -16.0,  azimuth: 135 },  // ER9: Rear-Right Surround (Vòm sau lưng Phải)
-  { ms: 52.0, db: -17.5,  azimuth: 180 },  // ER10: Back Wall (Tường sau chính diện)
-];
+// Convolve an acoustic ray pulse (~0.2ms) with measured KEMAR Dummy-Head HRIR
+const convolvePulseWithHrir = (
+  pulse: Float32Array,
+  hrir: Float32Array,
+  gain: number
+): Float32Array => {
+  const outLen = pulse.length + hrir.length - 1;
+  const out = new Float32Array(outLen);
+  for (let i = 0; i < pulse.length; i++) {
+    const p = pulse[i];
+    for (let j = 0; j < hrir.length; j++) {
+      out[i + j] += p * hrir[j];
+    }
+  }
+  if (gain !== 1) {
+    for (let i = 0; i < outLen; i++) {
+      out[i] *= gain;
+    }
+  }
+  return out;
+};
 
 // 2nd-order Butterworth filter helper for offline array processing
 const applyBiquadFilterToArray = (
@@ -312,7 +321,7 @@ const applyBiquadFilterToArray = (
   const sinW0 = Math.sin(w0);
   const alpha = sinW0 / (2 * q);
 
-  let b0 = 0, b1 = 0, b2 = 0, a0 = 1, a1 = 0, a2 = 0;
+  let b0: number, b1: number, b2: number, a0: number, a1: number, a2: number;
   if (type === 'lowpass') {
     b0 = (1 - cosW0) / 2;
     b1 = 1 - cosW0;
@@ -349,7 +358,8 @@ const applyBiquadFilterToArray = (
   return output;
 };
 
-const generateSpatialEarlyReflections = (
+// 10-Direction 3D Spatial Early Reflections using real measured KEMAR HRTF (MIT Media Lab)
+const generateSpatialEarlyReflectionsHrtf = (
   totalSamples: number,
   fs: number,
   seedVal: number
@@ -358,80 +368,42 @@ const generateSpatialEarlyReflections = (
   const erLeft = new Float32Array(totalSamples);
   const erRight = new Float32Array(totalSamples);
 
-  const pulseLen = Math.max(1, Math.floor(fs * 0.0003)); // ~0.3ms pulse
+  // Tia phản xạ âm thanh bề mặt (~0.2ms)
+  const pulseLen = Math.max(1, Math.floor(fs * 0.0002));
   const pulse = new Float32Array(pulseLen);
   for (let i = 0; i < pulseLen; i++) {
     pulse[i] = 1.0 - i / pulseLen;
   }
 
-  // Head-Shadowing 1st-order lowpass (6000Hz) cho tai bị khuất
-  const pulseShadow = new Float32Array(pulseLen);
-  const shadowAlpha = 1 - Math.exp((-2 * Math.PI * 6000) / fs);
-  let shadowLp = 0;
-  for (let i = 0; i < pulseLen; i++) {
-    shadowLp += shadowAlpha * (pulse[i] - shadowLp);
-    pulseShadow[i] = shadowLp;
-  }
+  for (let dirIdx = 0; dirIdx < SPATIAL_ER_CONFIGS_3D.length; dirIdx++) {
+    const cfg = SPATIAL_ER_CONFIGS_3D[dirIdx];
+    // Micro-jitter tự nhiên (±1.0ms, ±0.7dB) chống hiện tượng dội âm nhân tạo (comb filter)
+    const msJitter = cfg.ms + (prng() * 2.0 - 1.0);
+    const dbJitter = cfg.db + (prng() * 1.4 - 0.7);
+    const gain = Math.pow(10, dbJitter / 20.0);
 
-  const itdMaxSec = 0.00060; // Max ITD ~0.60ms (~29 samples tại 48kHz)
+    // Trích xuất cặp HRIR KEMAR thực tế từ góc 3D (resample tự động nếu fs != 48kHz)
+    const { hrirL, hrirR } = getKemarHrirPair(dirIdx, fs);
 
-  for (const cfg of SPATIAL_ER_CONFIGS) {
-    const msJitter = cfg.ms + (prng() * 2.4 - 1.2);
-    const dbJitter = cfg.db + (prng() * 1.6 - 0.8);
-    const baseGain = Math.pow(10, dbJitter / 20.0);
+    // Tích chập tia âm thanh với HRIR thực nghiệm của từng tai
+    const spatialL = convolvePulseWithHrir(pulse, hrirL, gain);
+    const spatialR = convolvePulseWithHrir(pulse, hrirR, gain);
 
-    const azRad = (cfg.azimuth * Math.PI) / 180.0;
-    const sinAz = Math.sin(azRad);
-    const absSin = Math.abs(sinAz);
-
-    const itdSec = itdMaxSec * absSin;
-    const itdSamples = Math.floor(fs * itdSec);
-
-    // Suy giảm biên độ cho tai ở phía bị khuất
-    const shadowGainMult = Math.pow(10, (-3.5 * absSin) / 20.0);
-    const baseSample = Math.floor(fs * (msJitter / 1000.0));
-
-    let idxL = baseSample;
-    let idxR = baseSample;
-    let gainL = baseGain;
-    let gainR = baseGain;
-    let pL = pulse;
-    let pR = pulse;
-
-    if (cfg.azimuth < 0) {
-      // Nguồn bên Trái
-      idxL = baseSample;
-      idxR = baseSample + itdSamples;
-      gainL = baseGain;
-      gainR = baseGain * shadowGainMult;
-      pL = pulse;
-      pR = pulseShadow;
-    } else if (cfg.azimuth > 0 && cfg.azimuth !== 180) {
-      // Nguồn bên Phải
-      idxR = baseSample;
-      idxL = baseSample + itdSamples;
-      gainR = baseGain;
-      gainL = baseGain * shadowGainMult;
-      pR = pulse;
-      pL = pulseShadow;
-    }
-
-    if (idxL >= 0 && idxL < totalSamples) {
-      const copyLenL = Math.min(pulseLen, totalSamples - idxL);
+    const startIdx = Math.floor(fs * (msJitter / 1000.0));
+    if (startIdx < totalSamples) {
+      const copyLenL = Math.min(spatialL.length, totalSamples - startIdx);
       for (let i = 0; i < copyLenL; i++) {
-        erLeft[idxL + i] += gainL * pL[i];
+        erLeft[startIdx + i] += spatialL[i];
       }
-    }
 
-    if (idxR >= 0 && idxR < totalSamples) {
-      const copyLenR = Math.min(pulseLen, totalSamples - idxR);
+      const copyLenR = Math.min(spatialR.length, totalSamples - startIdx);
       for (let i = 0; i < copyLenR; i++) {
-        erRight[idxR + i] += gainR * pR[i];
+        erRight[startIdx + i] += spatialR[i];
       }
     }
   }
 
-  // Lọc thông thấp 8000Hz cho Early Reflections
+  // Bộ lọc hấp thụ không khí & tán xạ bề mặt (8000Hz 2nd-order lowpass)
   return {
     erLeft: applyBiquadFilterToArray(erLeft, fs, 8000, 'lowpass'),
     erRight: applyBiquadFilterToArray(erRight, fs, 8000, 'lowpass'),
@@ -506,8 +478,8 @@ export const generateImpulseResponse = (ctx: BaseAudioContext, duration: number,
 
   const seedBase = Math.floor(safeDuration * 1000);
 
-  // 1. Phản xạ sớm 10 hướng không gian (3D Spatial Early Reflections với ITD + Head Shadowing)
-  const { erLeft, erRight } = generateSpatialEarlyReflections(totalSamples, fs, seedBase);
+  // 1. Phản xạ sớm 10 hướng không gian đo đạc thực tế KEMAR HRTF 3D (MIT Media Lab)
+  const { erLeft, erRight } = generateSpatialEarlyReflectionsHrtf(totalSamples, fs, seedBase);
 
   // 2. Đuôi vang khuếch tán đa hướng 360 độ (3 luồng độc lập)
   const tailShared = generateDiffuseTailStream(safeDuration, fs, seedBase + 10);
