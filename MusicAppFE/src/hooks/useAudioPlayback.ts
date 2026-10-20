@@ -1,4 +1,4 @@
-import { getSecureRandom } from '../utils/randomUtils';
+import { smartShuffleTracks } from '../utils/randomUtils';
 import { useState, useRef, useEffect, useCallback } from 'react';
 import { useTranslation } from 'react-i18next';
 import type { Track } from './audioTypes';
@@ -94,7 +94,7 @@ export function useAudioPlayback(
 ) {
   const { t } = useTranslation();
   const configStorageKey = getAudioConfigStorageKey(isAuthenticated);
-  const { currentTrack, setCurrentTrack, queue, setQueue, isShuffleState, songEndMode, queueEndMode, upcomingQueues, cycleQueues, setUpcomingQueues } = queueState || {};
+  const { currentTrack, setCurrentTrack, queue, setQueue, isShuffleState, songEndMode, queueEndMode, upcomingQueues, cycleQueues, setUpcomingQueues, setOriginalQueue } = queueState || {};
   const {
     precalculateOnIdle,
     fxEnabled,
@@ -1625,8 +1625,20 @@ export function useAudioPlayback(
     }
     playTrackSpamGuardRef.current = { trackId: String(startingTrack.id), timestamp: now };
     if (!currentQueue) currentQueue = [startingTrack];
+    
+    // Maintain original un-shuffled queue and produce de-clustered smart-shuffled queue when shuffle is on
+    let effectiveQueue = currentQueue;
+    if (isShuffleState && currentQueue.length > 1) {
+      setOriginalQueue?.(currentQueue);
+      effectiveQueue = smartShuffleTracks(currentQueue, {
+        startTrackId: startingTrack.id
+      });
+    } else {
+      setOriginalQueue?.(currentQueue);
+    }
+
     currentTrackSnapshotRef.current = startingTrack;
-    queueSnapshotRef.current = currentQueue;
+    queueSnapshotRef.current = effectiveQueue;
 
     const initialDuration = Number.isFinite(startingTrack.durationSeconds)
       ? Math.max(0, startingTrack.durationSeconds || 0)
@@ -1652,11 +1664,11 @@ export function useAudioPlayback(
     setSpeedPitchScope('global');
 
     setCurrentTrack(startingTrack);
-    setQueue(currentQueue);
+    setQueue(effectiveQueue);
     if (forceReloadFromDrive) {
       clearTrackRuntimeCaches(startingTrackId);
     }
-    const trackWindow = getAdjacentTrackWindow(startingTrack.id, currentQueue, {
+    const trackWindow = getAdjacentTrackWindow(startingTrack.id, effectiveQueue, {
       wrap: queueEndMode === 'repeat',
     });
     allowedIdsRef.current = trackWindow.allowedIds;
@@ -2092,13 +2104,8 @@ export function useAudioPlayback(
       latestPlayTrack(activeQueue[idx + 1], activeQueue, !isPreload);
     } else if (queueEndMode === 'repeat' && idx === activeQueue.length - 1) {
       if (isShuffleState) {
-        // eslint-disable-next-line prefer-const
-        let newQueue = [...activeQueue];
-        for (let i = newQueue.length - 1; i > 0; i--) {
-          const j = Math.floor(getSecureRandom() * (i + 1));
-          [newQueue[i], newQueue[j]] = [newQueue[j], newQueue[i]];
-        }
-        latestPlayTrack(newQueue[0], newQueue, !isPreload);
+        const reshuffled = smartShuffleTracks(activeQueue, { avoidRepeatLastId: activeTrack.id });
+        latestPlayTrack(reshuffled[0], reshuffled, !isPreload);
       } else {
         latestPlayTrack(activeQueue[0], activeQueue, !isPreload);
       }

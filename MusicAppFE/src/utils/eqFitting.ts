@@ -56,11 +56,44 @@ export function calculatePeakingMagnitudeDb(f: number, fc: number, q: number, ga
 }
 
 export function buildResponseMatrix(freqGrid: number[], centerFreqs: number[], q: number, sampleRate: number): number[][] {
-  const B = createMatrix(freqGrid.length, centerFreqs.length);
-  for (let j = 0; j < freqGrid.length; j++) {
-    const f = freqGrid[j];
-    for (let i = 0; i < centerFreqs.length; i++) {
-      B[j][i] = calculatePeakingMagnitudeDb(f, centerFreqs[i], q, 1.0, sampleRate);
+  const numGrid = freqGrid.length;
+  const numBands = centerFreqs.length;
+  const B = createMatrix(numGrid, numBands);
+
+  const cosW = new Float64Array(numGrid);
+  const cos2W = new Float64Array(numGrid);
+  const invSampleRate = (2 * Math.PI) / sampleRate;
+  for (let j = 0; j < numGrid; j++) {
+    const w = freqGrid[j] * invSampleRate;
+    cosW[j] = Math.cos(w);
+    cos2W[j] = Math.cos(2 * w);
+  }
+
+  const a = Math.pow(10, 1.0 / 40);
+  for (let i = 0; i < numBands; i++) {
+    const omega = centerFreqs[i] * invSampleRate;
+    const cos = Math.cos(omega);
+    const sin = Math.sin(omega);
+    const alpha = sin / (2 * q);
+
+    const b0 = 1 + alpha * a;
+    const b1 = -2 * cos;
+    const b2 = 1 - alpha * a;
+    const a0 = 1 + alpha / a;
+    const a1 = -2 * cos;
+    const a2 = 1 - alpha / a;
+
+    const numC0 = b0 * b0 + b1 * b1 + b2 * b2;
+    const numC1 = 2 * (b0 * b1 + b1 * b2);
+    const numC2 = 2 * b0 * b2;
+    const denC0 = a0 * a0 + a1 * a1 + a2 * a2;
+    const denC1 = 2 * (a0 * a1 + a1 * a2);
+    const denC2 = 2 * a0 * a2;
+
+    for (let j = 0; j < numGrid; j++) {
+      const num = numC0 + numC1 * cosW[j] + numC2 * cos2W[j];
+      const den = denC0 + denC1 * cosW[j] + denC2 * cos2W[j];
+      B[j][i] = 10 * Math.log10(num / den);
     }
   }
   return B;
@@ -79,29 +112,24 @@ export function buildSecondDifferenceMatrix(n: number): number[][] {
 export function buildPrecomputedInverse(B: number[][], lambda: number, weights?: number[]): number[][] {
   const numBands = B[0].length;
   const numGrid = B.length;
-  const BT = transposeMatrix(B);
 
-  // If weights are provided, compute B^T W B. Otherwise, B^T B.
-  let BT_B: number[][];
-  let BT_W: number[][] | null = null;
-
-  if (weights) {
-    const WB = createMatrix(numGrid, numBands);
-    for (let i = 0; i < numGrid; i++) {
-      for (let j = 0; j < numBands; j++) {
-        WB[i][j] = B[i][j] * weights[i];
+  // Direct symmetric accumulation of B^T W B (or B^T B)
+  const BT_B = createMatrix(numBands, numBands);
+  for (let r = 0; r < numBands; r++) {
+    for (let c = r; c < numBands; c++) {
+      let sum = 0;
+      if (weights) {
+        for (let j = 0; j < numGrid; j++) {
+          sum += B[j][r] * B[j][c] * weights[j];
+        }
+      } else {
+        for (let j = 0; j < numGrid; j++) {
+          sum += B[j][r] * B[j][c];
+        }
       }
+      BT_B[r][c] = sum;
+      BT_B[c][r] = sum;
     }
-    BT_B = multiplyMatrix(BT, WB);
-
-    BT_W = createMatrix(numBands, numGrid);
-    for (let i = 0; i < numBands; i++) {
-      for (let j = 0; j < numGrid; j++) {
-        BT_W[i][j] = BT[i][j] * weights[j];
-      }
-    }
-  } else {
-    BT_B = multiplyMatrix(BT, B);
   }
 
   const L = buildSecondDifferenceMatrix(numBands);
@@ -120,18 +148,65 @@ export function buildPrecomputedInverse(B: number[][], lambda: number, weights?:
     }
   }
   
-  const M = multiplyMatrix(A_inv, BT_W ? BT_W : BT);
+  // Compute M = A_inv * (B^T W) directly without allocating large intermediate transpose/product matrices
+  const M = createMatrix(numBands, numGrid);
+  for (let i = 0; i < numBands; i++) {
+    for (let j = 0; j < numGrid; j++) {
+      let sum = 0;
+      for (let k = 0; k < numBands; k++) {
+        sum += A_inv[i][k] * B[j][k];
+      }
+      if (weights) {
+        sum *= weights[j];
+      }
+      M[i][j] = sum;
+    }
+  }
 
   return M;
 }
 
 export function computeCascadeResponseDb(freqGrid: number[], centerFreqs: number[], gains: number[], q: number, sampleRate: number): number[] {
-  const response = new Float64Array(freqGrid.length);
+  const numGrid = freqGrid.length;
+  const response = new Float64Array(numGrid);
+
+  const cosW = new Float64Array(numGrid);
+  const cos2W = new Float64Array(numGrid);
+  const invSampleRate = (2 * Math.PI) / sampleRate;
+  for (let j = 0; j < numGrid; j++) {
+    const w = freqGrid[j] * invSampleRate;
+    cosW[j] = Math.cos(w);
+    cos2W[j] = Math.cos(2 * w);
+  }
+
   for (let i = 0; i < centerFreqs.length; i++) {
     const gain = Number.isFinite(gains[i]) ? gains[i] : 0;
     if (gain === 0) continue;
-    for (let j = 0; j < freqGrid.length; j++) {
-      response[j] += calculatePeakingMagnitudeDb(freqGrid[j], centerFreqs[i], q, gain, sampleRate);
+
+    const a = Math.pow(10, gain / 40);
+    const omega = centerFreqs[i] * invSampleRate;
+    const cos = Math.cos(omega);
+    const sin = Math.sin(omega);
+    const alpha = sin / (2 * q);
+
+    const b0 = 1 + alpha * a;
+    const b1 = -2 * cos;
+    const b2 = 1 - alpha * a;
+    const a0 = 1 + alpha / a;
+    const a1 = -2 * cos;
+    const a2 = 1 - alpha / a;
+
+    const numC0 = b0 * b0 + b1 * b1 + b2 * b2;
+    const numC1 = 2 * (b0 * b1 + b1 * b2);
+    const numC2 = 2 * b0 * b2;
+    const denC0 = a0 * a0 + a1 * a1 + a2 * a2;
+    const denC1 = 2 * (a0 * a1 + a1 * a2);
+    const denC2 = 2 * a0 * a2;
+
+    for (let j = 0; j < numGrid; j++) {
+      const num = numC0 + numC1 * cosW[j] + numC2 * cos2W[j];
+      const den = denC0 + denC1 * cosW[j] + denC2 * cos2W[j];
+      response[j] += 10 * Math.log10(num / den);
     }
   }
   return Array.from(response);
@@ -143,7 +218,6 @@ export function solveLocalCorrection(residual: number[], B: number[][], lambda: 
   const numBands = B[0].length;
   const numGrid = residual.length;
   
-  // Construct B_free
   const freeIndices: number[] = [];
   for (let i = 0; i < numBands; i++) {
     if (!lockedBands[i]) freeIndices.push(i);
@@ -151,22 +225,39 @@ export function solveLocalCorrection(residual: number[], B: number[][], lambda: 
   
   if (freeIndices.length === 0) return new Array(numBands).fill(0);
 
-  const B_free = createMatrix(numGrid, freeIndices.length);
-  for (let j = 0; j < numGrid; j++) {
-    for (let k = 0; k < freeIndices.length; k++) {
-      B_free[j][k] = B[j][freeIndices[k]];
+  const kLen = freeIndices.length;
+
+  // 1. Direct symmetric accumulation of A = (B_free^T * B_free + lambda * I)
+  // Eliminates allocating B_free, BT_free, I_free and reduces inner multiplications by half
+  const A = createMatrix(kLen, kLen);
+  for (let r = 0; r < kLen; r++) {
+    const idxR = freeIndices[r];
+    for (let c = r; c < kLen; c++) {
+      const idxC = freeIndices[c];
+      let sum = 0;
+      for (let j = 0; j < numGrid; j++) {
+        sum += B[j][idxR] * B[j][idxC];
+      }
+      if (r === c) {
+        sum += lambda;
+      }
+      A[r][c] = sum;
+      A[c][r] = sum;
     }
   }
 
-  const BT_free = transposeMatrix(B_free);
-  const BT_B_free = multiplyMatrix(BT_free, B_free);
-  
-  // Simple L2 regularization on delta gains (not 2nd difference for simplicity in local step)
-  const I_free = createMatrix(freeIndices.length, freeIndices.length);
-  for (let k = 0; k < freeIndices.length; k++) I_free[k][k] = lambda;
-  
-  const A = addMatrix(BT_B_free, I_free);
-  
+  // 2. Compute RHS vector v = B_free^T * residual (vector of length K)
+  const v = new Array(kLen).fill(0);
+  for (let r = 0; r < kLen; r++) {
+    const idxR = freeIndices[r];
+    let sum = 0;
+    for (let j = 0; j < numGrid; j++) {
+      sum += B[j][idxR] * residual[j];
+    }
+    v[r] = sum;
+  }
+
+  // 3. Invert small K x K matrix (K <= 31)
   let A_inv: number[][];
   try {
     A_inv = invertMatrix(A);
@@ -174,12 +265,12 @@ export function solveLocalCorrection(residual: number[], B: number[][], lambda: 
     // Fallback if singular
     return new Array(numBands).fill(0);
   }
-  
-  const M_free = multiplyMatrix(A_inv, BT_free);
-  const delta_free = multiplyMatrixVector(M_free, residual);
+
+  // 4. delta_free = A_inv * v (O(K^2) vector product instead of O(K^2 * numGrid) full matrix product)
+  const delta_free = multiplyMatrixVector(A_inv, v);
   
   const delta = new Array(numBands).fill(0);
-  for (let k = 0; k < freeIndices.length; k++) {
+  for (let k = 0; k < kLen; k++) {
     const dVal = delta_free[k];
     delta[freeIndices[k]] = Number.isFinite(dVal) ? dVal : 0;
   }

@@ -1,4 +1,4 @@
-import { getSecureRandom } from '../utils/randomUtils';
+import { smartShuffleTracks } from '../utils/randomUtils';
 import { useState, useEffect } from 'react';
 import { useSearchParams } from 'react-router-dom';
 import { useTranslation } from 'react-i18next';
@@ -370,8 +370,9 @@ export function Playlist({ isAuthenticated, onPlay, currentTrackId }: PlaylistPr
                 <button
                   onClick={() => {
                     const tracks = selectedPlaylistDetails.tracks;
+                    if (tracks.length === 0) return;
                     if (playerState.isShuffle) {
-                      const shuffled = [...tracks].sort(() => getSecureRandom() - 0.5);
+                      const shuffled = smartShuffleTracks(tracks);
                       playerState.playTrack(shuffled[0], shuffled);
                     } else {
                       playerState.playTrack(tracks[0], tracks);
@@ -384,9 +385,10 @@ export function Playlist({ isAuthenticated, onPlay, currentTrackId }: PlaylistPr
                 </button>
                 <button
                   onClick={() => {
-                    playerState.setIsShuffle(true);
                     const tracks = selectedPlaylistDetails.tracks;
-                    const shuffled = [...tracks].sort(() => getSecureRandom() - 0.5);
+                    if (tracks.length === 0) return;
+                    playerState.setIsShuffle(true);
+                    const shuffled = smartShuffleTracks(tracks);
                     playerState.playTrack(shuffled[0], shuffled);
                   }}
                   className="px-3 h-8 rounded-full bg-white/10 text-white hover:bg-white hover:text-black flex items-center gap-1.5 transition-all text-sm font-bold whitespace-nowrap"

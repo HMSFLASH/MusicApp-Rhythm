@@ -49,6 +49,7 @@ export function useVirtualList({
 
     const target = getScrollParent(container);
 
+    let rafId = 0;
     const updateMeasurements = () => {
       if (target === container) {
         setViewportHeight(container.clientHeight);
@@ -71,7 +72,17 @@ export function useVirtualList({
     updateMeasurements();
 
     const onScroll = () => {
-      updateMeasurements();
+      if (target === container) {
+        // Fast path: clientHeight is already measured; update scrollTop immediately or throttle via RAF
+        setScrollTop(container.scrollTop);
+        return;
+      }
+      if (!rafId) {
+        rafId = window.requestAnimationFrame(() => {
+          rafId = 0;
+          updateMeasurements();
+        });
+      }
     };
 
     target.addEventListener('scroll', onScroll, { passive: true });
@@ -84,6 +95,7 @@ export function useVirtualList({
     }
 
     return () => {
+      if (rafId) window.cancelAnimationFrame(rafId);
       target.removeEventListener('scroll', onScroll);
       window.removeEventListener('resize', updateMeasurements);
       resizeObserver.disconnect();

@@ -19,11 +19,13 @@ interface LyricLineItemProps {
   isPassed: boolean;
   canSeek: boolean;
   onSeekLine: (idx: number, time: number) => void;
+  setElementRef: (idx: number, el: HTMLDivElement | null) => void;
 }
 
-const LyricLineItem = memo(function LyricLineItem({ line, idx, isActive, isPassed, canSeek, onSeekLine }: LyricLineItemProps) {
+const LyricLineItem = memo(function LyricLineItem({ line, idx, isActive, isPassed, canSeek, onSeekLine, setElementRef }: LyricLineItemProps) {
   return (
     <div 
+      ref={(el) => setElementRef(idx, el)}
       data-index={idx}
       onClick={() => onSeekLine(idx, line.time)}
       className={`max-w-[85%] mx-auto transition-all duration-500 text-center md:text-lg font-bold ${canSeek ? 'cursor-pointer hover:text-white/80' : ''} ${isActive ? 'text-primary scale-110 [text-shadow:0_0_8px_rgba(0,229,255,0.8)]' : isPassed ? 'text-white/40' : 'text-white/20'}`}
@@ -35,6 +37,15 @@ const LyricLineItem = memo(function LyricLineItem({ line, idx, isActive, isPasse
 
 export function LyricsView({ lyrics, currentTime, duration = 0, onSeek }: LyricsViewProps) {
   const containerRef = useRef<HTMLDivElement>(null);
+  const lineElementsRef = useRef<Map<number, HTMLDivElement>>(new Map());
+  const setElementRef = useCallback((idx: number, el: HTMLDivElement | null) => {
+    if (el) {
+      lineElementsRef.current.set(idx, el);
+    } else {
+      lineElementsRef.current.delete(idx);
+    }
+  }, []);
+
   const [isUserScrolling, setIsUserScrolling] = useState(false);
   const scrollTimeoutRef = useRef<ReturnType<typeof setTimeout> | null>(null);
   const autoScrollTimeoutRef = useRef<ReturnType<typeof setTimeout> | null>(null);
@@ -58,20 +69,24 @@ export function LyricsView({ lyrics, currentTime, duration = 0, onSeek }: Lyrics
   };
 
   const parsedLyrics = useMemo(() => {
-    const lines = lyrics.split('\n');
+    const cleanLyrics = lyrics.replace(/^\ufeff/, '');
+    const lines = cleanLyrics.split('\n');
     const parsed: LyricLine[] = [];
     const timestampRegex = /\[\s*(\d{1,3}):(\d{2})(?:[:.,](\d{1,3}))?\s*\]/g;
+    const syllableRegex = /<(?:\d{1,3}):(?:\d{2})(?:[:.,](?:\d{1,3}))?>/g;
     const metadataRegex = /^\[[a-zA-Z]+:.*\]$/;
-    const offsetMatch = lyrics.match(/\[offset:([+-]?\d+)\]/i);
+    const offsetMatch = cleanLyrics.match(/\[offset:([+-]?\d+)\]/i);
     const offsetSeconds = offsetMatch ? Number(offsetMatch[1]) / 1000 : 0;
     
     let isSynced = false;
     
-    for (const line of lines) {
+    for (const rawLine of lines) {
+      const line = rawLine.trim();
+      if (!line) continue;
       const matches = [...line.matchAll(timestampRegex)];
       if (matches.length > 0) {
         isSynced = true;
-        const text = line.replace(timestampRegex, '').trim();
+        const text = line.replace(timestampRegex, '').replace(syllableRegex, '').trim();
         for (const match of matches) {
           const minutes = parseInt(match[1], 10);
           const seconds = parseInt(match[2], 10);
@@ -84,8 +99,8 @@ export function LyricsView({ lyrics, currentTime, duration = 0, onSeek }: Lyrics
           }
           parsed.push({ time: Math.max(0, minutes * 60 + seconds + fraction + offsetSeconds), text });
         }
-      } else if (line.trim() !== '' && !metadataRegex.test(line.trim())) {
-        parsed.push({ time: -1, text: line.trim() });
+      } else if (!metadataRegex.test(line)) {
+        parsed.push({ time: -1, text: line.replace(syllableRegex, '').trim() });
       }
     }
     
@@ -97,14 +112,14 @@ export function LyricsView({ lyrics, currentTime, duration = 0, onSeek }: Lyrics
 
   const unsyncedLines = useMemo(() => {
     if (parsedLyrics.isSynced) return [];
-    return lyrics.split('\n').map(l => l.trim()).filter(l => l.length > 0);
+    return lyrics.replace(/^\ufeff/, '').split('\n').map(l => l.trim()).filter(l => l.length > 0);
   }, [lyrics, parsedLyrics.isSynced]);
 
   const activeIndex = useMemo(() => {
     if (parsedLyrics.isSynced) {
       const lines = parsedLyrics.lines;
       if (lines.length === 0) return -1;
-      
+
       let low = 0;
       let high = lines.length - 1;
       let bestMatch = -1;
@@ -113,7 +128,7 @@ export function LyricsView({ lyrics, currentTime, duration = 0, onSeek }: Lyrics
         const mid = Math.floor((low + high) / 2);
         if (lines[mid].time >= 0 && lines[mid].time <= currentTime) {
           bestMatch = mid;
-          low = mid + 1; // Tiêp tục tìm ở nửa sau xem có dòng nào gần với currentTime hơn không
+          low = mid + 1;
         } else {
           high = mid - 1;
         }
@@ -128,13 +143,14 @@ export function LyricsView({ lyrics, currentTime, duration = 0, onSeek }: Lyrics
   useEffect(() => {
     setIsUserScrolling(false);
     previousActiveIndexRef.current = -1;
+    lineElementsRef.current.clear();
     if (scrollTimeoutRef.current) clearTimeout(scrollTimeoutRef.current);
   }, [lyrics]);
 
   const scrollToActiveLine = useCallback((behavior: ScrollBehavior) => {
     if (!containerRef.current) return;
     const container = containerRef.current;
-    const activeEl = container.querySelector(`[data-index="${activeIndex}"]`) as HTMLElement | null;
+    const activeEl = lineElementsRef.current.get(activeIndex);
     if (!activeEl) {
       if (!parsedLyrics.isSynced && duration > 0 && container.scrollHeight > container.clientHeight) {
         const progress = Math.min(1, Math.max(0, currentTimeRef.current / duration));
@@ -173,7 +189,7 @@ export function LyricsView({ lyrics, currentTime, duration = 0, onSeek }: Lyrics
     }
 
     const container = containerRef.current;
-    const activeEl = container.querySelector(`[data-index="${activeIndex}"]`) as HTMLElement | null;
+    const activeEl = lineElementsRef.current.get(activeIndex);
     if (!activeEl) {
       if (!parsedLyrics.isSynced && duration > 0) {
         scrollToActiveLine('smooth');
@@ -270,13 +286,14 @@ export function LyricsView({ lyrics, currentTime, duration = 0, onSeek }: Lyrics
 
         return (
           <LyricLineItem
-            key={idx}
+            key={`${idx}-${line.time}`}
             line={line}
             idx={idx}
             isActive={isActive}
             isPassed={isPassed}
             canSeek={canSeek}
             onSeekLine={handleSeekLine}
+            setElementRef={setElementRef}
           />
         );
       })}

@@ -44,6 +44,29 @@ export const AudioVisualizer = memo(function AudioVisualizer({
     let midEnergySmoothed = 0;
     let highEnergySmoothed = 0;
 
+    // Persistent typed buffers across frames to avoid garbage collector churn at 60-120fps
+    let cachedFreqData: Uint8Array<ArrayBuffer> | null = null;
+    let cachedTimeData: Uint8Array<ArrayBuffer> | null = null;
+    let cachedRawTargetBars: Float32Array | null = null;
+
+    // Precomputed frequency bin mapping table to avoid transcendental Math.pow calls every frame
+    interface BinMapEntry {
+      isSingleBin: boolean;
+      b0: number;
+      b1: number;
+      frac: number;
+      startBin: number;
+      endBin: number;
+      tilt: number;
+    }
+    let cachedBinMap: BinMapEntry[] | null = null;
+    let cachedBinKey = '';
+
+    // Preallocated buffers for liquid wave rendering
+    const wavePoints = 48;
+    const wavePointsX = new Float32Array(wavePoints);
+    const wavePointsY = new Float32Array(wavePoints);
+
     // Zero-crossing buffer for oscilloscope trigger stabilization
     let lastTimeDomain: Uint8Array | null = null;
 
@@ -73,7 +96,10 @@ export const AudioVisualizer = memo(function AudioVisualizer({
       // 0. AUDIO DATA EXTRACTION & DYNAMIC CONTRAST DSP PROCESSING
       // =========================================================================
       const barCount = Math.min(56, Math.max(28, Math.floor(width / 7.0)));
-      const rawTargetBars = new Float32Array(barCount);
+      if (!cachedRawTargetBars || cachedRawTargetBars.length !== barCount) {
+        cachedRawTargetBars = new Float32Array(barCount);
+      }
+      const rawTargetBars = cachedRawTargetBars;
 
       let hasRealAudio = false;
       let rawBassEnergy = 0;
@@ -82,54 +108,86 @@ export const AudioVisualizer = memo(function AudioVisualizer({
 
       if (analyser && isPlaying) {
         const bufferLength = analyser.frequencyBinCount;
-        const freqData = new Uint8Array(bufferLength);
+        if (!cachedFreqData || cachedFreqData.length !== bufferLength) {
+          cachedFreqData = new Uint8Array(new ArrayBuffer(bufferLength));
+        }
+        const freqData = cachedFreqData;
         analyser.getByteFrequencyData(freqData);
 
         // Check overall signal level across spectrum
         let totalSum = 0;
-        for (let i = 0; i < Math.min(128, bufferLength); i++) {
+        const checkBins = Math.min(128, bufferLength);
+        for (let i = 0; i < checkBins; i++) {
           totalSum += freqData[i];
         }
         hasRealAudio = totalSum > 20;
 
         if (hasRealAudio) {
           const sampleRate = analyser.context?.sampleRate || 44100;
-          const nyquist = sampleRate / 2;
-          const binWidth = nyquist / bufferLength;
+          const currentBinKey = `${barCount}_${bufferLength}_${sampleRate}`;
 
-          // Focus on active musical frequency range (32Hz to 15,000Hz)
-          const minFreq = 32;
-          const maxFreq = Math.min(15000, nyquist * 0.85);
+          // Precompute logarithmic bin boundaries and tilt once when parameters change
+          if (cachedBinKey !== currentBinKey || !cachedBinMap) {
+            const nyquist = sampleRate / 2;
+            const binWidth = nyquist / bufferLength;
+            const minFreq = 32;
+            const maxFreq = Math.min(15000, nyquist * 0.85);
+            const freqRatio = maxFreq / minFreq;
+            const denom = barCount - 1 || 1;
+
+            const map: BinMapEntry[] = new Array(barCount);
+            for (let i = 0; i < barCount; i++) {
+              const freqProgress = i / denom;
+              const centerFreq = minFreq * Math.pow(freqRatio, freqProgress);
+              const freqStart = minFreq * Math.pow(freqRatio, Math.max(0, i - 0.5) / denom);
+              const freqEnd = minFreq * Math.pow(freqRatio, Math.min(barCount - 1, i + 0.5) / denom);
+
+              const startBinFloat = Math.max(1, freqStart / binWidth);
+              const endBinFloat = Math.min(bufferLength - 1, freqEnd / binWidth);
+              const isSingleBin = endBinFloat - startBinFloat <= 1.2;
+
+              let b0 = 0;
+              let b1 = 0;
+              let frac = 0;
+              let startBin = 0;
+              let endBin = 0;
+
+              if (isSingleBin) {
+                const exactBin = centerFreq / binWidth;
+                b0 = Math.floor(exactBin);
+                b1 = Math.min(bufferLength - 1, b0 + 1);
+                frac = exactBin - b0;
+              } else {
+                startBin = Math.floor(startBinFloat);
+                endBin = Math.ceil(endBinFloat);
+              }
+
+              const tilt = 0.85 + 0.55 * Math.pow(freqProgress, 1.2);
+              map[i] = { isSingleBin, b0, b1, frac, startBin, endBin, tilt };
+            }
+
+            cachedBinMap = map;
+            cachedBinKey = currentBinKey;
+          }
+
+          const binMap = cachedBinMap;
+          const noiseFloor = 60;
+          const maxCeiling = 235;
+          const invDynamicRange = 1 / (maxCeiling - noiseFloor);
 
           for (let i = 0; i < barCount; i++) {
-            const freqProgress = i / (barCount - 1 || 1);
-            const centerFreq = minFreq * Math.pow(maxFreq / minFreq, freqProgress);
-
-            const freqStart = minFreq * Math.pow(maxFreq / minFreq, Math.max(0, i - 0.5) / (barCount - 1 || 1));
-            const freqEnd = minFreq * Math.pow(maxFreq / minFreq, Math.min(barCount - 1, i + 0.5) / (barCount - 1 || 1));
-
-            const startBinFloat = Math.max(1, freqStart / binWidth);
-            const endBinFloat = Math.min(bufferLength - 1, freqEnd / binWidth);
-
+            const entry = binMap[i];
             let rawEnergy = 0;
 
-            // Low frequencies: smooth sub-bin linear interpolation
-            if (endBinFloat - startBinFloat <= 1.2) {
-              const exactBin = centerFreq / binWidth;
-              const b0 = Math.floor(exactBin);
-              const b1 = Math.min(bufferLength - 1, b0 + 1);
-              const frac = exactBin - b0;
-              const val0 = freqData[b0] || 0;
-              const val1 = freqData[b1] || 0;
-              rawEnergy = val0 * (1 - frac) + val1 * frac;
+            if (entry.isSingleBin) {
+              const val0 = freqData[entry.b0] || 0;
+              const val1 = freqData[entry.b1] || 0;
+              rawEnergy = val0 * (1 - entry.frac) + val1 * entry.frac;
             } else {
-              // Higher frequencies: mix max peak and average for sharp punch
-              const startBin = Math.floor(startBinFloat);
-              const endBin = Math.ceil(endBinFloat);
               let sum = 0;
               let peak = 0;
               let count = 0;
-              for (let b = startBin; b <= endBin; b++) {
+              for (let b = entry.startBin; b <= entry.endBin; b++) {
                 const v = freqData[b] || 0;
                 sum += v;
                 if (v > peak) peak = v;
@@ -139,14 +197,9 @@ export const AudioVisualizer = memo(function AudioVisualizer({
               rawEnergy = peak * 0.7 + avg * 0.3;
             }
 
-            // High-Frequency Equal-Loudness Balance (mild tilt, 0.85 to 1.35)
-            const tilt = 0.85 + 0.55 * Math.pow(freqProgress, 1.2);
-
-            // Dynamic contrast & Noise Floor Subtraction (Cuts off noise, expands rhythm hits)
-            const noiseFloor = 60;
-            const maxCeiling = 235;
-            const unclamped = (rawEnergy - noiseFloor) / (maxCeiling - noiseFloor);
-            const normalized = Math.max(0, Math.min(1.0, unclamped * tilt));
+            // Dynamic contrast & Noise Floor Subtraction with equal-loudness tilt
+            const unclamped = (rawEnergy - noiseFloor) * invDynamicRange;
+            const normalized = Math.max(0, Math.min(1.0, unclamped * entry.tilt));
 
             // Gamma expansion curve (1.7) separates loud drum hits from soft harmonic beds
             const expanded = Math.pow(normalized, 1.7);
@@ -341,8 +394,8 @@ export const AudioVisualizer = memo(function AudioVisualizer({
       // =========================================================================
       else if (mode === 'wave') {
         const centerY = height / 2;
-        const wavePoints = 48;
         const step = width / (wavePoints - 1);
+        const invWavePointsMinusOne = 1 / (wavePoints - 1);
 
         const drawReactiveWaveLayer = (
           bandEnergy: number,
@@ -359,12 +412,11 @@ export const AudioVisualizer = memo(function AudioVisualizer({
           ctx.beginPath();
           ctx.moveTo(0, centerY);
 
-          const points: { x: number; y: number }[] = [];
           const effectiveAmp = (height * 0.38) * Math.max(0.08, bandEnergy);
 
           for (let i = 0; i < wavePoints; i++) {
             const x = i * step;
-            const normX = i / (wavePoints - 1);
+            const normX = i * invWavePointsMinusOne;
             const envelope = Math.sin(normX * Math.PI);
 
             const barIndex = Math.min(barCount - 1, Math.floor(normX * barCount));
@@ -372,17 +424,19 @@ export const AudioVisualizer = memo(function AudioVisualizer({
 
             const oscillation = Math.sin(normX * waveFreq * Math.PI * 2 + phase * speedMult + phaseOffset);
             const y = centerY + (oscillation * effectiveAmp + barMod * oscillation) * envelope;
-            points.push({ x, y });
+            wavePointsX[i] = x;
+            wavePointsY[i] = y;
           }
 
-          ctx.moveTo(points[0].x, points[0].y);
-          for (let i = 0; i < points.length - 1; i++) {
-            const xc = (points[i].x + points[i + 1].x) / 2;
-            const yc = (points[i].y + points[i + 1].y) / 2;
-            ctx.quadraticCurveTo(points[i].x, points[i].y, xc, yc);
+          ctx.moveTo(wavePointsX[0], wavePointsY[0]);
+          for (let i = 0; i < wavePoints - 1; i++) {
+            const xc = (wavePointsX[i] + wavePointsX[i + 1]) * 0.5;
+            const yc = (wavePointsY[i] + wavePointsY[i + 1]) * 0.5;
+            ctx.quadraticCurveTo(wavePointsX[i], wavePointsY[i], xc, yc);
           }
-          const last = points[points.length - 1];
-          ctx.lineTo(last.x, last.y);
+          const lastX = wavePointsX[wavePoints - 1];
+          const lastY = wavePointsY[wavePoints - 1];
+          ctx.lineTo(lastX, lastY);
 
           if (isFill) {
             ctx.lineTo(width, height);
@@ -482,7 +536,10 @@ export const AudioVisualizer = memo(function AudioVisualizer({
       // =========================================================================
       else if (mode === 'oscilloscope') {
         const bufferLength = analyser ? analyser.fftSize : 512;
-        const timeData = new Uint8Array(bufferLength);
+        if (!cachedTimeData || cachedTimeData.length !== bufferLength) {
+          cachedTimeData = new Uint8Array(new ArrayBuffer(bufferLength));
+        }
+        const timeData = cachedTimeData;
 
         if (analyser && isPlaying) {
           analyser.getByteTimeDomainData(timeData);

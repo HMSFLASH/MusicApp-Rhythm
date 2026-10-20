@@ -38,27 +38,58 @@ export function createMonotoneCubicSpline(xs: number[], ys: number[]) {
     }
   }
 
+  // Precompute polynomial coefficients for each interval: c0 + c1*t + c2*t^2 + c3*t^3
+  const c0 = new Float32Array(n - 1);
+  const c1 = new Float32Array(n - 1);
+  const c2 = new Float32Array(n - 1);
+  const c3 = new Float32Array(n - 1);
+  const invH = new Float32Array(n - 1);
+
+  for (let i = 0; i < n - 1; i++) {
+    const hk = h[i];
+    invH[i] = 1 / hk;
+    const dy = ys[i + 1] - ys[i];
+    c0[i] = ys[i];
+    c1[i] = hk * ms[i];
+    c2[i] = 3 * dy - hk * (2 * ms[i] + ms[i + 1]);
+    c3[i] = -2 * dy + hk * (ms[i] + ms[i + 1]);
+  }
+
+  let lastIdx = 0;
+
   return (x: number) => {
     // Hold extrapolation
     if (x <= xs[0]) return ys[0];
     if (x >= xs[n - 1]) return ys[n - 1];
 
-    let i = 0;
-    while (i < n - 1 && x > xs[i + 1]) {
-      i++;
+    // O(1) probe from last queried interval for sequential/monotonic queries
+    let i = lastIdx;
+    if (i < n - 1 && x >= xs[i] && x <= xs[i + 1]) {
+      // Hit cache
+    } else if (i + 1 < n - 1 && x >= xs[i + 1] && x <= xs[i + 2]) {
+      i = i + 1;
+      lastIdx = i;
+    } else {
+      // Binary search for general non-monotonic access
+      let low = 0;
+      let high = n - 2;
+      while (low <= high) {
+        const mid = (low + high) >> 1;
+        if (x < xs[mid]) {
+          high = mid - 1;
+        } else if (x > xs[mid + 1]) {
+          low = mid + 1;
+        } else {
+          i = mid;
+          break;
+        }
+      }
+      lastIdx = i;
     }
 
-    const hk = h[i];
-    const t = (x - xs[i]) / hk;
-    const t2 = t * t;
-    const t3 = t2 * t;
-
-    const h00 = 2 * t3 - 3 * t2 + 1;
-    const h10 = t3 - 2 * t2 + t;
-    const h01 = -2 * t3 + 3 * t2;
-    const h11 = t3 - t2;
-
-    return h00 * ys[i] + h10 * hk * ms[i] + h01 * ys[i + 1] + h11 * hk * ms[i + 1];
+    // Fast Horner's evaluation
+    const t = (x - xs[i]) * invH[i];
+    return c0[i] + t * (c1[i] + t * (c2[i] + t * c3[i]));
   };
 }
 
