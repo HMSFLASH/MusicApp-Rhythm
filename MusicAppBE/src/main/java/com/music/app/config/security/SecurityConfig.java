@@ -1,5 +1,10 @@
 package com.music.app.config.security;
 
+import java.util.ArrayList;
+import java.util.LinkedHashSet;
+import java.util.List;
+import java.util.Set;
+
 import jakarta.servlet.http.Cookie;
 
 import org.springframework.beans.factory.annotation.Value;
@@ -112,16 +117,36 @@ public class SecurityConfig {
     }
 
     @Bean
-    public CorsConfigurationSource corsConfigurationSource(@Value("${app.frontend-url}") String frontendUrl) {
+    public CorsConfigurationSource corsConfigurationSource(
+            @Value("${app.frontend-url}") String frontendUrl,
+            @Value("${app.cors.allowed-origins:}") String extraAllowedOrigins) {
+        Set<String> allowedOrigins = new LinkedHashSet<>();
+        addOriginIfValid(allowedOrigins, frontendUrl);
+        if (extraAllowedOrigins != null && !extraAllowedOrigins.isBlank()) {
+            for (String origin : extraAllowedOrigins.split(",")) {
+                addOriginIfValid(allowedOrigins, origin);
+            }
+        }
         CorsConfiguration corsConfiguration = new CorsConfiguration();
-        // Tạm thời allow tất cả origin để test mạng LAN không bị lỗi CORS
-        corsConfiguration.addAllowedOriginPattern("*");
-        corsConfiguration.addAllowedMethod("*");
+        corsConfiguration.setAllowedOrigins(new ArrayList<>(allowedOrigins));
+        corsConfiguration.setAllowedMethods(List.of("GET", "POST", "PUT", "PATCH", "DELETE", "OPTIONS"));
         corsConfiguration.addAllowedHeader("*");
+        corsConfiguration.setExposedHeaders(
+                List.of("Content-Range", "Accept-Ranges", "Content-Length", "Content-Disposition"));
         corsConfiguration.setAllowCredentials(true);
         UrlBasedCorsConfigurationSource source = new UrlBasedCorsConfigurationSource();
         source.registerCorsConfiguration("/**", corsConfiguration);
         return source;
+    }
+
+    private void addOriginIfValid(Set<String> allowedOrigins, String origin) {
+        if (origin == null) {
+            return;
+        }
+        String normalized = origin.trim().replaceAll("/+$", "");
+        if (!normalized.isEmpty() && !"*".equals(normalized)) {
+            allowedOrigins.add(normalized);
+        }
     }
 
     @Bean

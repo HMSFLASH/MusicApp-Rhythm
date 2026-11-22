@@ -43,12 +43,11 @@ public class BackupService {
     private final MusicService musicService;
     private final PlaylistService playlistService;
 
-    private final ObjectMapper objectMapper = new ObjectMapper()
+    private static final ObjectMapper OBJECT_MAPPER = new ObjectMapper()
             .registerModule(new com.fasterxml.jackson.datatype.jsr310.JavaTimeModule())
             .disable(com.fasterxml.jackson.databind.SerializationFeature.WRITE_DATES_AS_TIMESTAMPS);
 
-    public void backupToDrive(Map<String, Object> config, Map<String, Object> idbData, String userId)
-            throws org.hibernate.FetchNotFoundException {
+    public void backupToDrive(Map<String, Object> config, Map<String, Object> idbData, String userId) {
         User user = userRepository.findById(userId).orElseThrow(() -> new AppException(ErrorCode.UNAUTHENTICATED));
         if (user.getRefreshToken() == null) {
             throw new AppException(ErrorCode.DRIVE_NOT_LINKED);
@@ -82,7 +81,7 @@ public class BackupService {
             backupData.setFavorites(favoriteDtos);
             backupData.setLibrary(libraryDtos);
 
-            String jsonData = objectMapper.writeValueAsString(backupData);
+            String jsonData = OBJECT_MAPPER.writeValueAsString(backupData);
 
             googleDriveService.uploadJsonFile(jsonData, "musicapp_backup.json", user.getRefreshToken());
         } catch (Exception e) {
@@ -104,7 +103,7 @@ public class BackupService {
                 throw new AppException(ErrorCode.BACKUP_NOT_FOUND);
             }
 
-            BackupDataDto backupData = objectMapper.readValue(jsonData, BackupDataDto.class);
+            BackupDataDto backupData = OBJECT_MAPPER.readValue(jsonData, BackupDataDto.class);
 
             if (backupData.getLibrary() != null) {
                 for (MusicItemDto trackDto : backupData.getLibrary()) {
@@ -115,6 +114,7 @@ public class BackupService {
             if (backupData.getPlaylists() != null) {
                 List<Playlist> existing = playlistRepository.findByUserIdOrderByCreatedAtDesc(userId);
                 playlistRepository.deleteAll(existing);
+                playlistRepository.flush();
 
                 for (PlaylistDto pDto : backupData.getPlaylists()) {
                     Playlist playlist = Playlist.builder()

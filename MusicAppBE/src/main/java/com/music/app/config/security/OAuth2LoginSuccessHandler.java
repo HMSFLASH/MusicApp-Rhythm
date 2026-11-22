@@ -100,7 +100,7 @@ public class OAuth2LoginSuccessHandler extends SimpleUrlAuthenticationSuccessHan
                                 .httpOnly(true)
                                 .secure(secureCookies)
                                 .sameSite("Strict")
-                                .path("/api/auth/refresh")
+                                .path("/api/auth")
                                 .maxAge(30 * 24 * 60 * 60)
                                 .build()
                                 .toString());

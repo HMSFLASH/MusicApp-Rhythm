@@ -4,8 +4,10 @@ import java.io.ByteArrayInputStream;
 import java.io.ByteArrayOutputStream;
 import java.io.InputStream;
 import java.nio.charset.StandardCharsets;
+import java.util.ArrayList;
 import java.util.Collections;
 import java.util.List;
+import java.util.Locale;
 
 import jakarta.annotation.PostConstruct;
 
@@ -85,20 +87,55 @@ public class GoogleDriveService {
         return folderName;
     }
 
+    private String escapeDriveQuery(String value) {
+        if (value == null) {
+            return "";
+        }
+        return value.replace("\\", "\\\\").replace("'", "\\'");
+    }
+
     private String determineMimeType(String fileName) {
         if (fileName == null) return "audio/mpeg";
-        String lower = fileName.toLowerCase();
+        String lower = fileName.toLowerCase(Locale.ROOT);
         if (lower.endsWith(".flac")) return "audio/flac";
         if (lower.endsWith(".wav")) return "audio/wav";
         if (lower.endsWith(".ogg")) return "audio/ogg";
+        if (lower.endsWith(".opus")) return "audio/ogg";
         if (lower.endsWith(".m4a")) return "audio/mp4";
+        if (lower.endsWith(".aac")) return "audio/aac";
+        if (lower.endsWith(".wma")) return "audio/x-ms-wma";
         return "audio/mpeg"; // default MP3
+    }
+
+    private boolean isAudioFile(File file) {
+        if (file == null) {
+            return false;
+        }
+        String mimeType = file.getMimeType();
+        if (mimeType != null && mimeType.startsWith("audio/")) {
+            return true;
+        }
+        String name = file.getName();
+        if (name == null) {
+            return false;
+        }
+        String lower = name.toLowerCase(Locale.ROOT);
+        return lower.endsWith(".mp3")
+                || lower.endsWith(".m4a")
+                || lower.endsWith(".flac")
+                || lower.endsWith(".wav")
+                || lower.endsWith(".ogg")
+                || lower.endsWith(".opus")
+                || lower.endsWith(".aac")
+                || lower.endsWith(".wma");
     }
 
     private String getOrCreateFolder(Drive drive) throws Exception {
         FileList result = drive.files()
                 .list()
-                .setQ("mimeType='application/vnd.google-apps.folder' and name='" + folderName + "' and trashed=false")
+                .setQ("mimeType='application/vnd.google-apps.folder' and name='"
+                        + escapeDriveQuery(folderName)
+                        + "' and trashed=false")
                 .setSpaces("drive")
                 .setFields("files(id, name)")
                 .execute();
@@ -171,15 +208,34 @@ public class GoogleDriveService {
         Drive drive = getDrive(refreshToken);
 
         String folderId = getOrCreateFolder(drive);
+        String query = "'"
+                + escapeDriveQuery(folderId)
+                + "' in parents and trashed=false and mimeType != 'application/vnd.google-apps.folder'";
 
-        FileList result = drive.files()
-                .list()
-                .setQ("'" + folderId + "' in parents and mimeType contains 'audio/' and trashed=false")
-                .setSpaces("drive")
-                .setFields("nextPageToken, files(id, name, size, mimeType)")
-                .execute();
+        List<File> audioFiles = new ArrayList<>();
+        String pageToken = null;
+        do {
+            FileList result = drive.files()
+                    .list()
+                    .setQ(query)
+                    .setSpaces("drive")
+                    .setPageSize(1000)
+                    .setPageToken(pageToken)
+                    .setFields("nextPageToken, files(id, name, size, mimeType)")
+                    .execute();
 
-        return result.getFiles();
+            List<File> files = result.getFiles();
+            if (files != null) {
+                for (File file : files) {
+                    if (isAudioFile(file)) {
+                        audioFiles.add(file);
+                    }
+                }
+            }
+            pageToken = result.getNextPageToken();
+        } while (pageToken != null && !pageToken.isBlank());
+
+        return audioFiles;
     }
 
     public File getFileMetadata(String fileId, String refreshToken) throws Exception {
@@ -230,7 +286,11 @@ public class GoogleDriveService {
         // Check if file exists
         FileList result = drive.files()
                 .list()
-                .setQ("'" + folderId + "' in parents and name='" + fileName + "' and trashed=false")
+                .setQ("'"
+                        + escapeDriveQuery(folderId)
+                        + "' in parents and name='"
+                        + escapeDriveQuery(fileName)
+                        + "' and trashed=false")
                 .setSpaces("drive")
                 .setFields("files(id)")
                 .execute();
@@ -260,7 +320,11 @@ public class GoogleDriveService {
 
         FileList result = drive.files()
                 .list()
-                .setQ("'" + folderId + "' in parents and name='" + fileName + "' and trashed=false")
+                .setQ("'"
+                        + escapeDriveQuery(folderId)
+                        + "' in parents and name='"
+                        + escapeDriveQuery(fileName)
+                        + "' and trashed=false")
                 .setSpaces("drive")
                 .setFields("files(id)")
                 .execute();

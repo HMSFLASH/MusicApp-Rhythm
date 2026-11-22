@@ -3,6 +3,8 @@ package com.music.app.controller;
 import java.security.Principal;
 import java.util.List;
 
+import jakarta.validation.Valid;
+
 import org.springframework.web.bind.annotation.*;
 
 import com.music.app.dto.ApiResponse;
@@ -39,7 +41,7 @@ public class PlaylistController {
     }
 
     @PostMapping
-    public ApiResponse<PlaylistDto> createPlaylist(@RequestBody CreatePlaylistRequest req, Principal principal) {
+    public ApiResponse<PlaylistDto> createPlaylist(@Valid @RequestBody CreatePlaylistRequest req, Principal principal) {
         String userId = SecurityUtils.extractUserId(principal);
         return ApiResponse.<PlaylistDto>builder()
                 .result(playlistService.createPlaylist(req, userId))

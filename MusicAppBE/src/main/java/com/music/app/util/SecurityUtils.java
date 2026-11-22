@@ -4,6 +4,7 @@ import java.security.Principal;
 
 import org.springframework.security.core.Authentication;
 import org.springframework.security.core.context.SecurityContextHolder;
+import org.springframework.security.oauth2.server.resource.authentication.JwtAuthenticationToken;
 
 import com.music.app.exception.AppException;
 import com.music.app.exception.ErrorCode;
@@ -11,43 +12,36 @@ import com.music.app.exception.ErrorCode;
 public class SecurityUtils {
 
     public static String extractUserId(Principal principal) {
-        if (principal == null) {
+        if (principal == null
+                || principal.getName() == null
+                || principal.getName().isBlank()
+                || "anonymousUser".equals(principal.getName())) {
             throw new AppException(ErrorCode.UNAUTHORIZED);
         }
-        if (principal
-                instanceof
-                org.springframework.security.oauth2.server.resource.authentication.JwtAuthenticationToken
-                jwtAuth) {
+        if (principal instanceof JwtAuthenticationToken jwtAuth) {
             String userId = jwtAuth.getToken().getClaimAsString("userId");
-            if (userId != null) {
+            if (userId != null && !userId.isBlank()) {
                 return userId;
             }
         }
-        try {
-            return principal.getName();
-        } catch (NumberFormatException e) {
-            throw new AppException(ErrorCode.UNAUTHORIZED);
-        }
+        return principal.getName();
     }
 
     public static String getCurrentUserId() {
         Authentication auth = SecurityContextHolder.getContext().getAuthentication();
-        if (auth == null || !auth.isAuthenticated()) {
+        if (auth == null
+                || !auth.isAuthenticated()
+                || auth.getName() == null
+                || auth.getName().isBlank()
+                || "anonymousUser".equals(auth.getName())) {
             throw new AppException(ErrorCode.UNAUTHORIZED);
         }
-        if (auth
-                instanceof
-                org.springframework.security.oauth2.server.resource.authentication.JwtAuthenticationToken
-                jwtAuth) {
+        if (auth instanceof JwtAuthenticationToken jwtAuth) {
             String userId = jwtAuth.getToken().getClaimAsString("userId");
-            if (userId != null) {
+            if (userId != null && !userId.isBlank()) {
                 return userId;
             }
         }
-        try {
-            return auth.getName();
-        } catch (NumberFormatException e) {
-            throw new AppException(ErrorCode.UNAUTHORIZED);
-        }
+        return auth.getName();
     }
 }

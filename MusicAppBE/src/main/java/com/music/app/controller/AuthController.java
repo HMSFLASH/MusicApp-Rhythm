@@ -1,5 +1,6 @@
 package com.music.app.controller;
 
+import java.security.Principal;
 import java.util.Map;
 
 import jakarta.servlet.http.HttpServletResponse;
@@ -8,8 +9,6 @@ import jakarta.validation.Valid;
 import org.springframework.beans.factory.annotation.Value;
 import org.springframework.http.ResponseCookie;
 import org.springframework.http.ResponseEntity;
-import org.springframework.security.core.Authentication;
-import org.springframework.security.core.context.SecurityContextHolder;
 import org.springframework.security.web.csrf.CsrfToken;
 import org.springframework.web.bind.annotation.*;
 import org.springframework.web.bind.annotation.CookieValue;
@@ -21,12 +20,15 @@ import com.music.app.dto.RefreshRequest;
 import com.music.app.dto.RegisterRequest;
 import com.music.app.dto.SetPasswordRequest;
 import com.music.app.service.AuthService;
+import com.music.app.util.SecurityUtils;
 
 import lombok.RequiredArgsConstructor;
+import lombok.extern.slf4j.Slf4j;
 
 @RestController
 @RequestMapping("/api/auth")
 @RequiredArgsConstructor
+@Slf4j
 public class AuthController {
 
     private final AuthService authService;
@@ -55,7 +57,7 @@ public class AuthController {
                             .httpOnly(true)
                             .secure(secureCookies)
                             .sameSite("Strict")
-                            .path("/api/auth/refresh")
+                            .path("/api/auth")
                             .maxAge(30 * 24 * 60 * 60)
                             .build()
                             .toString());
@@ -82,7 +84,7 @@ public class AuthController {
                         .httpOnly(true)
                         .secure(secureCookies)
                         .sameSite("Strict")
-                        .path("/api/auth/refresh")
+                        .path("/api/auth")
                         .maxAge(0)
                         .build()
                         .toString());
@@ -150,18 +152,10 @@ public class AuthController {
 
     @PostMapping("/set-password")
     public ResponseEntity<ApiResponse<?>> setPassword(
-            @Valid @RequestBody SetPasswordRequest request, HttpServletResponse response) {
-        Authentication auth = SecurityContextHolder.getContext().getAuthentication();
-        if (auth == null || auth.getName().equals("anonymousUser")) {
-            return ResponseEntity.status(401)
-                    .body(ApiResponse.builder()
-                            .code(401)
-                            .message("Not authenticated")
-                            .build());
-        }
-        String currentSubject = auth.getName();
+            @Valid @RequestBody SetPasswordRequest request, HttpServletResponse response, Principal principal) {
+        String currentUserId = SecurityUtils.extractUserId(principal);
         AuthenticationResponse authResponse =
-                authService.setLocalCredentials(currentSubject, request.getLoginId(), request.getPassword());
+                authService.setLocalCredentials(currentUserId, request.getLoginId(), request.getPassword());
         setTokenCookie(response, authResponse.getAccessToken());
         setRefreshTokenCookie(response, authResponse.getRefreshToken());
         return ResponseEntity.ok(ApiResponse.builder().result(authResponse).build());
@@ -169,18 +163,12 @@ public class AuthController {
 
     @PostMapping("/change-password")
     public ResponseEntity<ApiResponse<?>> changePassword(
-            @Valid @RequestBody com.music.app.dto.ChangePasswordRequest request, HttpServletResponse response) {
-        Authentication auth = SecurityContextHolder.getContext().getAuthentication();
-        if (auth == null || auth.getName().equals("anonymousUser")) {
-            return ResponseEntity.status(401)
-                    .body(ApiResponse.builder()
-                            .code(401)
-                            .message("Not authenticated")
-                            .build());
-        }
-        String currentSubject = auth.getName();
+            @Valid @RequestBody com.music.app.dto.ChangePasswordRequest request,
+            HttpServletResponse response,
+            Principal principal) {
+        String currentUserId = SecurityUtils.extractUserId(principal);
         AuthenticationResponse authResponse =
-                authService.changePassword(currentSubject, request.getOldPassword(), request.getNewPassword());
+                authService.changePassword(currentUserId, request.getOldPassword(), request.getNewPassword());
         setTokenCookie(response, authResponse.getAccessToken());
         setRefreshTokenCookie(response, authResponse.getRefreshToken());
         return ResponseEntity.ok(ApiResponse.builder().result(authResponse).build());
@@ -201,6 +189,7 @@ public class AuthController {
                             "message", "If your email is registered, you will receive a password reset link shortly."))
                     .build();
         } catch (Exception e) {
+            log.warn("Forgot password request ignored or failed: {}", e.getMessage());
             return ApiResponse.<Map<String, String>>builder()
                     .result(Map.of(
                             "message", "If your email is registered, you will receive a password reset link shortly."))
@@ -210,40 +199,18 @@ public class AuthController {
 
     @PostMapping("/reset-password")
     public ResponseEntity<ApiResponse<Map<String, String>>> resetPassword(@RequestBody Map<String, String> request) {
-        try {
-            String token = request.get("token");
-            String newPassword = request.get("newPassword");
-            authService.resetPassword(token, newPassword);
-            return ResponseEntity.ok(ApiResponse.<Map<String, String>>builder()
-                    .result(Map.of("message", "Password has been successfully reset."))
-                    .build());
-        } catch (Exception e) {
-            return ResponseEntity.status(400)
-                    .body(ApiResponse.<Map<String, String>>builder()
-                            .code(400)
-                            .message(e.getMessage())
-                            .build());
-        }
+        String token = request.get("token");
+        String newPassword = request.get("newPassword");
+        authService.resetPassword(token, newPassword);
+        return ResponseEntity.ok(ApiResponse.<Map<String, String>>builder()
+                .result(Map.of("message", "Password has been successfully reset."))
+                .build());
     }
 
     @GetMapping("/me")
-    public ResponseEntity<ApiResponse<com.music.app.dto.UserDto>> getCurrentUser() {
-        Authentication auth = SecurityContextHolder.getContext().getAuthentication();
-        if (auth == null || auth.getName().equals("anonymousUser")) {
-            return ResponseEntity.status(401)
-                    .body(ApiResponse.<com.music.app.dto.UserDto>builder()
-                            .code(401)
-                            .message("Not authenticated")
-                            .build());
-        }
-        com.music.app.dto.UserDto user = authService.getUserDtoByLoginId(auth.getName());
-        if (user == null) {
-            return ResponseEntity.status(401)
-                    .body(ApiResponse.<com.music.app.dto.UserDto>builder()
-                            .code(401)
-                            .message("User not found")
-                            .build());
-        }
+    public ResponseEntity<ApiResponse<com.music.app.dto.UserDto>> getCurrentUser(Principal principal) {
+        String userId = SecurityUtils.extractUserId(principal);
+        com.music.app.dto.UserDto user = authService.getUserDtoById(userId);
         return ResponseEntity.ok(
                 ApiResponse.<com.music.app.dto.UserDto>builder().result(user).build());
     }

@@ -5,7 +5,6 @@ import java.util.stream.Collectors;
 
 import jakarta.persistence.EntityNotFoundException;
 
-import org.hibernate.FetchNotFoundException;
 import org.hibernate.ObjectNotFoundException;
 import org.springframework.stereotype.Service;
 import org.springframework.transaction.annotation.Transactional;
@@ -36,7 +35,7 @@ public class PlaylistService {
     private final UserRepository userRepository;
     private final MusicService musicService;
 
-    public PlaylistDto toDto(Playlist p, boolean includeTracks) throws FetchNotFoundException {
+    public PlaylistDto toDto(Playlist p, boolean includeTracks) {
         List<MusicItemDto> tracks = null;
         if (includeTracks) {
             tracks = new java.util.ArrayList<>();
@@ -76,10 +75,14 @@ public class PlaylistService {
 
     @Transactional
     public PlaylistDto createPlaylist(CreatePlaylistRequest req, String userId) {
+        String name = req.getName() != null ? req.getName().trim() : "";
+        if (name.isEmpty() || name.length() > 255) {
+            throw new AppException(ErrorCode.INVALID_REQUEST, "Playlist name must be between 1 and 255 characters");
+        }
         User user = userRepository.findById(userId).orElseThrow(() -> new AppException(ErrorCode.USER_NOT_EXISTED));
 
         Playlist playlist = Playlist.builder()
-                .name(req.getName())
+                .name(name)
                 .imageUrl(req.getImageUrl())
                 .user(user)
                 .build();
@@ -94,7 +97,13 @@ public class PlaylistService {
                 .findByIdAndUserId(id, userId)
                 .orElseThrow(() -> new AppException(ErrorCode.NOT_FOUND));
 
-        if (req.getName() != null) p.setName(req.getName());
+        if (req.getName() != null) {
+            String trimmedName = req.getName().trim();
+            if (trimmedName.isEmpty() || trimmedName.length() > 255) {
+                throw new AppException(ErrorCode.INVALID_REQUEST, "Playlist name must be between 1 and 255 characters");
+            }
+            p.setName(trimmedName);
+        }
         if (req.getImageUrl() != null) p.setImageUrl(req.getImageUrl());
         return toDto(playlistRepository.save(p), false);
     }

@@ -1,14 +1,13 @@
 package com.music.app.service;
 
-import java.util.Base64;
 import java.util.List;
 import java.util.Map;
+import java.util.Set;
 import java.util.stream.Collectors;
 
 import jakarta.persistence.EntityManager;
 import jakarta.persistence.PersistenceContext;
 
-import org.jaudiotagger.tag.Tag;
 import org.springframework.stereotype.Service;
 
 import com.google.api.services.drive.model.File;
@@ -36,29 +35,6 @@ public class MusicService {
     @PersistenceContext
     private EntityManager entityManager;
 
-    private String extractArtworkDataUrl(Tag tag) {
-        if (tag == null) {
-            return null;
-        }
-
-        try {
-            org.jaudiotagger.tag.images.Artwork artwork = tag.getFirstArtwork();
-            if (artwork == null || artwork.getBinaryData() == null || artwork.getBinaryData().length == 0) {
-                return null;
-            }
-
-            String mimeType = artwork.getMimeType();
-            if (mimeType == null || mimeType.isBlank() || !mimeType.startsWith("image/")) {
-                mimeType = "image/jpeg";
-            }
-
-            return "data:" + mimeType + ";base64," + Base64.getEncoder().encodeToString(artwork.getBinaryData());
-        } catch (Exception e) {
-            log.warn("Failed to extract artwork from audio tag", e);
-            return null;
-        }
-    }
-
     public MusicItemDto toDto(MusicLibrary lib) {
         return MusicItemDto.builder()
                 .id(lib.getId().toString())
@@ -69,20 +45,6 @@ public class MusicService {
                 .build();
     }
 
-    private boolean isMusicImageEndpoint(String imageUrl) {
-        if (imageUrl == null || imageUrl.isBlank()) {
-            return false;
-        }
-
-        String normalized = imageUrl;
-        int apiIndex = normalized.indexOf("/api/music/");
-        if (apiIndex >= 0) {
-            normalized = normalized.substring(apiIndex);
-        }
-
-        return normalized.matches("/api/music/[^/]+/image");
-    }
-
     public List<MusicItemDto> listMusic(String userId) {
         return musicLibraryRepository.findByUserId(userId).stream()
                 .map(this::toDto)
@@ -91,10 +53,13 @@ public class MusicService {
 
     @org.springframework.transaction.annotation.Transactional
     public MusicItemDto recordPlay(String id, String userId) {
+        int updated = musicLibraryRepository.incrementPlayCount(id, userId);
+        if (updated == 0) {
+            throw new AppException(ErrorCode.NOT_FOUND);
+        }
         MusicLibrary lib = musicLibraryRepository
                 .findByIdAndUserId(id, userId)
                 .orElseThrow(() -> new AppException(ErrorCode.NOT_FOUND));
-        lib.setPlayCount((lib.getPlayCount() == null ? 0L : lib.getPlayCount()) + 1);
         return toDto(lib);
     }
 
@@ -107,7 +72,10 @@ public class MusicService {
 
         try {
             List<File> driveFiles = googleDriveService.listFiles(user.getRefreshToken());
-            List<String> driveFileIds = driveFiles.stream().map(File::getId).collect(Collectors.toList());
+            if (driveFiles == null) {
+                driveFiles = List.of();
+            }
+            Set<String> driveFileIds = driveFiles.stream().map(File::getId).collect(Collectors.toSet());
 
             List<MusicLibrary> dbFiles = musicLibraryRepository.findByUserId(userId);
             List<MusicLibrary> toDelete = dbFiles.stream()
@@ -119,18 +87,14 @@ public class MusicService {
             if (!toDelete.isEmpty()) {
                 List<String> idsToDelete =
                         toDelete.stream().map(MusicLibrary::getId).collect(Collectors.toList());
-                try {
-                    entityManager
-                            .createQuery("DELETE FROM PlaylistItem p WHERE p.musicLibrary.id IN :ids")
-                            .setParameter("ids", idsToDelete)
-                            .executeUpdate();
-                    entityManager
-                            .createQuery("DELETE FROM Favorite f WHERE f.musicLibrary.id IN :ids")
-                            .setParameter("ids", idsToDelete)
-                            .executeUpdate();
-                } catch (Exception e) {
-                    log.error("Failed to delete related records during sync", e);
-                }
+                entityManager
+                        .createQuery("DELETE FROM PlaylistItem p WHERE p.musicLibrary.id IN :ids")
+                        .setParameter("ids", idsToDelete)
+                        .executeUpdate();
+                entityManager
+                        .createQuery("DELETE FROM Favorite f WHERE f.musicLibrary.id IN :ids")
+                        .setParameter("ids", idsToDelete)
+                        .executeUpdate();
 
                 try {
                     entityManager
@@ -168,25 +132,23 @@ public class MusicService {
                 .findByIdAndUserId(id, userId)
                 .orElseThrow(() -> new AppException(ErrorCode.NOT_FOUND));
 
-        // Fix logic error when deleting songs that are in favorites or playlists
-        try {
-            entityManager
-                    .createQuery("DELETE FROM PlaylistItem p WHERE p.musicLibrary.id = :id")
-                    .setParameter("id", id)
-                    .executeUpdate();
+        entityManager
+                .createQuery("DELETE FROM PlaylistItem p WHERE p.musicLibrary.id = :id")
+                .setParameter("id", id)
+                .executeUpdate();
 
-            entityManager
-                    .createQuery("DELETE FROM Favorite f WHERE f.musicLibrary.id = :id")
-                    .setParameter("id", id)
-                    .executeUpdate();
-        } catch (Exception e) {
-            log.error("Failed to delete related records for music id: {}", id, e);
-        }
+        entityManager
+                .createQuery("DELETE FROM Favorite f WHERE f.musicLibrary.id = :id")
+                .setParameter("id", id)
+                .executeUpdate();
 
-        if ("DRIVE".equals(lib.getSourceType()) && lib.getDriveFileId() != null) {
+        String refreshToken = lib.getUser() != null ? lib.getUser().getRefreshToken() : null;
+        if ("DRIVE".equals(lib.getSourceType())
+                && lib.getDriveFileId() != null
+                && refreshToken != null
+                && !refreshToken.isBlank()) {
             try {
-                googleDriveService.deleteFile(
-                        lib.getDriveFileId(), lib.getUser().getRefreshToken());
+                googleDriveService.deleteFile(lib.getDriveFileId(), refreshToken);
             } catch (Exception e) {
                 log.error("Failed to delete file from Google Drive, proceeding to delete from DB anyway", e);
             }
@@ -211,7 +173,7 @@ public class MusicService {
         if (request == null
                 || request.getDriveFileId() == null
                 || request.getDriveFileId().isBlank()) {
-            throw new AppException(ErrorCode.NOT_FOUND, "Drive file id is required");
+            throw new AppException(ErrorCode.INVALID_REQUEST, "Drive file id is required");
         }
 
         User user = userRepository.findById(userId).orElseThrow(() -> new AppException(ErrorCode.USER_NOT_EXISTED));
@@ -228,7 +190,7 @@ public class MusicService {
 
             String fileName = firstNonBlank(request.getFileName(), driveFile.getName(), "Unknown Audio");
             if (!isSupportedAudioFile(fileName)) {
-                throw new AppException(ErrorCode.NOT_FOUND, "A supported audio file is required");
+                throw new AppException(ErrorCode.INVALID_REQUEST, "A supported audio file is required");
             }
 
             boolean exists = musicLibraryRepository.findByUserId(userId).stream()
@@ -277,14 +239,6 @@ public class MusicService {
             }
         }
         return null;
-    }
-
-    private String stripExtension(String fileName) {
-        int dotIndex = fileName.lastIndexOf('.');
-        if (dotIndex <= 0) {
-            return fileName;
-        }
-        return fileName.substring(0, dotIndex);
     }
 
     public String getDriveToken(String userId) {

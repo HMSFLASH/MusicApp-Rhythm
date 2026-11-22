@@ -14,6 +14,7 @@ public enum ErrorCode {
     FORBIDDEN(1005, "Forbidden", HttpStatus.FORBIDDEN),
     UNAUTHENTICATED(1006, "Unauthenticated", HttpStatus.UNAUTHORIZED),
     UNAUTHORIZED(1007, "Unauthorized", HttpStatus.UNAUTHORIZED),
+    INVALID_REQUEST(1008, "Invalid request", HttpStatus.BAD_REQUEST),
     DRIVE_NOT_LINKED(2001, "Google Drive not linked", HttpStatus.BAD_REQUEST),
     BACKUP_NOT_FOUND(2002, "No backup found on Drive", HttpStatus.NOT_FOUND),
     BACKUP_FAILED(2003, "Backup to Google Drive failed", HttpStatus.INTERNAL_SERVER_ERROR),

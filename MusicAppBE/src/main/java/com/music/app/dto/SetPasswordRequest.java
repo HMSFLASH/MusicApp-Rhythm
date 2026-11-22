@@ -1,5 +1,6 @@
 package com.music.app.dto;
 
+import jakarta.validation.constraints.NotBlank;
 import jakarta.validation.constraints.Size;
 
 import lombok.AllArgsConstructor;
@@ -15,6 +16,7 @@ public class SetPasswordRequest {
     @Size(max = 254, message = "Login ID must be at most 254 characters")
     private String loginId;
 
+    @NotBlank(message = "Password is required")
     @Size(min = 12, max = 128, message = "Password must be between 12 and 128 characters")
     private String password;
 }

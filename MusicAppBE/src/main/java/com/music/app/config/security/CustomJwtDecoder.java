@@ -1,8 +1,9 @@
 package com.music.app.config.security;
 
-import java.text.ParseException;
-import java.util.Objects;
+import java.nio.charset.StandardCharsets;
 import javax.crypto.spec.SecretKeySpec;
+
+import jakarta.annotation.PostConstruct;
 
 import org.springframework.beans.factory.annotation.Value;
 import org.springframework.security.oauth2.jose.jws.MacAlgorithm;
@@ -28,42 +29,57 @@ public class CustomJwtDecoder implements JwtDecoder {
     private final InvalidatedTokenRepository invalidatedTokenRepository;
     private final UserRepository userRepository;
 
-    private NimbusJwtDecoder nimbusJwtDecoder = null;
+    private volatile NimbusJwtDecoder nimbusJwtDecoder;
+
+    @PostConstruct
+    public void init() {
+        SecretKeySpec secretKeySpec = new SecretKeySpec(signerKey.getBytes(StandardCharsets.UTF_8), "HS512");
+        this.nimbusJwtDecoder = NimbusJwtDecoder.withSecretKey(secretKeySpec)
+                .macAlgorithm(MacAlgorithm.HS512)
+                .build();
+    }
+
+    private NimbusJwtDecoder getNimbusJwtDecoder() {
+        NimbusJwtDecoder decoder = this.nimbusJwtDecoder;
+        if (decoder == null) {
+            synchronized (this) {
+                decoder = this.nimbusJwtDecoder;
+                if (decoder == null) {
+                    SecretKeySpec secretKeySpec =
+                            new SecretKeySpec(signerKey.getBytes(StandardCharsets.UTF_8), "HS512");
+                    decoder = NimbusJwtDecoder.withSecretKey(secretKeySpec)
+                            .macAlgorithm(MacAlgorithm.HS512)
+                            .build();
+                    this.nimbusJwtDecoder = decoder;
+                }
+            }
+        }
+        return decoder;
+    }
 
     @Override
     public Jwt decode(String token) throws JwtException {
-        try {
-            com.nimbusds.jwt.SignedJWT signedJWT = com.nimbusds.jwt.SignedJWT.parse(token);
+        Jwt jwt = getNimbusJwtDecoder().decode(token);
 
-            String jit = signedJWT.getJWTClaimsSet().getJWTID();
-            if (jit != null && invalidatedTokenRepository.existsById(jit)) {
-                throw new BadJwtException("Token has been invalidated");
-            }
-            if (!"ACCESS".equals(signedJWT.getJWTClaimsSet().getStringClaim("token_type"))) {
-                throw new BadJwtException("Refresh tokens cannot access protected resources");
-            }
-            String userId = signedJWT.getJWTClaimsSet().getStringClaim("userId");
-            Number tokenVersion = (Number) signedJWT.getJWTClaimsSet().getClaim("token_version");
-            if (userId == null
-                    || tokenVersion == null
-                    || userRepository
-                            .findById(userId)
-                            .map(user -> user.getAuthTokenVersion() == null
-                                    || user.getAuthTokenVersion().longValue() != tokenVersion.longValue())
-                            .orElse(true)) {
-                throw new BadJwtException("Token has been superseded");
-            }
-        } catch (ParseException e) {
-            throw new BadJwtException("Invalid token format", e);
+        String jit = jwt.getId();
+        if (jit != null && invalidatedTokenRepository.existsById(jit)) {
+            throw new BadJwtException("Token has been invalidated");
+        }
+        if (!"ACCESS".equals(jwt.getClaimAsString("token_type"))) {
+            throw new BadJwtException("Refresh tokens cannot access protected resources");
+        }
+        String userId = jwt.getClaimAsString("userId");
+        Object rawTokenVersion = jwt.getClaim("token_version");
+        if (userId == null
+                || !(rawTokenVersion instanceof Number tokenVersion)
+                || userRepository
+                        .findById(userId)
+                        .map(user -> user.getAuthTokenVersion() == null
+                                || user.getAuthTokenVersion().longValue() != tokenVersion.longValue())
+                        .orElse(true)) {
+            throw new BadJwtException("Token has been superseded");
         }
 
-        if (Objects.isNull(nimbusJwtDecoder)) {
-            SecretKeySpec secretKeySpec = new SecretKeySpec(signerKey.getBytes(), "HS512");
-            nimbusJwtDecoder = NimbusJwtDecoder.withSecretKey(secretKeySpec)
-                    .macAlgorithm(MacAlgorithm.HS512)
-                    .build();
-        }
-
-        return nimbusJwtDecoder.decode(token);
+        return jwt;
     }
 }

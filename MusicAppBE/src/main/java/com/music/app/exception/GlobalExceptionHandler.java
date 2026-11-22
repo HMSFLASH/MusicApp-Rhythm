@@ -1,7 +1,5 @@
 package com.music.app.exception;
 
-import java.io.IOException;
-
 import org.apache.catalina.connector.ClientAbortException;
 import org.springframework.http.HttpStatus;
 import org.springframework.http.ResponseEntity;
@@ -38,8 +36,7 @@ public class GlobalExceptionHandler {
             value = {
                 AsyncRequestTimeoutException.class,
                 AsyncRequestNotUsableException.class,
-                ClientAbortException.class,
-                IOException.class
+                ClientAbortException.class
             })
     public ResponseEntity<Void> handlingAsyncTimeout(Exception exception) {
         return ResponseEntity.status(HttpStatus.REQUEST_TIMEOUT).build();
@@ -49,14 +46,8 @@ public class GlobalExceptionHandler {
     public ResponseEntity<ApiResponse<Void>> handlingRuntimeException(Exception exception) {
         log.error("Uncaught exception occurred: ", exception);
         ApiResponse<Void> apiResponse = new ApiResponse<>();
-
         apiResponse.setCode(ErrorCode.UNCATEGORIZED_EXCEPTION.getCode());
-        // Trả về message thực tế của lỗi để dễ debug thay vì "Uncategorized error" chung chung
-        apiResponse.setMessage(
-                exception.getMessage() != null
-                        ? exception.getMessage()
-                        : ErrorCode.UNCATEGORIZED_EXCEPTION.getMessage());
-
+        apiResponse.setMessage(ErrorCode.UNCATEGORIZED_EXCEPTION.getMessage());
         return ResponseEntity.internalServerError().body(apiResponse);
     }
 
@@ -64,7 +55,15 @@ public class GlobalExceptionHandler {
     public ResponseEntity<ApiResponse<Void>> handlingValidationException(Exception exception) {
         ApiResponse<Void> apiResponse = new ApiResponse<>();
         apiResponse.setCode(HttpStatus.BAD_REQUEST.value());
-        apiResponse.setMessage("Invalid request");
+        if (exception instanceof MethodArgumentNotValidException manve) {
+            String message = manve.getBindingResult().getFieldErrors().stream()
+                    .findFirst()
+                    .map(error -> error.getDefaultMessage() != null ? error.getDefaultMessage() : "Invalid request")
+                    .orElse("Invalid request");
+            apiResponse.setMessage(message);
+        } else {
+            apiResponse.setMessage("Invalid request body");
+        }
         return ResponseEntity.badRequest().body(apiResponse);
     }
 
@@ -73,7 +72,7 @@ public class GlobalExceptionHandler {
             HttpRequestMethodNotSupportedException exception) {
         ApiResponse<Void> apiResponse = new ApiResponse<>();
         apiResponse.setCode(HttpStatus.METHOD_NOT_ALLOWED.value());
-        apiResponse.setMessage(exception.getMessage());
+        apiResponse.setMessage("Method not allowed");
         return ResponseEntity.status(HttpStatus.METHOD_NOT_ALLOWED).body(apiResponse);
     }
 
@@ -81,7 +80,7 @@ public class GlobalExceptionHandler {
     public ResponseEntity<ApiResponse<Void>> handlingNoResourceFound(NoResourceFoundException exception) {
         ApiResponse<Void> apiResponse = new ApiResponse<>();
         apiResponse.setCode(HttpStatus.NOT_FOUND.value());
-        apiResponse.setMessage(exception.getMessage());
+        apiResponse.setMessage("Resource not found");
         return ResponseEntity.status(HttpStatus.NOT_FOUND).body(apiResponse);
     }
 }
