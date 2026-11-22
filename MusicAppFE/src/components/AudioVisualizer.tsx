@@ -177,7 +177,7 @@ export const AudioVisualizer = memo(function AudioVisualizer({
 
           for (let i = 0; i < barCount; i++) {
             const entry = binMap[i];
-            let rawEnergy = 0;
+            let rawEnergy: number;
 
             if (entry.isSingleBin) {
               const val0 = freqData[entry.b0] || 0;
@@ -224,7 +224,7 @@ export const AudioVisualizer = memo(function AudioVisualizer({
 
       // Update Bar Physics (Snappy Attack, Fluid Gravity Decay & Peak Hold)
       for (let i = 0; i < barCount; i++) {
-        let target = 0;
+        let target: number;
         if (hasRealAudio && isPlaying) {
           target = rawTargetBars[i];
         } else if (isPlaying) {
@@ -246,7 +246,7 @@ export const AudioVisualizer = memo(function AudioVisualizer({
         // Studio Peak Hold Caps
         const curVal = smoothedBars[i];
         const currentPeak = peakBars[i] ?? 0;
-        let holdCounter = peakHoldCounters[i] ?? 0;
+        const holdCounter = peakHoldCounters[i] ?? 0;
         let velocity = peakVelocities[i] ?? 0;
 
         if (curVal >= currentPeak - 0.01) {

@@ -20,7 +20,7 @@ export const getAudioExtension = (fileName?: string) => fileName?.split('.').pop
 export const isLocalTrack = (track?: Track | null) =>
   track?.sourceType === 'LOCAL';
 
-export const getDefaultLegacyMetadataParser = (_track?: Track | null) => false;
+export const getDefaultLegacyMetadataParser = () => false;
 
 export const shouldUseLegacyMetadataParser = (
   track?: Track | null,

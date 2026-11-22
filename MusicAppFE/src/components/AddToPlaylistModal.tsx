@@ -5,6 +5,7 @@ import type { Track } from '../hooks/useAudioPlayer';
 import { axiosClient } from '../api/axiosClient';
 import { useGlobalAudio } from '../context/AudioContext';
 import { useAuth } from '../context/AuthContext';
+import { getErrorMessage } from '../utils/errorMessage';
 
 interface AddToPlaylistModalProps {
   isOpen: boolean;
@@ -14,35 +15,63 @@ interface AddToPlaylistModalProps {
   tracks?: Track[];
 }
 
+type PlaylistSummary = {
+  id: string;
+  name: string;
+  trackCount?: number;
+};
+
 export function AddToPlaylistModal({ isOpen, onClose, track, tracks }: AddToPlaylistModalProps) {
+  const items = tracks && tracks.length > 0 ? tracks : (track ? [track] : []);
+  if (!isOpen || items.length === 0) return null;
+
+  return <AddToPlaylistModalContent items={items} onClose={onClose} />;
+}
+
+function AddToPlaylistModalContent({
+  items,
+  onClose,
+}: {
+  items: Track[];
+  onClose: () => void;
+}) {
   const { t } = useTranslation();
   const { isAuthenticated } = useAuth();
   const { playerState } = useGlobalAudio();
 
-  const [playlists, setPlaylists] = useState<any[]>([]);
-  const [loading, setLoading] = useState(false);
-  const [addingId, setAddingId] = useState<number | null>(null);
+  const [playlists, setPlaylists] = useState<PlaylistSummary[]>([]);
+  const [loading, setLoading] = useState(Boolean(isAuthenticated));
+  const [addingId, setAddingId] = useState<string | null>(null);
   const [error, setError] = useState('');
   const [successMsg, setSuccessMsg] = useState('');
 
   useEffect(() => {
-    if (isOpen && isAuthenticated) {
-      // eslint-disable-next-line react-hooks/set-state-in-effect
-      setLoading(true);
-      setError('');
-      setSuccessMsg('');
-      axiosClient.get('/api/playlists')
+    if (!isAuthenticated) return;
+    let cancelled = false;
 
-        .then((data: any) => setPlaylists(data))
-        .catch(() => setError(t('modals.addToPlaylist.loadFail', 'Failed to load playlists')))
-        .finally(() => setLoading(false));
-    }
-  }, [isOpen, isAuthenticated, t]);
+    axiosClient.get('/api/playlists')
+      .then((data: unknown) => {
+        if (!cancelled) {
+          setPlaylists(Array.isArray(data) ? (data as PlaylistSummary[]) : []);
+        }
+      })
+      .catch(() => {
+        if (!cancelled) {
+          setError(t('modals.addToPlaylist.loadFail', 'Failed to load playlists'));
+        }
+      })
+      .finally(() => {
+        if (!cancelled) {
+          setLoading(false);
+        }
+      });
 
-  const items = tracks && tracks.length > 0 ? tracks : (track ? [track] : []);
-  if (!isOpen || items.length === 0) return null;
+    return () => {
+      cancelled = true;
+    };
+  }, [isAuthenticated, t]);
 
-  const handleAddToPlaylist = async (playlistId: number) => {
+  const handleAddToPlaylist = async (playlistId: string) => {
     setAddingId(playlistId);
     setError('');
     setSuccessMsg('');
@@ -64,8 +93,8 @@ export function AddToPlaylistModal({ isOpen, onClose, track, tracks }: AddToPlay
         onClose();
       }, 1500);
 
-    } catch (err: any) {
-      setError(err.message || t('common.systemError', 'An error occurred'));
+    } catch (err: unknown) {
+      setError(getErrorMessage(err, t('common.systemError', 'An error occurred')));
     } finally {
       setAddingId(null);
     }

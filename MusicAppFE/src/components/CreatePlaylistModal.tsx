@@ -2,6 +2,7 @@ import React, { useState } from 'react';
 import { X, Loader2 } from 'lucide-react';
 import { useTranslation } from 'react-i18next';
 import { axiosClient } from '../api/axiosClient';
+import { getErrorMessage } from '../utils/errorMessage';
 
 interface CreatePlaylistModalProps {
   isOpen: boolean;
@@ -36,8 +37,8 @@ export function CreatePlaylistModal({ isOpen, onClose, onSuccess }: CreatePlayli
       onSuccess();
       onClose();
 
-    } catch (err: any) {
-      setError(err.message || t('common.systemError', 'An error occurred'));
+    } catch (err: unknown) {
+      setError(getErrorMessage(err, t('common.systemError', 'An error occurred')));
     } finally {
       setLoading(false);
     }

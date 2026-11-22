@@ -36,7 +36,7 @@ export const STYLISTIC_PRESETS = {
   },
   'CLARITY': {
     name: 'Clarity',
-    isParametric: true,
+    isParametric: true as const,
     bands: [
       {
         id: 'param_clarity_1',
@@ -558,18 +558,39 @@ export function interpolateGains(sourceFreqs: number[], sourceGains: number[], t
 
 export type PrecomputedGraphicPreset = {
   name: string;
+  isParametric?: false;
   bassGain: number;
   trebleGain: number;
   preampGain: number;
   precomputedGains: Record<keyof typeof EQ_PRESETS, number[]>;
 };
 
-export const PRECOMPUTED_STYLISTIC_PRESETS = Object.keys(STYLISTIC_PRESETS).reduce((acc, key) => {
+type LegacyGraphicPreset = {
+  name: string;
+  eqBands?: number[];
+  gains?: number[];
+  bassGain: number;
+  trebleGain: number;
+  preampGain: number;
+};
+
+export type PrecomputedParametricPreset = {
+  name: string;
+  isParametric: true;
+  bands: EqBand[];
+  bassGain: number;
+  trebleGain: number;
+  preampGain: number;
+};
+
+export type PrecomputedStylisticPreset = PrecomputedGraphicPreset | PrecomputedParametricPreset;
+
+export const PRECOMPUTED_STYLISTIC_PRESETS = Object.keys(STYLISTIC_PRESETS).reduce<Record<string, PrecomputedStylisticPreset>>((acc, key) => {
   const preset = STYLISTIC_PRESETS[key as keyof typeof STYLISTIC_PRESETS];
-  if ('isParametric' in preset) {
-    acc[key] = preset; 
+  if ('isParametric' in preset && preset.isParametric) {
+    acc[key] = { ...preset, isParametric: true as const };
   } else {
-    const legacy = preset as any;
+    const legacy = preset as LegacyGraphicPreset;
     const sourceFreqs = legacy.eqBands || EQ_PRESETS['31_BANDS'];
     const sourceGains = legacy.gains || new Array(31).fill(0);
     
@@ -588,4 +609,4 @@ export const PRECOMPUTED_STYLISTIC_PRESETS = Object.keys(STYLISTIC_PRESETS).redu
     };
   }
   return acc;
-}, {} as Record<string, any>);
+}, {});

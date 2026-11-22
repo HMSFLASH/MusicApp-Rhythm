@@ -51,6 +51,8 @@ class MultibandStereoImagerProcessor extends AudioWorkletProcessor {
       { name: 'monoThreshold', defaultValue: 0.985, minValue: 0.7, maxValue: 1.0, automationRate: 'k-rate' },
       { name: 'monoSideLevel', defaultValue: 100, minValue: 0, maxValue: 150, automationRate: 'k-rate' },
       { name: 'chorusAmount', defaultValue: 0, minValue: 0, maxValue: 100, automationRate: 'k-rate' },
+      { name: 'stereoAnalysisEnabled', defaultValue: 1, minValue: 0, maxValue: 1, automationRate: 'k-rate' },
+      { name: 'stereoFftSize', defaultValue: 1024, minValue: 256, maxValue: 16384, automationRate: 'k-rate' },
     ];
   }
 
@@ -85,11 +87,13 @@ class MultibandStereoImagerProcessor extends AudioWorkletProcessor {
     this.antiDenormal = 1e-25;
 
     // Correlation detector state
-    this.leak = 1 - Math.exp(-1 / (this.sr * 0.300));
+    this.cachedStereoFftSize = -1;
+    this.leak = 1 - Math.exp(-1 / 1024);
     this.sumL2 = 0.0001;
     this.sumR2 = 0.0001;
     this.sumLR = 0.0001;
     this.correlation = 1.0;
+    this.updateStereoAnalysisWindow(1024);
 
     // Parameter smoothers (50 ms)
     this.smoothWet = 1 - Math.exp(-1 / (this.sr * 0.050));
@@ -219,6 +223,13 @@ class MultibandStereoImagerProcessor extends AudioWorkletProcessor {
     }
   }
 
+  updateStereoAnalysisWindow(fftSize) {
+    const windowSamples = clamp(Math.round(fftSize || 1024), 256, 16384);
+    if (windowSamples === this.cachedStereoFftSize) return;
+    this.cachedStereoFftSize = windowSamples;
+    this.leak = 1 - Math.exp(-1 / windowSamples);
+  }
+
   updateDelayTaps(surroundDelayMs) {
     const safeDelayMs = clamp(surroundDelayMs, 5, 30);
     if (safeDelayMs === this.cachedSurroundDelayMs) return;
@@ -255,9 +266,14 @@ class MultibandStereoImagerProcessor extends AudioWorkletProcessor {
     const monoThreshold = clamp(parameters.monoThreshold[0], 0.7, 1.0);
     const effSideLevel = clamp(parameters.monoSideLevel[0], 0, 150);
     const chorusAmount = clamp(parameters.chorusAmount[0] / 100, 0, 1);
+    const analysisEnabled = parameters.stereoAnalysisEnabled[0] >= 0.5;
+    const stereoFftSize = parameters.stereoFftSize[0];
 
     this.updateCrossoverCoefficients(crossoverLow, crossoverHigh);
     this.updateDelayTaps(surroundDelayMs);
+    if (analysisEnabled) {
+      this.updateStereoAnalysisWindow(stereoFftSize);
+    }
 
     const baseWidth = percentToStereoBaseWidth(widthPercent);
     const basePseudoAmount = percentToPseudoStereoAmount(widthPercent);
@@ -344,10 +360,14 @@ class MultibandStereoImagerProcessor extends AudioWorkletProcessor {
       }
 
       // 2. Continuous correlation detector
-      this.sumL2 = this.sumL2 + this.leak * (L * L - this.sumL2);
-      this.sumR2 = this.sumR2 + this.leak * (R * R - this.sumR2);
-      this.sumLR = this.sumLR + this.leak * (L * R - this.sumLR);
-      this.correlation = this.sumLR / Math.sqrt(this.sumL2 * this.sumR2 + 0.000001);
+      if (analysisEnabled) {
+        this.sumL2 = this.sumL2 + this.leak * (L * L - this.sumL2);
+        this.sumR2 = this.sumR2 + this.leak * (R * R - this.sumR2);
+        this.sumLR = this.sumLR + this.leak * (L * R - this.sumLR);
+        this.correlation = this.sumLR / Math.sqrt(this.sumL2 * this.sumR2 + 0.000001);
+      } else {
+        this.correlation = 0;
+      }
 
       let outL;
       let outR;
@@ -418,7 +438,7 @@ class MultibandStereoImagerProcessor extends AudioWorkletProcessor {
         outR = monoOut;
       } else {
         // Stereo 2-Speaker mode
-        const isNearMono = this.correlation >= monoThreshold;
+        const isNearMono = analysisEnabled && this.correlation >= monoThreshold;
         let targetWet = 0;
         if (surroundWetPercent > 0) {
           targetWet = surroundWetPercent / 100;

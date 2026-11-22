@@ -9,6 +9,7 @@ type AudioSelectRowProps<T extends string | number> = {
   onChange: (val: T) => void;
   tone?: 'default' | 'amber';
   direction?: 'up' | 'down' | 'auto';
+  disabled?: boolean;
   titleClassName?: string;
   descriptionClassName?: string;
   zIndex?: number;
@@ -22,31 +23,18 @@ export function AudioSelectRow<T extends string | number>({
   onChange,
   tone = 'default',
   direction = 'auto',
+  disabled = false,
   titleClassName,
   descriptionClassName,
   zIndex,
 }: AudioSelectRowProps<T>) {
   const [isOpen, setIsOpen] = useState(false);
-  const [openUpwards, setOpenUpwards] = useState(direction === 'up');
+  const [autoOpenUpwards, setAutoOpenUpwards] = useState(false);
   const containerRef = useRef<HTMLDivElement>(null);
 
   const selectedOption = options.find((opt) => opt.value === value) || options[0];
-
-  useEffect(() => {
-    if (isOpen && containerRef.current) {
-      if (direction === 'up') {
-        setOpenUpwards(true);
-      } else if (direction === 'down') {
-        setOpenUpwards(false);
-      } else {
-        const rect = containerRef.current.getBoundingClientRect();
-        const estimatedHeight = Math.min(options.length * 44 + 20, 260);
-        const spaceBelow = window.innerHeight - rect.bottom;
-        const spaceAbove = rect.top;
-        setOpenUpwards(spaceBelow < estimatedHeight && spaceAbove > spaceBelow);
-      }
-    }
-  }, [isOpen, direction, options.length]);
+  const openUpwards = direction === 'up' ? true : direction === 'down' ? false : autoOpenUpwards;
+  const menuOpen = isOpen && !disabled;
 
   useEffect(() => {
     const handlePointerDown = (event: PointerEvent) => {
@@ -56,7 +44,7 @@ export function AudioSelectRow<T extends string | number>({
     };
 
     const handleKeyDown = (event: KeyboardEvent) => {
-      if (event.key === 'Escape' && isOpen) {
+      if (event.key === 'Escape' && menuOpen) {
         setIsOpen(false);
       }
     };
@@ -67,7 +55,7 @@ export function AudioSelectRow<T extends string | number>({
       document.removeEventListener('pointerdown', handlePointerDown);
       document.removeEventListener('keydown', handleKeyDown);
     };
-  }, [isOpen]);
+  }, [menuOpen]);
 
   const containerStyle = tone === 'amber'
     ? 'bg-amber-500/[0.04] border-amber-500/20 hover:border-amber-500/30'
@@ -75,8 +63,8 @@ export function AudioSelectRow<T extends string | number>({
 
   return (
     <div 
-      className={`flex flex-col gap-3 mt-2 p-4 sm:p-5 rounded-2xl border transition-all ${containerStyle} w-full relative`}
-      style={{ zIndex: isOpen ? 50 : (zIndex ?? 1) }}
+      className={`flex flex-col gap-3 mt-2 p-4 sm:p-5 rounded-2xl border transition-all ${containerStyle} ${disabled ? 'opacity-50' : ''} w-full relative`}
+      style={{ zIndex: menuOpen ? 50 : (zIndex ?? 1) }}
     >
       <div className="flex flex-col w-full">
         <span className={`text-sm font-semibold block leading-snug break-words ${titleClassName || 'text-slate-100'}`}>{title}</span>
@@ -85,14 +73,28 @@ export function AudioSelectRow<T extends string | number>({
         </span>
       </div>
 
-      <div ref={containerRef} className={`relative w-full ${isOpen ? 'z-40' : ''}`}>
+      <div ref={containerRef} className={`relative w-full ${menuOpen ? 'z-40' : ''}`}>
         {/* Custom Dropdown Trigger */}
         <button
           type="button"
-          aria-expanded={isOpen}
-          onClick={() => setIsOpen(open => !open)}
-          className={`w-full flex items-center justify-between gap-3 bg-[#0c1626] text-primary font-mono text-xs font-semibold border rounded-xl px-4 py-3 outline-none transition-all shadow-md active:scale-[0.99] cursor-pointer ${
-            isOpen 
+          disabled={disabled}
+          aria-expanded={menuOpen}
+          onClick={() => {
+            if (disabled) return;
+            setIsOpen((prev) => {
+              const next = !prev;
+              if (next && direction === 'auto' && containerRef.current) {
+                const rect = containerRef.current.getBoundingClientRect();
+                const estimatedHeight = Math.min(options.length * 44 + 20, 260);
+                const spaceBelow = window.innerHeight - rect.bottom;
+                const spaceAbove = rect.top;
+                setAutoOpenUpwards(spaceBelow < estimatedHeight && spaceAbove > spaceBelow);
+              }
+              return next;
+            });
+          }}
+          className={`w-full flex items-center justify-between gap-3 bg-[#0c1626] text-primary font-mono text-xs font-semibold border rounded-xl px-4 py-3 outline-none transition-all shadow-md active:scale-[0.99] cursor-pointer disabled:cursor-not-allowed disabled:active:scale-100 ${
+            menuOpen 
               ? 'border-primary shadow-[0_0_15px_rgba(0,245,255,0.25)] ring-1 ring-primary/40' 
               : 'border-white/[0.1] hover:border-primary/50'
           }`}
@@ -100,12 +102,12 @@ export function AudioSelectRow<T extends string | number>({
           <span className="truncate text-left">{selectedOption ? selectedOption.label : String(value)}</span>
           <ChevronDown
             size={16}
-            className={`text-slate-400 transition-transform duration-300 shrink-0 ${isOpen ? 'rotate-180 text-primary' : ''}`}
+            className={`text-slate-400 transition-transform duration-300 shrink-0 ${menuOpen ? 'rotate-180 text-primary' : ''}`}
           />
         </button>
 
         {/* Custom Glassmorphic Popover Menu */}
-        {isOpen && (
+        {menuOpen && (
           <div
             className={`absolute ${
               openUpwards ? 'bottom-full mb-2' : 'top-full mt-2'

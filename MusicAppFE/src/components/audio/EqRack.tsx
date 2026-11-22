@@ -100,7 +100,7 @@ function EqResponseModal({
     }, !isParametricPreset);
 
     return data;
-  }, [bands, enabled, preampGain, bassGain, trebleGain, eqResponseData, effectsEnabled]);
+  }, [bands, enabled, preampGain, bassGain, trebleGain, eqResponseData, effectsEnabled, isParametricPreset]);
 
   const modalContent = (
     <div className="fixed inset-0 z-[100] flex items-center justify-center bg-black/80 backdrop-blur-md p-4">
@@ -296,7 +296,7 @@ export function EqRack() {
   const currentStylisticPreset = STYLISTIC_PRESETS[playerState.eqPresetName as keyof typeof STYLISTIC_PRESETS];
   const isParametricPreset = playerState.eqPresetName === 'PARAMETRIC'
     || isSavedParametricPreset(currentSavedPreset)
-    || Boolean(currentStylisticPreset && 'isParametric' in currentStylisticPreset && (currentStylisticPreset as any).isParametric);
+    || Boolean(currentStylisticPreset && 'isParametric' in currentStylisticPreset && currentStylisticPreset.isParametric);
   const isEditablePreset = playerState.eqBandMode === 'custom' && (
     playerState.eqPresetName === 'CUSTOM'
     || playerState.eqPresetName === 'PARAMETRIC'

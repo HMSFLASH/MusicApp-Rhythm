@@ -80,6 +80,8 @@ export const renderOfflineAudio = async ({
     monoThreshold,
     monoSideLevel,
     chorusAmount,
+    stereoAnalysisEnabled,
+    stereoFftSize,
     panValue,
     loudnessNormalization,
     useOversample,
@@ -310,6 +312,8 @@ export const renderOfflineAudio = async ({
       monoThreshold: monoThreshold ?? 0.985,
       monoSideLevel: monoSideLevel ?? 100,
       chorusAmount: chorusAmount ?? 0,
+      stereoAnalysisEnabled: stereoAnalysisEnabled ?? true,
+      stereoFftSize: stereoFftSize ?? 1024,
     });
     connectToNext(stereoNode);
   }

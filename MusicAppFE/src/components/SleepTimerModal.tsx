@@ -1,4 +1,4 @@
-import { useState, useMemo } from 'react';
+import { useState, useMemo, useEffect } from 'react';
 import { useTranslation } from 'react-i18next';
 import { Moon, Clock, Disc, X, Plus, Minus, Check, Volume2, Sparkles } from 'lucide-react';
 import { useSleepTimer } from '../context/SleepTimerContext';
@@ -24,10 +24,17 @@ const formatEndTime = (targetTimestamp: number) => {
 };
 
 export function SleepTimerModal() {
+  const { isModalOpen } = useSleepTimer();
+
+  if (!isModalOpen) return null;
+
+  return <SleepTimerModalContent />;
+}
+
+function SleepTimerModalContent() {
   const { t } = useTranslation();
   const {
     state,
-    isModalOpen,
     closeModal,
     setTimerMinutes,
     setTimerEndOfTrack,
@@ -41,14 +48,19 @@ export function SleepTimerModal() {
 
   const [selectedMinutes, setSelectedMinutes] = useState<number>(30);
   const [selectedMode, setSelectedMode] = useState<'minutes' | 'end_of_track'>('minutes');
+  const [nowMs, setNowMs] = useState<number>(() => Date.now());
+
+  useEffect(() => {
+    if (state.isActive || selectedMode !== 'minutes') return;
+    const intervalId = globalThis.setInterval(() => setNowMs(Date.now()), 15000);
+    return () => globalThis.clearInterval(intervalId);
+  }, [state.isActive, selectedMode]);
 
   const calculatedEndTime = useMemo(() => {
     if (selectedMode !== 'minutes') return null;
-    const target = Date.now() + selectedMinutes * 60 * 1000;
+    const target = nowMs + selectedMinutes * 60 * 1000;
     return formatEndTime(target);
-  }, [selectedMinutes, selectedMode]);
-
-  if (!isModalOpen) return null;
+  }, [nowMs, selectedMinutes, selectedMode]);
 
   const handleStart = () => {
     if (selectedMode === 'end_of_track') {

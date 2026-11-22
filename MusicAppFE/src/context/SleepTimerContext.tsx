@@ -58,19 +58,22 @@ export function SleepTimerProvider({ children }: { children: ReactNode }) {
   const currentTrackIdRef = useRef<string | number | null>(currentTrack?.id ?? null);
   const initialTrackIdRef = useRef<string | number | null>(null);
   const isPlayingRef = useRef(isPlaying);
-  isPlayingRef.current = isPlaying;
   const volumeRef = useRef(volume);
-  volumeRef.current = volume;
   const togglePlayRef = useRef(togglePlay);
-  togglePlayRef.current = togglePlay;
   const setVolumeRef = useRef(setVolume);
-  setVolumeRef.current = setVolume;
   const toastRef = useRef(toast);
-  toastRef.current = toast;
   const tRef = useRef(t);
-  tRef.current = t;
   const fadeOutRef = useRef(fadeOut);
-  fadeOutRef.current = fadeOut;
+
+  useEffect(() => {
+    isPlayingRef.current = isPlaying;
+    volumeRef.current = volume;
+    togglePlayRef.current = togglePlay;
+    setVolumeRef.current = setVolume;
+    toastRef.current = toast;
+    tRef.current = t;
+    fadeOutRef.current = fadeOut;
+  }, [isPlaying, volume, togglePlay, setVolume, toast, t, fadeOut]);
 
   useEffect(() => {
     currentTrackIdRef.current = currentTrack?.id ?? null;

@@ -87,8 +87,9 @@ export function NowPlaying() {
     };
   }, [scrollDiscIntoView]);
 
+  const currentTrackId = currentTrack?.id;
   useEffect(() => {
-    if (!currentTrack) return;
+    if (!currentTrackId) return;
 
     const frame = requestAnimationFrame(() => {
       const el = activeQueueTrackRef.current;
@@ -111,7 +112,7 @@ export function NowPlaying() {
     });
 
     return () => cancelAnimationFrame(frame);
-  }, [currentTrack?.id, playerState.queue.length]);
+  }, [currentTrackId, playerState.queue.length]);
 
   // Smooth GPU-accelerated JS animation
   const discRef1 = useRef<HTMLDivElement>(null);

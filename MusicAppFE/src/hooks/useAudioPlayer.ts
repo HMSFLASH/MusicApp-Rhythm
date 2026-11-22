@@ -137,7 +137,7 @@ export function useAudioPlayer(
 
     setLegacyMetadataOverrides((previous) => {
       const next = { ...previous };
-      if (nextEnabled === getDefaultLegacyMetadataParser(track)) {
+      if (nextEnabled === getDefaultLegacyMetadataParser()) {
         delete next[trackId];
       } else {
         next[trackId] = nextEnabled;
@@ -198,11 +198,13 @@ export function useAudioPlayer(
       chorusAmount: effectsState.chorusAmount,
       reverbMix: effectsState.reverbMix,
       reverbTime: effectsState.reverbTime,
+      reverbEngine: effectsState.reverbEngine,
       loudnessNormalization: effectsState.loudnessNormalization,
       useOversample: effectsState.useOversample,
       precalculateOnIdle: effectsState.precalculateOnIdle,
       fullQueueCacheEnabled: effectsState.fullQueueCacheEnabled,
       masterFftSize: effectsState.masterFftSize,
+      stereoAnalysisEnabled: effectsState.stereoAnalysisEnabled,
       stereoFftSize: effectsState.stereoFftSize,
 
       audioLatencyHint: effectsState.audioLatencyHint,
@@ -227,9 +229,9 @@ export function useAudioPlayer(
     effectsState.balancerSpeed, effectsState.balancerNoiseFloorDb, effectsState.balancerLookaheadMs, effectsState.balancerCeilingDb, effectsState.balancerUseKWeight,
     effectsState.panValue, effectsState.stereoWidth, effectsState.stereoCrossoverLow, effectsState.stereoCrossoverHigh, effectsState.stereoCrossoverMode,
     effectsState.surroundWet, effectsState.surroundDelay, effectsState.speakerMode, effectsState.monoThreshold, effectsState.monoSideLevel, effectsState.chorusAmount,
-    effectsState.reverbMix, effectsState.reverbTime,
+    effectsState.reverbMix, effectsState.reverbTime, effectsState.reverbEngine,
     effectsState.loudnessNormalization, effectsState.useOversample, effectsState.precalculateOnIdle,
-    effectsState.fullQueueCacheEnabled, effectsState.masterFftSize, effectsState.stereoFftSize, effectsState.audioLatencyHint, effectsState.fxEnabled,
+    effectsState.fullQueueCacheEnabled, effectsState.masterFftSize, effectsState.stereoAnalysisEnabled, effectsState.stereoFftSize, effectsState.audioLatencyHint, effectsState.fxEnabled,
     useLegacyMetadata
   ]);
 

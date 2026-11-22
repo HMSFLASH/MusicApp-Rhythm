@@ -20,8 +20,8 @@ export const decodeAacToAudioBuffer = async (
     sampleRate
   );
 
-  channelData.forEach((channel: any, index: number) => {
-    audioBuffer.copyToChannel(channel, index);
+  channelData.forEach((channel: Float32Array, index: number) => {
+    audioBuffer.copyToChannel(channel as Float32Array<ArrayBuffer>, index);
   });
 
   // Explicit cleanup of intermediate decoded channel references

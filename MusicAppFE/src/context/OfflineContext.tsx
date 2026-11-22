@@ -38,7 +38,12 @@ export function OfflineProvider({ children }: OfflineProviderProps) {
   }, []);
 
   useEffect(() => {
-    void refreshCachedMediaIds();
+    let cancelled = false;
+    void getAllCachedIds().then((ids) => {
+      if (!cancelled) {
+        setCachedMediaIds(new Set(ids));
+      }
+    });
 
     const handleOnline = () => setIsOfflineMode(false);
     const handleOffline = () => setIsOfflineMode(true);
@@ -47,10 +52,11 @@ export function OfflineProvider({ children }: OfflineProviderProps) {
     globalThis.addEventListener('offline', handleOffline);
 
     return () => {
+      cancelled = true;
       globalThis.removeEventListener('online', handleOnline);
       globalThis.removeEventListener('offline', handleOffline);
     };
-  }, [refreshCachedMediaIds]);
+  }, []);
 
   const isCached = useCallback((track: Track) => {
     if (track.sourceType === 'LOCAL') return true;

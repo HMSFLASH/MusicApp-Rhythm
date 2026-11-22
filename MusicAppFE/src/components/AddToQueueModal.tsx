@@ -1,4 +1,4 @@
-import { useState, useEffect } from 'react';
+import { useState } from 'react';
 import { X, ListMusic, Plus, Play, Check, Layers, ListEnd, ListPlus } from 'lucide-react';
 import { useTranslation } from 'react-i18next';
 import type { Track } from '../hooks/audioTypes';
@@ -20,27 +20,35 @@ export function AddToQueueModal({
   onClose,
   onQueueUpdated,
 }: AddToQueueModalProps) {
+  if (!isOpen || tracks.length === 0) return null;
+
+  return (
+    <AddToQueueModalContent
+      tracks={tracks}
+      currentPlayingTrackId={currentPlayingTrackId}
+      onClose={onClose}
+      onQueueUpdated={onQueueUpdated}
+    />
+  );
+}
+
+type AddToQueueModalContentProps = Omit<AddToQueueModalProps, 'isOpen'>;
+
+function AddToQueueModalContent({
+  tracks,
+  currentPlayingTrackId,
+  onClose,
+  onQueueUpdated,
+}: AddToQueueModalContentProps) {
   const { t } = useTranslation();
   const { toast } = useToast();
-  const [queues, setQueues] = useState<MultiQueue[]>([]);
-  const [activeQueueId, setActiveQueueId] = useState<string>('queue-1');
-  const [selectedQueueId, setSelectedQueueId] = useState<string>('queue-1');
+  const [initialData] = useState(() => loadMultiQueues());
+  const [queues, setQueues] = useState<MultiQueue[]>(initialData.queues);
+  const [activeQueueId] = useState<string>(initialData.activeQueueId);
+  const [selectedQueueId, setSelectedQueueId] = useState<string>(initialData.activeQueueId);
   const [insertMode, setInsertMode] = useState<'end' | 'next' | 'replace'>('end');
   const [newQueueName, setNewQueueName] = useState('');
   const [isCreatingNew, setIsCreatingNew] = useState(false);
-
-  useEffect(() => {
-    if (isOpen) {
-      const data = loadMultiQueues();
-      setQueues(data.queues);
-      setActiveQueueId(data.activeQueueId);
-      setSelectedQueueId(data.activeQueueId);
-      setIsCreatingNew(false);
-      setNewQueueName('');
-    }
-  }, [isOpen]);
-
-  if (!isOpen || tracks.length === 0) return null;
 
   const handleCreateNewQueue = () => {
     if (queues.length >= MAX_QUEUES) {

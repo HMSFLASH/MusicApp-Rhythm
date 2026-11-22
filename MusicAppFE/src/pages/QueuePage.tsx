@@ -86,28 +86,33 @@ export function QueuePage() {
   const [tempQueueName, setTempQueueName] = useState('');
   const [targetMoveTracks, setTargetMoveTracks] = useState<Track[] | null>(null);
 
-  // Sync current playing queue with multiQueues in storage
-  useEffect(() => {
-    setMultiQueues((prev) => {
-      const idx = prev.findIndex((q) => q.id === activeQueueId);
-      if (idx !== -1 && prev[idx].tracks !== queue) {
-        const next = [...prev];
-        next[idx] = { ...next[idx], tracks: queue };
-        saveMultiQueues(next, activeQueueId);
-        return next;
+  const effectiveMultiQueues = useMemo(() => {
+    let changed = false;
+    const next = multiQueues.map((q) => {
+      if (q.id === activeQueueId && q.tracks !== queue) {
+        changed = true;
+        return { ...q, tracks: queue };
       }
-      return prev;
+      return q;
     });
-  }, [queue, activeQueueId]);
+    return changed ? next : multiQueues;
+  }, [multiQueues, activeQueueId, queue]);
+
+  // Persist current playing queue changes with multiQueues in storage
+  useEffect(() => {
+    if (effectiveMultiQueues !== multiQueues) {
+      saveMultiQueues(effectiveMultiQueues, activeQueueId);
+    }
+  }, [effectiveMultiQueues, multiQueues, activeQueueId]);
 
   const viewingQueue = useMemo(() => {
-    return multiQueues.find((q) => q.id === selectedQueueId) || multiQueues[0] || {
+    return effectiveMultiQueues.find((q) => q.id === selectedQueueId) || effectiveMultiQueues[0] || {
       id: 'queue-1',
       name: t('queue.defaultName', 'Queue 1 (Main)', { index: 1 }),
       tracks: queue,
-      createdAt: Date.now(),
+      createdAt: 0,
     };
-  }, [multiQueues, selectedQueueId, queue, t]);
+  }, [effectiveMultiQueues, selectedQueueId, queue, t]);
 
   const displayTracks = viewingQueue.tracks;
   const isViewingActivePlayingQueue = selectedQueueId === activeQueueId;
@@ -139,18 +144,18 @@ export function QueuePage() {
 
   // Queue Operations
   const handleCreateNewQueue = () => {
-    if (multiQueues.length >= MAX_QUEUES) {
+    if (effectiveMultiQueues.length >= MAX_QUEUES) {
       toast.info(t('queue.maxQueuesReached', 'Maximum limit of {{max}} queues reached.', { max: MAX_QUEUES }));
       return;
     }
     const newQueue: MultiQueue = {
       id: `queue-${Date.now()}`,
-      name: t('queue.queueName', 'Queue {{index}}', { index: multiQueues.length + 1 }),
+      name: t('queue.queueName', 'Queue {{index}}', { index: effectiveMultiQueues.length + 1 }),
       tracks: [],
       currentTrackId: null,
       createdAt: Date.now(),
     };
-    const updated = [...multiQueues, newQueue];
+    const updated = [...effectiveMultiQueues, newQueue];
     setMultiQueues(updated);
     setSelectedQueueId(newQueue.id);
     saveMultiQueues(updated, activeQueueId);
@@ -164,7 +169,8 @@ export function QueuePage() {
     }
     setActiveQueueId(selectedQueueId);
     setQueue(displayTracks);
-    saveMultiQueues(multiQueues, selectedQueueId);
+    setMultiQueues(effectiveMultiQueues);
+    saveMultiQueues(effectiveMultiQueues, selectedQueueId);
 
     const trackToPlay = startTrack || displayTracks[0];
     playTrack(trackToPlay, displayTracks, true);
@@ -172,7 +178,7 @@ export function QueuePage() {
   };
 
   const handleUpdateViewingTracks = (newTracks: Track[]) => {
-    const updated = multiQueues.map((q) =>
+    const updated = effectiveMultiQueues.map((q) =>
       q.id === selectedQueueId ? { ...q, tracks: newTracks } : q
     );
     setMultiQueues(updated);
@@ -187,7 +193,7 @@ export function QueuePage() {
       setEditingQueueName(false);
       return;
     }
-    const updated = multiQueues.map((q) =>
+    const updated = effectiveMultiQueues.map((q) =>
       q.id === selectedQueueId ? { ...q, name: tempQueueName.trim() } : q
     );
     setMultiQueues(updated);
@@ -197,7 +203,7 @@ export function QueuePage() {
   };
 
   const handleCloneQueue = () => {
-    if (multiQueues.length >= MAX_QUEUES) {
+    if (effectiveMultiQueues.length >= MAX_QUEUES) {
       toast.info(t('queue.maxQueuesReached', 'Maximum limit of {{max}} queues reached.', { max: MAX_QUEUES }));
       return;
     }
@@ -208,7 +214,7 @@ export function QueuePage() {
       currentTrackId: null,
       createdAt: Date.now(),
     };
-    const updated = [...multiQueues, newQueue];
+    const updated = [...effectiveMultiQueues, newQueue];
     setMultiQueues(updated);
     setSelectedQueueId(newQueue.id);
     saveMultiQueues(updated, activeQueueId);
@@ -232,7 +238,7 @@ export function QueuePage() {
   };
 
   const handleDeleteQueue = async () => {
-    if (multiQueues.length <= 1) {
+    if (effectiveMultiQueues.length <= 1) {
       toast.info(t('queue.cannotDeleteSingle', 'Cannot delete when only 1 queue remains.'));
       return;
     }
@@ -246,7 +252,7 @@ export function QueuePage() {
     });
     if (!ok) return;
 
-    const remaining = multiQueues.filter((q) => q.id !== selectedQueueId);
+    const remaining = effectiveMultiQueues.filter((q) => q.id !== selectedQueueId);
     const nextActiveId = activeQueueId === selectedQueueId ? remaining[0].id : activeQueueId;
     setMultiQueues(remaining);
     setSelectedQueueId(remaining[0].id);
@@ -431,7 +437,7 @@ export function QueuePage() {
                   {t('queue.title', 'Multi-Queue')}
                 </h1>
                 <span className="text-[11px] font-mono font-bold px-2 py-0.5 rounded-md bg-cyan-500/15 border border-cyan-500/30 text-cyan-300">
-                  {multiQueues.length}/{MAX_QUEUES}
+                  {effectiveMultiQueues.length}/{MAX_QUEUES}
                 </span>
               </div>
               <p className="text-slate-400 text-xs font-mono mt-0.5">
@@ -441,7 +447,7 @@ export function QueuePage() {
           </div>
 
           {/* Quick Create Queue Button */}
-          {multiQueues.length < MAX_QUEUES && (
+          {effectiveMultiQueues.length < MAX_QUEUES && (
             <button
               onClick={handleCreateNewQueue}
               className="flex items-center gap-1.5 px-3.5 py-2 bg-cyan-500/15 hover:bg-cyan-500/25 text-cyan-300 border border-cyan-500/30 rounded-xl text-xs font-bold transition-all hover:scale-105 shadow-[0_0_15px_rgba(0,245,255,0.15)]"
@@ -454,7 +460,7 @@ export function QueuePage() {
 
         {/* Multi-Queue Tab Bar (Horizontal Scrollable) */}
         <div className="flex items-center gap-2 overflow-x-auto no-scrollbar py-1">
-          {multiQueues.map((q, idx) => {
+          {effectiveMultiQueues.map((q, idx) => {
             const isSelected = selectedQueueId === q.id;
             const isPlayingThis = activeQueueId === q.id;
 
@@ -577,7 +583,7 @@ export function QueuePage() {
             </button>
           )}
 
-          {multiQueues.length > 1 && (
+          {effectiveMultiQueues.length > 1 && (
             <button
               onClick={handleDeleteQueue}
               className="p-1.5 bg-red-500/10 hover:bg-red-500/20 text-red-400 border border-red-500/30 rounded-xl text-xs font-medium transition-colors"

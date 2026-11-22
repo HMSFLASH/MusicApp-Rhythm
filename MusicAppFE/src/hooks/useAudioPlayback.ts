@@ -3,7 +3,11 @@ import { useState, useRef, useEffect, useCallback } from 'react';
 import { useTranslation } from 'react-i18next';
 import type { Track } from './audioTypes';
 import { axiosClient } from '../api/axiosClient';
-import { getAudioConfigStorageKey } from './audioStorage';
+import { getAudioConfigStorageKey, type SavedAudioConfig } from './audioStorage';
+import type { useAudioQueue } from './useAudioQueue';
+import type { useAudioEffectsState } from './useAudioEffectsState';
+import type { useAudioContext } from './useAudioContext';
+import type { useAudioMetadata } from './useAudioMetadata';
 import { clamp } from './audioMath';
 import {
   calculateRealtimeTrackLoudnessGain,
@@ -77,18 +81,18 @@ interface ElementWithSinkId {
   setSinkId?: (sinkId: string) => Promise<void>;
 }
 
+type PlaybackEffectsState = ReturnType<typeof useAudioEffectsState> & {
+  flacWasmOverrides?: Record<string, boolean>;
+  m4aWasmOverrides?: Record<string, boolean>;
+};
+
 export function useAudioPlayback(
   isAuthenticated: boolean,
-
-  queueState: any,
-
-  effectsState: any,
-
-  contextState: any,
-
-  metadataState: any,
-
-  savedState: any,
+  queueState: ReturnType<typeof useAudioQueue>,
+  effectsState: PlaybackEffectsState,
+  contextState: ReturnType<typeof useAudioContext>,
+  metadataState: ReturnType<typeof useAudioMetadata>,
+  savedState: SavedAudioConfig,
   driveToken?: string,
   fetchDriveToken?: () => Promise<string>
 ) {
@@ -127,10 +131,11 @@ export function useAudioPlayback(
     monoThreshold,
     monoSideLevel,
     chorusAmount,
+    stereoAnalysisEnabled,
+    stereoFftSize,
     panValue,
     loudnessNormalization,
     useOversample,
-
     fullQueueCacheEnabled,
     flacWasmOverrides,
     m4aWasmOverrides,
@@ -168,6 +173,31 @@ export function useAudioPlayback(
   const [speedPitchScope, setSpeedPitchScope] = useState<'global' | 'track'>('global');
   const perTrackSpeedPitchRef = useRef<Map<string, { speed: number; pitch: number }>>(new Map());
   const pitchRateRef = useRef<number>(1);
+  const globalSpeedPitchRef = useRef<{ speed: number; pitch: number }>({
+    speed: savedState.playbackRate ?? 1,
+    pitch: 1,
+  });
+
+  useEffect(() => {
+    try {
+      const storageKey = `${configStorageKey}_perTrackSpeedPitch`;
+      const raw = localStorage.getItem(storageKey);
+      if (!raw) {
+        perTrackSpeedPitchRef.current = new Map();
+        return;
+      }
+      const parsed = JSON.parse(raw) as Record<string, { speed?: unknown; pitch?: unknown }>;
+      const nextMap = new Map<string, { speed: number; pitch: number }>();
+      for (const [trackId, entry] of Object.entries(parsed)) {
+        if (entry && typeof entry.speed === 'number' && typeof entry.pitch === 'number') {
+          nextMap.set(trackId, { speed: entry.speed, pitch: entry.pitch });
+        }
+      }
+      perTrackSpeedPitchRef.current = nextMap;
+    } catch {
+      perTrackSpeedPitchRef.current = new Map();
+    }
+  }, [configStorageKey]);
 
   const audioBufferRef = useRef<AudioBuffer | null>(null);
   const renderedAudioRef = useRef<HTMLAudioElement | null>(null);
@@ -194,7 +224,7 @@ export function useAudioPlayback(
   const seekRef = useRef<((time: number) => void) | null>(null);
   const togglePlayRef = useRef<(() => void) | null>(null);
 
-  const playTrackRef = useRef<((...args: any[]) => void) | null>(null);
+  const playTrackRef = useRef<((startingTrack: Track | null, currentQueue?: Track[], autoPlay?: boolean, playbackOptions?: { forceReloadFromDrive?: boolean }) => void) | null>(null);
   const currentTimeSnapshotRef = useRef<number>(0);
   const isPlayingSnapshotRef = useRef<boolean>(false);
   const currentTrackSnapshotRef = useRef<Track | null>(currentTrack ?? null);
@@ -351,9 +381,13 @@ export function useAudioPlayback(
   });
 
   const createDecodeContext = useCallback(() => {
-
-    const OfflineAudioContextCtor = globalThis.OfflineAudioContext || (window as any).webkitOfflineAudioContext;
-    return new OfflineAudioContextCtor(1, 1, 44100) as OfflineAudioContext;
+    const OfflineAudioContextCtor =
+      globalThis.OfflineAudioContext ||
+      (window as unknown as { webkitOfflineAudioContext?: typeof OfflineAudioContext }).webkitOfflineAudioContext;
+    if (!OfflineAudioContextCtor) {
+      throw new Error('OfflineAudioContext is not supported in this browser');
+    }
+    return new OfflineAudioContextCtor(1, 1, 44100);
   }, []);
 
   const decodeAudioDataForPreRender = useCallback((arrayBuffer: ArrayBuffer) => {
@@ -424,8 +458,8 @@ export function useAudioPlayback(
     renderedAudioRef.current.loop = false;
     renderedAudioRef.current.preload = 'auto';
     renderedAudioRef.current.volume = volume;
-    const effectiveRenderedRate = (speedPitchMode === 'advanced' && pitchRateRef.current !== 1)
-      ? playbackRate / pitchRateRef.current
+    const effectiveRenderedRate = (speedPitchMode === 'advanced' && pitchRate !== 1)
+      ? playbackRate / pitchRate
       : playbackRate;
     renderedAudioRef.current.playbackRate = Math.max(0.1, effectiveRenderedRate);
     renderedAudioRef.current.preservesPitch = (speedPitchMode === 'advanced') ? true : preservesPitch;
@@ -443,15 +477,35 @@ export function useAudioPlayback(
     return objectUrl;
   }, [playbackRate, preservesPitch, pitchRate, speedPitchMode, revokeRenderedAudioUrl, volume]);
 
+  const initialSavedVolumeRef = useRef<number>(savedState.volume ?? 1);
+  const initialSavedSinkIdRef = useRef<string | undefined>(savedState.sinkId);
+  const mountLifecycleCallbacksRef = useRef({
+    applyLoadedMetadataDuration,
+    cleanupMediaSessionAnchor,
+    clearTrackLoading,
+    revokeRenderedAudioUrl,
+  });
+
   useEffect(() => {
+    mountLifecycleCallbacksRef.current = {
+      applyLoadedMetadataDuration,
+      cleanupMediaSessionAnchor,
+      clearTrackLoading,
+      revokeRenderedAudioUrl,
+    };
+  });
+
+  useEffect(() => {
+    const precalculatedQueueBuffers = precalculatedQueueBuffersRef.current;
+
     if (!audioRef.current) {
       audioRef.current = new Audio();
       audioRef.current.crossOrigin = "use-credentials";
-      audioRef.current.volume = savedState.volume ?? 1;
+      audioRef.current.volume = initialSavedVolumeRef.current;
 
       const audioElem = audioRef.current as unknown as ElementWithSinkId;
-      if (savedState.sinkId && typeof audioElem.setSinkId === 'function') {
-        audioElem.setSinkId(savedState.sinkId).catch((e: unknown) => console.warn('Failed to restore HTMLAudioElement sinkId', e));
+      if (initialSavedSinkIdRef.current && typeof audioElem.setSinkId === 'function') {
+        audioElem.setSinkId(initialSavedSinkIdRef.current).catch((e: unknown) => console.warn('Failed to restore HTMLAudioElement sinkId', e));
       }
 
       audioRef.current.addEventListener('timeupdate', () => {
@@ -469,23 +523,23 @@ export function useAudioPlayback(
       document.addEventListener('visibilitychange', handleVisibilityChange);
       visibilityHandlerRef.current = handleVisibilityChange;
       audioRef.current.addEventListener('loadedmetadata', () => {
-        applyLoadedMetadataDuration(audioRef.current?.duration || 0);
+        mountLifecycleCallbacksRef.current.applyLoadedMetadataDuration(audioRef.current?.duration || 0);
       });
       audioRef.current.addEventListener('ended', () => {
-        if (!usingBufferPlaybackRef.current) clearTrackLoading();
+        if (!usingBufferPlaybackRef.current) mountLifecycleCallbacksRef.current.clearTrackLoading();
         if (playNextRef.current) playNextRef.current();
       });
       audioRef.current.addEventListener('play', () => {
         if (!usingBufferPlaybackRef.current) {
-          clearTrackLoading();
+          mountLifecycleCallbacksRef.current.clearTrackLoading();
           setIsPlaying(true);
         }
       });
       audioRef.current.addEventListener('playing', () => {
-        if (!usingBufferPlaybackRef.current) clearTrackLoading();
+        if (!usingBufferPlaybackRef.current) mountLifecycleCallbacksRef.current.clearTrackLoading();
       });
       audioRef.current.addEventListener('canplay', () => {
-        if (!usingBufferPlaybackRef.current) clearTrackLoading();
+        if (!usingBufferPlaybackRef.current) mountLifecycleCallbacksRef.current.clearTrackLoading();
       });
       audioRef.current.addEventListener('pause', () => {
         if (!usingBufferPlaybackRef.current) {
@@ -493,17 +547,17 @@ export function useAudioPlayback(
         }
       });
       audioRef.current.addEventListener('error', () => {
-        if (!usingBufferPlaybackRef.current) clearTrackLoading();
+        if (!usingBufferPlaybackRef.current) mountLifecycleCallbacksRef.current.clearTrackLoading();
       });
     }
 
     if (!renderedAudioRef.current) {
       const renderedAudio = new Audio();
-      renderedAudio.volume = savedState.volume ?? 1;
+      renderedAudio.volume = initialSavedVolumeRef.current;
       renderedAudio.preload = 'auto';
       const renderedElem = renderedAudio as unknown as ElementWithSinkId;
-      if (savedState.sinkId && typeof renderedElem.setSinkId === 'function') {
-        renderedElem.setSinkId(savedState.sinkId).catch((e: unknown) => console.warn('Failed to restore rendered HTMLAudioElement sinkId', e));
+      if (initialSavedSinkIdRef.current && typeof renderedElem.setSinkId === 'function') {
+        renderedElem.setSinkId(initialSavedSinkIdRef.current).catch((e: unknown) => console.warn('Failed to restore rendered HTMLAudioElement sinkId', e));
       }
       renderedAudioRef.current = renderedAudio;
 
@@ -514,28 +568,28 @@ export function useAudioPlayback(
       });
 
       renderedAudio.addEventListener('loadedmetadata', () => {
-        applyLoadedMetadataDuration(renderedAudio.duration || 0);
+        mountLifecycleCallbacksRef.current.applyLoadedMetadataDuration(renderedAudio.duration || 0);
       });
 
       renderedAudio.addEventListener('ended', () => {
-        clearTrackLoading();
+        mountLifecycleCallbacksRef.current.clearTrackLoading();
         if (playNextRef.current) playNextRef.current();
       });
       renderedAudio.addEventListener('play', () => {
-        clearTrackLoading();
+        mountLifecycleCallbacksRef.current.clearTrackLoading();
         setIsPlaying(true);
       });
       renderedAudio.addEventListener('playing', () => {
-        clearTrackLoading();
+        mountLifecycleCallbacksRef.current.clearTrackLoading();
       });
       renderedAudio.addEventListener('canplay', () => {
-        clearTrackLoading();
+        mountLifecycleCallbacksRef.current.clearTrackLoading();
       });
       renderedAudio.addEventListener('pause', () => {
         setIsPlaying(false);
       });
       renderedAudio.addEventListener('error', () => {
-        clearTrackLoading();
+        mountLifecycleCallbacksRef.current.clearTrackLoading();
       });
     }
 
@@ -555,19 +609,19 @@ export function useAudioPlayback(
         renderedAudioRef.current.src = "";
         renderedAudioRef.current = null;
       }
-      revokeRenderedAudioUrl();
+      mountLifecycleCallbacksRef.current.revokeRenderedAudioUrl();
       if (audioBufferRef.current) {
         explicitReleaseAudioBuffer(audioBufferRef.current);
         audioBufferRef.current = null;
       }
-      clearAudioBufferCache(precalculatedQueueBuffersRef.current);
+      clearAudioBufferCache(precalculatedQueueBuffers);
       if (audioContextRef.current && audioContextRef.current.state !== 'closed') {
         audioContextRef.current.close().catch(console.error);
         audioContextRef.current = null;
       }
-      cleanupMediaSessionAnchor();
+      mountLifecycleCallbacksRef.current.cleanupMediaSessionAnchor();
     };
-  }, []);
+  }, [audioContextRef, audioRef]);
   const allowedIdsRef = useRef<Set<string>>(new Set());
   const blobLoadingPromisesRef = useRef<Map<string, Promise<string>>>(new Map());
   const audioParamsRef = useRef<AudioRenderParams>({
@@ -600,6 +654,8 @@ export function useAudioPlayback(
     monoThreshold,
     monoSideLevel,
     chorusAmount,
+    stereoAnalysisEnabled,
+    stereoFftSize,
     panValue,
     loudnessNormalization,
     useOversample,
@@ -641,6 +697,8 @@ export function useAudioPlayback(
       monoThreshold,
       monoSideLevel,
       chorusAmount,
+      stereoAnalysisEnabled,
+      stereoFftSize,
       panValue,
       loudnessNormalization,
       useOversample,
@@ -670,9 +728,11 @@ export function useAudioPlayback(
     reverbMix,
     reverbTime,
     speakerMode,
+    stereoAnalysisEnabled,
     stereoCrossoverHigh,
     stereoCrossoverLow,
     stereoCrossoverMode,
+    stereoFftSize,
     stereoWidth,
     surroundDelay,
     surroundWet,
@@ -734,9 +794,11 @@ export function useAudioPlayback(
     setTrackLoudnessGain,
     speakerMode,
     stopQueuePrecalculateStatusSoon,
+    stereoAnalysisEnabled,
     stereoCrossoverHigh,
     stereoCrossoverLow,
     stereoCrossoverMode,
+    stereoFftSize,
     stereoWidth,
     surroundDelay,
     surroundWet,
@@ -940,7 +1002,7 @@ export function useAudioPlayback(
     pitchRateRef.current = val;
   }, []);
 
-  const togglePreservesPitch = useCallback(() => setPreservesPitch((prev: any) => !prev), []);
+  const togglePreservesPitch = useCallback(() => setPreservesPitch((prev: boolean) => !prev), []);
 
   useEffect(() => {
     const isAdvancedPitch = speedPitchMode === 'advanced' && pitchRate !== 1;
@@ -964,8 +1026,9 @@ export function useAudioPlayback(
     } catch {
       // Ignore localStorage write failures.
     }
-    // Save per-track settings if scope is 'track'
-    if (speedPitchScope === 'track' && currentTrackSnapshotRef.current) {
+    if (speedPitchScope === 'global') {
+      globalSpeedPitchRef.current = { speed: playbackRate, pitch: pitchRate };
+    } else if (speedPitchScope === 'track' && currentTrackSnapshotRef.current) {
       const trackId = String(currentTrackSnapshotRef.current.id);
       perTrackSpeedPitchRef.current.set(trackId, { speed: playbackRate, pitch: pitchRate });
       try {
@@ -1152,7 +1215,7 @@ export function useAudioPlayback(
 
           if (shouldResume) {
 
-            audioRef.current.play().catch((e: any) => {
+            audioRef.current.play().catch((e: unknown) => {
               console.error("Playback failed", e);
               clearTrackLoading();
             });
@@ -1162,10 +1225,12 @@ export function useAudioPlayback(
           }
         };
 
-        if (audioRef.current.readyState >= 1) {
+        const audioElement = audioRef.current;
+        if (!audioElement) return;
+        if (audioElement.readyState >= 1) {
           resumeHtmlAudio();
         } else {
-          audioRef.current.addEventListener('loadedmetadata', resumeHtmlAudio, { once: true });
+          audioElement.addEventListener('loadedmetadata', resumeHtmlAudio, { once: true });
         }
       } catch (e) {
         if (decodeSessionRef.current === transitionSessionId) {
@@ -1233,7 +1298,7 @@ export function useAudioPlayback(
       isParametricPreset: effectsState.isParametricPreset,
     });
 
-  const getRealtimeTrackLoudnessGain = async (track: Track, _audioUrl?: string) => {
+  const getRealtimeTrackLoudnessGain = async (track: Track) => {
     if (!audioParamsRef.current.loudnessNormalization) return 1;
 
     const trackId = String(track.id);
@@ -1406,7 +1471,7 @@ export function useAudioPlayback(
 
     const tracks = tracksToProcess ? [...tracksToProcess] : [...queue];
     const total = tracks.length;
-    const { recommendedWorkers, maxWorkers } = getQueuePrecalculateWorkerSettings(total);
+    const { recommendedWorkers, maxWorkers } = getQueuePrecalculateWorkerSettings();
     if (maxWorkers === 0) return;
     const workerCount = requestedWorkerCount != null
       ? Math.max(1, Math.min(Math.floor(requestedWorkerCount), maxWorkers))
@@ -1469,6 +1534,11 @@ export function useAudioPlayback(
     }));
   }, []);
 
+  const precalculateEntireQueueRef = useRef(precalculateEntireQueue);
+  useEffect(() => {
+    precalculateEntireQueueRef.current = precalculateEntireQueue;
+  });
+
   const retryFailedQueuePrecalculate = useCallback((requestedWorkerCount?: number) => {
     const failedIds = failedTrackIdsRef.current;
     if (!failedIds.length || !Array.isArray(queue) || queue.length === 0) return;
@@ -1479,8 +1549,7 @@ export function useAudioPlayback(
       inFlightRef.current.delete(id);
     }
     failedTrackIdsRef.current = [];
-    precalculateEntireQueue(requestedWorkerCount, failedTracks);
-
+    precalculateEntireQueueRef.current(requestedWorkerCount, failedTracks);
   }, [queue]);
 
   // Download tracks into RAM-backed blob URLs. The backend only provides the
@@ -1638,29 +1707,27 @@ export function useAudioPlayback(
   };
 
 
-  const playTrack = async (startingTrack: Track | null, currentQueue?: Track[], autoPlay = true, ..._args: any[]) => {
+  const playTrack = async (
+    startingTrack: Track | null,
+    currentQueue?: Track[],
+    autoPlay = true,
+    playbackOptions: { forceReloadFromDrive?: boolean } = {}
+  ) => {
     ensureAudioContextResumed();
     if (!precalculateOnIdleRef.current) {
       initializeAudioContext();
     }
     if (!startingTrack) return;
-    const playbackOptions = (_args[0] || {}) as { forceReloadFromDrive?: boolean };
     const forceReloadFromDrive = Boolean(playbackOptions.forceReloadFromDrive && startingTrack.sourceType !== 'LOCAL');
     const startingTrackId = String(startingTrack.id);
-
-    console.log(`\n--- [Audio] playTrack STARTED ---`);
-    console.log(`[Audio] Requested Track ID: ${startingTrack.id}, Title: ${startingTrack.title}`);
-    console.log(`[Audio] AutoPlay: ${autoPlay}, precalculateOnIdle: ${precalculateOnIdleRef.current}`);
-    console.log(`[Audio] Force reload from Drive: ${forceReloadFromDrive}`);
 
     // Spam guard: prevent rapid repeated calls for the SAME track
     const now = performance.now();
     const lastCall = playTrackSpamGuardRef.current;
     if (lastCall && !forceReloadFromDrive) {
       const elapsed = now - lastCall.timestamp;
-      // Same track clicked again within 300ms → skip (prevents double-click spam)
+      // Same track clicked again within 300ms -> skip (prevents double-click spam)
       if (lastCall.trackId === String(startingTrack.id) && elapsed < 300) {
-        console.log(`[Audio] Spam guard triggered, skipping redundant playTrack call.`);
         return;
       }
     }
@@ -1688,21 +1755,21 @@ export function useAudioPlayback(
     currentTimeSnapshotRef.current = 0;
     setDuration(initialDuration);
     bufferPausedTimeRef.current = 0;
-    // Load per-track speed/pitch or reset to defaults
     const startingId = String(startingTrack.id);
     const perTrackSettings = perTrackSpeedPitchRef.current.get(startingId);
-    if (perTrackSettings && speedPitchScope === 'track') {
+    if (perTrackSettings) {
+      setSpeedPitchScope('track');
       setPlaybackRate(perTrackSettings.speed);
       setPitchRate(perTrackSettings.pitch);
       pitchRateRef.current = perTrackSettings.pitch;
     } else {
-      setPlaybackRate(1);
-      if (speedPitchMode === 'advanced') {
-        setPitchRate(1);
-        pitchRateRef.current = 1;
-      }
+      setSpeedPitchScope('global');
+      const globalSettings = globalSpeedPitchRef.current;
+      setPlaybackRate(globalSettings.speed);
+      const nextPitch = speedPitchMode === 'advanced' ? globalSettings.pitch : 1;
+      setPitchRate(nextPitch);
+      pitchRateRef.current = nextPitch;
     }
-    setSpeedPitchScope('global');
 
     setCurrentTrack(startingTrack);
     setQueue(effectiveQueue);
@@ -1740,7 +1807,6 @@ export function useAudioPlayback(
     releaseRenderedAudioSource();
 
     const useRenderedBufferPlayback = precalculateOnIdle || shouldUseFlacWasmPlayback(startingTrack) || shouldUseM4aWasmPlayback(startingTrack);
-    console.log(`[Audio] useRenderedBufferPlayback: ${useRenderedBufferPlayback}`);
 
     if (useRenderedBufferPlayback) {
       setTrackLoudnessGain?.(1);
@@ -1759,30 +1825,24 @@ export function useAudioPlayback(
           // Fast path: check in-memory cache BEFORE fetching the audio URL.
           const cachedRenderedBuffer = getCachedPrecalculatedQueueBuffer(startingTrackId);
           if (cachedRenderedBuffer) {
-            console.log(`[Audio] Fast Path: Cache HIT for Track ID ${startingTrackId} in precalculatedQueueBuffersRef.`);
             finalRenderedBuffer = cachedRenderedBuffer;
           } else if (
             precalculatedNextBufferRef.current?.trackId === startingTrackId &&
             precalculatedNextBufferRef.current?.buffer
           ) {
-            console.log(`[Audio] Fast Path: Cache HIT for Track ID ${startingTrackId} in precalculatedNextBufferRef.`);
             finalRenderedBuffer = precalculatedNextBufferRef.current.buffer;
-          } else {
-            console.log(`[Audio] Slow Path: Cache MISS for Track ID ${startingTrackId}. Proceeding to download.`);
           }
 
           // Track the audio URL for the fallback path (stream on decode failure).
           let slowPathAudioUrl = '';
 
-          // Slow path: no cached buffer – need to download, decode, and render.
+          // Slow path: no cached buffer - need to download, decode, and render.
           if (!finalRenderedBuffer) {
             setLoadingTrackPhase(autoPlay ? 'downloading' : null);
 
             try {
-              console.log(`[Audio] Fetching audio URL...`);
               slowPathAudioUrl = await getTrackAudioUrl(startingTrack, forceReloadFromDrive);
               if (decodeSessionRef.current !== playSessionId) {
-                console.log(`[Audio] Session changed after getTrackAudioUrl, aborting.`);
                 return;
               }
               if (!slowPathAudioUrl) {
@@ -1794,7 +1854,6 @@ export function useAudioPlayback(
               if (forceReloadFromDrive) {
                 void metadataState.refreshTrackMetadataFromDrive?.(startingTrack);
               }
-              console.log(`[Audio] URL fetched successfully: ${slowPathAudioUrl.substring(0, 50)}...`);
             } catch (e) {
               console.error("[Audio] Failed to prepare track for playback", e);
               setIsPlaying(false);
@@ -1802,14 +1861,12 @@ export function useAudioPlayback(
               return;
             }
 
-            console.log(`[Audio] Starting buffer precalculation...`);
             setLoadingTrackPhase(autoPlay ? 'processing' : null);
             finalRenderedBuffer = await precalculateTrackBuffer(
               startingTrack,
               false,
               () => decodeSessionRef.current !== playSessionId
             );
-            console.log(`[Audio] Precalculation completed.`);
           }
 
           // Check if session changed while decoding
@@ -1817,7 +1874,6 @@ export function useAudioPlayback(
             decodeSessionRef.current !== playSessionId ||
             (!precalculateOnIdleRef.current && !shouldUseFlacWasmPlayback(startingTrack) && !shouldUseM4aWasmPlayback(startingTrack))
           ) {
-            console.log(`[Audio] Session changed or precalculation cancelled, aborting.`);
             return;
           }
 
@@ -1827,19 +1883,16 @@ export function useAudioPlayback(
             precalculatedNextBufferRef.current = null;
           }
           setDuration(finalRenderedBuffer.duration);
-          console.log(`[Audio] Configuring rendered audio buffer source...`);
           const renderedAudioUrl = configureRenderedAudioBufferSource(finalRenderedBuffer);
-          console.log(`[Audio] Configured blob URL: ${renderedAudioUrl}`);
           if (!renderedAudioUrl) {
             throw new Error('Failed to create rendered audio source');
           }
-
 
           // Trigger background preload for the next track
           if (precalculateOnIdleRef.current) {
             const nextSession = Symbol();
             precalculateNextSessionRef.current = nextSession;
-            setTimeout(() => preloadNextTrack(startingTrack, currentQueue, nextSession), getPrecalculateDelayMs());
+            setTimeout(() => preloadNextTrack(startingTrack, effectiveQueue, nextSession), getPrecalculateDelayMs());
           }
 
           if (autoPlay) {
@@ -1927,15 +1980,12 @@ export function useAudioPlayback(
       })();
     } else {
       // Non-buffer playback path (streaming)
-      console.log(`[Audio] Using non-buffer (streaming) path.`);
       setLoadingTrackPhase(autoPlay ? 'downloading' : null);
 
       let audioUrl: string;
       try {
-        console.log(`[Audio] Fetching audio URL for streaming...`);
         audioUrl = await getTrackAudioUrl(startingTrack, forceReloadFromDrive);
         if (decodeSessionRef.current !== playSessionId) {
-          console.log(`[Audio] Session changed after getTrackAudioUrl, aborting.`);
           return;
         }
         if (!audioUrl) {
@@ -1947,7 +1997,6 @@ export function useAudioPlayback(
         if (forceReloadFromDrive) {
           void metadataState.refreshTrackMetadataFromDrive?.(startingTrack);
         }
-        console.log(`[Audio] Streaming URL fetched: ${audioUrl.substring(0, 50)}...`);
 
         const startingTrackId = String(startingTrack.id);
         const hasKnownCover = Boolean(metadataState.imageCacheRef?.current?.has(startingTrackId));
@@ -1957,7 +2006,6 @@ export function useAudioPlayback(
           !audioCoverFallbackTrackIdsRef.current.has(startingTrackId)
         ) {
           audioCoverFallbackTrackIdsRef.current.add(startingTrackId);
-          console.log(`[Audio] Triggering legacy cover fallback for ${startingTrackId} after streaming blob load.`);
           void metadataState.refreshMissingTrackCover?.(withoutBackendImageUrl(startingTrack));
         }
       } catch (e) {
@@ -1970,18 +2018,16 @@ export function useAudioPlayback(
         return;
       }
 
-
-      if ((window as any).dummyAudio) (window as any).dummyAudio.pause();
+      const dummyWindow = window as unknown as { dummyAudio?: HTMLAudioElement };
+      if (dummyWindow.dummyAudio) dummyWindow.dummyAudio.pause();
       pauseMediaSessionAnchor();
       audioBufferRef.current = null;
       usingBufferPlaybackRef.current = false;
-      const realtimeLoudnessGain = await getRealtimeTrackLoudnessGain(startingTrack, audioUrl);
+      const realtimeLoudnessGain = await getRealtimeTrackLoudnessGain(startingTrack);
       if (decodeSessionRef.current !== playSessionId || precalculateOnIdleRef.current) {
-        console.log(`[Audio] Session changed during streaming prep, aborting.`);
         return;
       }
       setTrackLoudnessGain?.(realtimeLoudnessGain);
-      console.log(`[Audio] Configuring streaming audio element source...`);
       configureAudioElementSource(audioUrl);
       if (autoPlay) {
         pendingNetworkRetryTrackRef.current = null;
@@ -1994,9 +2040,8 @@ export function useAudioPlayback(
         } catch {
           // Some browsers reject seeking until metadata is ready.
         }
-        console.log(`[Audio] Starting streaming playback...`);
 
-        audioRef.current!.play().catch((e: any) => {
+        audioRef.current!.play().catch((e: unknown) => {
           clearTrackLoading();
           console.error("Playback failed", e);
         });
@@ -2010,7 +2055,7 @@ export function useAudioPlayback(
     // Keep only the active neighborhood in RAM: current, previous, and next.
     preloadAdjacentTracks(
       startingTrack.id,
-      currentQueue!,
+      effectiveQueue,
       !(precalculateOnIdleRef.current && (isLikelyConstrainedDevice() || getFullCoreCount() <= 8))
     );
 
@@ -2033,6 +2078,11 @@ export function useAudioPlayback(
     );
   };
 
+  const refreshMissingTrackCoverRef = useRef(metadataState.refreshMissingTrackCover);
+  useEffect(() => {
+    refreshMissingTrackCoverRef.current = metadataState.refreshMissingTrackCover;
+  }, [metadataState.refreshMissingTrackCover]);
+
   useEffect(() => {
     const persistLoadedBackendImage = async (trackId: string, src: string) => {
       try {
@@ -2049,7 +2099,6 @@ export function useAudioPlayback(
         const stored = await saveCover(trackId, new Uint8Array(await blob.arrayBuffer()), blob.type);
         if (stored) {
           persistedBackendImageIdsRef.current.add(trackId);
-          console.log(`[Audio] Saved backend cover image for ${trackId} to IndexedDB.`);
         } else {
           persistedBackendImageIdsRef.current.delete(trackId);
         }
@@ -2085,7 +2134,7 @@ export function useAudioPlayback(
       autoDriveReloadAtRef.current.set(failedTrackId, now);
 
       console.warn(`[Audio] Cover image failed for ${failedTrackId}; trying legacy cover fallback before backend metadata reload.`);
-      void metadataState.refreshMissingTrackCover?.(withoutBackendImageUrl(activeTrack));
+      void refreshMissingTrackCoverRef.current?.(withoutBackendImageUrl(activeTrack));
     };
 
     globalThis.addEventListener('load', handleImageLoad, true);
@@ -2096,6 +2145,10 @@ export function useAudioPlayback(
     };
   }, []);
 
+  const playCurrentBufferRef = useRef(playCurrentBuffer);
+  useEffect(() => {
+    playCurrentBufferRef.current = playCurrentBuffer;
+  });
 
   const playNext = useCallback(() => {
     const activeTrack = currentTrackSnapshotRef.current ?? currentTrack ?? null;
@@ -2109,11 +2162,11 @@ export function useAudioPlayback(
     if (songEndMode === 'repeat_one') {
       resetPlayCountTracking(Symbol());
       if (isRenderedBufferPlayback && (renderedAudioUrlRef.current || audioBufferRef.current)) {
-        playCurrentBuffer(0);
+        playCurrentBufferRef.current(0);
       } else if (audioRef.current) {
         audioRef.current.currentTime = 0;
 
-        audioRef.current.play().catch((e: any) => console.error(e));
+        audioRef.current.play().catch((e: unknown) => console.error(e));
       }
       return;
     }
@@ -2167,7 +2220,7 @@ export function useAudioPlayback(
     } else {
       setIsPlaying(false);
     }
-  }, [currentTrack, queue, songEndMode, queueEndMode, isShuffleState, upcomingQueues, cycleQueues, resetPlayCountTracking, setUpcomingQueues]);
+  }, [audioRef, currentTrack, queue, songEndMode, queueEndMode, isShuffleState, upcomingQueues, cycleQueues, resetPlayCountTracking, setUpcomingQueues, stopBufferPlayback]);
 
 
   const playPrevious = useCallback(() => {
@@ -2202,19 +2255,18 @@ export function useAudioPlayback(
         stopBufferPlayback();
         bufferPausedTimeRef.current = currentTime;
         setIsPlaying(false);
-      } else {
+      } else if (audioRef.current) {
         audioRef.current.pause();
       }
     } else {
       if ((precalculateOnIdle || usingBufferPlaybackRef.current) && (renderedAudioUrlRef.current || audioBufferRef.current)) {
         playCurrentBuffer(bufferPausedTimeRef.current);
-      } else if (!precalculateOnIdle && (!audioRef.current.src || audioRef.current.src === globalThis.location.href || audioRef.current.src.endsWith('/'))) {
+      } else if (!precalculateOnIdle && audioRef.current && (!audioRef.current.src || audioRef.current.src === globalThis.location.href || audioRef.current.src.endsWith('/'))) {
         if (currentTrack) {
           playTrack(currentTrack, queue, true);
         }
-      } else if (!precalculateOnIdle) {
-
-        audioRef.current.play().catch((e: any) => console.error(e));
+      } else if (!precalculateOnIdle && audioRef.current) {
+        audioRef.current.play().catch((e: unknown) => console.error(e));
       } else if (currentTrack && isDecodingRef.current === false) {
         playTrack(currentTrack, queue, true);
       }

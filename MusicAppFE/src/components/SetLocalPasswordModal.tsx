@@ -3,6 +3,7 @@ import { X, Key, User, Lock, Loader2 } from 'lucide-react';
 import { useTranslation } from 'react-i18next';
 import { axiosClient } from '../api/axiosClient';
 import { useAuth } from '../context/AuthContext';
+import { getErrorMessage } from '../utils/errorMessage';
 
 interface SetLocalPasswordModalProps {
   isOpen: boolean;
@@ -52,8 +53,8 @@ export function SetLocalPasswordModal({ isOpen, onClose, defaultEmail = '' }: Se
         setConfirmPassword('');
       }, 2000);
 
-    } catch (err: any) {
-      setError(err.message || t('auth.setPasswordFail', 'Failed to set password'));
+    } catch (err: unknown) {
+      setError(getErrorMessage(err, t('auth.setPasswordFail', 'Failed to set password')));
     } finally {
       setLoading(false);
     }

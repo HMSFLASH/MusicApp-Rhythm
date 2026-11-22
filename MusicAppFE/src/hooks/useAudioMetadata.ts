@@ -1,4 +1,4 @@
-import { useRef, useEffect, useState } from 'react';
+import { useRef, useEffect, useState, useMemo } from 'react';
 import type { Track } from './audioTypes';
 import { getCover, removeCover, saveCover } from '../utils/idb';
 import { getCachedAudio } from '../utils/mediaCache';
@@ -122,11 +122,22 @@ async function parseMetadataBuffer(
     return parseBufferFn(buffer, fileInfo, { duration: false }) as Promise<ParsedAudioMetadata>;
 }
 
-export function useAudioMetadata(isAuthenticated: boolean, queueState: any, settings: AudioMetadataSettings = {}) {
+export function useAudioMetadata(
+    isAuthenticated: boolean,
+    queueState: {
+        currentTrack?: Track | null;
+        setCurrentTrack?: React.Dispatch<React.SetStateAction<Track | null>>;
+        setQueue?: React.Dispatch<React.SetStateAction<Track[]>>;
+    },
+    settings: AudioMetadataSettings = {}
+) {
     const setCurrentTrack = queueState?.setCurrentTrack;
     const setQueue = queueState?.setQueue;
     const currentTrack = queueState?.currentTrack as Track | undefined;
-    const legacyMetadataOverrides = settings.legacyMetadataOverrides || {};
+    const legacyMetadataOverrides = useMemo(
+        () => settings.legacyMetadataOverrides || {},
+        [settings.legacyMetadataOverrides]
+    );
     const useLegacyMetadata = Boolean(settings.useLegacyMetadata);
 
 
@@ -154,10 +165,10 @@ export function useAudioMetadata(isAuthenticated: boolean, queueState: any, sett
             console.warn('[Metadata] Failed to clear cached metadata', e);
         }
 
-        setCurrentTrack((prev: Track | null) => (
+        setCurrentTrack?.((prev: Track | null) => (
             prev && String(prev.id) === trackId ? clearRefreshableMetadata(prev) : prev
         ));
-        setQueue((prevQ: Track[] | undefined) => Array.isArray(prevQ)
+        setQueue?.((prevQ: Track[]) => Array.isArray(prevQ)
             ? prevQ.map((t: Track) => String(t.id) === trackId ? clearRefreshableMetadata(t) : t)
             : prevQ);
         setMetadataVersion(v => v + 1);
@@ -186,10 +197,8 @@ export function useAudioMetadata(isAuthenticated: boolean, queueState: any, sett
 
             if (idbCover && !lsData) {
                 setMetadataVersion(v => v + 1);
-
-                setCurrentTrack?.((prev: any) => prev && String(prev.id) === trackId ? { ...prev, ...cachedCoverUpdate } : prev);
-
-                setQueue?.((prevQ: any) => prevQ?.map ? prevQ.map((t: any) => String(t.id) === trackId ? { ...t, ...cachedCoverUpdate } : t) : prevQ);
+                setCurrentTrack?.((prev: Track | null) => prev && String(prev.id) === trackId ? { ...prev, ...cachedCoverUpdate } : prev);
+                setQueue?.((prevQ: Track[]) => Array.isArray(prevQ) ? prevQ.map((t: Track) => String(t.id) === trackId ? { ...t, ...cachedCoverUpdate } : t) : prevQ);
                 globalThis.dispatchEvent(new CustomEvent('sonic_metadata_updated', { detail: trackId }));
             }
 
@@ -201,10 +210,8 @@ export function useAudioMetadata(isAuthenticated: boolean, queueState: any, sett
                         metadataCacheRef.current.set(trackId, parsed);
                         await db.set(lsKey, cacheData);
                         setMetadataVersion(v => v + 1);
-
-                        setCurrentTrack?.((prev: any) => prev && String(prev.id) === trackId ? { ...prev, ...parsed } : prev);
-
-                        setQueue?.((prevQ: any) => prevQ?.map ? prevQ.map((t: any) => String(t.id) === trackId ? { ...t, ...parsed } : t) : prevQ);
+                        setCurrentTrack?.((prev: Track | null) => prev && String(prev.id) === trackId ? { ...prev, ...parsed } : prev);
+                        setQueue?.((prevQ: Track[]) => Array.isArray(prevQ) ? prevQ.map((t: Track) => String(t.id) === trackId ? { ...t, ...parsed } : t) : prevQ);
                         globalThis.dispatchEvent(new CustomEvent('sonic_metadata_updated', { detail: trackId }));
 
                         const hasCover = !!parsed.imageUrl || !!track.imageUrl;
@@ -267,7 +274,6 @@ export function useAudioMetadata(isAuthenticated: boolean, queueState: any, sett
             } else {
                 const ext = track.fileName?.split('.').pop()?.toLowerCase();
 
-                // eslint-disable-next-line prefer-const
                 let blobUrl = blobCacheRef.current.get(trackId);
                 let cachedBlob: Blob | null | undefined;
 
@@ -275,14 +281,11 @@ export function useAudioMetadata(isAuthenticated: boolean, queueState: any, sett
                     cachedBlob = await getCachedAudio(trackId);
                     if (!cachedBlob && track.driveFileId && track.driveFileId !== 'undefined' && track.driveFileId !== 'null') {
                         cachedBlob = await getCachedAudio(`drive:${track.driveFileId}`);
-                        console.log(`[Metadata Debug] getCachedAudio for drive:${track.driveFileId} fallback returned:`, !!cachedBlob);
                     }
                     if (cachedBlob) {
                         blobUrl = URL.createObjectURL(cachedBlob);
                     }
                 }
-
-                console.log(`[Metadata Debug] Processing blobUrl:`, !!blobUrl, `useLegacy:`, useLegacyMetadataParser);
 
                 if (blobUrl) {
                     const fetched = cachedBlob ? undefined : await fetch(blobUrl);
@@ -440,11 +443,8 @@ export function useAudioMetadata(isAuthenticated: boolean, queueState: any, sett
 
             if (metadata.common.picture?.length) {
                 extractedPicture = true;
-                console.log(`[useAudioMetadata] Found ${metadata.common.picture.length} pictures`);
                 const pic = metadata.common.picture.reduce((prev, current) => (prev.data.length > current.data.length) ? prev : current);
                 const pictureData = pic.data as Uint8Array;
-                const header = Array.from(pictureData.slice(0, 4), (b) => b.toString(16).padStart(2, '0').toUpperCase()).join(' ');
-                console.log(`[useAudioMetadata] Found picture for ${track.id}: size=${pictureData.length} bytes, format=${pic.format}, magic=${header}`);
                 const fmt = pic.format || 'jpeg';
                 const mime = fmt.startsWith('image/') ? fmt : `image/${fmt}`;
                 const imgUrl = URL.createObjectURL(new Blob([new Uint8Array(pictureData)], { type: mime }));
@@ -455,7 +455,6 @@ export function useAudioMetadata(isAuthenticated: boolean, queueState: any, sett
                     extractedCoverStored = await saveCover(trackId, new Uint8Array(pictureData), mime);
                     if (extractedCoverStored) {
                         (cachePayload as Record<string, unknown>).coverStored = true;
-                        console.log(`[Metadata] Saved parsed cover image for ${trackId} to IndexedDB.`);
                     } else {
                         console.warn(`[Metadata] Cover for ${trackId} was parsed but could not be saved to IndexedDB`);
                     }
@@ -473,16 +472,13 @@ export function useAudioMetadata(isAuthenticated: boolean, queueState: any, sett
             }
             setMetadataVersion(v => v + 1);
 
-            console.log(`[Metadata Debug] Finished extract. extractedPicture:`, extractedPicture, `keys(up):`, Object.keys(up));
-
             if (Object.keys(up).length > 0) {
-                setCurrentTrack?.((prev: any) => prev && String(prev.id) === trackId ? { ...prev, ...up } : prev);
-                setQueue?.((prevQ: any) => prevQ?.map ? prevQ.map((t: any) => String(t.id) === trackId ? { ...t, ...up } : t) : prevQ);
+                setCurrentTrack?.((prev: Track | null) => prev && String(prev.id) === trackId ? { ...prev, ...up } : prev);
+                setQueue?.((prevQ: Track[]) => Array.isArray(prevQ) ? prevQ.map((t: Track) => String(t.id) === trackId ? { ...t, ...up } : t) : prevQ);
                 globalThis.dispatchEvent(new CustomEvent('sonic_metadata_updated', { detail: trackId }));
             }
 
             if (!extractedPicture && !useLegacyMetadataParser) {
-                console.log(`[Metadata Debug] Auto fallback triggered for ${trackId}`);
                 setTimeout(() => {
                     refreshMissingTrackCover(track).catch(err => console.warn('Failed auto legacy fallback', err));
                 }, 100);
@@ -516,10 +512,10 @@ export function useAudioMetadata(isAuthenticated: boolean, queueState: any, sett
     async function refreshMissingTrackCover(track: Track) {
         const trackId = String(track.id);
 
-        setCurrentTrack((prev: Track | null) => (
+        setCurrentTrack?.((prev: Track | null) => (
             prev && String(prev.id) === trackId ? withoutBackendImageUrl(prev) : prev
         ));
-        setQueue((prevQ: Track[] | undefined) => Array.isArray(prevQ)
+        setQueue?.((prevQ: Track[]) => Array.isArray(prevQ)
             ? prevQ.map((t: Track) => String(t.id) === trackId ? withoutBackendImageUrl(t) : t)
             : prevQ);
 
@@ -551,7 +547,6 @@ export function useAudioMetadata(isAuthenticated: boolean, queueState: any, sett
             console.warn('[Metadata] Failed to reset cover retry cache', err);
         }
 
-        console.log(`[Metadata] Trying legacy cover fallback for ${trackId} from cached audio blob.`);
         await extractMetadata(withoutBackendImageUrl(track), {
             ignoreCache: true,
             useLegacyMetadataParser: true,
@@ -570,6 +565,11 @@ export function useAudioMetadata(isAuthenticated: boolean, queueState: any, sett
         }
     }
 
+    const extractMetadataRef = useRef(extractMetadata);
+    useEffect(() => {
+        extractMetadataRef.current = extractMetadata;
+    });
+
     useEffect(() => {
         if (currentTrack) {
             const trackId = String(currentTrack.id);
@@ -582,7 +582,7 @@ export function useAudioMetadata(isAuthenticated: boolean, queueState: any, sett
                 const imageUrl = imageCacheRef.current.get(trackId);
                 if (imageUrl?.startsWith('blob:')) URL.revokeObjectURL(imageUrl);
                 imageCacheRef.current.delete(trackId);
-                void extractMetadata(currentTrack, { ignoreCache: true });
+                void extractMetadataRef.current(currentTrack, { ignoreCache: true });
             }
         }
 
@@ -592,7 +592,7 @@ export function useAudioMetadata(isAuthenticated: boolean, queueState: any, sett
             const hasCover = !!cached?.imageUrl || !!currentTrack.imageUrl || imageCacheRef.current.has(trackId);
             const isCoverChecked = Boolean(cached?.coverChecked || cached?.coverMissing);
             if (!cached || (!hasCover && !isCoverChecked)) {
-                void extractMetadata(currentTrack);
+                void extractMetadataRef.current(currentTrack);
             }
         }
     }, [currentTrack, legacyMetadataOverrides, useLegacyMetadata]);

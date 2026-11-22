@@ -3,6 +3,7 @@ import { useAudioMetadata } from './useAudioMetadata';
 import { useAudioPlayback } from './useAudioPlayback';
 import type { useAudioQueue } from './useAudioQueue';
 import type { useAudioEffectsState } from './useAudioEffectsState';
+import type { SavedAudioConfig } from './audioStorage';
 
 type AudioEngineEffectsState = ReturnType<typeof useAudioEffectsState> & {
   flacWasmOverrides?: Record<string, boolean>;
@@ -15,8 +16,7 @@ export function useAudioEngine(
   isAuthenticated: boolean,
   queueState: ReturnType<typeof useAudioQueue>,
   effectsState: AudioEngineEffectsState,
-
-  savedState: any,
+  savedState: SavedAudioConfig,
   driveToken?: string,
   fetchDriveToken?: () => Promise<string>
 ) {

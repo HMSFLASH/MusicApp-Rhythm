@@ -5,18 +5,37 @@ import type { Track } from '../hooks/audioTypes';
 import { useToast } from '../context/ToastContext';
 
 interface TrackInfoModalProps {
-  readonly track: Track;
+  readonly track: Track | null;
   readonly trackMetadata?: Partial<Track> | null;
   readonly onClose: () => void;
   readonly onUpdateMetadata?: (updatedTags: Record<string, string>) => void;
 }
 
 export function TrackInfoModal({ track, trackMetadata, onClose, onUpdateMetadata }: TrackInfoModalProps) {
+  if (!track) return null;
+
+  return (
+    <TrackInfoModalContent
+      key={String(track.id)}
+      track={track}
+      trackMetadata={trackMetadata}
+      onClose={onClose}
+      onUpdateMetadata={onUpdateMetadata}
+    />
+  );
+}
+
+interface TrackInfoModalContentProps {
+  readonly track: Track;
+  readonly trackMetadata?: Partial<Track> | null;
+  readonly onClose: () => void;
+  readonly onUpdateMetadata?: (updatedTags: Record<string, string>) => void;
+}
+
+function TrackInfoModalContent({ track, trackMetadata, onClose, onUpdateMetadata }: TrackInfoModalContentProps) {
   const { t } = useTranslation();
   const { toast } = useToast();
   const [activeTab, setActiveTab] = useState<'details' | 'metadata' | 'cover'>('details');
-
-  if (!track) return null;
 
   const fileSize = track.fileSize ?? trackMetadata?.fileSize;
   const bitrate = track.bitrate ?? trackMetadata?.bitrate;

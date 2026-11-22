@@ -89,8 +89,9 @@ async function extractUploadMetadata(file: File) {
     }
 
     if (metadata.common.lyrics && metadata.common.lyrics.length > 0) {
-
-      extracted.lyrics = metadata.common.lyrics.map((l: any) => typeof l === 'string' ? l : (l.text || JSON.stringify(l))).join('\n\n');
+      extracted.lyrics = metadata.common.lyrics
+        .map((l: string | { text?: string }) => (typeof l === 'string' ? l : (l.text || JSON.stringify(l))))
+        .join('\n\n');
     }
 
     return extracted;
@@ -254,9 +255,10 @@ export function UploadProvider({ children }: { children: ReactNode }) {
 
       void uploadDirectTask(task.file)
         .then(() => finishTask(task.id, 'success'))
-        .catch((e: any) => {
+        .catch((e: unknown) => {
+          const err = e as { message?: string; response?: { status?: number; data?: { message?: string } } };
           console.error(`Error uploading ${task.file.name}:`, e);
-          if (e?.message === 'File already exists in library' || e?.response?.data?.message === 'File already exists in library' || e?.response?.status === 409) {
+          if (err?.message === 'File already exists in library' || err?.response?.data?.message === 'File already exists in library' || err?.response?.status === 409) {
             finishTask(task.id, 'skipped');
           } else {
             finishTask(task.id, 'error');

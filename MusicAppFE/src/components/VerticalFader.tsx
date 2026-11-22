@@ -1,5 +1,5 @@
 import React, { useRef, useEffect, useState, useCallback } from 'react';
-import { formatNumberInput, parseDecimalInput } from './NumberInput';
+import { formatNumberInput, parseDecimalInput } from '../utils/numberInput';
 
 interface VerticalFaderProps {
   value: number;

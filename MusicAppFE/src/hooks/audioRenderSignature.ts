@@ -30,6 +30,8 @@ export type AudioRenderParams = {
   monoThreshold?: number;
   monoSideLevel?: number;
   chorusAmount?: number;
+  stereoAnalysisEnabled?: boolean;
+  stereoFftSize?: number;
   panValue: number;
   loudnessNormalization: boolean;
   useOversample: boolean;
@@ -94,6 +96,8 @@ export const createRenderSignature = (
   monoThreshold: params.monoThreshold ?? 0.985,
   monoSideLevel: params.monoSideLevel ?? 100,
   chorusAmount: params.chorusAmount ?? 0,
+  stereoAnalysisEnabled: params.stereoAnalysisEnabled !== false,
+  stereoFftSize: params.stereoFftSize ?? 1024,
   panValue: params.panValue,
   loudnessNormalization: Boolean(params.loudnessNormalization),
 });

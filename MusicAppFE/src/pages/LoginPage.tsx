@@ -1,10 +1,10 @@
 import { Disc, ChevronRight, Loader2, Eye, EyeOff } from 'lucide-react';
 import { NavLink, useNavigate, useSearchParams } from 'react-router-dom';
-import { useState, useEffect } from 'react';
+import { useState } from 'react';
 import { useTranslation } from 'react-i18next';
-import { axiosClient } from '../api/axiosClient';
+import { axiosClient, BACKEND_URL } from '../api/axiosClient';
 import { useAuth } from '../context/AuthContext';
-import { BACKEND_URL } from '../api/axiosClient';
+import { getErrorMessage } from '../utils/errorMessage';
 
 export function LoginPage() {
   const { t } = useTranslation();
@@ -12,18 +12,15 @@ export function LoginPage() {
   const [password, setPassword] = useState('');
   const [showPassword, setShowPassword] = useState(false);
   const [loading, setLoading] = useState(false);
-  const [error, setError] = useState('');
+  const [error, setError] = useState<string | null>(null);
   const { setIsAuthenticated } = useAuth();
   const navigate = useNavigate();
   const [searchParams] = useSearchParams();
 
-  useEffect(() => {
-    const errorParam = searchParams.get('error');
-    const messageParam = searchParams.get('message');
-    if (errorParam === 'oauth2_failure') {
-      setError(messageParam || t('auth.invalidCredentials', 'Google login failed'));
-    }
-  }, [searchParams, t]);
+  const oauthError = searchParams.get('error') === 'oauth2_failure'
+    ? (searchParams.get('message') || t('auth.invalidCredentials', 'Google login failed'))
+    : '';
+  const displayError = error ?? oauthError;
 
   const handleGoogleLogin = (provider: string = 'google') => {
     globalThis.location.href = `${BACKEND_URL}/oauth2/authorization/${provider}`;
@@ -44,8 +41,8 @@ export function LoginPage() {
       setIsAuthenticated(true);
       navigate('/');
 
-    } catch (err: any) {
-      setError(err.message || t('auth.invalidCredentials', 'Invalid credentials'));
+    } catch (err: unknown) {
+      setError(getErrorMessage(err, t('auth.invalidCredentials', 'Invalid credentials')));
     } finally {
       setLoading(false);
     }
@@ -94,9 +91,9 @@ export function LoginPage() {
 
           <form onSubmit={handleLocalLogin} className="w-full space-y-4">
 
-            {error && (
+            {displayError && (
               <div className="p-3 bg-red-500/10 border border-red-500/20 rounded-xl text-red-400 text-xs font-medium">
-                {error}
+                {displayError}
               </div>
             )}
 

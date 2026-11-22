@@ -90,6 +90,7 @@ type SavedAudioEffectsState = Partial<{
   precalculateOnIdle: boolean;
   fullQueueCacheEnabled: boolean;
   masterFftSize: number;
+  stereoAnalysisEnabled: boolean;
   stereoFftSize: number;
   audioLatencyHint: AudioContextLatencyCategory;
   reverbEngine: 'procedural' | 'file';
@@ -333,7 +334,9 @@ export function useAudioEffectsState(savedState: SavedAudioEffectsState = {}) {
   const [precalculateOnIdle, setPrecalculateOnIdle] = useState<boolean>(savedState.precalculateOnIdle ?? false);
   const [fullQueueCacheEnabled, setFullQueueCacheEnabled] = useState<boolean>(savedState.fullQueueCacheEnabled ?? false);
   const [masterFftSize, setMasterFftSize] = useState<number>(savedState.masterFftSize ?? 2048);
+  const [stereoAnalysisEnabled, setStereoAnalysisEnabled] = useState<boolean>(savedState.stereoAnalysisEnabled ?? true);
   const [stereoFftSize, setStereoFftSize] = useState<number>(savedState.stereoFftSize ?? 1024);
+  const toggleStereoAnalysis = useCallback(() => setStereoAnalysisEnabled((prev) => !prev), []);
   const [audioLatencyHint, setAudioLatencyHint] = useState<AudioContextLatencyCategory>(savedState.audioLatencyHint ?? 'playback');
 
   const initialFxEnabled: FxEnabledState = {
@@ -569,35 +572,32 @@ export function useAudioEffectsState(savedState: SavedAudioEffectsState = {}) {
   }, [bassGain, eqBands, eqPresetName, preampGain, trebleGain]);
   const applyCustomSavedPreset = useCallback((name: string) => {
     setEqPresetName(name);
-    setCustomEqPresets(prev => {
-      const preset = prev.find(p => p.name === name);
-      if (preset) {
-        const isParametricPreset = preset.presetMode === 'parametric'
-          || Boolean(preset.isCustomOrigin && hasParametricBandSettings(preset.bands));
-        if (isParametricPreset) {
-          disableInterpolation();
-        } else {
-          setEqBandCountState(preset.bands.length);
-        }
-        setEqBands(isParametricPreset
-          ? preset.bands.map(band => ({ ...band }))
-          : applyGraphicEqQ(preset.bands));
-        if (typeof preset.preampGain === 'number') setPreampGain(preset.preampGain);
-        if (typeof preset.bassGain === 'number') setBassGain(preset.bassGain);
-        if (typeof preset.trebleGain === 'number') setTrebleGain(preset.trebleGain);
-      }
-      return prev;
-    });
-  }, [disableInterpolation, setPreampGain]);
+    const preset = customEqPresets.find(p => p.name === name);
+    if (!preset) return;
+
+    const isParametricPreset = preset.presetMode === 'parametric'
+      || Boolean(preset.isCustomOrigin && hasParametricBandSettings(preset.bands));
+    if (isParametricPreset) {
+      disableInterpolation();
+    } else {
+      setEqBandCountState(preset.bands.length);
+    }
+    setEqBands(isParametricPreset
+      ? preset.bands.map(band => ({ ...band }))
+      : applyGraphicEqQ(preset.bands));
+    if (typeof preset.preampGain === 'number') setPreampGain(preset.preampGain);
+    if (typeof preset.bassGain === 'number') setBassGain(preset.bassGain);
+    if (typeof preset.trebleGain === 'number') setTrebleGain(preset.trebleGain);
+  }, [customEqPresets, disableInterpolation, setPreampGain]);
 
   const changeEqBandCount = useCallback((newCount: number) => {
     setEqBandCountState(newCount);
     const bandKey = `${newCount}_BANDS` as keyof typeof EQ_PRESETS;
 
-    if (PRECOMPUTED_STYLISTIC_PRESETS[eqPresetName] && !PRECOMPUTED_STYLISTIC_PRESETS[eqPresetName].isParametric) {
-      const preset = PRECOMPUTED_STYLISTIC_PRESETS[eqPresetName];
+    const stylisticPreset = PRECOMPUTED_STYLISTIC_PRESETS[eqPresetName];
+    if (stylisticPreset && !stylisticPreset.isParametric) {
       const freqs = EQ_PRESETS[bandKey] || EQ_PRESETS['10_BANDS'];
-      const gains = preset.precomputedGains[bandKey] || preset.precomputedGains['10_BANDS'];
+      const gains = stylisticPreset.precomputedGains[bandKey] || stylisticPreset.precomputedGains['10_BANDS'];
       setEqBands(createEqBands(freqs, gains));
       return;
     }
@@ -611,23 +611,31 @@ export function useAudioEffectsState(savedState: SavedAudioEffectsState = {}) {
     }
   }, [eqPresetName, isCurrentParametricEq]);
   const renameCustomPreset = useCallback((oldName: string, newName: string) => {
+    const hasDuplicate = customEqPresets.some(p => p.name === newName);
+    if (hasDuplicate) return;
+
     setCustomEqPresets(prev => {
       if (prev.some(p => p.name === newName)) return prev;
       return prev.map(p => p.name === oldName ? { ...p, name: newName } : p);
     });
-  }, []);
+    setEqPresetName(prev => (prev === oldName ? newName : prev));
+  }, [customEqPresets]);
   const deleteCustomPreset = useCallback((name: string) => setCustomEqPresets(prev => prev.filter(p => p.name !== name)), []);
 
-  const addCustomEqBand = useCallback((freq?: number) => setEqBands(prev => {
+  const addCustomEqBand = useCallback((freq?: number) => {
     checkAndSwitchToCustom();
-    const nextBands = [...prev, { id: `band_${Date.now()}`, frequency: freq || 1000, gain: 0, q: DEFAULT_PARAMETRIC_Q, channel: 'L+R' as const, type: 'peaking' as BiquadFilterType }];
-    return isCurrentParametricEq() ? nextBands : applyGraphicEqQ(nextBands);
-  }), [isCurrentParametricEq, checkAndSwitchToCustom]);
-  const removeCustomEqBand = useCallback((id: string) => setEqBands(prev => {
+    setEqBands(prev => {
+      const nextBands = [...prev, { id: `band_${Date.now()}`, frequency: freq || 1000, gain: 0, q: DEFAULT_PARAMETRIC_Q, channel: 'L+R' as const, type: 'peaking' as BiquadFilterType }];
+      return isCurrentParametricEq() ? nextBands : applyGraphicEqQ(nextBands);
+    });
+  }, [isCurrentParametricEq, checkAndSwitchToCustom]);
+  const removeCustomEqBand = useCallback((id: string) => {
     checkAndSwitchToCustom();
-    const nextBands = prev.filter(b => b.id !== id);
-    return isCurrentParametricEq() ? nextBands : applyGraphicEqQ(nextBands);
-  }), [isCurrentParametricEq, checkAndSwitchToCustom]);
+    setEqBands(prev => {
+      const nextBands = prev.filter(b => b.id !== id);
+      return isCurrentParametricEq() ? nextBands : applyGraphicEqQ(nextBands);
+    });
+  }, [isCurrentParametricEq, checkAndSwitchToCustom]);
   const updateEqGain = useCallback((id: string, val: number) => {
     checkAndSwitchToCustom();
     setEqBands(prev => prev.map(b => b.id === id ? { ...b, gain: val } : b));
@@ -696,6 +704,7 @@ export function useAudioEffectsState(savedState: SavedAudioEffectsState = {}) {
     precalculateOnIdle, setPrecalculateOnIdle,
     fullQueueCacheEnabled, setFullQueueCacheEnabled,
     masterFftSize, setMasterFftSize, updateMasterFftSize: setMasterFftSize,
+    stereoAnalysisEnabled, setStereoAnalysisEnabled, updateStereoAnalysisEnabled: setStereoAnalysisEnabled, toggleStereoAnalysis,
     stereoFftSize, setStereoFftSize, updateStereoFftSize: setStereoFftSize,
 
     audioLatencyHint, setAudioLatencyHint, updateAudioLatencyHint: setAudioLatencyHint,

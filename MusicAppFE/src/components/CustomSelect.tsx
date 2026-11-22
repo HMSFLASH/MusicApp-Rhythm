@@ -48,26 +48,11 @@ export function CustomSelect<T extends string | number>({
   size = 'sm',
 }: CustomSelectProps<T>) {
   const [isOpen, setIsOpen] = useState(false);
-  const [openUpwards, setOpenUpwards] = useState(direction === 'up');
+  const [autoOpenUpwards, setAutoOpenUpwards] = useState(false);
   const containerRef = useRef<HTMLDivElement>(null);
 
   const selectedOption = options.find((opt) => opt.value === value);
-
-  useEffect(() => {
-    if (isOpen && containerRef.current) {
-      if (direction === 'up') {
-        setOpenUpwards(true);
-      } else if (direction === 'down') {
-        setOpenUpwards(false);
-      } else {
-        const rect = containerRef.current.getBoundingClientRect();
-        const estimatedHeight = Math.min(options.length * 40 + 20, 250);
-        const spaceBelow = window.innerHeight - rect.bottom;
-        const spaceAbove = rect.top;
-        setOpenUpwards(spaceBelow < estimatedHeight && spaceAbove > spaceBelow);
-      }
-    }
-  }, [isOpen, direction, options.length]);
+  const openUpwards = direction === 'up' ? true : direction === 'down' ? false : autoOpenUpwards;
 
   useEffect(() => {
     const handlePointerDown = (event: PointerEvent) => {
@@ -141,7 +126,18 @@ export function CustomSelect<T extends string | number>({
         aria-label={ariaLabel}
         onClick={(e) => {
           e.stopPropagation();
-          if (!disabled) setIsOpen((prev) => !prev);
+          if (disabled) return;
+          setIsOpen((prev) => {
+            const next = !prev;
+            if (next && direction === 'auto' && containerRef.current) {
+              const rect = containerRef.current.getBoundingClientRect();
+              const estimatedHeight = Math.min(options.length * 40 + 20, 250);
+              const spaceBelow = window.innerHeight - rect.bottom;
+              const spaceAbove = rect.top;
+              setAutoOpenUpwards(spaceBelow < estimatedHeight && spaceAbove > spaceBelow);
+            }
+            return next;
+          });
         }}
         className={`flex items-center justify-between rounded-xl font-mono transition-all duration-200 cursor-pointer disabled:opacity-40 disabled:cursor-not-allowed ${sizeClasses} ${
           isOpen

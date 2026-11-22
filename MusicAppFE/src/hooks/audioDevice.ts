@@ -36,7 +36,7 @@ export const getConstrainedWorkerCount = (total: number) => {
   return Math.min(cores, total);
 };
 
-export const getQueuePrecalculateWorkerSettings = (_queueCount?: number) => {
+export const getQueuePrecalculateWorkerSettings = () => {
   const cores = getFullCoreCount();
   const quarterCoreWorkers = Math.max(1, Math.ceil(cores / 4));
   const maxAllowedWorkers = cores <= 8 ? quarterCoreWorkers : cores;

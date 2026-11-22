@@ -1,4 +1,4 @@
-import { useState, useEffect } from 'react';
+import { useState } from 'react';
 import { useTranslation } from 'react-i18next';
 import { useSearchParams, useNavigate } from 'react-router-dom';
 import {
@@ -27,6 +27,7 @@ import { useToast } from '../context/ToastContext';
 import { useGlobalAudio } from '../context/AudioContext';
 import { BACKEND_URL, axiosClient } from '../api/axiosClient';
 import { db } from '../lib/db';
+import { getErrorMessage } from '../utils/errorMessage';
 
 type SettingsTab = 'storage' | 'cloud' | 'general';
 
@@ -44,22 +45,13 @@ export function SettingsPage() {
   } = playerState;
   const [searchParams, setSearchParams] = useSearchParams();
 
-  const tabParam = (searchParams.get('tab') as SettingsTab) || 'storage';
-  const [activeTab, setActiveTab] = useState<SettingsTab>(
-    tabParam === 'cloud' ? 'cloud' : tabParam === 'general' ? 'general' : 'storage'
-  );
+  const tabParam = searchParams.get('tab');
+  const activeTab: SettingsTab =
+    tabParam === 'cloud' ? 'cloud' : tabParam === 'general' ? 'general' : 'storage';
 
   const [syncing, setSyncing] = useState(false);
 
-  useEffect(() => {
-    const currentTab = searchParams.get('tab') as SettingsTab;
-    if (currentTab && (currentTab === 'storage' || currentTab === 'cloud' || currentTab === 'general')) {
-      setActiveTab(currentTab);
-    }
-  }, [searchParams]);
-
   const handleTabChange = (tab: SettingsTab) => {
-    setActiveTab(tab);
     setSearchParams({ tab });
   };
 
@@ -84,10 +76,10 @@ export function SettingsPage() {
 
       await axiosClient.post('/api/backup/drive', { config, idbData });
       toast.success(t('layout.backupSuccess', 'Sao lưu lên Google Drive thành công!'));
-    } catch (e: any) {
+    } catch (e: unknown) {
       console.error('Backup error:', e);
       toast.error(
-        e.message || t('layout.backupFail', 'Sao lưu lên Google Drive thất bại.')
+        getErrorMessage(e, t('layout.backupFail', 'Sao lưu lên Google Drive thất bại.'))
       );
     } finally {
       setSyncing(false);
@@ -110,8 +102,14 @@ export function SettingsPage() {
 
     setSyncing(true);
     try {
-      const response = (await axiosClient.get('/api/backup/drive')) as any;
-      let config = response;
+      type BackupRestorePayload = {
+        config?: Record<string, unknown>;
+        idbData?: Record<string, unknown>;
+      };
+      const response = (await axiosClient.get('/api/backup/drive')) as
+        | (BackupRestorePayload & Record<string, unknown>)
+        | null;
+      let config: Record<string, unknown> | null | undefined = response;
 
       if (response && response.config) {
         config = response.config;
@@ -128,10 +126,10 @@ export function SettingsPage() {
         t('layout.restoreSuccess', 'Khôi phục thành công! Ứng dụng sẽ tải lại.')
       );
       setTimeout(() => globalThis.location.reload(), 1500);
-    } catch (e: any) {
+    } catch (e: unknown) {
       console.error('Restore error:', e);
       toast.error(
-        e.message || t('layout.restoreFail', 'Khôi phục từ Google Drive thất bại.')
+        getErrorMessage(e, t('layout.restoreFail', 'Khôi phục từ Google Drive thất bại.'))
       );
     } finally {
       setSyncing(false);
@@ -536,6 +534,43 @@ export function SettingsPage() {
                   zIndex={20}
                 />
 
+                <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-4 p-4 sm:p-5 rounded-2xl border bg-white/[0.02] border-white/[0.06] hover:border-white/[0.12] transition-all">
+                  <div className="flex flex-col min-w-0">
+                    <span className="text-sm font-semibold text-slate-100 leading-snug">
+                      {t('settings.stereoAnalysisToggleTitle', 'Phân tích tương quan Stereo tự động (Imager)')}
+                    </span>
+                    <span className="text-xs font-mono text-slate-400 mt-1 leading-normal">
+                      {t('settings.stereoAnalysisToggleDesc', 'Tự động đo độ tương quan giữa hai kênh L/R để kích hoạt mở rộng giả lập khi phát nguồn âm mono.')}
+                    </span>
+                  </div>
+
+                  <div className="flex items-center gap-3 shrink-0 self-start sm:self-center">
+                    <span className={`text-xs font-mono font-semibold ${playerState.stereoAnalysisEnabled ? 'text-primary' : 'text-slate-400'}`}>
+                      {playerState.stereoAnalysisEnabled
+                        ? t('settings.stereoAnalysisOn', 'Đang bật')
+                        : t('settings.stereoAnalysisOff', 'Đã tắt')}
+                    </span>
+                    <button
+                      type="button"
+                      role="switch"
+                      aria-checked={playerState.stereoAnalysisEnabled}
+                      aria-label={t('settings.stereoAnalysisToggleTitle', 'Phân tích tương quan Stereo tự động (Imager)')}
+                      onClick={playerState.toggleStereoAnalysis}
+                      className={`w-11 h-6 rounded-full transition-colors duration-200 relative flex items-center p-0.5 shrink-0 cursor-pointer ${
+                        playerState.stereoAnalysisEnabled
+                          ? 'bg-primary shadow-[0_0_12px_rgba(0,245,255,0.4)]'
+                          : 'bg-slate-700 hover:bg-slate-600'
+                      }`}
+                    >
+                      <span
+                        className={`w-5 h-5 rounded-full bg-white transition-transform duration-200 ${
+                          playerState.stereoAnalysisEnabled ? 'translate-x-5 shadow-md' : 'translate-x-0'
+                        }`}
+                      />
+                    </button>
+                  </div>
+                </div>
+
                 <AudioSelectRow<number>
                   title={t('settings.stereoFftTitle', 'Độ phân giải phân tích Stereo (Imager)')}
                   description={t('settings.stereoFftDesc', 'Tần số lấy mẫu phân tích tương quan kênh L/R của hiệu ứng Stereo Imager. Mặc định 1024. Nếu tăng lên sẽ mở rộng không gian cực chuẩn nhưng rất tốn tài nguyên.')}
@@ -550,6 +585,7 @@ export function SettingsPage() {
                     { label: t('settings.fft16384', '16384 (Tối đa / Đồ thị cực nét / Rất nặng CPU)'), value: 16384 },
                   ]}
                   onChange={(val) => playerState.updateStereoFftSize(val)}
+                  disabled={!playerState.stereoAnalysisEnabled}
                   zIndex={10}
                 />
               </div>

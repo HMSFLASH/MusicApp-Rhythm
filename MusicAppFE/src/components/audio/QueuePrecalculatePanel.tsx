@@ -21,7 +21,7 @@ export function QueuePrecalculatePanel({ playerState }: QueuePrecalculatePanelPr
   const queuePrecalculateStatus = playerState.queuePrecalculateStatus;
   const queueCount = playerState.queue?.length ?? 0;
   const totalCores = getFullCoreCount();
-  const { recommendedWorkers, maxWorkers, isConstrained } = getQueuePrecalculateWorkerSettings(queueCount);
+  const { recommendedWorkers, maxWorkers, isConstrained } = getQueuePrecalculateWorkerSettings();
   const [requestedWorkers, setRequestedWorkers] = useState<number | null>(null);
   const completedCount = queuePrecalculateStatus?.completed ?? 0;
   const failedCount = queuePrecalculateStatus?.failed ?? 0;

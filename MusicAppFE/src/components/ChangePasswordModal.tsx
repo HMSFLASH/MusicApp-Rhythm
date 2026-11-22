@@ -2,6 +2,7 @@ import { useState } from 'react';
 import { X, Key, Lock, Loader2 } from 'lucide-react';
 import { useTranslation } from 'react-i18next';
 import { axiosClient } from '../api/axiosClient';
+import { getErrorMessage } from '../utils/errorMessage';
 
 interface ChangePasswordModalProps {
   isOpen: boolean;
@@ -48,8 +49,8 @@ export function ChangePasswordModal({ isOpen, onClose }: ChangePasswordModalProp
         setConfirmPassword('');
       }, 2000);
 
-    } catch (err: any) {
-      setError(err.response?.data?.message || err.message || t('auth.changePasswordFail', 'Failed to change password'));
+    } catch (err: unknown) {
+      setError(getErrorMessage(err, t('auth.changePasswordFail', 'Failed to change password')));
     } finally {
       setLoading(false);
     }

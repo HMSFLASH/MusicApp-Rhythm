@@ -1,5 +1,5 @@
 import React, { useRef, useEffect, useState, useCallback } from 'react';
-import { formatNumberInput, parseDecimalInput } from './NumberInput';
+import { formatNumberInput, parseDecimalInput } from '../utils/numberInput';
 
 interface HorizontalSliderProps {
   value: number;
@@ -13,12 +13,12 @@ interface HorizontalSliderProps {
   hideLabels?: boolean;
 }
 
-export function HorizontalSlider({ 
-  value, 
-  min, 
-  max, 
-  onChange, 
-  label, 
+export function HorizontalSlider({
+  value,
+  min,
+  max,
+  onChange,
+  label,
   color = '#00f5ff',
   unit = 'dB',
   step = 1,
@@ -32,7 +32,7 @@ export function HorizontalSlider({
 
   const range = max - min;
   const isBidirectional = min < 0 && max > 0;
-  
+
   const percentage = isBidirectional
     ? value <= 0
       ? ((value - min) / Math.abs(min)) * 50
@@ -41,25 +41,25 @@ export function HorizontalSlider({
 
   const handleMove = useCallback((clientX: number) => {
     if (!isDragging || !trackRef.current) return;
-    
+
     const rect = trackRef.current.getBoundingClientRect();
     let newX = clientX - rect.left;
     newX = Math.max(0, Math.min(newX, rect.width));
-    
+
     const pct = newX / rect.width;
     let newValue = min < 0 && max > 0
       ? pct <= 0.5
         ? min + (pct / 0.5) * Math.abs(min)
         : ((pct - 0.5) / 0.5) * max
       : min + (pct * range);
-    
+
     if (step > 0) {
       newValue = Math.round(newValue / step) * step;
     }
-    
+
     // Fix floating point errors like 1.2000000000000002
     newValue = Number(newValue.toFixed(5));
-    
+
     onChange(newValue);
   }, [isDragging, min, max, range, onChange, step]);
 
@@ -151,12 +151,12 @@ export function HorizontalSlider({
   // Center point logic for bi-directional active track
   // Only use bidirectional center tracking if min < 0 and max > 0 (e.g. dB gain)
   const zeroPct = isBidirectional ? 50 : 0;
-  
+
   // Calculate width and left for the filled portion
   const isPositive = value >= 0;
   let fillLeft = 0;
   let fillWidth = percentage;
-  
+
   if (isBidirectional) {
     fillLeft = isPositive ? zeroPct : percentage;
     fillWidth = isPositive ? percentage - zeroPct : zeroPct - percentage;
@@ -183,7 +183,7 @@ export function HorizontalSlider({
               <span className="text-xs font-mono text-slate-400">{unit}</span>
             </div>
           ) : (
-            <span 
+            <span
               onClick={handleEditClick}
               className="text-xs font-mono font-semibold text-slate-300 cursor-pointer hover:text-primary transition-colors"
             >
@@ -194,7 +194,7 @@ export function HorizontalSlider({
       )}
 
       {/* Track Container */}
-      <div 
+      <div
         ref={trackRef}
         onPointerDown={handlePointerDown}
         onTouchStart={handleTouchStart}
@@ -202,19 +202,19 @@ export function HorizontalSlider({
       >
         {/* Background dark track */}
         <div className="absolute left-0 right-0 h-[5px] bg-white/[0.08] rounded-full"></div>
-        
+
         {/* Center zero mark (only if bidirectional) */}
         {isBidirectional && (
-          <div 
+          <div
             className="absolute -translate-x-1/2 w-1 h-3.5 bg-white/25 rounded-full"
             style={{ left: `${zeroPct}%` }}
           ></div>
         )}
 
         {/* Active Track (Colored from 0 to value) */}
-        <div 
+        <div
           className={`absolute h-[5px] rounded-full pointer-events-none ${!isDragging ? 'transition-all duration-75' : ''}`}
-          style={{ 
+          style={{
             left: `${fillLeft}%`,
             width: `${fillWidth}%`,
             backgroundColor: color,
@@ -223,9 +223,9 @@ export function HorizontalSlider({
         ></div>
 
         {/* Thumb */}
-        <div 
+        <div
           className={`absolute w-5 h-9 bg-[#0c1626] rounded-xl border border-white/25 shadow-2xl pointer-events-none flex flex-col items-center justify-center group-hover:border-primary/60 group-hover:scale-105 ${!isDragging ? 'transition-transform duration-75' : ''}`}
-          style={{ 
+          style={{
             left: `${percentage}%`,
             transform: 'translateX(-50%)'
           }}
@@ -234,13 +234,13 @@ export function HorizontalSlider({
           <div className="w-[2px] h-3.5 bg-primary rounded-full shadow-[0_0_6px_rgba(0,245,255,0.8)]"></div>
         </div>
       </div>
-      
+
       {!hideLabels && (
         <div className="relative h-4 font-mono text-[10px] text-slate-400 mt-1.5 font-medium">
           <span className="absolute left-0">{min}</span>
           {isBidirectional && (
-            <span 
-              className="absolute -translate-x-1/2" 
+            <span
+              className="absolute -translate-x-1/2"
               style={{ left: `${zeroPct}%` }}
             >
               0

@@ -33,7 +33,7 @@ import { getCoversStats } from '../../utils/idb';
 import { axiosClient } from '../../api/axiosClient';
 import type { Track } from '../../hooks/useAudioPlayer';
 
-export function formatBytes(bytes: number, decimals = 2): string {
+function formatBytes(bytes: number, decimals = 2): string {
   if (bytes === 0) return '0 B';
   const k = 1024;
   const dm = decimals < 0 ? 0 : decimals;
@@ -42,7 +42,7 @@ export function formatBytes(bytes: number, decimals = 2): string {
   return `${Number.parseFloat((bytes / Math.pow(k, i)).toFixed(dm))} ${sizes[i]}`;
 }
 
-export function formatDate(timestamp: number): string {
+function formatDate(timestamp: number): string {
   if (!timestamp) return '---';
   const date = new Date(timestamp);
   return date.toLocaleDateString(undefined, {
@@ -131,63 +131,89 @@ export function OfflineStorageManager() {
     { value: 'date' as SortField, label: t('storage.sortDate', 'Ngày tải') },
   ], [t]);
 
-  // Load storage statistics
+  // Fetch storage statistics without synchronous state updates before first await
+  const fetchStatsData = useCallback(async () => {
+    const [cacheSummary, covStats, estimate] = await Promise.all([
+      getAudioCacheSummary(),
+      getCoversStats(),
+      navigator.storage && navigator.storage.estimate
+        ? navigator.storage.estimate()
+        : Promise.resolve(null),
+    ]);
+
+    let nextPlaylists: PlaylistInfo[] = [];
+    const nextPlaylistMap = new Map<string, string[]>();
+    try {
+      const pls = (await axiosClient.get('/api/playlists')) as PlaylistInfo[];
+      if (Array.isArray(pls)) {
+        nextPlaylists = pls;
+        await Promise.all(
+          pls.map(async (pl) => {
+            try {
+              const details = (await axiosClient.get(`/api/playlists/${pl.id}`)) as {
+                tracks?: Array<{ id: string | number }>;
+              };
+              if (details?.tracks) {
+                nextPlaylistMap.set(pl.id, details.tracks.map((trackItem) => String(trackItem.id)));
+              }
+            } catch {
+              // Ignore single playlist detail error
+            }
+          })
+        );
+      }
+    } catch {
+      // Playlists may not be available if guest/offline
+    }
+
+    return { cacheSummary, covStats, estimate, nextPlaylists, nextPlaylistMap };
+  }, []);
+
+  const applyStatsData = useCallback((data: Awaited<ReturnType<typeof fetchStatsData>>) => {
+    setAudioCacheStats(data.cacheSummary);
+    setCoversStats(data.covStats);
+    setSelectedLimit(data.cacheSummary.maxBytes);
+    if (data.estimate) {
+      setBrowserStorage({
+        usage: data.estimate.usage || 0,
+        quota: data.estimate.quota || 0,
+      });
+    }
+    setPlaylists(data.nextPlaylists);
+    setPlaylistTracksMap(data.nextPlaylistMap);
+  }, []);
+
   const loadStats = useCallback(async () => {
     setIsLoading(true);
     try {
-      const [cacheSummary, covStats] = await Promise.all([
-        getAudioCacheSummary(),
-        getCoversStats(),
-      ]);
-      setAudioCacheStats(cacheSummary);
-      setCoversStats(covStats);
-      setSelectedLimit(cacheSummary.maxBytes);
-
-      if (navigator.storage && navigator.storage.estimate) {
-        const estimate = await navigator.storage.estimate();
-        setBrowserStorage({
-          usage: estimate.usage || 0,
-          quota: estimate.quota || 0,
-        });
-      }
-
-      // Load playlists for playlist group view
-      try {
-        const pls = (await axiosClient.get('/api/playlists')) as PlaylistInfo[];
-        if (Array.isArray(pls)) {
-          setPlaylists(pls);
-          // Fetch details for each playlist to map cached tracks
-          const pMap = new Map<string, string[]>();
-          await Promise.all(
-            pls.map(async (pl) => {
-              try {
-                const details = (await axiosClient.get(`/api/playlists/${pl.id}`)) as {
-                  tracks?: Array<{ id: string | number }>;
-                };
-                if (details?.tracks) {
-                  pMap.set(pl.id, details.tracks.map((t) => String(t.id)));
-                }
-              } catch {
-                // Ignore single playlist detail error
-              }
-            })
-          );
-          setPlaylistTracksMap(pMap);
-        }
-      } catch {
-        // Playlists may not be available if guest/offline
-      }
+      const data = await fetchStatsData();
+      applyStatsData(data);
     } catch (e) {
       console.error('Failed to load cache stats:', e);
       toast.error(t('storage.loadError', 'Không thể tải thông tin bộ nhớ đệm'));
     } finally {
       setIsLoading(false);
     }
-  }, [t, toast]);
+  }, [applyStatsData, fetchStatsData, t, toast]);
 
   useEffect(() => {
-    void loadStats();
-  }, [loadStats]);
+    let cancelled = false;
+    void fetchStatsData()
+      .then((data) => {
+        if (!cancelled) applyStatsData(data);
+      })
+      .catch((e) => {
+        if (cancelled) return;
+        console.error('Failed to load cache stats:', e);
+        toast.error(t('storage.loadError', 'Không thể tải thông tin bộ nhớ đệm'));
+      })
+      .finally(() => {
+        if (!cancelled) setIsLoading(false);
+      });
+    return () => {
+      cancelled = true;
+    };
+  }, [applyStatsData, fetchStatsData, t, toast]);
 
   // Handle changing cache limit
   const handleLimitChange = (newLimit: number) => {

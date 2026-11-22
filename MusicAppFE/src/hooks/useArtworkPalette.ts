@@ -1,34 +1,23 @@
-import { useState, useEffect, useRef } from 'react';
+import { useState, useEffect } from 'react';
 import { extractPaletteFromImage, DEFAULT_PALETTE, type PaletteResult } from '../utils/colorExtractor';
 
 export function useArtworkPalette(imageUrl: string | null | undefined) {
-  const [palette, setPalette] = useState<PaletteResult>(DEFAULT_PALETTE);
-  const [isLoading, setIsLoading] = useState<boolean>(false);
-  const activeUrlRef = useRef<string | null | undefined>(imageUrl);
+  const [resolved, setResolved] = useState<{ url: string; palette: PaletteResult } | null>(null);
 
   useEffect(() => {
-    activeUrlRef.current = imageUrl;
-
-    if (!imageUrl) {
-      setPalette(DEFAULT_PALETTE);
-      setIsLoading(false);
-      return;
-    }
+    if (!imageUrl) return;
 
     let isMounted = true;
-    setIsLoading(true);
 
     extractPaletteFromImage(imageUrl)
       .then((extracted) => {
-        if (isMounted && activeUrlRef.current === imageUrl) {
-          setPalette(extracted);
-          setIsLoading(false);
+        if (isMounted) {
+          setResolved({ url: imageUrl, palette: extracted });
         }
       })
       .catch(() => {
-        if (isMounted && activeUrlRef.current === imageUrl) {
-          setPalette(DEFAULT_PALETTE);
-          setIsLoading(false);
+        if (isMounted) {
+          setResolved({ url: imageUrl, palette: DEFAULT_PALETTE });
         }
       });
 
@@ -37,5 +26,13 @@ export function useArtworkPalette(imageUrl: string | null | undefined) {
     };
   }, [imageUrl]);
 
-  return { palette, isLoading };
+  if (!imageUrl) {
+    return { palette: DEFAULT_PALETTE, isLoading: false };
+  }
+
+  const isCurrentResolved = resolved?.url === imageUrl;
+  return {
+    palette: isCurrentResolved ? resolved.palette : DEFAULT_PALETTE,
+    isLoading: !isCurrentResolved,
+  };
 }

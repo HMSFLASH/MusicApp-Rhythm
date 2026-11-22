@@ -2,9 +2,9 @@ import { Disc, ChevronRight, Mail, Eye, EyeOff, IdCard } from 'lucide-react';
 import { NavLink, useNavigate } from 'react-router-dom';
 import { useState } from 'react';
 import { useTranslation } from 'react-i18next';
-import { axiosClient } from '../api/axiosClient';
+import { axiosClient, BACKEND_URL } from '../api/axiosClient';
 import { useAuth } from '../context/AuthContext';
-import { BACKEND_URL } from '../api/axiosClient';
+import { getErrorMessage } from '../utils/errorMessage';
 
 export function RegisterPage() {
   const { t } = useTranslation();
@@ -47,8 +47,8 @@ export function RegisterPage() {
       setIsAuthenticated(true);
       navigate('/');
 
-    } catch (err: any) {
-      setError(err.response?.data?.message || err.message || t('auth.registerFail', 'Registration failed. Email or username might already exist.'));
+    } catch (err: unknown) {
+      setError(getErrorMessage(err, t('auth.registerFail', 'Registration failed. Email or username might already exist.')));
     } finally {
       setLoading(false);
     }

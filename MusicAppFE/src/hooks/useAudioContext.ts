@@ -63,6 +63,8 @@ export type AudioContextEffectsInput = {
   loudnessNormalization: boolean;
   useOversample: boolean;
   masterFftSize?: number;
+  stereoAnalysisEnabled?: boolean;
+  stereoFftSize?: number;
   audioLatencyHint?: AudioContextLatencyCategory;
   fxEnabled: FxEnabledFlags;
   isAuthenticated?: boolean;
@@ -149,12 +151,15 @@ export function useAudioContext(inputEffectsState: AudioContextEffectsInput) {
     loudnessNormalization,
     useOversample,
     masterFftSize = 2048,
+    stereoAnalysisEnabled = true,
+    stereoFftSize = 1024,
     audioLatencyHint = 'playback',
     fxEnabled,
     isAuthenticated,
   } = inputEffectsState;
 
   const [audioSampleRate, setAudioSampleRate] = useState(44100);
+  const [audioContextInitCount, setAudioContextInitCount] = useState(0);
 
   // Audio Context and Core Nodes
   const audioRef = useRef<HTMLAudioElement | null>(null);
@@ -175,6 +180,22 @@ export function useAudioContext(inputEffectsState: AudioContextEffectsInput) {
     }
     return { eqBands: rawEqBands, autoPreamp: 0, eqResponseData: null };
   }, [rawEqBands, audioSampleRate, isParametricPreset]);
+
+  const expandedEqBands = React.useMemo(
+    () => (Array.isArray(eqBands) ? expandResonantEqBands(eqBands) : []),
+    [eqBands]
+  );
+
+  const expandedToneBands = React.useMemo(() => {
+    const toneBands: EqBand[] = [];
+    if (Math.abs(bassGain) > 0.001) {
+      toneBands.push({ id: 'bass', type: 'lowshelf', frequency: 150, q: 1, gain: bassGain, channel: 'L+R' });
+    }
+    if (Math.abs(trebleGain) > 0.001) {
+      toneBands.push({ id: 'treble', type: 'highshelf', frequency: 4000, q: 1, gain: trebleGain, channel: 'L+R' });
+    }
+    return expandResonantEqBands(toneBands);
+  }, [bassGain, trebleGain]);
 
   const effectivePreampGain = (fxEnabled?.preamp ? (preampGain || 0) : 0) + autoPreamp;
   const effectiveFxEnabled = React.useMemo(() => ({
@@ -204,12 +225,13 @@ export function useAudioContext(inputEffectsState: AudioContextEffectsInput) {
   const reverbHighpassRef = useRef<BiquadFilterNode | null>(null);
   const reverbLowpassRef = useRef<BiquadFilterNode | null>(null);
 
+  const nodesOwnerCtxRef = useRef<AudioContext | null>(null);
   const stereoImagerNodeRef = useRef<AudioWorkletNode | null>(null);
   const balancerNodeRef = useRef<AudioWorkletNode | null>(null);
-  const stereoWorkletReadyRef = useRef(false);
-  const balancerWorkletReadyRef = useRef(false);
-  const stereoWorkletLoadingRef = useRef<Promise<boolean> | null>(null);
-  const balancerWorkletLoadingRef = useRef<Promise<boolean> | null>(null);
+  const stereoWorkletReadyCtxRef = useRef<BaseAudioContext | null>(null);
+  const balancerWorkletReadyCtxRef = useRef<BaseAudioContext | null>(null);
+  const stereoWorkletLoadingCtxRef = useRef<BaseAudioContext | null>(null);
+  const balancerWorkletLoadingCtxRef = useRef<BaseAudioContext | null>(null);
   const balancerTelemetryListenersRef = useRef<Set<(data: BalancerTelemetry) => void>>(new Set());
 
   const masterAnalyserRef = useRef<AnalyserNode | null>(null);
@@ -240,28 +262,36 @@ export function useAudioContext(inputEffectsState: AudioContextEffectsInput) {
   }, []);
 
   const ensureStereoImagerWorklet = useCallback((ctx: BaseAudioContext) => {
-    if (stereoWorkletReadyRef.current || stereoWorkletLoadingRef.current) return;
+    if (stereoWorkletReadyCtxRef.current === ctx || stereoWorkletLoadingCtxRef.current === ctx) return;
 
-    stereoWorkletLoadingRef.current = loadMultibandStereoImagerWorklet(ctx).then((ready) => {
-      stereoWorkletReadyRef.current = ready;
-      stereoWorkletLoadingRef.current = null;
-      if (ready && sourceNodeRef.current && fxEnabledRef.current?.stereo) {
-        globalThis.setTimeout(() => initializeAudioContextRef.current?.(), 0);
+    stereoWorkletLoadingCtxRef.current = ctx;
+    void loadMultibandStereoImagerWorklet(ctx).then((ready) => {
+      if (stereoWorkletLoadingCtxRef.current === ctx) {
+        stereoWorkletLoadingCtxRef.current = null;
       }
-      return ready;
+      if (ready && audioContextRef.current === ctx && ctx.state !== 'closed') {
+        stereoWorkletReadyCtxRef.current = ctx;
+        if (sourceNodeRef.current && fxEnabledRef.current?.stereo) {
+          globalThis.setTimeout(() => initializeAudioContextRef.current?.(), 0);
+        }
+      }
     });
   }, []);
 
   const ensureWebAudioBalancerWorklet = useCallback((ctx: BaseAudioContext) => {
-    if (balancerWorkletReadyRef.current || balancerWorkletLoadingRef.current) return;
+    if (balancerWorkletReadyCtxRef.current === ctx || balancerWorkletLoadingCtxRef.current === ctx) return;
 
-    balancerWorkletLoadingRef.current = loadWebAudioBalancerWorklet(ctx).then((ready) => {
-      balancerWorkletReadyRef.current = ready;
-      balancerWorkletLoadingRef.current = null;
-      if (ready && sourceNodeRef.current && fxEnabledRef.current?.comp) {
-        globalThis.setTimeout(() => initializeAudioContextRef.current?.(), 0);
+    balancerWorkletLoadingCtxRef.current = ctx;
+    void loadWebAudioBalancerWorklet(ctx).then((ready) => {
+      if (balancerWorkletLoadingCtxRef.current === ctx) {
+        balancerWorkletLoadingCtxRef.current = null;
       }
-      return ready;
+      if (ready && audioContextRef.current === ctx && ctx.state !== 'closed') {
+        balancerWorkletReadyCtxRef.current = ctx;
+        if (sourceNodeRef.current && fxEnabledRef.current?.comp) {
+          globalThis.setTimeout(() => initializeAudioContextRef.current?.(), 0);
+        }
+      }
     });
   }, []);
 
@@ -298,11 +328,12 @@ export function useAudioContext(inputEffectsState: AudioContextEffectsInput) {
     needsHeadroom: currentGraphActivity.needsHeadroom,
     preamp: currentGraphActivity.preamp,
     eq: currentGraphActivity.eq,
-    eqBandCount: currentGraphActivity.eq && Array.isArray(eqBands) ? eqBands.length : 0,
-    eqRouting: currentGraphActivity.eq && Array.isArray(eqBands)
-      ? eqBands.map((band: { channel?: string }) => band.channel || 'L+R').join('|')
+    eqNodeCount: currentGraphActivity.eq ? expandedEqBands.length : 0,
+    eqRouting: currentGraphActivity.eq
+      ? expandedEqBands.map((band: { channel?: string }) => band.channel || 'L+R').join('|')
       : null,
     tone: currentGraphActivity.tone,
+    toneNodeCount: currentGraphActivity.tone ? expandedToneBands.length : 0,
     comp: currentGraphActivity.comp,
     reverb: currentGraphActivity.reverb,
     stereo: currentGraphActivity.stereo,
@@ -311,9 +342,11 @@ export function useAudioContext(inputEffectsState: AudioContextEffectsInput) {
   });
 
   useEffect(() => {
-    if (!audioContextRef.current) return;
+    const ctx = audioContextRef.current;
+    if (!ctx || ctx.state === 'closed') return;
 
     let isCancelled = false;
+    const isContextClosed = (context: AudioContext) => context.state === 'closed';
 
     const updateConvolver = async () => {
       try {
@@ -323,28 +356,32 @@ export function useAudioContext(inputEffectsState: AudioContextEffectsInput) {
           try {
             const timeStr = clamp(reverbTime || 2, 0.1, 10).toFixed(1);
             const response = await fetch(`/reverbs/reverb_${timeStr}.opus`);
+            if (isCancelled || audioContextRef.current !== ctx || isContextClosed(ctx)) return;
             if (response.ok) {
               const arrayBuffer = await response.arrayBuffer();
-              newIrBuffer = await audioContextRef.current!.decodeAudioData(arrayBuffer);
+              if (isCancelled || audioContextRef.current !== ctx || isContextClosed(ctx)) return;
+              newIrBuffer = await ctx.decodeAudioData(arrayBuffer);
+              if (isCancelled || audioContextRef.current !== ctx || isContextClosed(ctx)) return;
             }
           } catch (e) {
             console.warn('Failed to load file-based IR, falling back to procedural', e);
           }
         }
 
+        if (isCancelled || audioContextRef.current !== ctx || isContextClosed(ctx)) return;
+
         if (!newIrBuffer) {
           newIrBuffer = generateImpulseResponse(
-            audioContextRef.current!,
+            ctx,
             clamp(reverbTime || 2, 0.1, 10),
             2
           );
         }
 
-        if (isCancelled) return;
+        if (isCancelled || audioContextRef.current !== ctx || isContextClosed(ctx)) return;
         irBufferRef.current = newIrBuffer;
 
         if (convolverNodeRef.current && reverbHighpassRef.current && reverbPreDelayRef.current && wetGainRef.current) {
-          const ctx = audioContextRef.current!;
           const now = ctx.currentTime;
 
           const oldConvolver = convolverNodeRef.current;
@@ -370,6 +407,7 @@ export function useAudioContext(inputEffectsState: AudioContextEffectsInput) {
           convolverNodeRef.current = newConvolver;
 
           setTimeout(() => {
+            if (isCancelled || audioContextRef.current !== ctx || ctx.state === 'closed') return;
             try {
               oldConvolver.disconnect();
               oldWetGain.disconnect();
@@ -395,10 +433,11 @@ export function useAudioContext(inputEffectsState: AudioContextEffectsInput) {
     return () => {
       isCancelled = true;
     };
-  }, [reverbTime, reverbEngine]);
+  }, [reverbTime, reverbEngine, audioContextInitCount]);
 
   const initializeAudioContext = useCallback(() => {
-    if (!audioContextRef.current) {
+    if (!audioContextRef.current || audioContextRef.current.state === 'closed') {
+      audioContextRef.current = null;
       const AudioContextCtor = globalThis.AudioContext || (window as unknown as { webkitAudioContext: typeof AudioContext }).webkitAudioContext;
       try {
         audioContextRef.current = new AudioContextCtor({ latencyHint: audioLatencyHint, sampleRate: 96000 });
@@ -409,6 +448,7 @@ export function useAudioContext(inputEffectsState: AudioContextEffectsInput) {
           audioContextRef.current = new AudioContextCtor();
         }
       }
+      setAudioContextInitCount((prev) => prev + 1);
       try {
         if (isAuthenticated !== undefined) {
           const configStorageKey = getAudioConfigStorageKey(isAuthenticated);
@@ -423,6 +463,32 @@ export function useAudioContext(inputEffectsState: AudioContextEffectsInput) {
       }
     }
     const ctx = audioContextRef.current;
+    if (nodesOwnerCtxRef.current !== ctx) {
+      sourceNodeRef.current = null;
+      trackLoudnessGainRef.current = null;
+      headroomDropRef.current = null;
+      headroomRecoverRef.current = null;
+      preampNodeRef.current = null;
+      eqNodesRef.current = [];
+      eqSplitterRef.current = null;
+      eqMergerRef.current = null;
+      toneNodesRef.current = [];
+      convolverNodeRef.current = null;
+      dryGainRef.current = null;
+      wetGainRef.current = null;
+      reverbOutRef.current = null;
+      reverbPreDelayRef.current = null;
+      reverbHighpassRef.current = null;
+      reverbLowpassRef.current = null;
+      stereoImagerNodeRef.current = null;
+      balancerNodeRef.current = null;
+      panNodeRef.current = null;
+      limiterNodeRef.current = null;
+      softClipWaveShaperRef.current = null;
+      masterAnalyserRef.current = null;
+      irBufferRef.current = null;
+      nodesOwnerCtxRef.current = ctx;
+    }
     if (audioSampleRate !== ctx.sampleRate) {
       setAudioSampleRate(ctx.sampleRate);
     }
@@ -520,8 +586,7 @@ export function useAudioContext(inputEffectsState: AudioContextEffectsInput) {
     }
 
     // 2. EQ
-    if (activity.eq && eqBands && eqBands.length > 0) {
-      const expandedEqBands = expandResonantEqBands(eqBands || []);
+    if (activity.eq && expandedEqBands.length > 0) {
       if (eqNodesRef.current.length !== expandedEqBands.length) {
         eqNodesRef.current.forEach(node => node.disconnect());
         eqNodesRef.current = expandedEqBands.map(() => ctx.createBiquadFilter());
@@ -589,12 +654,6 @@ export function useAudioContext(inputEffectsState: AudioContextEffectsInput) {
 
     // 3. Tone
     if (activity.tone) {
-      const toneBands: EqBand[] = [];
-      if (Math.abs(bassGain) > 0.001) toneBands.push({ id: 'bass', type: 'lowshelf', frequency: 150, q: 1, gain: bassGain, channel: 'L+R' });
-      if (Math.abs(trebleGain) > 0.001) toneBands.push({ id: 'treble', type: 'highshelf', frequency: 4000, q: 1, gain: trebleGain, channel: 'L+R' });
-
-      const expandedToneBands = expandResonantEqBands(toneBands);
-
       if (toneNodesRef.current.length !== expandedToneBands.length) {
         toneNodesRef.current.forEach(node => node.disconnect());
         toneNodesRef.current = expandedToneBands.map(() => ctx.createBiquadFilter());
@@ -663,7 +722,7 @@ export function useAudioContext(inputEffectsState: AudioContextEffectsInput) {
     }
 
     // 5. Multiband Stereo Imager & 3D Surround (AudioWorklet)
-    if (activity.stereo && stereoWorkletReadyRef.current) {
+    if (activity.stereo && stereoWorkletReadyCtxRef.current === ctx) {
       const stereoSettings = {
         widthPercent: stereoWidth,
         speakerMode,
@@ -675,6 +734,8 @@ export function useAudioContext(inputEffectsState: AudioContextEffectsInput) {
         monoThreshold,
         monoSideLevel,
         chorusAmount,
+        stereoAnalysisEnabled,
+        stereoFftSize,
       };
       if (!stereoImagerNodeRef.current || stereoImagerNodeRef.current.context !== ctx) {
         stereoImagerNodeRef.current = createMultibandStereoImagerNode(ctx, stereoSettings);
@@ -711,7 +772,7 @@ export function useAudioContext(inputEffectsState: AudioContextEffectsInput) {
     }
 
     // 8. Web Audio Balancer v2.1 (3-Stage Dynamics @ true dBFS)
-    if (activity.comp && balancerWorkletReadyRef.current) {
+    if (activity.comp && balancerWorkletReadyCtxRef.current === ctx) {
       const balancerSettings = {
         enabled: Boolean(enabled.comp),
         mode: balancerMode,
@@ -805,6 +866,8 @@ export function useAudioContext(inputEffectsState: AudioContextEffectsInput) {
     ensureStereoImagerWorklet,
     ensureWebAudioBalancerWorklet,
     eqBands,
+    expandedEqBands,
+    expandedToneBands,
     isAuthenticated,
     loudnessNormalization,
     masterFftSize,
@@ -815,9 +878,11 @@ export function useAudioContext(inputEffectsState: AudioContextEffectsInput) {
     reverbMix,
     reverbTime,
     speakerMode,
+    stereoAnalysisEnabled,
     stereoCrossoverHigh,
     stereoCrossoverLow,
     stereoCrossoverMode,
+    stereoFftSize,
     stereoWidth,
     surroundDelay,
     surroundWet,
@@ -882,47 +947,43 @@ export function useAudioContext(inputEffectsState: AudioContextEffectsInput) {
       return;
     }
 
-    const toneBands: EqBand[] = [];
-    if (Math.abs(bassGain) > 0.001) toneBands.push({ id: 'bass', type: 'lowshelf', frequency: 150, q: 1, gain: bassGain, channel: 'L+R' });
-    if (Math.abs(trebleGain) > 0.001) toneBands.push({ id: 'treble', type: 'highshelf', frequency: 4000, q: 1, gain: trebleGain, channel: 'L+R' });
-
-    const expandedToneBands = expandResonantEqBands(toneBands);
-
     if (toneNodesRef.current.length === expandedToneBands.length) {
       expandedToneBands.forEach((band, i) => {
         const filter = toneNodesRef.current[i];
         const now = audioContextRef.current?.currentTime || 0;
+        filter.type = band.type || 'peaking';
         filter.gain.cancelScheduledValues(now);
         filter.gain.setTargetAtTime(band.gain, now, 0.015);
         filter.frequency.cancelScheduledValues(now);
         filter.frequency.setTargetAtTime(band.frequency, now, 0.015);
+        filter.Q.cancelScheduledValues(now);
+        filter.Q.setTargetAtTime(band.q || 1, now, 0.015);
       });
     }
-  }, [bassGain, trebleGain, fxEnabled.tone]);
+  }, [expandedToneBands, fxEnabled.tone]);
 
   useEffect(() => {
-    if (eqNodesRef.current && eqBands) {
-      eqBands.forEach((band: EqBand, i: number) => {
-        if (eqNodesRef.current[i]) {
-          const freq = Number.isFinite(band.frequency) ? band.frequency : 1000;
-          const qVal = Number.isFinite(band.q) ? band.q : 1;
-          const gainVal = Number.isFinite(band.gain) ? (fxEnabled.eq ? band.gain : 0) : 0;
-          const now = audioContextRef.current?.currentTime || 0;
+    if (eqNodesRef.current.length !== expandedEqBands.length) return;
+    expandedEqBands.forEach((band: EqBand, i: number) => {
+      const filter = eqNodesRef.current[i];
+      if (!filter) return;
+      const freq = Number.isFinite(band.frequency) ? band.frequency : 1000;
+      const qVal = Number.isFinite(band.q) ? band.q : 1;
+      const gainVal = Number.isFinite(band.gain) ? (fxEnabled.eq ? band.gain : 0) : 0;
+      const now = audioContextRef.current?.currentTime || 0;
 
-          eqNodesRef.current[i].type = band.type || 'peaking';
+      filter.type = band.type || 'peaking';
 
-          eqNodesRef.current[i].frequency.cancelScheduledValues(now);
-          eqNodesRef.current[i].frequency.setTargetAtTime(freq, now, 0.015);
+      filter.frequency.cancelScheduledValues(now);
+      filter.frequency.setTargetAtTime(freq, now, 0.015);
 
-          eqNodesRef.current[i].Q.cancelScheduledValues(now);
-          eqNodesRef.current[i].Q.setTargetAtTime(qVal, now, 0.015);
+      filter.Q.cancelScheduledValues(now);
+      filter.Q.setTargetAtTime(qVal, now, 0.015);
 
-          eqNodesRef.current[i].gain.cancelScheduledValues(now);
-          eqNodesRef.current[i].gain.setTargetAtTime(gainVal, now, 0.015);
-        }
-      });
-    }
-  }, [eqBands, fxEnabled.eq]);
+      filter.gain.cancelScheduledValues(now);
+      filter.gain.setTargetAtTime(gainVal, now, 0.015);
+    });
+  }, [expandedEqBands, fxEnabled.eq]);
 
   // Direct live AudioWorklet parameter updates (zero graph rebuild)
   useEffect(() => {
@@ -938,15 +999,19 @@ export function useAudioContext(inputEffectsState: AudioContextEffectsInput) {
       monoThreshold,
       monoSideLevel,
       chorusAmount,
+      stereoAnalysisEnabled,
+      stereoFftSize,
     });
   }, [
     chorusAmount,
     monoSideLevel,
     monoThreshold,
     speakerMode,
+    stereoAnalysisEnabled,
     stereoCrossoverHigh,
     stereoCrossoverLow,
     stereoCrossoverMode,
+    stereoFftSize,
     stereoWidth,
     surroundDelay,
     surroundWet,
@@ -1037,16 +1102,6 @@ export function useAudioContext(inputEffectsState: AudioContextEffectsInput) {
       true
     );
   }, [fxEnabled.limiter, useOversample, initializeAudioContext]);
-
-  const eqBandsLength = eqBands ? eqBands.length : 0;
-  const prevEqBandsLengthRef = useRef(eqBandsLength);
-  useEffect(() => {
-    if (prevEqBandsLengthRef.current === eqBandsLength) return;
-    prevEqBandsLengthRef.current = eqBandsLength;
-    if (sourceNodeRef.current) {
-      initializeAudioContext();
-    }
-  }, [eqBandsLength, initializeAudioContext]);
 
   return {
     audioRef,

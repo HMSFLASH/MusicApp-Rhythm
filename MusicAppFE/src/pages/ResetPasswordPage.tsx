@@ -3,6 +3,7 @@ import { useNavigate, useSearchParams } from 'react-router-dom';
 import { useState } from 'react';
 import { useTranslation } from 'react-i18next';
 import { axiosClient } from '../api/axiosClient';
+import { getErrorMessage } from '../utils/errorMessage';
 
 export function ResetPasswordPage() {
   const { t } = useTranslation();
@@ -43,8 +44,8 @@ export function ResetPasswordPage() {
       setSuccess(true);
       setTimeout(() => navigate('/login'), 3000);
 
-    } catch (err: any) {
-      setError(err.response?.data?.message || err.message || t('auth.resetPasswordFail', 'Failed to reset password. The link might be expired.'));
+    } catch (err: unknown) {
+      setError(getErrorMessage(err, t('auth.resetPasswordFail', 'Failed to reset password. The link might be expired.')));
     } finally {
       setLoading(false);
     }

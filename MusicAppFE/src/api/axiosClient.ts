@@ -30,20 +30,21 @@ const processQueue = (error: unknown) => {
   failedQueue = [];
 };
 
-const transformResponse = (data: any): any => {
+const transformResponse = <T,>(data: T): T => {
   if (Array.isArray(data)) {
-    return data.map(transformResponse);
+    return data.map((item) => transformResponse(item)) as unknown as T;
   }
   if (data !== null && typeof data === 'object') {
-    const newData = { ...data };
-    for (const key in newData) {
-      if (key === 'imageUrl' && typeof newData[key] === 'string' && newData[key].startsWith('/api/')) {
-        newData[key] = BACKEND_URL + newData[key];
+    const newData: Record<string, unknown> = { ...(data as Record<string, unknown>) };
+    for (const key of Object.keys(newData)) {
+      const value = newData[key];
+      if (key === 'imageUrl' && typeof value === 'string' && value.startsWith('/api/')) {
+        newData[key] = BACKEND_URL + value;
       } else {
-        newData[key] = transformResponse(newData[key]);
+        newData[key] = transformResponse(value);
       }
     }
-    return newData;
+    return newData as T;
   }
   return data;
 };

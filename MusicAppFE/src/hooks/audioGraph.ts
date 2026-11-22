@@ -194,6 +194,8 @@ export type MultibandStereoImagerSettings = {
   monoThreshold: number;
   monoSideLevel: number;
   chorusAmount: number;
+  stereoAnalysisEnabled?: boolean;
+  stereoFftSize?: number;
 };
 
 export type WebAudioBalancerNodeSettings = BalancerSettings & {
@@ -224,6 +226,14 @@ const toStereoImagerParamMap = (settings: MultibandStereoImagerSettings): Record
   monoThreshold: clamp(Number.isFinite(settings.monoThreshold) ? settings.monoThreshold : 0.985, 0.7, 1.0),
   monoSideLevel: clamp(Number.isFinite(settings.monoSideLevel) ? settings.monoSideLevel : 100, 0, 150),
   chorusAmount: clamp(Number.isFinite(settings.chorusAmount) ? settings.chorusAmount : 0, 0, 100),
+  stereoAnalysisEnabled: settings.stereoAnalysisEnabled === false ? 0 : 1,
+  stereoFftSize: clamp(
+    typeof settings.stereoFftSize === 'number' && Number.isFinite(settings.stereoFftSize)
+      ? settings.stereoFftSize
+      : 1024,
+    256,
+    16384
+  ),
 });
 
 export const applyMultibandStereoImagerSettings = (

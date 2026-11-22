@@ -46,7 +46,8 @@ export function LyricsView({ lyrics, currentTime, duration = 0, onSeek }: Lyrics
     }
   }, []);
 
-  const [isUserScrolling, setIsUserScrolling] = useState(false);
+  const [scrollingForLyrics, setScrollingForLyrics] = useState<string | null>(null);
+  const isUserScrolling = scrollingForLyrics === lyrics;
   const scrollTimeoutRef = useRef<ReturnType<typeof setTimeout> | null>(null);
   const autoScrollTimeoutRef = useRef<ReturnType<typeof setTimeout> | null>(null);
   const previousActiveIndexRef = useRef(-1);
@@ -61,10 +62,11 @@ export function LyricsView({ lyrics, currentTime, duration = 0, onSeek }: Lyrics
 
   const handleUserInteraction = () => {
     if (isAutoScrollingRef.current) return;
-    setIsUserScrolling(true);
+    const activeLyrics = lyrics;
+    setScrollingForLyrics(activeLyrics);
     if (scrollTimeoutRef.current) clearTimeout(scrollTimeoutRef.current);
     scrollTimeoutRef.current = setTimeout(() => {
-      setIsUserScrolling(false);
+      setScrollingForLyrics((prev) => (prev === activeLyrics ? null : prev));
     }, 5000);
   };
 
@@ -141,7 +143,6 @@ export function LyricsView({ lyrics, currentTime, duration = 0, onSeek }: Lyrics
   }, [parsedLyrics, currentTime, duration, unsyncedLines.length]);
 
   useEffect(() => {
-    setIsUserScrolling(false);
     previousActiveIndexRef.current = -1;
     lineElementsRef.current.clear();
     if (scrollTimeoutRef.current) clearTimeout(scrollTimeoutRef.current);
@@ -254,7 +255,7 @@ export function LyricsView({ lyrics, currentTime, duration = 0, onSeek }: Lyrics
   const handleSeekLine = useCallback((idx: number, lineTime: number) => {
     if (onSeek) {
       lastSeekTimeRef.current = performance.now();
-      setIsUserScrolling(false);
+      setScrollingForLyrics(null);
       if (parsedLyrics.isSynced && lineTime >= 0) {
         onSeek(lineTime);
       } else if (!parsedLyrics.isSynced && duration > 0 && unsyncedLines.length > 0) {

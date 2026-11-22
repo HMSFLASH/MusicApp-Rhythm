@@ -1,4 +1,5 @@
-import { useEffect, useState } from 'react';
+import { useState } from 'react';
+import { formatNumberInput, parseDecimalInput } from '../utils/numberInput';
 
 type NumberInputProps = {
   value: number;
@@ -8,21 +9,6 @@ type NumberInputProps = {
   max?: number;
   step?: number;
   ariaLabel?: string;
-};
-
-export const parseDecimalInput = (value: string) => {
-  const normalized = value.trim().replace(/,/g, '.');
-  if (!normalized || normalized === '-' || normalized === '+') return null;
-
-  const parsed = Number(normalized);
-  return Number.isFinite(parsed) ? parsed : null;
-};
-
-export const formatNumberInput = (value: number) => {
-  if (!Number.isFinite(value)) return '';
-
-  const rounded = Number(value.toFixed(5));
-  return Object.is(rounded, -0) ? '0' : String(rounded);
 };
 
 const clampNumber = (value: number, min?: number, max?: number) => {
@@ -49,12 +35,6 @@ export function NumberInput({
   const [inputValue, setInputValue] = useState(formatNumberInput(value));
   const [isFocused, setIsFocused] = useState(false);
 
-  useEffect(() => {
-    if (!isFocused) {
-      setInputValue(formatNumberInput(value));
-    }
-  }, [isFocused, value]);
-
   const commitInput = () => {
     setIsFocused(false);
 
@@ -74,8 +54,11 @@ export function NumberInput({
       type="text"
       inputMode="decimal"
       aria-label={ariaLabel}
-      value={inputValue}
-      onFocus={() => setIsFocused(true)}
+      value={isFocused ? inputValue : formatNumberInput(value)}
+      onFocus={() => {
+        setIsFocused(true);
+        setInputValue(formatNumberInput(value));
+      }}
       onChange={(event) => setInputValue(event.target.value.replace(/,/g, '.'))}
       onBlur={commitInput}
       onKeyDown={(event) => {

@@ -236,7 +236,7 @@ export const createEqResponseChartData = (
   }
 
   const getEqGainDb = (frequency: number, channelFilter: (b: EqBand) => boolean) => {
-    let eqDb = 0;
+    let eqDb: number;
     if (graphicSpline) {
       // In graphic mode, eq is the spline
       eqDb = graphicSpline(Math.log2(clampFrequency(frequency)));
