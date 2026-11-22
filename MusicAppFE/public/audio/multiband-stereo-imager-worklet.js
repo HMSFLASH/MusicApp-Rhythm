@@ -86,13 +86,27 @@ class MultibandStereoImagerProcessor extends AudioWorkletProcessor {
 
     this.antiDenormal = 1e-25;
 
-    // Correlation detector state
+    // L/R correlation & mono detection state
     this.cachedStereoFftSize = -1;
     this.leak = 1 - Math.exp(-1 / 1024);
-    this.sumL2 = 0.0001;
-    this.sumR2 = 0.0001;
-    this.sumLR = 0.0001;
+    this.monoAtt = 1 - Math.exp(-1 / (this.sr * 0.350));
+    this.monoRel = 1 - Math.exp(-1 / (this.sr * 0.120));
+    this.corrEps = 1e-24;
+    this.corrSilenceThresh = 2.0e-7; // ~ -70 dBFS total L^2 + R^2 energy
+    this.monoHysteresis = 0.030;
+    this.monoKneeWidth = 0.050;
+    this.corrHpSL = 0;
+    this.corrHpSR = 0;
+    this.sumL2 = 0.0;
+    this.sumR2 = 0.0;
+    this.sumLR = 0.0;
     this.correlation = 1.0;
+    this.monoCoherence = 1.0;
+    this.stereoBalance = 0.0;
+    this.isNearMono = false;
+    this.monoBlend = 0.0;
+    this.isSilent = true;
+    this.wasAnalysisEnabled = false;
     this.updateStereoAnalysisWindow(1024);
 
     // Parameter smoothers (50 ms)
@@ -151,6 +165,9 @@ class MultibandStereoImagerProcessor extends AudioWorkletProcessor {
     this.p2S4X1 = 0; this.p2S4X2 = 0; this.p2S4Y1 = 0; this.p2S4Y2 = 0;
 
     // Fixed sample-rate coefficients
+    const gCorrHp = Math.tan((Math.PI * clamp(130, this.minFc, this.maxFc)) / this.sr);
+    this.G_corr_hp = gCorrHp / (1.0 + gCorrHp);
+
     const gSurrHp = Math.tan((Math.PI * clamp(240, this.minFc, this.maxFc)) / this.sr);
     this.kSurrHp = Math.SQRT2;
     this.surrHpA1 = 1.0 / (1.0 + gSurrHp * (gSurrHp + this.kSurrHp));
@@ -230,6 +247,20 @@ class MultibandStereoImagerProcessor extends AudioWorkletProcessor {
     this.leak = 1 - Math.exp(-1 / windowSamples);
   }
 
+  resetStereoAnalysisState() {
+    this.corrHpSL = 0;
+    this.corrHpSR = 0;
+    this.sumL2 = 0.0;
+    this.sumR2 = 0.0;
+    this.sumLR = 0.0;
+    this.correlation = 0.0;
+    this.monoCoherence = 0.0;
+    this.stereoBalance = 0.0;
+    this.isNearMono = false;
+    this.monoBlend = 0.0;
+    this.isSilent = true;
+  }
+
   updateDelayTaps(surroundDelayMs) {
     const safeDelayMs = clamp(surroundDelayMs, 5, 30);
     if (safeDelayMs === this.cachedSurroundDelayMs) return;
@@ -272,8 +303,17 @@ class MultibandStereoImagerProcessor extends AudioWorkletProcessor {
     this.updateCrossoverCoefficients(crossoverLow, crossoverHigh);
     this.updateDelayTaps(surroundDelayMs);
     if (analysisEnabled) {
+      this.wasAnalysisEnabled = true;
       this.updateStereoAnalysisWindow(stereoFftSize);
+    } else if (this.wasAnalysisEnabled || this.monoBlend !== 0 || this.isNearMono || this.correlation !== 0 || !this.isSilent) {
+      this.resetStereoAnalysisState();
+      this.wasAnalysisEnabled = false;
     }
+
+    const monoHystLow = monoThreshold - this.monoHysteresis;
+    const monoKneeLow = monoThreshold - this.monoKneeWidth * 0.8;
+    const monoKneeHigh = Math.min(1.0, monoThreshold + this.monoKneeWidth * 0.2);
+    const monoKneeDenom = Math.max(0.0001, monoKneeHigh - monoKneeLow);
 
     const baseWidth = percentToStereoBaseWidth(widthPercent);
     const basePseudoAmount = percentToPseudoStereoAmount(widthPercent);
@@ -359,14 +399,54 @@ class MultibandStereoImagerProcessor extends AudioWorkletProcessor {
         bypassR = midR;
       }
 
-      // 2. Continuous correlation detector
+      // 2. L/R Correlation & Mono Detection (independent of Crossover)
       if (analysisEnabled) {
-        this.sumL2 = this.sumL2 + this.leak * (L * L - this.sumL2);
-        this.sumR2 = this.sumR2 + this.leak * (R * R - this.sumR2);
-        this.sumLR = this.sumLR + this.leak * (L * R - this.sumLR);
-        this.correlation = this.sumLR / Math.sqrt(this.sumL2 * this.sumR2 + 0.000001);
-      } else {
-        this.correlation = 0;
+        // Step A: Sidechain HPF 130 Hz (TPT 1-pole) to strip DC offset & mono sub-bass
+        const corrHpVL = (lIn - this.corrHpSL) * this.G_corr_hp;
+        const corrHpLpL = corrHpVL + this.corrHpSL;
+        this.corrHpSL = corrHpLpL + corrHpVL;
+        const corrL = lIn - corrHpLpL;
+
+        const corrHpVR = (rIn - this.corrHpSR) * this.G_corr_hp;
+        const corrHpLpR = corrHpVR + this.corrHpSR;
+        this.corrHpSR = corrHpLpR + corrHpVR;
+        const corrR = rIn - corrHpLpR;
+
+        // Step B: EMA energy accumulation (window driven by stereoFftSize)
+        this.sumL2 += this.leak * (corrL * corrL - this.sumL2);
+        this.sumR2 += this.leak * (corrR * corrR - this.sumR2);
+        this.sumLR += this.leak * (corrL * corrR - this.sumLR);
+
+        // Step C: Silence Gate (-70 dBFS) - freeze state during silence
+        const corrEnergySum = this.sumL2 + this.sumR2;
+        if (corrEnergySum > this.corrSilenceThresh) {
+          this.isSilent = false;
+
+          // Normalized M/S Coherence = (M^2 - S^2) / (M^2 + S^2): 1.0 only when L == R (immune to panning)
+          this.monoCoherence = clamp((2.0 * this.sumLR) / (corrEnergySum + this.corrEps), -1.0, 1.0);
+
+          // Pearson Phase Correlation
+          this.correlation = clamp(this.sumLR / Math.sqrt(this.sumL2 * this.sumR2 + this.corrEps), -1.0, 1.0);
+
+          // Stereo Balance: -1 (Left), 0 (Center), +1 (Right)
+          this.stereoBalance = clamp((this.sumR2 - this.sumL2) / (corrEnergySum + this.corrEps), -1.0, 1.0);
+
+          // Hysteresis (Schmitt Trigger) for discrete near-mono flag
+          if (this.isNearMono) {
+            if (this.monoCoherence < monoHystLow) this.isNearMono = false;
+          } else if (this.monoCoherence >= monoThreshold) {
+            this.isNearMono = true;
+          }
+
+          // Soft-knee (smoothstep) + asymmetric Attack/Release for continuous DSP blend
+          const monoT = clamp((this.monoCoherence - monoKneeLow) / monoKneeDenom, 0.0, 1.0);
+          const targetMonoBlend = monoT * monoT * (3.0 - 2.0 * monoT);
+
+          const monoSmoothCoeff = targetMonoBlend > this.monoBlend ? this.monoAtt : this.monoRel;
+          this.monoBlend += monoSmoothCoeff * (targetMonoBlend - this.monoBlend);
+        } else {
+          this.isSilent = true;
+        }
       }
 
       let outL;
@@ -438,12 +518,12 @@ class MultibandStereoImagerProcessor extends AudioWorkletProcessor {
         outR = monoOut;
       } else {
         // Stereo 2-Speaker mode
-        const isNearMono = analysisEnabled && this.correlation >= monoThreshold;
         let targetWet = 0;
         if (surroundWetPercent > 0) {
           targetWet = surroundWetPercent / 100;
-        } else if (widthPercent > 100 && isNearMono) {
-          targetWet = Math.max(0.10, basePseudoAmount * 0.18);
+        } else if (widthPercent > 100 && analysisEnabled) {
+          const monoBoostWet = Math.max(0.10, basePseudoAmount * 0.18);
+          targetWet = this.monoBlend * monoBoostWet;
         }
 
         this.currentSurroundWet += this.smoothWet * (targetWet - this.currentSurroundWet);
