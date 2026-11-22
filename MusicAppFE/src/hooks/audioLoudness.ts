@@ -267,9 +267,13 @@ export const calculateRealtimeTrackLoudnessGain = (
     stereoCrossoverLow?: number;
     stereoCrossoverHigh?: number;
     stereoCrossoverMode?: 'inside' | 'outside';
+    surroundWet?: number;
+    surroundDelay?: number;
+    speakerMode?: 'stereo' | 'phase-safe-mono' | 'mono-sum';
+    chorusAmount?: number;
     panValue?: number;
   },
-  fxEnabled: Partial<Record<'preamp' | 'eq' | 'tone' | 'reverb' | 'stereo' | 'master' | 'limiter', boolean>> = {}
+  fxEnabled: Partial<Record<'preamp' | 'eq' | 'tone' | 'comp' | 'reverb' | 'stereo' | 'master' | 'limiter', boolean>> = {}
 ): number => {
   const fxParams = {
     preampGain: params.preampGain ?? 0,
@@ -281,11 +285,15 @@ export const calculateRealtimeTrackLoudnessGain = (
     stereoCrossoverLow: params.stereoCrossoverLow ?? 150,
     stereoCrossoverHigh: params.stereoCrossoverHigh ?? 20000,
     stereoCrossoverMode: params.stereoCrossoverMode ?? 'inside',
+    surroundWet: params.surroundWet ?? 14,
+    surroundDelay: params.surroundDelay ?? 12,
+    speakerMode: params.speakerMode ?? 'stereo',
+    chorusAmount: params.chorusAmount ?? 0,
     panValue: params.panValue ?? 0,
   };
   const fxActivity = getAudioFxActivity(fxParams, fxEnabled);
-  const postFxTrimDb = calculateAutoPostFxTrimDb(params, fxEnabled);
-  const downstreamGainDb = INPUT_HEADROOM_DB + postFxTrimDb;
+  const postFxTrimDb = fxActivity.needsHeadroom ? calculateAutoPostFxTrimDb(params, fxEnabled) : 0;
+  const downstreamGainDb = fxActivity.needsHeadroom ? INPUT_HEADROOM_DB + postFxTrimDb : 0;
   const normalizedGain = dbToGain(calculateTrackGainDb(measurement, downstreamGainDb));
   return fxActivity.any
     ? normalizedGain

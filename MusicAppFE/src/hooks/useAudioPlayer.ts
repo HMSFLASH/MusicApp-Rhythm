@@ -172,13 +172,19 @@ export function useAudioPlayer(
       preampGain: effectsState.preampGain,
       bassGain: effectsState.bassGain,
       trebleGain: effectsState.trebleGain,
-      compThreshold: effectsState.compThreshold,
-      compRatio: effectsState.compRatio,
-      compKnee: effectsState.compKnee,
-      compAttack: effectsState.compAttack,
-      compRelease: effectsState.compRelease,
-      compRmsSize: effectsState.compRmsSize,
-      compMakeupGain: effectsState.compMakeupGain,
+      balancerMode: effectsState.balancerMode,
+      balancerOffset: effectsState.balancerOffset,
+      balancerTargetDb: effectsState.balancerTargetDb,
+      balancerDeadzoneDb: effectsState.balancerDeadzoneDb,
+      balancerUpwardStrength: effectsState.balancerUpwardStrength,
+      balancerDownwardStrength: effectsState.balancerDownwardStrength,
+      balancerMaxUpwardDb: effectsState.balancerMaxUpwardDb,
+      balancerMaxDownwardDb: effectsState.balancerMaxDownwardDb,
+      balancerSpeed: effectsState.balancerSpeed,
+      balancerNoiseFloorDb: effectsState.balancerNoiseFloorDb,
+      balancerLookaheadMs: effectsState.balancerLookaheadMs,
+      balancerCeilingDb: effectsState.balancerCeilingDb,
+      balancerUseKWeight: effectsState.balancerUseKWeight,
       panValue: effectsState.panValue,
       stereoWidth: effectsState.stereoWidth,
       stereoCrossoverLow: effectsState.stereoCrossoverLow,
@@ -187,7 +193,9 @@ export function useAudioPlayer(
       surroundWet: effectsState.surroundWet,
       surroundDelay: effectsState.surroundDelay,
       speakerMode: effectsState.speakerMode,
-      chorusEnabled: effectsState.chorusEnabled,
+      monoThreshold: effectsState.monoThreshold,
+      monoSideLevel: effectsState.monoSideLevel,
+      chorusAmount: effectsState.chorusAmount,
       reverbMix: effectsState.reverbMix,
       reverbTime: effectsState.reverbTime,
       loudnessNormalization: effectsState.loudnessNormalization,
@@ -196,15 +204,15 @@ export function useAudioPlayer(
       fullQueueCacheEnabled: effectsState.fullQueueCacheEnabled,
       masterFftSize: effectsState.masterFftSize,
       stereoFftSize: effectsState.stereoFftSize,
-      
+
       audioLatencyHint: effectsState.audioLatencyHint,
       fxEnabled: effectsState.fxEnabled,
       useLegacyMetadata
     };
-    
+
     // Add a simple throttle to avoid too frequent writes
     const timeoutId = setTimeout(() => {
-        localStorage.setItem(getAudioConfigStorageKey(isAuthenticated), JSON.stringify(configToSave));
+      localStorage.setItem(getAudioConfigStorageKey(isAuthenticated), JSON.stringify(configToSave));
     }, 500);
 
     return () => clearTimeout(timeoutId);
@@ -214,9 +222,11 @@ export function useAudioPlayer(
     queueState.cycleQueues, queueState.upcomingQueues,
     effectsState.eqPresetName, effectsState.eqBands, effectsState.customEqPresets,
     effectsState.preampGain, effectsState.bassGain, effectsState.trebleGain,
-    effectsState.compThreshold, effectsState.compRatio, effectsState.compKnee, effectsState.compAttack, effectsState.compRelease, effectsState.compRmsSize, effectsState.compMakeupGain,
+    effectsState.balancerMode, effectsState.balancerOffset, effectsState.balancerTargetDb, effectsState.balancerDeadzoneDb,
+    effectsState.balancerUpwardStrength, effectsState.balancerDownwardStrength, effectsState.balancerMaxUpwardDb, effectsState.balancerMaxDownwardDb,
+    effectsState.balancerSpeed, effectsState.balancerNoiseFloorDb, effectsState.balancerLookaheadMs, effectsState.balancerCeilingDb, effectsState.balancerUseKWeight,
     effectsState.panValue, effectsState.stereoWidth, effectsState.stereoCrossoverLow, effectsState.stereoCrossoverHigh, effectsState.stereoCrossoverMode,
-    effectsState.surroundWet, effectsState.surroundDelay, effectsState.speakerMode, effectsState.chorusEnabled,
+    effectsState.surroundWet, effectsState.surroundDelay, effectsState.speakerMode, effectsState.monoThreshold, effectsState.monoSideLevel, effectsState.chorusAmount,
     effectsState.reverbMix, effectsState.reverbTime,
     effectsState.loudnessNormalization, effectsState.useOversample, effectsState.precalculateOnIdle,
     effectsState.fullQueueCacheEnabled, effectsState.masterFftSize, effectsState.stereoFftSize, effectsState.audioLatencyHint, effectsState.fxEnabled,

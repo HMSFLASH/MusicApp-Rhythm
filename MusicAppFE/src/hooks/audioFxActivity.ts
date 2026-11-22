@@ -18,13 +18,14 @@ export type AudioFxActivity = {
   stereo: boolean;
   master: boolean;
   limiter: boolean;
+  needsHeadroom: boolean;
   any: boolean;
 };
 
 export const getAudioFxActivity = (
   params: Pick<
     AudioRenderParams,
-    'preampGain' | 'eqBands' | 'bassGain' | 'trebleGain' | 'reverbMix' | 'stereoWidth' | 'stereoCrossoverLow' | 'stereoCrossoverHigh' | 'stereoCrossoverMode' | 'panValue' | 'surroundWet' | 'surroundDelay' | 'speakerMode' | 'chorusEnabled'
+    'preampGain' | 'eqBands' | 'bassGain' | 'trebleGain' | 'reverbMix' | 'stereoWidth' | 'stereoCrossoverLow' | 'stereoCrossoverHigh' | 'stereoCrossoverMode' | 'panValue' | 'surroundWet' | 'surroundDelay' | 'speakerMode' | 'chorusAmount'
   >,
   enabled: FxEnabledFlags = {}
 ): AudioFxActivity => {
@@ -39,11 +40,12 @@ export const getAudioFxActivity = (
   const stereo = Boolean(enabled.stereo) && (
     !isNeutralPercentValue(params.stereoWidth, 100) ||
     (Boolean(params.speakerMode) && params.speakerMode !== 'stereo') ||
-    Boolean(params.chorusEnabled) ||
+    (typeof params.chorusAmount === 'number' && params.chorusAmount > 0) ||
     (typeof params.surroundWet === 'number' && params.surroundWet > 0)
   );
   const master = Boolean(enabled.master) && !isNeutralPercentValue(params.panValue, 0);
   const limiter = Boolean(enabled.limiter);
+  const needsHeadroom = preamp || eq || tone || reverb || stereo;
 
   return {
     preamp,
@@ -54,6 +56,7 @@ export const getAudioFxActivity = (
     stereo,
     master,
     limiter,
-    any: preamp || eq || tone || comp || reverb || stereo || master || limiter,
+    needsHeadroom,
+    any: needsHeadroom || comp || master || limiter,
   };
 };

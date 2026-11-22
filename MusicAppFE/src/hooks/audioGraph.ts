@@ -1,10 +1,7 @@
-import {
-  clamp,
-  percentToPseudoStereoAmount,
-  percentToStereoBaseWidth,
-} from './audioMath';
+import { clamp } from './audioMath';
 import { TRUE_PEAK_CEILING_DB } from './audioLoudness';
 import { SPATIAL_ER_CONFIGS_3D, getKemarHrirPair } from '../utils/kemarHrirData';
+import { BALANCER_MODE_TO_INDEX, type BalancerSettings } from './audioTypes';
 
 export const REVERB_WET_GAIN = 0.70;
 export const REVERB_PRE_DELAY_MIN_SECONDS = 0.008;
@@ -15,14 +12,50 @@ export const HAAS_WET_GAIN_MAX = 0.14;
 export const NEAR_MONO_CORRELATION_THRESHOLD = 0.985;
 export const NEAR_MONO_SIDE_RATIO_THRESHOLD = 0.12;
 
-export const CUSTOM_DYNAMICS_COMPRESSOR_WORKLET_URL = '/audio/custom-dynamics-compressor-worklet.js';
+export const MULTIBAND_STEREO_IMAGER_WORKLET_URL = '/audio/multiband-stereo-imager-worklet.js';
+export const WEB_AUDIO_BALANCER_WORKLET_URL = '/audio/web-audio-balancer-worklet.js';
 export const SOFT_CLIP_CURVE_POINTS = 65536;
 export const SOFT_CLIP_THRESHOLD = 0.86;
 export const SOFT_CLIP_SHAPE = 1.2;
 export const SOFT_CLIP_CEILING = 0.985;
 
+const createWorkletLoader = (url: string, label: string) => {
+  const loadedContexts = new WeakSet<BaseAudioContext>();
+  const inflightLoads = new WeakMap<BaseAudioContext, Promise<boolean>>();
 
-const loadedDynamicsCompressorWorkletContexts = new WeakSet<BaseAudioContext>();
+  return async (ctx: BaseAudioContext): Promise<boolean> => {
+    if (!('audioWorklet' in ctx) || !ctx.audioWorklet) return false;
+    if (loadedContexts.has(ctx)) return true;
+
+    const existing = inflightLoads.get(ctx);
+    if (existing) return existing;
+
+    const promise = ctx.audioWorklet.addModule(url)
+      .then(() => {
+        loadedContexts.add(ctx);
+        inflightLoads.delete(ctx);
+        return true;
+      })
+      .catch((error) => {
+        inflightLoads.delete(ctx);
+        console.warn(`[Audio] ${label} worklet unavailable.`, error);
+        return false;
+      });
+
+    inflightLoads.set(ctx, promise);
+    return promise;
+  };
+};
+
+export const loadMultibandStereoImagerWorklet = createWorkletLoader(
+  MULTIBAND_STEREO_IMAGER_WORKLET_URL,
+  'Multiband Stereo Imager'
+);
+
+export const loadWebAudioBalancerWorklet = createWorkletLoader(
+  WEB_AUDIO_BALANCER_WORKLET_URL,
+  'Web Audio Balancer'
+);
 
 export const normalizedReverbMix = (reverbMix: number) => clamp((Number(reverbMix) || 0) / 100, 0, 1);
 
@@ -142,61 +175,112 @@ export const configureMasterLimiter = (limiter: DynamicsCompressorNode) => {
 
 
 
-export type CustomDynamicsCompressorSettings = {
-  threshold: number;
-  ratio: number;
-  knee: number;
-  attack: number;
-  release: number;
-  rmsSize: number;
+export type SpeakerMode = 'stereo' | 'phase-safe-mono' | 'mono-sum';
+
+export const SPEAKER_MODE_TO_INDEX: Record<SpeakerMode, number> = {
+  stereo: 0,
+  'phase-safe-mono': 1,
+  'mono-sum': 2,
 };
 
-export const loadCustomDynamicsCompressorWorklet = async (ctx: BaseAudioContext) => {
-  if (!('audioWorklet' in ctx) || !ctx.audioWorklet) return false;
-  if (loadedDynamicsCompressorWorkletContexts.has(ctx)) return true;
+export type MultibandStereoImagerSettings = {
+  widthPercent: number;
+  speakerMode: SpeakerMode;
+  crossoverLow: number;
+  crossoverHigh: number;
+  crossoverMode: 'inside' | 'outside';
+  surroundDelayMs: number;
+  surroundWetPercent: number;
+  monoThreshold: number;
+  monoSideLevel: number;
+  chorusAmount: number;
+};
 
-  try {
-    await ctx.audioWorklet.addModule(CUSTOM_DYNAMICS_COMPRESSOR_WORKLET_URL);
-    loadedDynamicsCompressorWorkletContexts.add(ctx);
-    return true;
-  } catch (error) {
-    console.warn('[Audio] Custom dynamics compressor unavailable.', error);
-    return false;
+export type WebAudioBalancerNodeSettings = BalancerSettings & {
+  enabled: boolean;
+};
+
+const setWorkletParams = (
+  node: AudioWorkletNode,
+  paramValues: Record<string, number>
+) => {
+  const params = node.parameters as unknown as Map<string, AudioParam>;
+  for (const [name, value] of Object.entries(paramValues)) {
+    const param = params.get(name);
+    if (param && Number.isFinite(value)) {
+      param.value = value;
+    }
   }
 };
 
-export const applyCustomDynamicsCompressorSettings = (
-  node: AudioWorkletNode,
-  settings: CustomDynamicsCompressorSettings
-) => {
-  const params = node.parameters as unknown as Map<string, AudioParam>;
-  const setParam = (name: keyof CustomDynamicsCompressorSettings, defaultVal: number) => {
-    const param = params.get(name);
-    if (param) {
-      const val = settings[name];
-      param.value = Number.isFinite(val) ? val : defaultVal;
-    }
-  };
+const toStereoImagerParamMap = (settings: MultibandStereoImagerSettings): Record<string, number> => ({
+  widthPercent: clamp(Number.isFinite(settings.widthPercent) ? settings.widthPercent : 100, 0, 200),
+  speakerMode: SPEAKER_MODE_TO_INDEX[settings.speakerMode] ?? 0,
+  crossoverLow: clamp(Number.isFinite(settings.crossoverLow) ? settings.crossoverLow : 150, 20, 20000),
+  crossoverHigh: clamp(Number.isFinite(settings.crossoverHigh) ? settings.crossoverHigh : 20000, 20, 20000),
+  crossoverMode: settings.crossoverMode === 'outside' ? 1 : 0,
+  surroundDelayMs: clamp(Number.isFinite(settings.surroundDelayMs) ? settings.surroundDelayMs : 12, 5, 30),
+  surroundWetPercent: clamp(Number.isFinite(settings.surroundWetPercent) ? settings.surroundWetPercent : 14, 0, 50),
+  monoThreshold: clamp(Number.isFinite(settings.monoThreshold) ? settings.monoThreshold : 0.985, 0.7, 1.0),
+  monoSideLevel: clamp(Number.isFinite(settings.monoSideLevel) ? settings.monoSideLevel : 100, 0, 150),
+  chorusAmount: clamp(Number.isFinite(settings.chorusAmount) ? settings.chorusAmount : 0, 0, 100),
+});
 
-  setParam('threshold', -18);
-  setParam('ratio', 3);
-  setParam('knee', 12);
-  setParam('attack', 0.005);
-  setParam('release', 0.18);
-  setParam('rmsSize', 0.005);
+export const applyMultibandStereoImagerSettings = (
+  node: AudioWorkletNode,
+  settings: MultibandStereoImagerSettings
+) => {
+  setWorkletParams(node, toStereoImagerParamMap(settings));
 };
 
-export const createCustomDynamicsCompressorNode = (
+export const createMultibandStereoImagerNode = (
   ctx: BaseAudioContext,
-  settings: CustomDynamicsCompressorSettings
-) => new AudioWorkletNode(ctx, 'custom-dynamics-compressor', {
+  settings: MultibandStereoImagerSettings
+) => new AudioWorkletNode(ctx, 'multiband-stereo-imager', {
   numberOfInputs: 1,
   numberOfOutputs: 1,
   outputChannelCount: [2],
   channelCount: 2,
-  channelCountMode: 'max',
+  channelCountMode: 'explicit',
   channelInterpretation: 'speakers',
-  parameterData: settings,
+  parameterData: toStereoImagerParamMap(settings),
+});
+
+const toBalancerParamMap = (settings: WebAudioBalancerNodeSettings): Record<string, number> => ({
+  mode: BALANCER_MODE_TO_INDEX[settings.mode] ?? 1,
+  enabled: settings.enabled ? 1 : 0,
+  loudnessOffset: clamp(Number.isFinite(settings.offset) ? settings.offset : 0, -6, 6),
+  targetDb: clamp(Number.isFinite(settings.targetDb) ? settings.targetDb : -18, -32, -8),
+  deadzoneDb: clamp(Number.isFinite(settings.deadzoneDb) ? settings.deadzoneDb : 2.0, 0, 8),
+  upwardStrength: clamp(Number.isFinite(settings.upwardStrength) ? settings.upwardStrength : 45, 0, 100),
+  downwardStrength: clamp(Number.isFinite(settings.downwardStrength) ? settings.downwardStrength : 65, 0, 100),
+  maxUpwardDb: clamp(Number.isFinite(settings.maxUpwardDb) ? settings.maxUpwardDb : 9.0, 0, 20),
+  maxDownwardDb: clamp(Number.isFinite(settings.maxDownwardDb) ? settings.maxDownwardDb : -14.0, -30, 0),
+  speed: clamp(Number.isFinite(settings.speed) ? settings.speed : 38, 0, 100),
+  noiseFloorDb: clamp(Number.isFinite(settings.noiseFloorDb) ? settings.noiseFloorDb : -48, -80, -25),
+  lookaheadMs: clamp(Number.isFinite(settings.lookaheadMs) ? settings.lookaheadMs : 3.5, 1, 10),
+  ceilingDb: clamp(Number.isFinite(settings.ceilingDb) ? settings.ceilingDb : -1.0, -6, -0.1),
+  useKWeight: settings.useKWeight ? 1 : 0,
+});
+
+export const applyWebAudioBalancerSettings = (
+  node: AudioWorkletNode,
+  settings: WebAudioBalancerNodeSettings
+) => {
+  setWorkletParams(node, toBalancerParamMap(settings));
+};
+
+export const createWebAudioBalancerNode = (
+  ctx: BaseAudioContext,
+  settings: WebAudioBalancerNodeSettings
+) => new AudioWorkletNode(ctx, 'web-audio-balancer', {
+  numberOfInputs: 1,
+  numberOfOutputs: 1,
+  outputChannelCount: [2],
+  channelCount: 2,
+  channelCountMode: 'explicit',
+  channelInterpretation: 'speakers',
+  parameterData: toBalancerParamMap(settings),
 });
 
 const MASTER_LIMITER_RAMP_SECONDS = 0.08;
@@ -245,23 +329,6 @@ export const applyMasterLimiterState = (
   applyMasterLimiterCompressorState(ctx, limiter, enabled, smooth);
   softClip.curve = (enabled ? createSoftClipCurve() : createIdentityCurve()) as Float32Array<ArrayBuffer>;
   softClip.oversample = useOversample ? '4x' : 'none';
-};
-
-export const configureLoudnessNormalization = (
-  preGain: GainNode,
-  compressor: DynamicsCompressorNode,
-  makeup: GainNode,
-  enabled: boolean
-) => {
-  preGain.gain.value = 1;
-  void enabled;
-
-  compressor.threshold.value = 0;
-  compressor.knee.value = 0;
-  compressor.ratio.value = 1;
-  compressor.attack.value = 0;
-  compressor.release.value = 0.25;
-  makeup.gain.value = 1;
 };
 
 // Seeded pseudo-random generator (Mulberry32) for deterministic, artifact-free impulse response generation
@@ -526,386 +593,6 @@ export const generateImpulseResponse = (ctx: BaseAudioContext, duration: number,
 
   return impulse;
 };
-
-// Allpass Diffuser Stage (Schroeder All-pass Filter)
-const createSchroederAllpass = (ctx: BaseAudioContext, delaySec: number, g: number) => {
-  const inputNode = ctx.createGain();
-  const outputNode = ctx.createGain();
-  const sumW = ctx.createGain();
-  const delay = ctx.createDelay(0.05);
-  delay.delayTime.value = delaySec;
-
-  const feedback = ctx.createGain();
-  feedback.gain.value = -g;
-
-  const feedforward = ctx.createGain();
-  feedforward.gain.value = g;
-
-  inputNode.connect(sumW);
-  sumW.connect(delay);
-  delay.connect(feedback);
-  feedback.connect(sumW);
-
-  delay.connect(outputNode);
-  sumW.connect(feedforward);
-  feedforward.connect(outputNode);
-
-  return { input: inputNode, output: outputNode };
-};
-
-export type SpeakerMode = 'stereo' | 'phase-safe-mono' | 'mono-sum';
-
-export interface StereoWidthMatrixOptions {
-  widthPercent: number;
-  stereoCrossoverLow: number;
-  stereoCrossoverHigh: number;
-  stereoCrossoverMode: 'inside' | 'outside';
-  usePseudoStereo?: boolean;
-  surroundWet?: number;
-  surroundDelay?: number;
-  speakerMode?: SpeakerMode;
-  chorusEnabled?: boolean;
-}
-
-export const connectStereoWidthMatrix = (
-  ctx: BaseAudioContext,
-  input: AudioNode,
-  widthPercentOrOptions: number | StereoWidthMatrixOptions,
-  legacyLow = 150,
-  legacyHigh = 20000,
-  legacyMode: 'inside' | 'outside' = 'inside',
-  legacyPseudo = true,
-  legacySurroundWet?: number,
-  legacySurroundDelay?: number,
-  legacySpeakerMode: SpeakerMode = 'stereo',
-  legacyChorusEnabled = false
-) => {
-  const opts: StereoWidthMatrixOptions = typeof widthPercentOrOptions === 'object'
-    ? widthPercentOrOptions
-    : {
-      widthPercent: widthPercentOrOptions,
-      stereoCrossoverLow: legacyLow,
-      stereoCrossoverHigh: legacyHigh,
-      stereoCrossoverMode: legacyMode,
-      usePseudoStereo: legacyPseudo,
-      surroundWet: legacySurroundWet,
-      surroundDelay: legacySurroundDelay,
-      speakerMode: legacySpeakerMode,
-      chorusEnabled: legacyChorusEnabled,
-    };
-
-  const width = percentToStereoBaseWidth(opts.widthPercent);
-  const out = ctx.createGain();
-
-  // 1. Phân tách dải tần Crossover Transient-Perfect (hp = in - lp)
-  // Tổng lp + hp = in tuyệt đối, triệt tiêu hoàn toàn hiện tượng lệch pha/khuyết tần số tại crossover
-  const lowHz = Math.min(opts.stereoCrossoverLow, opts.stereoCrossoverHigh);
-  const highHz = Math.max(opts.stereoCrossoverLow, opts.stereoCrossoverHigh);
-
-  const lpLow = ctx.createBiquadFilter();
-  lpLow.type = 'lowpass';
-  lpLow.frequency.value = lowHz;
-  lpLow.Q.value = 0.7071;
-
-  const hpLowBus = ctx.createGain();
-  const lpLowInv = ctx.createGain();
-  lpLowInv.gain.value = -1;
-
-  input.connect(lpLow);
-  input.connect(hpLowBus);
-  lpLow.connect(lpLowInv);
-  lpLowInv.connect(hpLowBus); // hpLowBus = input - lpLow
-
-  const lpHigh = ctx.createBiquadFilter();
-  lpHigh.type = 'lowpass';
-  lpHigh.frequency.value = highHz;
-  lpHigh.Q.value = 0.7071;
-
-  const hpHighBus = ctx.createGain();
-  const lpHighInv = ctx.createGain();
-  lpHighInv.gain.value = -1;
-
-  hpLowBus.connect(lpHigh);
-  hpLowBus.connect(hpHighBus);
-  lpHigh.connect(lpHighInv);
-  lpHighInv.connect(hpHighBus); // hpHighBus = hpLowBus - lpHigh
-
-  const processedBand = ctx.createGain();
-  const bypassBand = ctx.createGain();
-
-  if (opts.stereoCrossoverMode === 'inside') {
-    // Inside: Xử lý dải trung (từ lowHz đến highHz)
-    lpHigh.connect(processedBand);
-    lpLow.connect(bypassBand);
-    hpHighBus.connect(bypassBand);
-  } else {
-    // Outside: Xử lý dải trầm và dải cao
-    lpLow.connect(processedBand);
-    hpHighBus.connect(processedBand);
-    lpHigh.connect(bypassBand);
-  }
-
-  bypassBand.connect(out);
-
-  // 2. Chế độ 1 Loa (Speaker Mode)
-  if (opts.speakerMode === 'mono-sum') {
-    // Chế độ 1 loa tiêu chuẩn: Downmix (L + R) * 0.5
-    const monoSum = ctx.createGain();
-    monoSum.gain.value = 0.5;
-    const monoMerger = ctx.createChannelMerger(2);
-    processedBand.connect(monoSum);
-    monoSum.connect(monoMerger, 0, 0);
-    monoSum.connect(monoMerger, 0, 1);
-    monoMerger.connect(out);
-    return out;
-  }
-
-  if (opts.speakerMode === 'phase-safe-mono') {
-    // Chế độ 1 loa thông minh: Bộ dịch pha trực giao 90 độ (Olli Niemitalo Hilbert Network)
-    // Giúp bảo toàn 100% âm lượng dải Side trên loa mono mà KHÔNG bị triệt tiêu pha
-    const splitter = ctx.createChannelSplitter(2);
-    processedBand.connect(splitter);
-
-    const midNode = ctx.createGain();
-    midNode.gain.value = 0.5;
-    const sideNode = ctx.createGain();
-    sideNode.gain.value = 0.5;
-    const sideInv = ctx.createGain();
-    sideInv.gain.value = -0.5;
-
-    splitter.connect(midNode, 0);
-    splitter.connect(midNode, 1); // M = (L+R)*0.5
-
-    splitter.connect(sideNode, 0);
-    splitter.connect(sideInv, 1);
-    sideInv.connect(sideNode); // S = (L-R)*0.5
-
-    // Lọc cắt trầm Side (120Hz) chống ù/đục âm khi gập vào mono
-    const sideHp = ctx.createBiquadFilter();
-    sideHp.type = 'highpass';
-    sideHp.frequency.value = 120;
-    sideHp.Q.value = 0.7071;
-    sideNode.connect(sideHp);
-
-    // Nhánh 1 (Mid): Trễ 1 mẫu + 4 bộ lọc Allpass IIR
-    const samplePeriod = 1 / ctx.sampleRate;
-    const delay1 = ctx.createDelay(0.001);
-    delay1.delayTime.value = samplePeriod;
-    midNode.connect(delay1);
-
-    const apCoeffs = [0.4794008653, 0.8762184931, 0.9765975883, 0.9974992552];
-    let prevP1: AudioNode = delay1;
-    for (const c of apCoeffs) {
-      const ap = ctx.createIIRFilter([c, 0, -1], [1, 0, -c]);
-      prevP1.connect(ap);
-      prevP1 = ap;
-    }
-
-    // Nhánh 2 (Side): 4 bộ lọc Allpass IIR (lệch pha 90 độ so với Mid)
-    const bpCoeffs = [0.1617585000, 0.7330289300, 0.9453497000, 0.9905991600];
-    let prevP2: AudioNode = sideHp;
-    for (const c of bpCoeffs) {
-      const bp = ctx.createIIRFilter([c, 0, -1], [1, 0, -c]);
-      prevP2.connect(bp);
-      prevP2 = bp;
-    }
-
-    // Gộp Mid và Side trực giao: M_phase + 0.7071 * k * S_phase
-    const effK = 0.7071 * clamp(opts.widthPercent / 100, 0, 2);
-    const monoSumOut = ctx.createGain();
-    prevP1.connect(monoSumOut);
-
-    const sideScaled = ctx.createGain();
-    sideScaled.gain.value = effK;
-    prevP2.connect(sideScaled);
-    sideScaled.connect(monoSumOut);
-
-    const monoMerger = ctx.createChannelMerger(2);
-    monoSumOut.connect(monoMerger, 0, 0);
-    monoSumOut.connect(monoMerger, 0, 1);
-    monoMerger.connect(out);
-    return out;
-  }
-
-  // 3. Chế độ Stereo: Mid/Side Width Matrix
-  const splitter = ctx.createChannelSplitter(2);
-  const merger = ctx.createChannelMerger(2);
-
-  const lToL = ctx.createGain();
-  const rToL = ctx.createGain();
-  const lToR = ctx.createGain();
-  const rToR = ctx.createGain();
-
-  lToL.gain.value = (1 + width) / 2;
-  rToL.gain.value = (1 - width) / 2;
-  lToR.gain.value = (1 - width) / 2;
-  rToR.gain.value = (1 + width) / 2;
-
-  processedBand.connect(splitter);
-  splitter.connect(lToL, 0);
-  splitter.connect(lToR, 0);
-  splitter.connect(rToL, 1);
-  splitter.connect(rToR, 1);
-
-  lToL.connect(merger, 0, 0);
-  rToL.connect(merger, 0, 0);
-  lToR.connect(merger, 0, 1);
-  rToR.connect(merger, 0, 1);
-
-  // 4. Mạng trễ Khuyếch tán Đa hướng Âm vòm 3D (3D Differential Surround Multi-tap Network)
-  let effectiveWet = 0;
-  if (typeof opts.surroundWet === 'number' && opts.surroundWet > 0) {
-    effectiveWet = opts.surroundWet / 100;
-  } else if (opts.widthPercent > 100) {
-    const pseudoAmount = percentToPseudoStereoAmount(opts.widthPercent);
-    effectiveWet = pseudoAmount * 0.18;
-    if (opts.usePseudoStereo) {
-      effectiveWet = Math.max(0.10, effectiveWet);
-    }
-  } else if (opts.usePseudoStereo) {
-    effectiveWet = 0.10;
-  }
-
-  if (effectiveWet > 0.001) {
-    // Bước A: Lấy tín hiệu Mid và lọc Sub-rumble (80Hz) chống ù kick/bass
-    const midFeed = ctx.createGain();
-    midFeed.gain.value = 0.5;
-    splitter.connect(midFeed, 0);
-    splitter.connect(midFeed, 1);
-
-    const subHp = ctx.createBiquadFilter();
-    subHp.type = 'highpass';
-    subHp.frequency.value = 80;
-    subHp.Q.value = 0.7071;
-    midFeed.connect(subHp);
-
-    // Bước B: Mạng Khuếch tán All-Pass 2 tầng (Phase Dispersion / Transient Smearing)
-    // Tầng 1: D1 ~ 2.1ms (g = 0.60); Tầng 2: D2 ~ 3.7ms (g = 0.50)
-    const ap1 = createSchroederAllpass(ctx, 0.0021, 0.60);
-    const ap2 = createSchroederAllpass(ctx, 0.0037, 0.50);
-    subHp.connect(ap1.input);
-    ap1.output.connect(ap2.input);
-
-    // Bước C & D: Đọc 4 luồng phản xạ phi điều hòa (Golden ratio & irrational spacing) với Progressive Air Absorption
-    const baseDelaySec = clamp((opts.surroundDelay ?? 12) / 1000, 0.005, 0.030);
-    const diffBus = ctx.createGain();
-
-    // Tap 1: 0.618x, gain +0.75, dải cao trong sáng
-    const tap1Delay = ctx.createDelay(0.1);
-    tap1Delay.delayTime.value = baseDelaySec * 0.618;
-    const tap1Gain = ctx.createGain();
-    tap1Gain.gain.value = 0.75;
-    ap2.output.connect(tap1Delay);
-    tap1Delay.connect(tap1Gain);
-    tap1Gain.connect(diffBus);
-
-    // Tap 2: 1.000x, gain -0.65, damping nhẹ 10kHz
-    const tap2Delay = ctx.createDelay(0.1);
-    tap2Delay.delayTime.value = baseDelaySec * 1.000;
-    const tap2Lp = ctx.createBiquadFilter();
-    tap2Lp.type = 'lowpass';
-    tap2Lp.frequency.value = 10000;
-    const tap2Gain = ctx.createGain();
-    tap2Gain.gain.value = -0.65;
-    ap2.output.connect(tap2Delay);
-    tap2Delay.connect(tap2Lp);
-    tap2Lp.connect(tap2Gain);
-    tap2Gain.connect(diffBus);
-
-    // Tap 3: 1.414x, gain +0.50, damping 7.5kHz cho phản xạ sau trái
-    const tap3Delay = ctx.createDelay(0.1);
-    tap3Delay.delayTime.value = baseDelaySec * 1.414;
-    const tap3Lp = ctx.createBiquadFilter();
-    tap3Lp.type = 'lowpass';
-    tap3Lp.frequency.value = 7500;
-    const tap3Gain = ctx.createGain();
-    tap3Gain.gain.value = 0.50;
-    ap2.output.connect(tap3Delay);
-    tap3Delay.connect(tap3Lp);
-    tap3Lp.connect(tap3Gain);
-    tap3Gain.connect(diffBus);
-
-    // Tap 4: 1.932x, gain -0.40, damping 5.5kHz cho ambient sau phải
-    const tap4Delay = ctx.createDelay(0.1);
-    tap4Delay.delayTime.value = baseDelaySec * 1.932;
-    const tap4Lp = ctx.createBiquadFilter();
-    tap4Lp.type = 'lowpass';
-    tap4Lp.frequency.value = 5500;
-    const tap4Gain = ctx.createGain();
-    tap4Gain.gain.value = -0.40;
-    ap2.output.connect(tap4Delay);
-    tap4Delay.connect(tap4Lp);
-    tap4Lp.connect(tap4Gain);
-    tap4Gain.connect(diffBus);
-
-    // Bước E: Ma trận phân bổ không gian vi sai (3D Differential Surround Matrix)
-    // Kênh L nhận (+), kênh R nhận (-) => Triệt tiêu 100% đối xứng khi gập Mono (Phase-Safe Mono-Compatible)
-    const surroundLeft = ctx.createGain();
-    surroundLeft.gain.value = effectiveWet;
-    const surroundRight = ctx.createGain();
-    surroundRight.gain.value = -effectiveWet;
-
-    diffBus.connect(surroundLeft);
-    diffBus.connect(surroundRight);
-    surroundLeft.connect(merger, 0, 0);
-    surroundRight.connect(merger, 0, 1);
-  }
-
-  // 5. Chorus Micro-Delay Ensemble (Tạo độ dày và lộng lẫy âm thanh)
-  if (opts.chorusEnabled) {
-    try {
-      const chorusLfo = ctx.createOscillator();
-      chorusLfo.frequency.value = 0.45;
-
-      const chorusModL = ctx.createGain();
-      chorusModL.gain.value = 0.0012;
-      const chorusModR = ctx.createGain();
-      chorusModR.gain.value = -0.0012;
-
-      chorusLfo.connect(chorusModL);
-      chorusLfo.connect(chorusModR);
-
-      const chorusDelayL = ctx.createDelay(0.02);
-      chorusDelayL.delayTime.value = 0.0045;
-      const chorusDelayR = ctx.createDelay(0.02);
-      chorusDelayR.delayTime.value = 0.0045;
-
-      chorusModL.connect(chorusDelayL.delayTime);
-      chorusModR.connect(chorusDelayR.delayTime);
-
-      splitter.connect(chorusDelayL, 0);
-      splitter.connect(chorusDelayR, 1);
-
-      const chorusSide = ctx.createGain();
-      chorusSide.gain.value = 0.5;
-      const chorusSideInv = ctx.createGain();
-      chorusSideInv.gain.value = -0.5;
-
-      chorusDelayL.connect(chorusSide);
-      chorusDelayR.connect(chorusSideInv);
-      chorusSideInv.connect(chorusSide);
-
-      const chorusWet = 0.22;
-      const chorusLeftGain = ctx.createGain();
-      chorusLeftGain.gain.value = chorusWet;
-      const chorusRightGain = ctx.createGain();
-      chorusRightGain.gain.value = -chorusWet;
-
-      chorusSide.connect(chorusLeftGain);
-      chorusSide.connect(chorusRightGain);
-      chorusLeftGain.connect(merger, 0, 0);
-      chorusRightGain.connect(merger, 0, 1);
-
-      chorusLfo.start(0);
-    } catch {
-      // Ignored if oscillator start fails in inactive context
-    }
-  }
-
-  merger.connect(out);
-  return out;
-};
-
 
 export const createSilentWavUrl = () => {
   const sampleRate = 8000;

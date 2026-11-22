@@ -1,18 +1,16 @@
 import type { AudioRenderParams, FxEnabledFlags } from './audioRenderSignature';
 import {
   clamp,
-  compressorAttackSeconds,
-  msToAudioSeconds,
   percentToPan,
 } from './audioMath';
 import {
   configureMasterLimiter,
-  createCustomDynamicsCompressorNode,
-  connectStereoWidthMatrix,
+  createMultibandStereoImagerNode,
   createSoftClipCurve,
+  createWebAudioBalancerNode,
   generateImpulseResponse,
-  isAudioBufferNearMono,
-  loadCustomDynamicsCompressorWorklet,
+  loadMultibandStereoImagerWorklet,
+  loadWebAudioBalancerWorklet,
   REVERB_WET_HIGHPASS_HZ,
   REVERB_WET_LOWPASS_HZ,
   reverbPreDelaySeconds,
@@ -57,13 +55,19 @@ export const renderOfflineAudio = async ({
     eqBands,
     bassGain,
     trebleGain,
-    compThreshold,
-    compRatio,
-    compKnee,
-    compAttack,
-    compRelease,
-    compRmsSize,
-    compMakeupGain,
+    balancerMode,
+    balancerOffset,
+    balancerTargetDb,
+    balancerDeadzoneDb,
+    balancerUpwardStrength,
+    balancerDownwardStrength,
+    balancerMaxUpwardDb,
+    balancerMaxDownwardDb,
+    balancerSpeed,
+    balancerNoiseFloorDb,
+    balancerLookaheadMs,
+    balancerCeilingDb,
+    balancerUseKWeight,
     reverbMix,
     reverbTime,
     stereoWidth,
@@ -73,7 +77,9 @@ export const renderOfflineAudio = async ({
     surroundWet,
     surroundDelay,
     speakerMode,
-    chorusEnabled,
+    monoThreshold,
+    monoSideLevel,
+    chorusAmount,
     panValue,
     loudnessNormalization,
     useOversample,
@@ -81,7 +87,7 @@ export const renderOfflineAudio = async ({
 
   let autoPreamp = 0;
   let processedEqBands = eqBands;
-  const isParametricPreset = paramPresetOpt ?? eqBands.some((band: any) => (band.type && band.type !== 'peaking') || band.channel !== 'L+R');
+  const isParametricPreset = paramPresetOpt ?? eqBands.some((band) => (band.type && band.type !== 'peaking') || band.channel !== 'L+R');
   if (!isParametricPreset) {
     const result = processGraphicEqBands(eqBands, sampleRate, true);
     processedEqBands = result.fittedBands;
@@ -104,6 +110,10 @@ export const renderOfflineAudio = async ({
     stereoCrossoverLow,
     stereoCrossoverHigh,
     stereoCrossoverMode,
+    surroundWet: surroundWet ?? 14,
+    surroundDelay: surroundDelay ?? 12,
+    speakerMode: speakerMode ?? 'stereo',
+    chorusAmount: chorusAmount ?? 0,
     panValue,
   }, enabledWithAutoPreamp);
 
@@ -111,7 +121,7 @@ export const renderOfflineAudio = async ({
     return audioBuffer;
   }
 
-  const postFxTrimDb = activity.any
+  const postFxTrimDb = activity.needsHeadroom
     ? calculateAutoPostFxTrimDb({
       preampGain: totalPreampGain,
       eqBands: processedEqBands,
@@ -125,6 +135,8 @@ export const renderOfflineAudio = async ({
     }, enabledWithAutoPreamp)
     : 0;
 
+  const downstreamGainDb = activity.needsHeadroom ? INPUT_HEADROOM_DB + postFxTrimDb : 0;
+
   const offlineCtx = new OfflineAudioContext(2, length, sampleRate);
   const offlineSource = offlineCtx.createBufferSource();
   offlineSource.buffer = audioBuffer;
@@ -134,20 +146,7 @@ export const renderOfflineAudio = async ({
 
   if (!activity.any && loudnessNormalization) {
     const trackGain = offlineCtx.createGain();
-    const downstreamGainDb = INPUT_HEADROOM_DB + calculateAutoPostFxTrimDb({
-      preampGain: totalPreampGain,
-      eqBands: processedEqBands,
-      bassGain,
-      trebleGain,
-      reverbMix,
-      stereoWidth,
-      stereoCrossoverLow,
-      stereoCrossoverHigh,
-      stereoCrossoverMode,
-    }, enabledWithAutoPreamp);
-    trackGain.gain.value =
-      calculateNormalizedTrackGain(audioBuffer, downstreamGainDb) *
-      dbToGain(downstreamGainDb);
+    trackGain.gain.value = calculateNormalizedTrackGain(audioBuffer, 0);
     offlineSource.connect(trackGain);
     trackGain.connect(offlineCtx.destination);
     offlineSource.start(0);
@@ -156,15 +155,17 @@ export const renderOfflineAudio = async ({
 
   if (loudnessNormalization) {
     const trackGain = offlineCtx.createGain();
-    trackGain.gain.value = calculateNormalizedTrackGain(audioBuffer, INPUT_HEADROOM_DB + postFxTrimDb);
+    trackGain.gain.value = calculateNormalizedTrackGain(audioBuffer, downstreamGainDb);
     currentNode.connect(trackGain);
     currentNode = trackGain;
   }
 
-  const headroomDrop = offlineCtx.createGain();
-  headroomDrop.gain.value = 0.5;
-  currentNode.connect(headroomDrop);
-  currentNode = headroomDrop;
+  if (activity.needsHeadroom) {
+    const headroomDrop = offlineCtx.createGain();
+    headroomDrop.gain.value = 0.5;
+    currentNode.connect(headroomDrop);
+    currentNode = headroomDrop;
+  }
 
   if (activity.preamp) {
     const preamp = offlineCtx.createGain();
@@ -230,10 +231,10 @@ export const renderOfflineAudio = async ({
 
   if (activity.tone) {
     const toneBands = [];
-    if (Math.abs(bassGain) > 0.001) toneBands.push({ id: 'bass', type: 'lowshelf', frequency: 150, q: 1, gain: bassGain } as any);
-    if (Math.abs(trebleGain) > 0.001) toneBands.push({ id: 'treble', type: 'highshelf', frequency: 4000, q: 1, gain: trebleGain } as any);
+    if (Math.abs(bassGain) > 0.001) toneBands.push({ id: 'bass', type: 'lowshelf', frequency: 150, q: 1, gain: bassGain });
+    if (Math.abs(trebleGain) > 0.001) toneBands.push({ id: 'treble', type: 'highshelf', frequency: 4000, q: 1, gain: trebleGain });
 
-    const expandedToneBands = expandResonantEqBands(toneBands);
+    const expandedToneBands = expandResonantEqBands(toneBands as typeof processedEqBands);
 
     let prevTone = currentNode;
     expandedToneBands.forEach((band) => {
@@ -247,39 +248,6 @@ export const renderOfflineAudio = async ({
       prevTone = filter;
     });
     currentNode = prevTone;
-  }
-
-  if (activity.comp) {
-    const makeup = offlineCtx.createGain();
-    makeup.gain.value = Math.pow(10, compMakeupGain / 20);
-
-    if (compRatio < 1 && await loadCustomDynamicsCompressorWorklet(offlineCtx)) {
-      const comp = createCustomDynamicsCompressorNode(offlineCtx, {
-        threshold: compThreshold,
-        ratio: compRatio,
-        knee: compKnee,
-        attack: compressorAttackSeconds(compAttack, compRmsSize),
-        release: msToAudioSeconds(compRelease),
-        rmsSize: msToAudioSeconds(compRmsSize),
-      });
-
-      currentNode.connect(comp);
-      comp.connect(makeup);
-    } else if (compRatio >= 1) {
-      const comp = offlineCtx.createDynamicsCompressor();
-      comp.threshold.value = compThreshold;
-      comp.ratio.value = compRatio;
-      comp.knee.value = compKnee;
-      comp.attack.value = compressorAttackSeconds(compAttack, compRmsSize);
-      comp.release.value = msToAudioSeconds(compRelease);
-
-      currentNode.connect(comp);
-      comp.connect(makeup);
-    } else {
-      currentNode.connect(makeup);
-    }
-
-    currentNode = makeup;
   }
 
   let dryGain: GainNode | null = null;
@@ -330,23 +298,20 @@ export const renderOfflineAudio = async ({
     currentNode = nextNode;
   };
 
-  if (activity.stereo) {
-    const stereoInput = offlineCtx.createGain();
-    connectToNext(stereoInput);
-    const shouldUsePseudoStereo = isAudioBufferNearMono(audioBuffer);
-    currentNode = connectStereoWidthMatrix(
-      offlineCtx,
-      stereoInput,
-      stereoWidth,
-      stereoCrossoverLow,
-      stereoCrossoverHigh,
-      stereoCrossoverMode,
-      shouldUsePseudoStereo,
-      surroundWet,
-      surroundDelay,
-      speakerMode,
-      chorusEnabled
-    );
+  if (activity.stereo && await loadMultibandStereoImagerWorklet(offlineCtx)) {
+    const stereoNode = createMultibandStereoImagerNode(offlineCtx, {
+      widthPercent: stereoWidth,
+      speakerMode: speakerMode ?? 'stereo',
+      crossoverLow: stereoCrossoverLow,
+      crossoverHigh: stereoCrossoverHigh,
+      crossoverMode: stereoCrossoverMode,
+      surroundDelayMs: surroundDelay ?? 12,
+      surroundWetPercent: surroundWet ?? 14,
+      monoThreshold: monoThreshold ?? 0.985,
+      monoSideLevel: monoSideLevel ?? 100,
+      chorusAmount: chorusAmount ?? 0,
+    });
+    connectToNext(stereoNode);
   }
 
   if (activity.master) {
@@ -355,13 +320,35 @@ export const renderOfflineAudio = async ({
     connectToNext(panNode);
   }
 
-  const headroomRecover = offlineCtx.createGain();
-  headroomRecover.gain.value = dbToGain(postFxTrimDb);
-  connectToNext(headroomRecover);
+  if (activity.needsHeadroom) {
+    const headroomRecover = offlineCtx.createGain();
+    headroomRecover.gain.value = dbToGain(postFxTrimDb);
+    connectToNext(headroomRecover);
+  }
+
+  if (activity.comp && await loadWebAudioBalancerWorklet(offlineCtx)) {
+    const balancerNode = createWebAudioBalancerNode(offlineCtx, {
+      enabled: true,
+      mode: balancerMode,
+      offset: balancerOffset,
+      targetDb: balancerTargetDb,
+      deadzoneDb: balancerDeadzoneDb,
+      upwardStrength: balancerUpwardStrength,
+      downwardStrength: balancerDownwardStrength,
+      maxUpwardDb: balancerMaxUpwardDb,
+      maxDownwardDb: balancerMaxDownwardDb,
+      speed: balancerSpeed,
+      noiseFloorDb: balancerNoiseFloorDb,
+      lookaheadMs: balancerLookaheadMs,
+      ceilingDb: balancerCeilingDb,
+      useKWeight: balancerUseKWeight,
+    });
+    connectToNext(balancerNode);
+  }
 
   if (activity.limiter) {
     const waveShaper = offlineCtx.createWaveShaper();
-    waveShaper.curve = createSoftClipCurve() as any;
+    waveShaper.curve = createSoftClipCurve() as Float32Array<ArrayBuffer>;
     waveShaper.oversample = useOversample ? '4x' : 'none';
     connectToNext(waveShaper);
 

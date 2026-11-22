@@ -334,34 +334,153 @@ export function expandResonantEqBands(bands: EqBand[]): EqBand[] {
   });
 }
 
-export type CompressorSettings = {
-  threshold: number;
-  ratio: number;
-  knee: number;
-  attack: number;
-  release: number;
-  rmsSize: number;
-  makeupGain: number;
+export type BalancerMode = 'normal' | 'music' | 'smart' | 'custom';
+export type BalancerTemplate = 'normal' | 'music' | 'night';
+
+export type BalancerCustomSettings = {
+  targetDb: number;
+  deadzoneDb: number;
+  upwardStrength: number;
+  downwardStrength: number;
+  maxUpwardDb: number;
+  maxDownwardDb: number;
+  speed: number;
+  noiseFloorDb: number;
+  lookaheadMs: number;
+  ceilingDb: number;
+  useKWeight: boolean;
 };
 
-export const COMPRESSOR_DEFAULTS: CompressorSettings = {
-  threshold: -18,
-  ratio: 3,
-  knee: 12,
-  attack: 5,
-  release: 180,
-  rmsSize: 5,
-  makeupGain: 2
+export type BalancerSettings = BalancerCustomSettings & {
+  mode: BalancerMode;
+  offset: number;
 };
 
-export const COMPRESSOR_RESET_SETTINGS: CompressorSettings = {
-  threshold: 0,
-  ratio: 1,
-  knee: 0,
-  attack: 0,
-  release: 250,
-  rmsSize: 5,
-  makeupGain: 0
+export type BalancerTelemetry = {
+  rmsDb: number;
+  currentGainDb: number;
+  limGrDb: number;
+  smartTargetDb: number;
+  smartGateDb: number;
+  musicDenseIdx: number;
+};
+
+export const BALANCER_MODE_TO_INDEX: Record<BalancerMode, number> = {
+  normal: 0,
+  music: 1,
+  smart: 2,
+  custom: 3,
+};
+
+export const BALANCER_TEMPLATES: Record<BalancerTemplate, BalancerCustomSettings> = {
+  normal: {
+    targetDb: -18.0,
+    deadzoneDb: 2.0,
+    upwardStrength: 45,
+    downwardStrength: 65,
+    maxUpwardDb: 9.0,
+    maxDownwardDb: -14.0,
+    speed: 38,
+    noiseFloorDb: -48,
+    lookaheadMs: 3.0,
+    ceilingDb: -1.0,
+    useKWeight: true,
+  },
+  music: {
+    targetDb: -16.5,
+    deadzoneDb: 3.5,
+    upwardStrength: 25,
+    downwardStrength: 35,
+    maxUpwardDb: 5.5,
+    maxDownwardDb: -8.0,
+    speed: 78,
+    noiseFloorDb: -54,
+    lookaheadMs: 4.0,
+    ceilingDb: -1.0,
+    useKWeight: true,
+  },
+  night: {
+    targetDb: -17.0,
+    deadzoneDb: 1.2,
+    upwardStrength: 65,
+    downwardStrength: 80,
+    maxUpwardDb: 12.0,
+    maxDownwardDb: -18.0,
+    speed: 22,
+    noiseFloorDb: -46,
+    lookaheadMs: 3.5,
+    ceilingDb: -1.5,
+    useKWeight: true,
+  },
+};
+
+export const BALANCER_DEFAULTS: BalancerSettings = {
+  mode: 'music',
+  offset: 0,
+  ...BALANCER_TEMPLATES.normal,
+  lookaheadMs: 3.5,
+};
+
+export const getBalancerEffectiveParams = (settings: BalancerSettings) => {
+  const clampVal = (v: number, lo: number, hi: number) => Math.min(hi, Math.max(lo, v));
+  let base: BalancerCustomSettings;
+
+  if (settings.mode === 'normal') {
+    base = BALANCER_TEMPLATES.normal;
+  } else if (settings.mode === 'music') {
+    base = BALANCER_TEMPLATES.music;
+  } else if (settings.mode === 'smart') {
+    base = {
+      targetDb: -17.5,
+      deadzoneDb: 2.5,
+      upwardStrength: 40,
+      downwardStrength: 55,
+      maxUpwardDb: 11.0,
+      maxDownwardDb: -15.0,
+      speed: 50,
+      noiseFloorDb: -50,
+      lookaheadMs: 3.5,
+      ceilingDb: -1.0,
+      useKWeight: true,
+    };
+  } else {
+    base = settings;
+  }
+
+  const s = clampVal(base.speed / 100, 0, 1);
+  const rmsMs = 1000 * 0.08 * Math.exp(s * Math.log(1.00 / 0.08));
+  const attackMs = 1000 * 0.10 * Math.exp(s * Math.log(1.40 / 0.10));
+  const releaseMs = 1000 * 0.40 * Math.exp(s * Math.log(2.60 / 0.40));
+
+  return {
+    targetDb: clampVal(base.targetDb + settings.offset, -40.0, -4.0),
+    deadzoneDb: base.deadzoneDb,
+    upwardStrength: base.upwardStrength,
+    downwardStrength: base.downwardStrength,
+    maxUpwardDb: base.maxUpwardDb,
+    maxDownwardDb: base.maxDownwardDb,
+    speed: base.speed,
+    noiseFloorDb: base.noiseFloorDb,
+    lookaheadMs: base.lookaheadMs,
+    ceilingDb: base.ceilingDb,
+    useKWeight: base.useKWeight,
+    rmsMs,
+    attackMs,
+    releaseMs,
+  };
+};
+
+export const STEREO_IMAGER_DEFAULTS = {
+  stereoWidth: 100,
+  speakerMode: 'stereo' as const,
+  stereoCrossoverLow: 150,
+  stereoCrossoverHigh: 20000,
+  stereoCrossoverMode: 'inside' as const,
+  surroundDelay: 12,
+  surroundWet: 14,
+  monoThreshold: 0.985,
+  monoSideLevel: 100,
+  chorusAmount: 0,
 };
 
 export interface EqBand {

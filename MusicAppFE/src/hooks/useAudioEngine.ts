@@ -24,14 +24,9 @@ export function useAudioEngine(
     legacyMetadataOverrides: effectsState.legacyMetadataOverrides,
     useLegacyMetadata: effectsState.useLegacyMetadata,
   });
-  const currentTrack = queueState.currentTrack;
-  const currentTrackMetadata = currentTrack
-    ? metadataState.metadataCacheRef.current.get(String(currentTrack.id))
-    : undefined;
-  const currentTrackChannelCount = currentTrack?.numberOfChannels ?? currentTrackMetadata?.numberOfChannels;
+
   const contextState = useAudioContext({
     ...effectsState,
-    audioIsStereo: currentTrackChannelCount == null ? true : currentTrackChannelCount >= 2,
     isAuthenticated,
   });
 
@@ -57,5 +52,6 @@ export function useAudioEngine(
     metadataVersion: metadataState.metadataVersion,
     eqResponseData: contextState.eqResponseData,
     masterAnalyserRef: contextState.masterAnalyserRef,
+    subscribeBalancerTelemetry: contextState.subscribeBalancerTelemetry,
   };
 }

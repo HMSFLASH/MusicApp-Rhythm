@@ -1,18 +1,54 @@
 import { useState, useCallback, useRef } from 'react';
-import { COMPRESSOR_DEFAULTS, COMPRESSOR_RESET_SETTINGS, EQ_PRESETS, STYLISTIC_PRESETS, PRECOMPUTED_STYLISTIC_PRESETS } from './audioTypes';
-import type { EqBand, CustomEqPreset } from './audioTypes';
 import {
+  BALANCER_DEFAULTS,
+  BALANCER_TEMPLATES,
+  EQ_PRESETS,
+  PRECOMPUTED_STYLISTIC_PRESETS,
+  STEREO_IMAGER_DEFAULTS,
+  STYLISTIC_PRESETS,
+} from './audioTypes';
+import type {
+  BalancerMode,
+  BalancerTemplate,
+  CustomEqPreset,
+  EqBand,
+} from './audioTypes';
+import {
+  BALANCER_OFFSET_MAX,
+  BALANCER_OFFSET_MIN,
+  CHORUS_AMOUNT_DEFAULT,
+  CHORUS_AMOUNT_MAX,
+  CHORUS_AMOUNT_MIN,
   clamp,
+  MONO_SIDE_LEVEL_DEFAULT,
+  MONO_SIDE_LEVEL_MAX,
+  MONO_SIDE_LEVEL_MIN,
+  MONO_THRESHOLD_DEFAULT,
+  MONO_THRESHOLD_MAX,
+  MONO_THRESHOLD_MIN,
   STEREO_WIDTH_MAX_PERCENT,
-  SURROUND_WET_MAX_PERCENT,
   SURROUND_DELAY_DEFAULT_MS,
-  SURROUND_DELAY_MIN_MS,
   SURROUND_DELAY_MAX_MS,
+  SURROUND_DELAY_MIN_MS,
+  SURROUND_WET_MAX_PERCENT,
 } from './audioMath';
 import type { SpeakerMode } from './audioGraph';
 
 type FxKey = 'eq' | 'tone' | 'comp' | 'reverb' | 'master' | 'preamp' | 'limiter' | 'stereo' | 'interpolate';
 type FxEnabledState = Record<FxKey, boolean>;
+
+const VALID_BALANCER_MODES = new Set<BalancerMode>(['normal', 'music', 'smart', 'custom']);
+const VALID_SPEAKER_MODES = new Set<SpeakerMode>(['stereo', 'phase-safe-mono', 'mono-sum']);
+
+const sanitizeBalancerMode = (value: unknown): BalancerMode =>
+  typeof value === 'string' && VALID_BALANCER_MODES.has(value as BalancerMode)
+    ? (value as BalancerMode)
+    : BALANCER_DEFAULTS.mode;
+
+const sanitizeSpeakerMode = (value: unknown): SpeakerMode =>
+  typeof value === 'string' && VALID_SPEAKER_MODES.has(value as SpeakerMode)
+    ? (value as SpeakerMode)
+    : STEREO_IMAGER_DEFAULTS.speakerMode;
 
 type SavedAudioEffectsState = Partial<{
   eqPresetName: string;
@@ -22,13 +58,19 @@ type SavedAudioEffectsState = Partial<{
   preampGain: number;
   bassGain: number;
   trebleGain: number;
-  compThreshold: number;
-  compRatio: number;
-  compKnee: number;
-  compAttack: number;
-  compRelease: number;
-  compRmsSize: number;
-  compMakeupGain: number;
+  balancerMode: BalancerMode;
+  balancerOffset: number;
+  balancerTargetDb: number;
+  balancerDeadzoneDb: number;
+  balancerUpwardStrength: number;
+  balancerDownwardStrength: number;
+  balancerMaxUpwardDb: number;
+  balancerMaxDownwardDb: number;
+  balancerSpeed: number;
+  balancerNoiseFloorDb: number;
+  balancerLookaheadMs: number;
+  balancerCeilingDb: number;
+  balancerUseKWeight: boolean;
   panValue: number;
   stereoWidth: number;
   stereoCrossoverLow: number;
@@ -37,6 +79,9 @@ type SavedAudioEffectsState = Partial<{
   surroundWet: number;
   surroundDelay: number;
   speakerMode: SpeakerMode;
+  monoThreshold: number;
+  monoSideLevel: number;
+  chorusAmount: number;
   chorusEnabled: boolean;
   reverbMix: number;
   reverbTime: number;
@@ -81,7 +126,7 @@ function asymmetryQFactor(asymmetry: number) {
 
 const calculateGraphicEqQ = (frequencies: number[], index: number) => {
   const minFreq = 20;
-  const maxFreq = 20000; // Safe upper bound for UI
+  const maxFreq = 20000;
   const fc = clamp(frequencies[index], minFreq, maxFreq);
   if (!fc) return DEFAULT_PARAMETRIC_Q;
 
@@ -90,11 +135,9 @@ const calculateGraphicEqQ = (frequencies: number[], index: number) => {
 
   if (!fPrev && !fNext) return DEFAULT_PARAMETRIC_Q;
 
-  // 0. Minimum spacing check
   if (fNext && fNext / fc < 1.03) return DEFAULT_PARAMETRIC_Q;
   if (fPrev && fc / fPrev < 1.03) return DEFAULT_PARAMETRIC_Q;
 
-  // 1. Mirror log spacing for boundaries
   if (!fPrev && fNext) {
     fPrev = (fc * fc) / fNext;
   }
@@ -102,42 +145,33 @@ const calculateGraphicEqQ = (frequencies: number[], index: number) => {
     fNext = (fc * fc) / fPrev;
   }
 
-  // 2. Geometric boundaries
   let fL = Math.sqrt(fPrev * fc);
   let fH = Math.sqrt(fc * fNext);
 
-  // 3. Clamp into audible range
   fL = clamp(fL, minFreq, maxFreq);
   fH = clamp(fH, minFreq, maxFreq);
 
-  // Fallback if clamp or bad custom input ruins the boundaries
   if (!(fL < fc && fc < fH)) {
     return DEFAULT_PARAMETRIC_Q;
   }
 
-  // 4. Calculate bandwidth
   const leftBW = Math.log2(fc / fL);
   const rightBW = Math.log2(fH / fc);
   let totalBW = leftBW + rightBW;
 
-  const minBW = 1 / 24; // 1/24 octave
+  const minBW = 1 / 24;
   totalBW = Math.max(totalBW, minBW);
-
-  // Custom Smooth Factor (1.0 = default)
-  totalBW *= 1.0;
 
   let q = bandwidthToQ(totalBW);
 
   if (!Number.isFinite(q)) return DEFAULT_PARAMETRIC_Q;
 
-  // 5. Asymmetry Protection (Soft Transition)
   const asymmetry = Math.max(leftBW, rightBW) / Math.max(0.001, Math.min(leftBW, rightBW));
   const asymFactor = asymmetryQFactor(asymmetry);
   if (Number.isFinite(asymFactor)) {
     q *= asymFactor;
   }
 
-  // Smooth EQ Clamping
   const minQ = 0.5;
   const maxQ = 6;
   const finalQ = Math.round(clamp(q, minQ, maxQ) * 100) / 100;
@@ -184,24 +218,24 @@ export function useAudioEffectsState(savedState: SavedAudioEffectsState = {}) {
   const [eqBands, setEqBands] = useState<EqBand[]>(() => {
     const presetName = savedState.eqPresetName || 'CUSTOM';
     const precomputedPreset = PRECOMPUTED_STYLISTIC_PRESETS[presetName];
-    const isParam = presetName === 'PARAMETRIC' 
-      || savedCustomPreset?.presetMode === 'parametric' 
+    const isParam = presetName === 'PARAMETRIC'
+      || savedCustomPreset?.presetMode === 'parametric'
       || Boolean(savedCustomPreset?.isCustomOrigin && hasParametricBandSettings(savedCustomPreset.bands))
       || Boolean(precomputedPreset && precomputedPreset.isParametric);
 
     if (savedState.eqBands && savedState.eqBands.length > 0) {
-       return isParam ? savedState.eqBands : applyGraphicEqQ(savedState.eqBands);
+      return isParam ? savedState.eqBands : applyGraphicEqQ(savedState.eqBands);
     }
-    
+
     const bandKey = `${savedState.eqBandCount ?? 10}_BANDS` as keyof typeof EQ_PRESETS;
-    
+
     if (precomputedPreset) {
       if (precomputedPreset.isParametric) return precomputedPreset.bands as EqBand[];
       const freqs = EQ_PRESETS[bandKey] || EQ_PRESETS['10_BANDS'];
       const gains = precomputedPreset.precomputedGains[bandKey] || precomputedPreset.precomputedGains['10_BANDS'];
       return createEqBands(freqs, gains);
     }
-    
+
     const freqs = EQ_PRESETS[bandKey] || EQ_PRESETS['10_BANDS'];
     return createEqBands(freqs);
   });
@@ -213,39 +247,83 @@ export function useAudioEffectsState(savedState: SavedAudioEffectsState = {}) {
   const [bassGain, setBassGain] = useState<number>(savedStylisticPreset?.bassGain ?? savedState.bassGain ?? 0);
   const [trebleGain, setTrebleGain] = useState<number>(savedStylisticPreset?.trebleGain ?? savedState.trebleGain ?? 0);
 
-  const [compThreshold, setCompThreshold] = useState<number>(savedState.compThreshold ?? COMPRESSOR_DEFAULTS.threshold);
-  const [compRatio, setCompRatio] = useState<number>(savedState.compRatio ?? COMPRESSOR_DEFAULTS.ratio);
-  const [compKnee, setCompKnee] = useState<number>(savedState.compKnee ?? COMPRESSOR_DEFAULTS.knee);
-  const [compAttack, setCompAttack] = useState<number>(savedState.compAttack ?? COMPRESSOR_DEFAULTS.attack);
-  const [compRelease, setCompRelease] = useState<number>(savedState.compRelease ?? COMPRESSOR_DEFAULTS.release);
-  const [compRmsSize, setCompRmsSize] = useState<number>(savedState.compRmsSize ?? COMPRESSOR_DEFAULTS.rmsSize);
-  const [compMakeupGain, setCompMakeupGain] = useState<number>(savedState.compMakeupGain ?? COMPRESSOR_DEFAULTS.makeupGain);
+  // Web Audio Balancer v2.1 state
+  const [balancerMode, setBalancerModeState] = useState<BalancerMode>(
+    sanitizeBalancerMode(savedState.balancerMode)
+  );
+  const [balancerOffset, setBalancerOffsetState] = useState<number>(
+    clamp(savedState.balancerOffset ?? BALANCER_DEFAULTS.offset, BALANCER_OFFSET_MIN, BALANCER_OFFSET_MAX)
+  );
+  const [balancerTargetDb, setBalancerTargetDbState] = useState<number>(
+    clamp(savedState.balancerTargetDb ?? BALANCER_DEFAULTS.targetDb, -32, -8)
+  );
+  const [balancerDeadzoneDb, setBalancerDeadzoneDbState] = useState<number>(
+    clamp(savedState.balancerDeadzoneDb ?? BALANCER_DEFAULTS.deadzoneDb, 0, 8)
+  );
+  const [balancerUpwardStrength, setBalancerUpwardStrengthState] = useState<number>(
+    clamp(savedState.balancerUpwardStrength ?? BALANCER_DEFAULTS.upwardStrength, 0, 100)
+  );
+  const [balancerDownwardStrength, setBalancerDownwardStrengthState] = useState<number>(
+    clamp(savedState.balancerDownwardStrength ?? BALANCER_DEFAULTS.downwardStrength, 0, 100)
+  );
+  const [balancerMaxUpwardDb, setBalancerMaxUpwardDbState] = useState<number>(
+    clamp(savedState.balancerMaxUpwardDb ?? BALANCER_DEFAULTS.maxUpwardDb, 0, 20)
+  );
+  const [balancerMaxDownwardDb, setBalancerMaxDownwardDbState] = useState<number>(
+    clamp(savedState.balancerMaxDownwardDb ?? BALANCER_DEFAULTS.maxDownwardDb, -30, 0)
+  );
+  const [balancerSpeed, setBalancerSpeedState] = useState<number>(
+    clamp(savedState.balancerSpeed ?? BALANCER_DEFAULTS.speed, 0, 100)
+  );
+  const [balancerNoiseFloorDb, setBalancerNoiseFloorDbState] = useState<number>(
+    clamp(savedState.balancerNoiseFloorDb ?? BALANCER_DEFAULTS.noiseFloorDb, -80, -25)
+  );
+  const [balancerLookaheadMs, setBalancerLookaheadMsState] = useState<number>(
+    clamp(savedState.balancerLookaheadMs ?? BALANCER_DEFAULTS.lookaheadMs, 1, 10)
+  );
+  const [balancerCeilingDb, setBalancerCeilingDbState] = useState<number>(
+    clamp(savedState.balancerCeilingDb ?? BALANCER_DEFAULTS.ceilingDb, -6, -0.1)
+  );
+  const [balancerUseKWeight, setBalancerUseKWeightState] = useState<boolean>(
+    savedState.balancerUseKWeight ?? BALANCER_DEFAULTS.useKWeight
+  );
 
+  // Stereo & 3D Spatializer state
   const [panValue, setPanValue] = useState<number>(savedState.panValue ?? 0);
   const [stereoWidth, setStereoWidthState] = useState<number>(
-    clamp(savedState.stereoWidth ?? 100, 0, STEREO_WIDTH_MAX_PERCENT)
+    clamp(savedState.stereoWidth ?? STEREO_IMAGER_DEFAULTS.stereoWidth, 0, STEREO_WIDTH_MAX_PERCENT)
   );
   const [stereoCrossoverLow, setStereoCrossoverLowState] = useState<number>(
-    clamp(savedState.stereoCrossoverLow ?? 150, 20, 20000)
+    clamp(savedState.stereoCrossoverLow ?? STEREO_IMAGER_DEFAULTS.stereoCrossoverLow, 20, 20000)
   );
   const [stereoCrossoverHigh, setStereoCrossoverHighState] = useState<number>(
-    clamp(savedState.stereoCrossoverHigh ?? 20000, 20, 20000)
+    clamp(savedState.stereoCrossoverHigh ?? STEREO_IMAGER_DEFAULTS.stereoCrossoverHigh, 20, 20000)
   );
   const [stereoCrossoverMode, setStereoCrossoverModeState] = useState<'inside' | 'outside'>(
-    savedState.stereoCrossoverMode ?? 'inside'
+    savedState.stereoCrossoverMode ?? STEREO_IMAGER_DEFAULTS.stereoCrossoverMode
   );
   const [surroundWet, setSurroundWetState] = useState<number>(
-    clamp(savedState.surroundWet ?? 14, 0, SURROUND_WET_MAX_PERCENT)
+    clamp(savedState.surroundWet ?? STEREO_IMAGER_DEFAULTS.surroundWet, 0, SURROUND_WET_MAX_PERCENT)
   );
   const [surroundDelay, setSurroundDelayState] = useState<number>(
     clamp(savedState.surroundDelay ?? SURROUND_DELAY_DEFAULT_MS, SURROUND_DELAY_MIN_MS, SURROUND_DELAY_MAX_MS)
   );
   const [speakerMode, setSpeakerModeState] = useState<SpeakerMode>(
-    savedState.speakerMode ?? 'stereo'
+    sanitizeSpeakerMode(savedState.speakerMode)
   );
-  const [chorusEnabled, setChorusEnabledState] = useState<boolean>(
-    savedState.chorusEnabled ?? false
+  const [monoThreshold, setMonoThresholdState] = useState<number>(
+    clamp(savedState.monoThreshold ?? MONO_THRESHOLD_DEFAULT, MONO_THRESHOLD_MIN, MONO_THRESHOLD_MAX)
   );
+  const [monoSideLevel, setMonoSideLevelState] = useState<number>(
+    clamp(savedState.monoSideLevel ?? MONO_SIDE_LEVEL_DEFAULT, MONO_SIDE_LEVEL_MIN, MONO_SIDE_LEVEL_MAX)
+  );
+  const [chorusAmount, setChorusAmountState] = useState<number>(() => {
+    if (typeof savedState.chorusAmount === 'number') {
+      return clamp(savedState.chorusAmount, CHORUS_AMOUNT_MIN, CHORUS_AMOUNT_MAX);
+    }
+    return savedState.chorusEnabled ? 50 : CHORUS_AMOUNT_DEFAULT;
+  });
+
   const [reverbMix, setReverbMix] = useState<number>(savedState.reverbMix ?? 0);
   const [reverbTime, setReverbTime] = useState<number>(savedState.reverbTime ?? 2);
   const [reverbEngine, setReverbEngine] = useState<'procedural' | 'file'>(savedState.reverbEngine ?? 'procedural');
@@ -281,8 +359,16 @@ export function useAudioEffectsState(savedState: SavedAudioEffectsState = {}) {
       return next;
     });
   }, []);
+
+  // Stereo Imager setters & reset
   const setStereoWidth = useCallback((value: number) => {
     setStereoWidthState(clamp(value, 0, STEREO_WIDTH_MAX_PERCENT));
+  }, []);
+  const setStereoCrossoverLow = useCallback((value: number) => {
+    setStereoCrossoverLowState(clamp(value, 20, 20000));
+  }, []);
+  const setStereoCrossoverHigh = useCallback((value: number) => {
+    setStereoCrossoverHighState(clamp(value, 20, 20000));
   }, []);
   const setSurroundWet = useCallback((value: number) => {
     setSurroundWetState(clamp(value, 0, SURROUND_WET_MAX_PERCENT));
@@ -291,41 +377,110 @@ export function useAudioEffectsState(savedState: SavedAudioEffectsState = {}) {
     setSurroundDelayState(clamp(value, SURROUND_DELAY_MIN_MS, SURROUND_DELAY_MAX_MS));
   }, []);
   const setSpeakerMode = useCallback((mode: SpeakerMode) => {
-    setSpeakerModeState(mode);
+    setSpeakerModeState(sanitizeSpeakerMode(mode));
   }, []);
-  const setChorusEnabled = useCallback((value: boolean) => {
-    setChorusEnabledState(value);
+  const setMonoThreshold = useCallback((value: number) => {
+    setMonoThresholdState(clamp(value, MONO_THRESHOLD_MIN, MONO_THRESHOLD_MAX));
   }, []);
-  const toggleChorus = useCallback(() => {
-    setChorusEnabledState((prev) => !prev);
+  const setMonoSideLevel = useCallback((value: number) => {
+    setMonoSideLevelState(clamp(value, MONO_SIDE_LEVEL_MIN, MONO_SIDE_LEVEL_MAX));
   }, []);
-  const toggleLoudnessNormalization = useCallback(() => setLoudnessNormalization(prev => !prev), []);
-  const toggleUseOversample = useCallback(() => setUseOversample(prev => !prev), []);
-  const setPreampGain = useCallback((value: number) => setPreampGainState(clampPreampGain(value)), []);
+  const setChorusAmount = useCallback((value: number) => {
+    setChorusAmountState(clamp(value, CHORUS_AMOUNT_MIN, CHORUS_AMOUNT_MAX));
+  }, []);
+  const resetStereoImager = useCallback(() => {
+    setStereoWidthState(STEREO_IMAGER_DEFAULTS.stereoWidth);
+    setSpeakerModeState(STEREO_IMAGER_DEFAULTS.speakerMode);
+    setStereoCrossoverLowState(STEREO_IMAGER_DEFAULTS.stereoCrossoverLow);
+    setStereoCrossoverHighState(STEREO_IMAGER_DEFAULTS.stereoCrossoverHigh);
+    setStereoCrossoverModeState(STEREO_IMAGER_DEFAULTS.stereoCrossoverMode);
+    setSurroundDelayState(STEREO_IMAGER_DEFAULTS.surroundDelay);
+    setSurroundWetState(STEREO_IMAGER_DEFAULTS.surroundWet);
+    setMonoThresholdState(STEREO_IMAGER_DEFAULTS.monoThreshold);
+    setMonoSideLevelState(STEREO_IMAGER_DEFAULTS.monoSideLevel);
+    setChorusAmountState(STEREO_IMAGER_DEFAULTS.chorusAmount);
+  }, []);
 
-  const setCompressorSettings = useCallback((settings: typeof COMPRESSOR_DEFAULTS, enabled = true) => {
-    setCompThreshold(settings.threshold);
-    setCompRatio(settings.ratio);
-    setCompKnee(settings.knee);
-    setCompAttack(settings.attack);
-    setCompRelease(settings.release);
-    setCompRmsSize(settings.rmsSize);
-    setCompMakeupGain(settings.makeupGain);
+  // Web Audio Balancer setters, templates & reset
+  const setBalancerMode = useCallback((mode: BalancerMode) => {
+    setBalancerModeState(sanitizeBalancerMode(mode));
+  }, []);
+  const setBalancerOffset = useCallback((value: number) => {
+    setBalancerOffsetState(clamp(value, BALANCER_OFFSET_MIN, BALANCER_OFFSET_MAX));
+  }, []);
+  const setBalancerTargetDb = useCallback((value: number) => {
+    setBalancerTargetDbState(clamp(value, -32, -8));
+  }, []);
+  const setBalancerDeadzoneDb = useCallback((value: number) => {
+    setBalancerDeadzoneDbState(clamp(value, 0, 8));
+  }, []);
+  const setBalancerUpwardStrength = useCallback((value: number) => {
+    setBalancerUpwardStrengthState(clamp(value, 0, 100));
+  }, []);
+  const setBalancerDownwardStrength = useCallback((value: number) => {
+    setBalancerDownwardStrengthState(clamp(value, 0, 100));
+  }, []);
+  const setBalancerMaxUpwardDb = useCallback((value: number) => {
+    setBalancerMaxUpwardDbState(clamp(value, 0, 20));
+  }, []);
+  const setBalancerMaxDownwardDb = useCallback((value: number) => {
+    setBalancerMaxDownwardDbState(clamp(value, -30, 0));
+  }, []);
+  const setBalancerSpeed = useCallback((value: number) => {
+    setBalancerSpeedState(clamp(value, 0, 100));
+  }, []);
+  const setBalancerNoiseFloorDb = useCallback((value: number) => {
+    setBalancerNoiseFloorDbState(clamp(value, -80, -25));
+  }, []);
+  const setBalancerLookaheadMs = useCallback((value: number) => {
+    setBalancerLookaheadMsState(clamp(value, 1, 10));
+  }, []);
+  const setBalancerCeilingDb = useCallback((value: number) => {
+    setBalancerCeilingDbState(clamp(value, -6, -0.1));
+  }, []);
+  const setBalancerUseKWeight = useCallback((value: boolean) => {
+    setBalancerUseKWeightState(Boolean(value));
+  }, []);
+  const toggleBalancerKWeight = useCallback(() => {
+    setBalancerUseKWeightState((prev) => !prev);
+  }, []);
 
+  const applyBalancerCustomValues = useCallback((vals: typeof BALANCER_TEMPLATES.normal) => {
+    setBalancerTargetDbState(vals.targetDb);
+    setBalancerDeadzoneDbState(vals.deadzoneDb);
+    setBalancerUpwardStrengthState(vals.upwardStrength);
+    setBalancerDownwardStrengthState(vals.downwardStrength);
+    setBalancerMaxUpwardDbState(vals.maxUpwardDb);
+    setBalancerMaxDownwardDbState(vals.maxDownwardDb);
+    setBalancerSpeedState(vals.speed);
+    setBalancerNoiseFloorDbState(vals.noiseFloorDb);
+    setBalancerLookaheadMsState(vals.lookaheadMs);
+    setBalancerCeilingDbState(vals.ceilingDb);
+    setBalancerUseKWeightState(vals.useKWeight);
+  }, []);
+
+  const applyBalancerTemplate = useCallback((template: BalancerTemplate) => {
+    const preset = BALANCER_TEMPLATES[template];
+    if (!preset) return;
+    applyBalancerCustomValues(preset);
+    setBalancerModeState('custom');
     setFxEnabled((prev) => {
-      const next = { ...prev, comp: enabled };
+      if (prev.comp) return prev;
+      const next = { ...prev, comp: true };
       fxEnabledRef.current = next;
       return next;
     });
-  }, []);
+  }, [applyBalancerCustomValues]);
 
-  const applyDefaultCompressor = useCallback(() => {
-    setCompressorSettings(COMPRESSOR_DEFAULTS, true);
-  }, [setCompressorSettings]);
+  const resetBalancer = useCallback(() => {
+    setBalancerModeState(BALANCER_DEFAULTS.mode);
+    setBalancerOffsetState(BALANCER_DEFAULTS.offset);
+    applyBalancerCustomValues(BALANCER_DEFAULTS);
+  }, [applyBalancerCustomValues]);
 
-  const resetCompressor = useCallback(() => {
-    setCompressorSettings(COMPRESSOR_RESET_SETTINGS, false);
-  }, [setCompressorSettings]);
+  const toggleLoudnessNormalization = useCallback(() => setLoudnessNormalization(prev => !prev), []);
+  const toggleUseOversample = useCallback(() => setUseOversample(prev => !prev), []);
+  const setPreampGain = useCallback((value: number) => setPreampGainState(clampPreampGain(value)), []);
 
   const applyPreset = useCallback((presetName: string) => {
     setEqPresetName(presetName);
@@ -369,7 +524,7 @@ export function useAudioEffectsState(savedState: SavedAudioEffectsState = {}) {
       if (prev === 'CUSTOM' || prev === 'PARAMETRIC') return prev;
       const isCustom = customEqPresets.some(p => p.name === prev);
       if (isCustom) return prev;
-      
+
       const precomputedPreset = PRECOMPUTED_STYLISTIC_PRESETS[prev];
       return precomputedPreset?.isParametric ? 'PARAMETRIC' : 'CUSTOM';
     });
@@ -420,9 +575,9 @@ export function useAudioEffectsState(savedState: SavedAudioEffectsState = {}) {
         const isParametricPreset = preset.presetMode === 'parametric'
           || Boolean(preset.isCustomOrigin && hasParametricBandSettings(preset.bands));
         if (isParametricPreset) {
-            disableInterpolation();
+          disableInterpolation();
         } else {
-            setEqBandCountState(preset.bands.length);
+          setEqBandCountState(preset.bands.length);
         }
         setEqBands(isParametricPreset
           ? preset.bands.map(band => ({ ...band }))
@@ -438,7 +593,7 @@ export function useAudioEffectsState(savedState: SavedAudioEffectsState = {}) {
   const changeEqBandCount = useCallback((newCount: number) => {
     setEqBandCountState(newCount);
     const bandKey = `${newCount}_BANDS` as keyof typeof EQ_PRESETS;
-    
+
     if (PRECOMPUTED_STYLISTIC_PRESETS[eqPresetName] && !PRECOMPUTED_STYLISTIC_PRESETS[eqPresetName].isParametric) {
       const preset = PRECOMPUTED_STYLISTIC_PRESETS[eqPresetName];
       const freqs = EQ_PRESETS[bandKey] || EQ_PRESETS['10_BANDS'];
@@ -446,7 +601,7 @@ export function useAudioEffectsState(savedState: SavedAudioEffectsState = {}) {
       setEqBands(createEqBands(freqs, gains));
       return;
     }
-    
+
     if (!isCurrentParametricEq()) {
       setEqBands(() => {
         const freqs = EQ_PRESETS[bandKey] || EQ_PRESETS['10_BANDS'];
@@ -504,23 +659,35 @@ export function useAudioEffectsState(savedState: SavedAudioEffectsState = {}) {
     preampGain, setPreampGain, updatePreampGain: setPreampGain,
     bassGain, setBassGain, updateBassGain: setBassGain,
     trebleGain, setTrebleGain, updateTrebleGain: setTrebleGain,
-    compThreshold, setCompThreshold, updateCompThreshold: setCompThreshold,
-    compRatio, setCompRatio, updateCompRatio: setCompRatio,
-    compKnee, setCompKnee, updateCompKnee: setCompKnee,
-    compAttack, setCompAttack, updateCompAttack: setCompAttack,
-    compRelease, setCompRelease, updateCompRelease: setCompRelease,
-    compRmsSize, setCompRmsSize, updateCompRmsSize: setCompRmsSize,
-    compMakeupGain, setCompMakeupGain, updateCompMakeupGain: setCompMakeupGain,
-    applyDefaultCompressor, resetCompressor,
+
+    balancerMode, setBalancerMode, updateBalancerMode: setBalancerMode,
+    balancerOffset, setBalancerOffset, updateBalancerOffset: setBalancerOffset,
+    balancerTargetDb, setBalancerTargetDb, updateBalancerTargetDb: setBalancerTargetDb,
+    balancerDeadzoneDb, setBalancerDeadzoneDb, updateBalancerDeadzoneDb: setBalancerDeadzoneDb,
+    balancerUpwardStrength, setBalancerUpwardStrength, updateBalancerUpwardStrength: setBalancerUpwardStrength,
+    balancerDownwardStrength, setBalancerDownwardStrength, updateBalancerDownwardStrength: setBalancerDownwardStrength,
+    balancerMaxUpwardDb, setBalancerMaxUpwardDb, updateBalancerMaxUpwardDb: setBalancerMaxUpwardDb,
+    balancerMaxDownwardDb, setBalancerMaxDownwardDb, updateBalancerMaxDownwardDb: setBalancerMaxDownwardDb,
+    balancerSpeed, setBalancerSpeed, updateBalancerSpeed: setBalancerSpeed,
+    balancerNoiseFloorDb, setBalancerNoiseFloorDb, updateBalancerNoiseFloorDb: setBalancerNoiseFloorDb,
+    balancerLookaheadMs, setBalancerLookaheadMs, updateBalancerLookaheadMs: setBalancerLookaheadMs,
+    balancerCeilingDb, setBalancerCeilingDb, updateBalancerCeilingDb: setBalancerCeilingDb,
+    balancerUseKWeight, setBalancerUseKWeight, updateBalancerUseKWeight: setBalancerUseKWeight, toggleBalancerKWeight,
+    applyBalancerTemplate, resetBalancer,
+
     panValue, setPanValue, updatePanValue: setPanValue,
     stereoWidth, setStereoWidth, updateStereoWidth: setStereoWidth,
-    stereoCrossoverLow, setStereoCrossoverLow: setStereoCrossoverLowState, updateStereoCrossoverLow: setStereoCrossoverLowState,
-    stereoCrossoverHigh, setStereoCrossoverHigh: setStereoCrossoverHighState, updateStereoCrossoverHigh: setStereoCrossoverHighState,
+    stereoCrossoverLow, setStereoCrossoverLow, updateStereoCrossoverLow: setStereoCrossoverLow,
+    stereoCrossoverHigh, setStereoCrossoverHigh, updateStereoCrossoverHigh: setStereoCrossoverHigh,
     stereoCrossoverMode, setStereoCrossoverMode: setStereoCrossoverModeState, updateStereoCrossoverMode: setStereoCrossoverModeState,
     surroundWet, setSurroundWet, updateSurroundWet: setSurroundWet,
     surroundDelay, setSurroundDelay, updateSurroundDelay: setSurroundDelay,
     speakerMode, setSpeakerMode, updateSpeakerMode: setSpeakerMode,
-    chorusEnabled, setChorusEnabled, updateChorusEnabled: setChorusEnabled, toggleChorus,
+    monoThreshold, setMonoThreshold, updateMonoThreshold: setMonoThreshold,
+    monoSideLevel, setMonoSideLevel, updateMonoSideLevel: setMonoSideLevel,
+    chorusAmount, setChorusAmount, updateChorusAmount: setChorusAmount,
+    resetStereoImager,
+
     reverbMix, setReverbMix, updateReverbMix: setReverbMix,
     reverbTime, setReverbTime, updateReverbTime: setReverbTime,
     reverbEngine, setReverbEngine, updateReverbEngine: setReverbEngine,
@@ -530,7 +697,7 @@ export function useAudioEffectsState(savedState: SavedAudioEffectsState = {}) {
     fullQueueCacheEnabled, setFullQueueCacheEnabled,
     masterFftSize, setMasterFftSize, updateMasterFftSize: setMasterFftSize,
     stereoFftSize, setStereoFftSize, updateStereoFftSize: setStereoFftSize,
-    
+
     audioLatencyHint, setAudioLatencyHint, updateAudioLatencyHint: setAudioLatencyHint,
     fxEnabled, setFxEnabled, toggleFx, fxEnabledRef,
     applyPreset, applyStylisticPreset, setCustomPreset, setParametricPreset,
