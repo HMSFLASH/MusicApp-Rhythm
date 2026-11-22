@@ -162,10 +162,14 @@ export async function extractPaletteFromImage(imageUrl: string | null | undefine
       totalB += b;
       totalValidPixels++;
 
-      const [h, s, l] = rgbToHsl(r, g, b);
+      // Fast integer pre-check before floating-point HSL conversion:
+      // Skip extreme darks (sum < 61), extreme whites (sum > 469), and near-monochrome grays (diff < 8)
+      const min = r < g ? (r < b ? r : b) : (g < b ? g : b);
+      const max = r > g ? (r > b ? r : b) : (g > b ? g : b);
+      const sum = max + min;
+      if (sum < 61 || sum > 469 || (max - min) < 8) continue;
 
-      // Skip extreme darks (black/muddy) and extreme lights (washed out/pure white)
-      if (l < 0.12 || l > 0.92) continue;
+      const [h, s, l] = rgbToHsl(r, g, b);
 
       const bucketIdx = Math.floor((h / 360) * NUM_BUCKETS) % NUM_BUCKETS;
       const bkt = buckets[bucketIdx];

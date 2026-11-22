@@ -1,4 +1,4 @@
-import { getSecureRandom } from '../utils/randomUtils';
+import { smartShuffleTracks } from '../utils/randomUtils';
 import { useMemo, useState } from 'react';
 import { useNavigate, useLocation } from 'react-router-dom';
 import { useTranslation } from 'react-i18next';
@@ -64,7 +64,7 @@ export function AlbumsPage() {
   const playTracks = (tracks: Track[]) => {
     if (tracks.length === 0) return;
     if (playerState.isShuffle) {
-      const shuffled = [...tracks].sort(() => getSecureRandom() - 0.5);
+      const shuffled = smartShuffleTracks(tracks);
       playerState.playTrack(shuffled[0], shuffled);
     } else {
       playerState.playTrack(tracks[0], tracks);
@@ -74,7 +74,7 @@ export function AlbumsPage() {
   const shuffleTracks = (tracks: Track[]) => {
     if (tracks.length === 0) return;
     playerState.setIsShuffle(true);
-    const shuffled = [...tracks].sort(() => getSecureRandom() - 0.5);
+    const shuffled = smartShuffleTracks(tracks);
     playerState.playTrack(shuffled[0], shuffled);
   };
 

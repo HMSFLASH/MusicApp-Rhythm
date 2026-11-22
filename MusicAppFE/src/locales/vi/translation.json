@@ -460,7 +460,7 @@
       "routingTitle": "Cân Bằng Tín Hiệu Không Gian",
       "routingDesc": "Tổng trường không gian đã tính toán",
       "reverbTitle": "Hiệu Ứng Vang (Reverb)",
-      "reverbDesc": "Thêm không gian và độ sâu bằng Convolution Reverb (Phản xạ sớm 10 hướng không gian 3D & Đuôi vang khuếch tán 360°).",
+      "reverbDesc": "Thêm không gian và độ sâu bằng Convolution Reverb (Phản xạ sớm 10 hướng đo đạc KEMAR HRTF 3D & Đuôi vang khuếch tán 360°).",
       "reverbMix": "Tỉ Lệ Vang (Mix)",
       "roomSize": "Kích Thước Phòng (Room Size)",
       "stereoTitle": "Mở Rộng Không Gian & Âm Vòm (Stereo & Spatializer)",

@@ -460,7 +460,7 @@
       "routingTitle": "Spatial Output Balance",
       "routingDesc": "Total calculated spatial field",
       "reverbTitle": "Reverb FX",
-      "reverbDesc": "Add space and depth using Convolution Reverb (10-direction 3D Early Reflections & 360° Diffuse Tail).",
+      "reverbDesc": "Add space and depth using Convolution Reverb (10-direction measured KEMAR HRTF 3D Early Reflections & 360° Diffuse Tail).",
       "reverbMix": "Reverb Mix",
       "roomSize": "Room Size",
       "stereoTitle": "Stereo & 3D Spatializer",

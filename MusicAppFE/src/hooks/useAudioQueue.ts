@@ -1,4 +1,4 @@
-import { getSecureRandom } from '../utils/randomUtils';
+import { smartShuffleTracks } from '../utils/randomUtils';
 import { useState, useCallback, useEffect, useRef } from 'react';
 import type { Track, SongEndMode, QueueEndMode } from './audioTypes';
 import { PLAYBACK_STORAGE_KEY } from './audioStorage';
@@ -261,26 +261,9 @@ export function useAudioQueue(
       if (next && !prev) {
         setQueue(currentQueue => {
           setOriginalQueue([...currentQueue]);
-          let newQueue = [...currentQueue];
-          const currentIdx = currentTrack ? newQueue.findIndex(t => String(t.id) === String(currentTrack.id)) : -1;
-
-          if (currentIdx !== -1) {
-            const current = newQueue[currentIdx];
-            const rest = [...newQueue.slice(0, currentIdx), ...newQueue.slice(currentIdx + 1)];
-
-            for (let i = rest.length - 1; i > 0; i--) {
-              const j = Math.floor(getSecureRandom() * (i + 1));
-              [rest[i], rest[j]] = [rest[j], rest[i]];
-            }
-
-            newQueue = [current, ...rest];
-          } else {
-            for (let i = newQueue.length - 1; i > 0; i--) {
-              const j = Math.floor(getSecureRandom() * (i + 1));
-              [newQueue[i], newQueue[j]] = [newQueue[j], newQueue[i]];
-            }
-          }
-          return newQueue;
+          return smartShuffleTracks(currentQueue, {
+            startTrackId: currentTrack ? currentTrack.id : undefined
+          });
         });
       } else if (!next && prev) {
         setQueue(currentQueue => {
@@ -296,9 +279,25 @@ export function useAudioQueue(
     setQueue(prev => {
       const existingIds = new Set(prev.map(t => t.id));
       const newTracks = tracks.filter(t => !existingIds.has(t.id));
+      if (newTracks.length === 0) return prev;
+      if (isShuffleState) {
+        const currentIdx = currentTrack ? prev.findIndex(t => String(t.id) === String(currentTrack.id)) : -1;
+        if (currentIdx !== -1) {
+          const played = prev.slice(0, currentIdx + 1);
+          const remaining = [...prev.slice(currentIdx + 1), ...newTracks];
+          const shuffledRemaining = smartShuffleTracks(remaining);
+          return [...played, ...shuffledRemaining];
+        }
+        return smartShuffleTracks([...prev, ...newTracks]);
+      }
       return [...prev, ...newTracks];
     });
-  }, []);
+    setOriginalQueue(prev => {
+      const existingIds = new Set(prev.map(t => t.id));
+      const newTracks = tracks.filter(t => !existingIds.has(t.id));
+      return [...prev, ...newTracks];
+    });
+  }, [currentTrack, isShuffleState, setOriginalQueue]);
 
   const addToNextQueue = useCallback((tracks: Track[]) => {
     setUpcomingQueues(prev => {

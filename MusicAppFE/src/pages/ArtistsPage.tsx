@@ -4,7 +4,7 @@ import { useTranslation } from 'react-i18next';
 import { ArrowLeft, Mic2, Play, ListMusic, ListPlus, Shuffle, Heart } from 'lucide-react';
 import { useGlobalAudio } from '../context/AudioContext';
 import { useLibrary } from '../context/LibraryContext';
-import { getSecureRandom } from '../utils/randomUtils';
+import { smartShuffleTracks } from '../utils/randomUtils';
 import type { Track } from '../hooks/useAudioPlayer';
 import { ActionMenu } from '../components/ActionMenu';
 import { AddToPlaylistModal } from '../components/AddToPlaylistModal';
@@ -51,7 +51,7 @@ export function ArtistsPage() {
   const playTracks = (artistTracks: Track[]) => {
     if (artistTracks.length === 0) return;
     if (playerState.isShuffle) {
-      const shuffled = [...artistTracks].sort(() => getSecureRandom() - 0.5);
+      const shuffled = smartShuffleTracks(artistTracks);
       playerState.playTrack(shuffled[0], shuffled);
     } else {
       playerState.playTrack(artistTracks[0], artistTracks);
@@ -61,7 +61,7 @@ export function ArtistsPage() {
   const shuffleTracks = (artistTracks: Track[]) => {
     if (artistTracks.length === 0) return;
     playerState.setIsShuffle(true);
-    const shuffled = [...artistTracks].sort(() => getSecureRandom() - 0.5);
+    const shuffled = smartShuffleTracks(artistTracks);
     playerState.playTrack(shuffled[0], shuffled);
   };
 

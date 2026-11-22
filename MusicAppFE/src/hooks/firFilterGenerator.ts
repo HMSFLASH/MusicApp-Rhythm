@@ -1,11 +1,58 @@
 import { createMonotoneCubicSpline } from './audioInterpolation';
 import type { EqBand } from './audioTypes';
 
+interface TwiddleTable {
+  cos: Float32Array;
+  sin: Float32Array;
+}
+const twiddleCache = new Map<number, TwiddleTable>();
+
+function getTwiddleTable(n: number): TwiddleTable {
+  let table = twiddleCache.get(n);
+  if (table) return table;
+
+  const halfN = n / 2;
+  const cos = new Float32Array(halfN);
+  const sin = new Float32Array(halfN);
+  const angleStep = (Math.PI * 2) / n;
+  for (let i = 0; i < halfN; i++) {
+    const angle = angleStep * i;
+    cos[i] = Math.cos(angle);
+    sin[i] = Math.sin(angle); // positive for IFFT
+  }
+  table = { cos, sin };
+  twiddleCache.set(n, table);
+  return table;
+}
+
+const windowCache = new Map<number, Float32Array>();
+
+function getBlackmanHarrisWindow(n: number): Float32Array {
+  const cached = windowCache.get(n);
+  if (cached) return cached;
+
+  const w = new Float32Array(n);
+  const factor = (2 * Math.PI) / (n - 1);
+  const half = Math.ceil(n / 2);
+
+  for (let i = 0; i < half; i++) {
+    const angle = factor * i;
+    const val = 0.35875 - 0.48829 * Math.cos(angle)
+              + 0.14128 * Math.cos(2 * angle)
+              - 0.01168 * Math.cos(3 * angle);
+    w[i] = val;
+    w[n - 1 - i] = val; // Symmetric reflection
+  }
+
+  windowCache.set(n, w);
+  return w;
+}
+
 function ifft(real: Float32Array, imag: Float32Array) {
   const n = real.length;
-  let i, j, k, n1, n2, a, c, s, t1, t2;
+  let i, j, k, n1, n2, t1, t2;
 
-  // Bit-reverse
+  // Bit-reverse permutation
   j = 0;
   n2 = n / 2;
   for (i = 1; i < n - 1; i++) {
@@ -26,33 +73,37 @@ function ifft(real: Float32Array, imag: Float32Array) {
     }
   }
 
-  // IFFT
-  n1 = 0;
+  // Precomputed Cooley-Tukey Radix-2 IFFT with O(1) twiddle lookup
+  const twiddles = getTwiddleTable(n);
   n2 = 1;
   const numStages = Math.log2(n);
   for (i = 0; i < numStages; i++) {
     n1 = n2;
     n2 = n2 + n2;
-    a = 0;
+    const twiddleStep = n / n2;
+
     for (j = 0; j < n1; j++) {
-      c = Math.cos(a);
-      s = Math.sin(a); // positive for IFFT
-      a += (Math.PI * 2) / n2;
-      for (k = j; k < n; k = k + n2) {
-        t1 = c * real[k + n1] - s * imag[k + n1];
-        t2 = s * real[k + n1] + c * imag[k + n1];
-        real[k + n1] = real[k] - t1;
-        imag[k + n1] = imag[k] - t2;
-        real[k] = real[k] + t1;
-        imag[k] = imag[k] + t2;
+      const twiddleIdx = j * twiddleStep;
+      const c = twiddles.cos[twiddleIdx];
+      const s = twiddles.sin[twiddleIdx];
+
+      for (k = j; k < n; k += n2) {
+        const kNext = k + n1;
+        t1 = c * real[kNext] - s * imag[kNext];
+        t2 = s * real[kNext] + c * imag[kNext];
+        real[kNext] = real[k] - t1;
+        imag[kNext] = imag[k] - t2;
+        real[k] += t1;
+        imag[k] += t2;
       }
     }
   }
 
   // Normalize
+  const invN = 1 / n;
   for (i = 0; i < n; i++) {
-    real[i] = real[i] / n;
-    imag[i] = imag[i] / n;
+    real[i] *= invN;
+    imag[i] *= invN;
   }
 }
 
@@ -64,7 +115,6 @@ export function generateGraphicEqImpulseResponse(bands: EqBand[], sampleRate: nu
   }
 
   // 1. Build PCHIP Spline from Graphic EQ Bands
-  // Sort bands just in case
   const sortedBands = [...bands].sort((a, b) => a.frequency - b.frequency);
   const freqs = sortedBands.map(b => b.frequency);
   const gains = sortedBands.map(b => b.gain);
@@ -87,24 +137,21 @@ export function generateGraphicEqImpulseResponse(bands: EqBand[], sampleRate: nu
   const imag = new Float32Array(N);
   
   const df = sampleRate / N;
+  const halfN = N / 2;
 
-  for (let i = 0; i <= N / 2; i++) {
+  for (let i = 0; i <= halfN; i++) {
     const freq = i * df;
-    let gainDb = 0;
-    if (freq < 20) {
-      gainDb = spline(Math.log2(20)); // clamp to 20Hz
-    } else if (freq > 20000) {
-      gainDb = spline(Math.log2(20000)); // clamp to 20kHz
-    } else {
-      gainDb = spline(Math.log2(freq));
-    }
+    const gainDb = freq < 20
+      ? spline(Math.log2(20))
+      : freq > 20000
+        ? spline(Math.log2(20000))
+        : spline(Math.log2(freq));
     
-    const magLinear = Math.pow(10, gainDb / 20);
-    real[i] = magLinear;
+    real[i] = Math.pow(10, gainDb / 20);
   }
 
   // 3. Mirror the spectrum (Hermitian symmetry for real-valued time signal)
-  for (let i = 1; i < N / 2; i++) {
+  for (let i = 1; i < halfN; i++) {
     real[N - i] = real[i];
   }
   // imag remains 0 for a zero-phase filter
@@ -114,18 +161,15 @@ export function generateGraphicEqImpulseResponse(bands: EqBand[], sampleRate: nu
 
   // 5. Circular shift by N/2 to make it causal (center peak at N/2)
   const ir = new Float32Array(N);
-  const halfN = N / 2;
   for (let i = 0; i < halfN; i++) {
     ir[i + halfN] = real[i];
     ir[i] = real[i + halfN];
   }
 
-  // 6. Apply Blackman-Harris window to smooth edges
+  // 6. Apply precomputed Blackman-Harris window to smooth edges
+  const window = getBlackmanHarrisWindow(N);
   for (let i = 0; i < N; i++) {
-    const w = 0.35875 - 0.48829 * Math.cos((2 * Math.PI * i) / (N - 1)) 
-            + 0.14128 * Math.cos((4 * Math.PI * i) / (N - 1)) 
-            - 0.01168 * Math.cos((6 * Math.PI * i) / (N - 1));
-    ir[i] *= w;
+    ir[i] *= window[i];
   }
 
   return ir;

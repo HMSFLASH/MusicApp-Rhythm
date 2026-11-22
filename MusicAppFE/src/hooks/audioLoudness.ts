@@ -74,36 +74,64 @@ const createHighShelfCoefficients = (
   };
 };
 
-const applyBiquad = (input: Float32Array, coefficients: BiquadCoefficients) => {
-  const output = new Float32Array(input.length);
-  let x1 = 0;
-  let x2 = 0;
-  let y1 = 0;
-  let y2 = 0;
-
-  for (let i = 0; i < input.length; i += 1) {
-    const x0 = input[i] || 0;
-    const y0 =
-      coefficients.b0 * x0 +
-      coefficients.b1 * x1 +
-      coefficients.b2 * x2 -
-      coefficients.a1 * y1 -
-      coefficients.a2 * y2;
-
-    output[i] = y0;
-    x2 = x1;
-    x1 = x0;
-    y2 = y1;
-    y1 = y0;
-  }
-
-  return output;
-};
-
-const createKWeightedChannel = (channel: Float32Array, sampleRate: number) => {
+// Combined single-pass dual-biquad cascade (Shelf + Highpass) with direct peak tracking
+const processKWeightedChannelAndPeak = (
+  source: Float32Array,
+  sampleRate: number
+): { filtered: Float32Array; peak: number } => {
   const shelf = createHighShelfCoefficients(sampleRate, 1681.974, 4);
   const highpass = createHighpassCoefficients(sampleRate, 38, 0.5);
-  return applyBiquad(applyBiquad(channel, shelf), highpass);
+
+  const len = source.length;
+  const output = new Float32Array(len);
+
+  let sx1 = 0;
+  let sx2 = 0;
+  let sy1 = 0;
+  let sy2 = 0;
+
+  let hx1 = 0;
+  let hx2 = 0;
+  let hy1 = 0;
+  let hy2 = 0;
+
+  let peak = 0;
+
+  const sb0 = shelf.b0;
+  const sb1 = shelf.b1;
+  const sb2 = shelf.b2;
+  const sa1 = shelf.a1;
+  const sa2 = shelf.a2;
+
+  const hb0 = highpass.b0;
+  const hb1 = highpass.b1;
+  const hb2 = highpass.b2;
+  const ha1 = highpass.a1;
+  const ha2 = highpass.a2;
+
+  for (let i = 0; i < len; i += 1) {
+    const x0 = source[i] || 0;
+    const absX = Math.abs(x0);
+    if (absX > peak) peak = absX;
+
+    // Stage 1: High shelf filter
+    const yShelf = sb0 * x0 + sb1 * sx1 + sb2 * sx2 - sa1 * sy1 - sa2 * sy2;
+    sx2 = sx1;
+    sx1 = x0;
+    sy2 = sy1;
+    sy1 = yShelf;
+
+    // Stage 2: Highpass filter (cascaded from Stage 1 output)
+    const yHp = hb0 * yShelf + hb1 * hx1 + hb2 * hx2 - ha1 * hy1 - ha2 * hy2;
+    hx2 = hx1;
+    hx1 = yShelf;
+    hy2 = hy1;
+    hy1 = yHp;
+
+    output[i] = yHp;
+  }
+
+  return { filtered: output, peak };
 };
 
 export const measureLoudness = (audioBuffer: AudioBuffer): LoudnessMeasurement => {
@@ -113,17 +141,23 @@ export const measureLoudness = (audioBuffer: AudioBuffer): LoudnessMeasurement =
   const blockSize = Math.max(1, Math.round(sampleRate * BLOCK_SECONDS));
   const stepSize = Math.max(1, Math.round(blockSize * (1 - BLOCK_OVERLAP)));
   const blockEnergies: number[] = [];
-  const weightedChannels: Float32Array[] = [];
+  const cumEnergies: Float64Array[] = [];
   let samplePeak = 0;
 
   for (let channelIndex = 0; channelIndex < channelCount; channelIndex += 1) {
     const source = audioBuffer.getChannelData(channelIndex);
+    const { filtered, peak } = processKWeightedChannelAndPeak(source, sampleRate);
+    if (peak > samplePeak) samplePeak = peak;
 
-    for (let i = 0; i < source.length; i += 1) {
-      samplePeak = Math.max(samplePeak, Math.abs(source[i] || 0));
+    // Single-pass cumulative square energy (prefix sum) to allow O(1) block energy calculation
+    const cum = new Float64Array(length + 1);
+    let acc = 0;
+    for (let i = 0; i < length; i += 1) {
+      const s = filtered[i] || 0;
+      acc += s * s;
+      cum[i + 1] = acc;
     }
-
-    weightedChannels.push(createKWeightedChannel(source, sampleRate));
+    cumEnergies.push(cum);
   }
 
   for (let start = 0; start < length; start += stepSize) {
@@ -132,15 +166,9 @@ export const measureLoudness = (audioBuffer: AudioBuffer): LoudnessMeasurement =
     if (actualBlockSize <= 0) continue;
 
     let blockEnergy = 0;
-    for (let channelIndex = 0; channelIndex < weightedChannels.length; channelIndex += 1) {
-      const data = weightedChannels[channelIndex];
-      let sumSquares = 0;
-
-      for (let i = start; i < end; i += 1) {
-        const sample = data[i] || 0;
-        sumSquares += sample * sample;
-      }
-
+    for (let channelIndex = 0; channelIndex < cumEnergies.length; channelIndex += 1) {
+      const cum = cumEnergies[channelIndex];
+      const sumSquares = cum[end] - cum[start];
       blockEnergy += (CHANNEL_WEIGHTS[channelIndex] || 1) * (sumSquares / actualBlockSize);
     }
 

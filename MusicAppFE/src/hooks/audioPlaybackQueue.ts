@@ -9,7 +9,7 @@ export const getCurrentTrackIndex = (currentTrack: Track | null, queue: Track[])
 export const getAdjacentTrackWindow = (
   currentId: string,
   currentQueue: Track[],
-  options: { wrap?: boolean } = {}
+  options: { wrap?: boolean; currentIndexHint?: number } = {}
 ) => {
   const allowedIds = new Set<string>();
   const currentTrackId = String(currentId);
@@ -17,7 +17,12 @@ export const getAdjacentTrackWindow = (
 
   let prev1: Track | undefined;
   let next1: Track | undefined;
-  const idx = currentQueue.findIndex((track) => String(track.id) === currentTrackId);
+  const idx = options.currentIndexHint !== undefined &&
+    options.currentIndexHint >= 0 &&
+    options.currentIndexHint < currentQueue.length &&
+    String(currentQueue[options.currentIndexHint].id) === currentTrackId
+      ? options.currentIndexHint
+      : currentQueue.findIndex((track) => String(track.id) === currentTrackId);
 
   if (idx !== -1) {
     prev1 = currentQueue[idx - 1];
